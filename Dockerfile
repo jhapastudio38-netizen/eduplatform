@@ -12,6 +12,8 @@ RUN bun install --frozen-lockfile
 
 # Copy source and build
 COPY . .
+# Generate Prisma client BEFORE building Next.js
+RUN bun run db:generate
 RUN bun run build
 
 # ─── Runtime stage ──────────────────────────────────────────────────────────
