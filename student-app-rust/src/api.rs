@@ -17,7 +17,7 @@ const STORAGE_KEY: &str = "eduplatform-student-token";
 pub struct ApiClient {
     http: Client,
     base_url: String,
-    token: parking_lot::RwLock<Option<String>>,
+    token: std::sync::Arc<parking_lot::RwLock<Option<String>>>,
 }
 
 impl ApiClient {
@@ -31,7 +31,7 @@ impl ApiClient {
         Self {
             http,
             base_url: base_url.into(),
-            token: parking_lot::RwLock::new(None),
+            token: std::sync::Arc::new(parking_lot::RwLock::new(None)),
         }
     }
 
@@ -180,7 +180,12 @@ impl<'a> RequestBuilder<'a> {
     }
 
     async fn send_empty(self) -> Result<()> {
-        self.send::<serde_json::Value>().await?;
+        let resp = self.send_raw().await?;
+        if !resp.status().is_success() {
+            let status = resp.status();
+            let text = resp.text().await.unwrap_or_default();
+            return Err(anyhow!("HTTP {status}: {text}"));
+        }
         Ok(())
     }
 
