@@ -1,0 +1,141 @@
+// QAScreen — list questions, post a new one.
+
+import { Theme, QAQuestionItem } from "../app.slint";
+import { GlassCard, AccentButton, GhostButton, GlassTextInput, SectionTitle } from "../components/glass.slint";
+import { TouchArea, ScrollView } from "std-widgets.slint";
+
+export component QAScreen inherits Rectangle {
+    width: 100%;
+    height: 100%;
+    background: transparent;
+
+    in property <[QAQuestionItem]> questions: [];
+    callback load-qa();
+    callback post-question(string, string);
+    callback back();
+
+    property <bool> show-form: false;
+    property <string> new-title: "";
+    property <string> new-body: "";
+
+    ScrollView {
+        width: 100%;
+        height: 100%;
+
+        VerticalLayout {
+            padding: 20px;
+            padding-bottom: 110px;
+            spacing: 16px;
+
+            HorizontalLayout {
+                spacing: 12px;
+                SectionTitle {
+                    text: "Q&A";
+                    vertical-alignment: center;
+                }
+                Rectangle { horizontal-stretch: 1; }
+                AccentButton {
+                    text: "+ Ask";
+                    width: 80px;
+                    height: 40px;
+                    font-size: 13px;
+                    clicked: () => { root.show-form = !root.show-form; }
+                }
+            }
+
+            // ─── New question form ──────────────────────────────────────
+            if root.show-form {
+                GlassCard {
+                    VerticalLayout {
+                        padding: 18px;
+                        spacing: 12px;
+
+                        Text {
+                            text: "Ask a question";
+                            color: Theme.text-primary;
+                            font-size: 16px;
+                            font-weight: 700;
+                        }
+
+                        GlassTextInput {
+                            placeholder: "Question title";
+                            text <=> root.new-title;
+                        }
+
+                        GlassTextInput {
+                            placeholder: "Add more details";
+                            text <=> root.new-body;
+                            height: 80px;
+                        }
+
+                        HorizontalLayout {
+                            spacing: 8px;
+                            AccentButton {
+                                text: "Post";
+                                disabled: root.new-title == "" || root.new-body == "";
+                                clicked: () => {
+                                    root.post-question(root.new-title, root.new-body);
+                                    root.new-title = "";
+                                    root.new-body = "";
+                                    root.show-form = false;
+                                }
+                            }
+                            GhostButton {
+                                text: "Cancel";
+                                clicked: () => { root.show-form = false; }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // ─── Question list ──────────────────────────────────────────
+            if root.questions.length == 0 {
+                GlassCard {
+                    height: 100px;
+                    VerticalLayout {
+                        alignment: center;
+                        Text {
+                            text: "No questions yet. Be the first to ask!";
+                            color: Theme.text-muted;
+                            font-size: 14px;
+                            horizontal-alignment: center;
+                        }
+                    }
+                }
+            }
+
+            for q[i] in root.questions : GlassCard {
+                height: 100px;
+                VerticalLayout {
+                    padding: 16px;
+                    spacing: 6px;
+
+                    Text {
+                        text: q.title;
+                        color: Theme.text-primary;
+                        font-size: 15px;
+                        font-weight: 600;
+                        overflow: elide;
+                        width: parent.width;
+                    }
+                    Text {
+                        text: q.body;
+                        color: Theme.text-secondary;
+                        font-size: 13px;
+                        overflow: elide;
+                        width: parent.width;
+                    }
+                    HorizontalLayout {
+                        spacing: 12px;
+                        Text {
+                            text: "💬 " + q.answers-count + " answers";
+                            color: Theme.text-muted;
+                            font-size: 11px;
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

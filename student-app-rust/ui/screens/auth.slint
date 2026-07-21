@@ -1,0 +1,167 @@
+// AuthScreen — multi-step animated login.
+//
+// Step 1: contact entry (email or phone)
+// Step 2: OTP entry (6 digits)
+// Step 3: success → invokes show-otp (parent navigates to home)
+//
+// Glassy aesthetic: frosted glass card floating over the deep navy background,
+// with the EduPlatform logo on top.
+
+import { Theme, Screen } from "../app.slint";
+import { GlassCard, AccentButton, GhostButton, GlassTextInput, OTPInput, SectionTitle, Subtitle } from "../components/glass.slint";
+import { TouchArea } from "std-widgets.slint";
+
+export component AuthScreen inherits Rectangle {
+    width: 100%;
+    height: 100%;
+    background: transparent;
+
+    in property <bool> boot-loading: false;
+    in property <string> boot-error: "";
+    callback request-otp(string);
+    callback verify-otp(string);
+    callback show-otp();
+
+    property <int> step: 1;
+    property <string> contact: "";
+    property <string> otp: "";
+
+    ScrollView {
+        width: 100%;
+        height: 100%;
+
+        VerticalLayout {
+            alignment: center;
+            padding: 24px;
+            spacing: 24px;
+
+            // ─── Logo header ─────────────────────────────────────────────
+            VerticalLayout {
+                alignment: center;
+                spacing: 12px;
+
+                Rectangle {
+                    width: 72px;
+                    height: 72px;
+                    radius: 20px;
+                    background: @linear-gradient(135deg, #10B981 0%, #0D9488 100%);
+                    drop-shadow-blur: 20px;
+                    drop-shadow-color: rgba(16, 185, 129, 0.4);
+                    drop-shadow-offset-y: 8px;
+                    horizontal-stretch: 0;
+
+                    Text {
+                        text: "🎓";
+                        font-size: 36px;
+                        horizontal-alignment: center;
+                        vertical-alignment: center;
+                        x: (parent.width - self.width) / 2;
+                        y: (parent.height - self.height) / 2;
+                    }
+                }
+
+                Text {
+                    text: "EduPlatform";
+                    color: Theme.text-primary;
+                    font-size: 28px;
+                    font-weight: 800;
+                    horizontal-alignment: center;
+                    letter-spacing: -0.5px;
+                }
+
+                Text {
+                    text: "One app. Endless learning.";
+                    color: Theme.text-secondary;
+                    font-size: 14px;
+                    horizontal-alignment: center;
+                }
+            }
+
+            // ─── Glass card with form ────────────────────────────────────
+            GlassCard {
+                VerticalLayout {
+                    padding: 24px;
+                    spacing: 18px;
+
+                    Text {
+                        text: root.step == 1 ? "Sign in or sign up" : "Verify it's you";
+                        color: Theme.text-primary;
+                        font-size: 22px;
+                        font-weight: 700;
+                    }
+                    Text {
+                        text: root.step == 1
+                            ? "Use your email or phone number — we'll send a one-time code."
+                            : "We sent a 6-digit code to " + root.contact;
+                        color: Theme.text-secondary;
+                        font-size: 14px;
+                        wrap: word-wrap;
+                    }
+
+                    // ─── Step 1: contact entry ───────────────────────────
+                    if root.step == 1 {
+                        VerticalLayout {
+                            spacing: 12px;
+
+                            GlassTextInput {
+                                placeholder: "you@gmail.com  or  +97798XXXXXXXX";
+                                text <=> root.contact;
+                            }
+
+                            AccentButton {
+                                text: "Send code →";
+                                disabled: root.contact == "" || root.boot-loading;
+                                clicked: () => { root.request-otp(root.contact); root.step = 2; }
+                            }
+
+                            GhostButton {
+                                text: "I already have an account";
+                                clicked: () => { root.step = 2; }
+                            }
+                        }
+                    }
+
+                    // ─── Step 2: OTP entry ───────────────────────────────
+                    if root.step == 2 {
+                        VerticalLayout {
+                            spacing: 16px;
+
+                            OTPInput {
+                                value <=> root.otp;
+                            }
+
+                            AccentButton {
+                                text: "Verify & continue";
+                                disabled: root.otp.length < 6 || root.boot-loading;
+                                clicked: () => { root.verify-otp(root.otp); }
+                            }
+
+                            HorizontalLayout {
+                                spacing: 8px;
+
+                                GhostButton {
+                                    text: "← Back";
+                                    clicked: () => { root.step = 1; }
+                                }
+
+                                GhostButton {
+                                    text: "Resend code";
+                                    clicked: () => { root.request-otp(root.contact); }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // ─── Terms ──────────────────────────────────────────────────
+            Text {
+                text: "By continuing you agree to our Terms and Privacy Policy.";
+                color: Theme.text-muted;
+                font-size: 12px;
+                horizontal-alignment: center;
+                width: 100%;
+            }
+        }
+    }
+}

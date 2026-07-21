@@ -1,0 +1,126 @@
+// TestResultScreen — score card after submission.
+
+import { Theme, TestResultItem } from "../app.slint";
+import { GlassCard, AccentButton } from "../components/glass.slint";
+
+export component TestResultScreen inherits Rectangle {
+    width: 100%;
+    height: 100%;
+    background: transparent;
+
+    in property <TestResultItem> result: { score: 0, max-score: 0, graded: false };
+    in property <int> pass-score: 40;
+    callback done();
+
+    property <int> pct: root.result.max-score > 0 ? (root.result.score * 100) / root.result.max-score : 0;
+    property <bool> passed: root.pct >= root.pass-score;
+
+    VerticalLayout {
+        alignment: center;
+        padding: 32px;
+        spacing: 24px;
+
+        // ─── Score circle ──────────────────────────────────────────────
+        Rectangle {
+            width: 160px;
+            height: 160px;
+            radius: self.width / 2;
+            background: root.passed ? rgba(16, 185, 129, 0.15) : rgba(239, 68, 68, 0.15);
+            border-width: 3px;
+            border-color: root.passed ? Theme.accent : Theme.danger;
+            horizontal-stretch: 0;
+
+            VerticalLayout {
+                alignment: center;
+                spacing: 4px;
+
+                Text {
+                    text: root.passed ? "✓" : "✗";
+                    color: root.passed ? Theme.accent : Theme.danger;
+                    font-size: 48px;
+                    font-weight: 800;
+                    horizontal-alignment: center;
+                }
+                Text {
+                    text: root.pct + "%";
+                    color: Theme.text-primary;
+                    font-size: 28px;
+                    font-weight: 800;
+                    horizontal-alignment: center;
+                }
+            }
+        }
+
+        // ─── Result text ──────────────────────────────────────────────
+        VerticalLayout {
+            alignment: center;
+            spacing: 6px;
+
+            Text {
+                text: root.passed ? "Passed!" : "Try again";
+                color: Theme.text-primary;
+                font-size: 26px;
+                font-weight: 800;
+                horizontal-alignment: center;
+            }
+            Text {
+                text: "You scored " + root.result.score + " / " + root.result.max-score + " points";
+                color: Theme.text-secondary;
+                font-size: 14px;
+                horizontal-alignment: center;
+            }
+            if !root.result.graded {
+                Text {
+                    text: "Subjective answers will be graded by your teacher.";
+                    color: Theme.text-muted;
+                    font-size: 12px;
+                    horizontal-alignment: center;
+                }
+            }
+        }
+
+        // ─── Score breakdown ──────────────────────────────────────────
+        GlassCard {
+            height: 100px;
+            VerticalLayout {
+                padding: 18px;
+                spacing: 6px;
+
+                HorizontalLayout {
+                    Text {
+                        text: "Pass mark";
+                        color: Theme.text-secondary;
+                        font-size: 13px;
+                    }
+                    Rectangle { horizontal-stretch: 1; }
+                    Text {
+                        text: root.pass-score + "%";
+                        color: Theme.text-primary;
+                        font-size: 14px;
+                        font-weight: 600;
+                    }
+                }
+                HorizontalLayout {
+                    Text {
+                        text: "Your score";
+                        color: Theme.text-secondary;
+                        font-size: 13px;
+                    }
+                    Rectangle { horizontal-stretch: 1; }
+                    Text {
+                        text: root.pct + "%";
+                        color: root.passed ? Theme.accent : Theme.danger;
+                        font-size: 14px;
+                        font-weight: 700;
+                    }
+                }
+            }
+        }
+
+        // ─── Done button ──────────────────────────────────────────────
+        AccentButton {
+            text: "Back to tests";
+            clicked: () => { root.done(); }
+        }
+    }
+}

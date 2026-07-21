@@ -1,0 +1,16 @@
+/target
+/android
+/ios
+/keystore
+*.jks
+*.keystore
+.env
+.env.local
+
+# macOS
+.DS_Store
+
+# IDEs
+.vscode/
+.idea/
+*.iml

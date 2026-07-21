@@ -1,0 +1,121 @@
+// TestsScreen — list available tests & exams.
+
+import { Theme, TestItem } from "../app.slint";
+import { GlassCard, GhostButton, SectionTitle } from "../components/glass.slint";
+import { TouchArea, ScrollView } from "std-widgets.slint";
+
+export component TestsScreen inherits Rectangle {
+    width: 100%;
+    height: 100%;
+    background: transparent;
+
+    in property <[TestItem]> tests: [];
+    callback load-tests();
+    callback start-test(string);
+    callback back();
+
+    ScrollView {
+        width: 100%;
+        height: 100%;
+
+        VerticalLayout {
+            padding: 20px;
+            padding-bottom: 110px;
+            spacing: 16px;
+
+            SectionTitle { text: "Tests & Exams"; }
+
+            Text {
+                text: "Practice quizzes and graded exams.";
+                color: Theme.text-secondary;
+                font-size: 14px;
+            }
+
+            if root.tests.length == 0 {
+                GlassCard {
+                    height: 100px;
+                    VerticalLayout {
+                        alignment: center;
+                        Text {
+                            text: "No tests available right now.";
+                            color: Theme.text-muted;
+                            font-size: 14px;
+                            horizontal-alignment: center;
+                        }
+                    }
+                }
+            }
+
+            for test[i] in root.tests : GlassCard {
+                height: 140px;
+                ta := TouchArea {
+                    mouse-cursor: ta.has-hover ? pointer : default;
+                    clicked: () => { root.start-test(test.id); }
+                }
+                VerticalLayout {
+                    padding: 18px;
+                    spacing: 8px;
+
+                    HorizontalLayout {
+                        spacing: 8px;
+
+                        Text {
+                            text: test.title;
+                            color: Theme.text-primary;
+                            font-size: 17px;
+                            font-weight: 700;
+                            vertical-alignment: center;
+                        }
+                        Rectangle { horizontal-stretch: 1; }
+                        Rectangle {
+                            width: 56px;
+                            height: 24px;
+                            radius: 12px;
+                            background: test.is-exam ? rgba(239, 68, 68, 0.2) : rgba(59, 130, 246, 0.2);
+                            Text {
+                                text: test.is-exam ? "EXAM" : "PRACTICE";
+                                color: test.is-exam ? #FCA5A5 : #93C5FD;
+                                font-size: 10px;
+                                font-weight: 700;
+                                x: (parent.width - self.width) / 2;
+                                y: (parent.height - self.height) / 2;
+                            }
+                        }
+                    }
+
+                    Text {
+                        text: test.description;
+                        color: Theme.text-secondary;
+                        font-size: 13px;
+                        wrap: word-wrap;
+                        width: parent.width;
+                    }
+
+                    // Spacer
+                    Rectangle { vertical-stretch: 1; }
+
+                    HorizontalLayout {
+                        spacing: 16px;
+                        Text {
+                            text: "⏱ " + test.duration-min + " min";
+                            color: Theme.text-muted;
+                            font-size: 12px;
+                        }
+                        Text {
+                            text: "🏆 Pass: " + test.pass-score + "%";
+                            color: Theme.text-muted;
+                            font-size: 12px;
+                        }
+                        if test.question-count > 0 {
+                            Text {
+                                text: "📝 " + test.question-count + " Q";
+                                color: Theme.text-muted;
+                                font-size: 12px;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

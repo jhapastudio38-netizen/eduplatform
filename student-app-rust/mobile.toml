@@ -1,0 +1,47 @@
+{
+  "package-name": "eduplatform-student",
+  "android": {
+    "package-name": "app.eduplatform.student",
+    "build-resources": {
+      "keystore-path": "../keystore/eduplatform.jks",
+      "keystore-password": "${EDUPLATFORM_KEYSTORE_PASSWORD}",
+      "keystore-alias": "eduplatform",
+      "keystore-alias-password": "${EDUPLATFORM_KEYSTORE_PASSWORD}"
+    },
+    "sdk-versions": {
+      "min-sdk-version": 24,
+      "target-sdk-version": 34,
+      "compile-sdk-version": 34
+    },
+    "app-attributes": {
+      "label": "EduPlatform",
+      "theme": "@style/Theme.EduPlatform",
+      "orientation": "portrait"
+    },
+    "app-permissions": [
+      "android.permission.INTERNET",
+      "android.permission.ACCESS_NETWORK_STATE"
+    ]
+  },
+  "ios": {
+    "bundle-identifier": "app.eduplatform.student",
+    "bundle-name": "EduPlatform",
+    "build-resources": {
+      "development-team": "${APPLE_DEVELOPMENT_TEAM}",
+      "provisioning-profile-specifier": "${APPLE_PROVISIONING_PROFILE}",
+      "code-sign-identity": "${APPLE_CODE_SIGN_IDENTITY}"
+    },
+    "app-attributes": {
+      "uilaunchscreen": {
+        "uicolorname": "LaunchScreenBackgroundColor"
+      },
+      "uisupportedinterfaceorientations": ["uiinterfaceorientationportrait"],
+      "nsapptransportsecurity": {
+        "nsallowsarbitraryloads": false
+      },
+      "nsphotolibraryusagedescription": "EduPlatform needs photo library access for profile pictures.",
+      "nscamerausagedescription": "EduPlatform needs camera access for profile pictures."
+    },
+    "deployment-target": "14.0"
+  }
+}
