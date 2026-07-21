@@ -37,7 +37,7 @@ pub fn android_main(app: slint::android::AndroidApp) {
 
     // Initialize Slint's Android backend with the AndroidApp handle.
     // This MUST happen before any Slint component is created.
-    slint::android::init_app(app);
+    slint::android::init(app);
 
     // Boot the tokio runtime for async API calls
     let runtime = tokio::runtime::Builder::new_multi_thread()
