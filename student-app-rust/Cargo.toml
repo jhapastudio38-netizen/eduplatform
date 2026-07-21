@@ -12,9 +12,12 @@ path = "src/main.rs"
 
 [features]
 default = ["desktop"]
+# Desktop: winit window + skia (OpenGL) — best for Linux/macOS/Windows dev
 desktop = ["slint/backend-winit", "slint/renderer-winit-skia-opengl"]
+# Android: android-activity backend + software renderer (most reliable for cross-compile)
 android = ["slint/backend-android-activity-05", "slint/renderer-software"]
-ios = ["slint/backend-winit", "slint/renderer-skia-opengl"]
+# iOS: winit + femtovg (OpenGL ES) — skia has compile issues on iOS in 1.17
+ios = ["slint/backend-winit", "slint/renderer-femtovg"]
 
 [dependencies]
 slint = { version = "1.7", default-features = false, features = ["std", "compat-1-2"] }
