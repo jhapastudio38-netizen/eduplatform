@@ -118,7 +118,7 @@ export component App inherits Window {
 
             Button {
                 text: "Verify and continue";
-                enabled: root.otp.length >= 6;
+                enabled: root.otp.character-count >= 6;
                 clicked => {
                     root.verify-otp(root.otp);
                 }
