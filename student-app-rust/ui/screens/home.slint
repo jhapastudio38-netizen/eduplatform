@@ -154,8 +154,7 @@ export component HomeScreen inherits Rectangle {
                 Rectangle { horizontal-stretch: 1; }
             }
 
-            if root.subjects.length == 0 {
-                GlassCard {
+            if root.subjects.length == 0 : GlassCard {
                     height: 80px;
                     VerticalLayout {
                         alignment: center;

@@ -50,8 +50,7 @@ export component QAScreen inherits Rectangle {
             }
 
             // ─── New question form ──────────────────────────────────────
-            if root.show-form {
-                GlassCard {
+            if root.show-form : GlassCard {
                     VerticalLayout {
                         padding: 18px;
                         spacing: 12px;
@@ -97,8 +96,7 @@ export component QAScreen inherits Rectangle {
             }
 
             // ─── Question list ──────────────────────────────────────────
-            if root.questions.length == 0 {
-                GlassCard {
+            if root.questions.length == 0 : GlassCard {
                     height: 100px;
                     VerticalLayout {
                         alignment: center;

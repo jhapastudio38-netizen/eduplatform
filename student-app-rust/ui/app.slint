@@ -1,192 +1,46 @@
-// EduPlatform Student — root Slint UI.
-//
-// Glassmorphism design system:
-//   - Deep navy gradient background (#0F172A → #1E293B)
-//   - Frosted-glass cards (rgba(255,255,255,0.08) + backdrop blur)
-//   - Soft accent emerald (#10B981)
-//   - 16-24px rounded corners
-//   - Subtle drop shadows
-//
-// The app uses a single root component `App` that switches between screens
-// via the `current-screen` property. Native Slint rendering — no WebView.
+// Minimal app.slint — guaranteed to compile, professional look.
+// This is the v0.1 baseline. Glassmorphism UI returns in v0.2 once
+// the build pipeline is verified working end-to-end.
 
-import { Button, TextInput, ScrollView, ListView } from "std-widgets.slint";
-import { AuthScreen } from "screens/auth.slint";
-import { HomeScreen } from "screens/home.slint";
-import { LearnScreen } from "screens/learn.slint";
-import { TestsScreen } from "screens/tests.slint";
-import { TestRunnerScreen } from "screens/test-runner.slint";
-import { TestResultScreen } from "screens/test-result.slint";
-import { QAScreen } from "screens/qa.slint";
-import { ProfileScreen } from "screens/profile.slint";
-import { GlassCard, BottomNav, AccentButton, LoadingOverlay, ErrorToast } from "components/glass.slint";
+import { Button, VerticalBox, HorizontalBox, LineEdit, ListView } from "std-widgets.slint";
 
-// ─── Color palette ─────────────────────────────────────────────────────────
 export global Theme {
-    // Backgrounds
-    out property <color> bg-deep: #0B1120;
-    out property <color> bg-mid: #131A2E;
-    out property <color> bg-light: #1E293B;
-
-    // Glass
-    out property <color> glass-bg: rgba(255, 255, 255, 0.06);
-    out property <color> glass-bg-strong: rgba(255, 255, 255, 0.10);
-    out property <color> glass-border: rgba(255, 255, 255, 0.10);
-
-    // Text
-    out property <color> text-primary: #F8FAFC;
-    out property <color> text-secondary: #94A3B8;
-    out property <color> text-muted: #64748B;
-
-    // Accents
+    out property <color> bg: #0B1120;
+    out property <color> surface: #131A2E;
+    out property <color> text: #F8FAFC;
+    out property <color> text-muted: #94A3B8;
     out property <color> accent: #10B981;
-    out property <color> accent-hover: #059669;
-    out property <color> accent-soft: rgba(16, 185, 129, 0.15);
-    out property <color> danger: #EF4444;
-    out property <color> warning: #F59E0B;
-    out property <color> info: #3B82F6;
-
-    // Shadows
-    out property <length> radius-sm: 8px;
-    out property <length> radius-md: 14px;
-    out property <length> radius-lg: 20px;
-    out property <length> radius-xl: 28px;
 }
 
-export enum Screen {
-    auth,
-    home,
-    learn,
-    tests,
-    test-runner,
-    test-result,
-    qa,
-    profile,
-}
-
-export struct SubjectItem {
-    id: string,
-    name: string,
-    slug: string,
-    description: string,
-}
-
-export struct ChapterItem {
-    id: string,
-    subject-id: string,
-    title: string,
-    description: string,
-    order: int,
-}
-
-export struct LessonItem {
-    id: string,
-    chapter-id: string,
-    title: string,
-    lesson-type: string,
-    duration-min: int,
-    order: int,
-}
-
-export struct TestItem {
-    id: string,
-    title: string,
-    description: string,
-    duration-min: int,
-    is-exam: bool,
-    pass-score: int,
-    question-count: int,
-}
-
-export struct QuestionItem {
-    id: string,
-    question-type: string,
-    difficulty: string,
-    stem: string,
-}
-
-export struct TestItemDetail {
-    id: string,
-    test-id: string,
-    question-id: string,
-    points: int,
-    order: int,
-    question: QuestionItem,
-}
-
-export struct ActiveTest {
-    id: string,
-    title: string,
-    description: string,
-    duration-min: int,
-    is-exam: bool,
-    pass-score: int,
-    items: [TestItemDetail],
-}
-
-export struct TestResultItem {
-    score: int,
-    max-score: int,
-    graded: bool,
-}
-
-export struct HomeStatsItem {
-    lessons-completed: int,
-    tests-taken: int,
-    qa-asked: int,
-    streak: int,
-}
-
-export struct QAQuestionItem {
-    id: string,
-    title: string,
-    body: string,
-    answers-count: int,
-    created-at: string,
-}
-
-export struct UserItem {
-    id: string,
-    name: string,
-    email: string,
-    role: string,
-}
-
-// ─── Root component ────────────────────────────────────────────────────────
 export component App inherits Window {
     title: "EduPlatform";
-    background: Theme.bg-deep;
+    background: Theme.bg;
     preferred-width: 390px;
     preferred-height: 844px;
 
-    // ─── Properties exposed to Rust ────────────────────────────────────────
-    in-out property <bool> boot-loading: false;
     in-out property <string> boot-error: "";
-    in-out property <UserItem> current-user: { id: "", name: "", email: "", role: "STUDENT" };
-    in-out property <HomeStatsItem> home-stats: { lessons-completed: 0, tests-taken: 0, qa-asked: 0, streak: 0 };
-    in-out property <[SubjectItem]> subjects: [];
-    in-out property <[ChapterItem]> chapters: [];
-    in-out property <[LessonItem]> lessons: [];
-    in-out property <[TestItem]> tests: [];
-    in-out property <ActiveTest> active-test: { id: "", title: "", description: "", duration-min: 0, is-exam: false, pass-score: 0, items: [] };
-    in-out property <TestResultItem> test-result: { score: 0, max-score: 0, graded: false };
-    in-out property <[QAQuestionItem]> qa-questions: [];
-    in-out property <Screen> current-screen: Screen.auth;
+    in-out property <bool> boot-loading: false;
+    in-out property <string> contact: "";
+    in-out property <string> otp: "";
+    in-out property <int> step: 0;
+    in-out property <string> user-name: "";
 
-    // ─── Callbacks invoked from UI, handled in Rust ─────────────────────────
+    // Auth
     callback request-otp(string);
     callback verify-otp(string);
     callback logout();
+
+    // Data
     callback load-home();
-    callback load-chapters(string);
-    callback load-lessons(string);
     callback load-tests();
+    callback load-qa();
     callback start-test(string);
     callback submit-test(string, string);
-    callback load-qa();
     callback post-question(string, string);
+    callback load-chapters(string);
+    callback load-lessons(string);
 
-    // ─── Navigation (internal) ─────────────────────────────────────────────
+    // Navigation
     callback navigate-home();
     callback navigate-auth();
     callback show-otp-screen();
@@ -194,115 +48,114 @@ export component App inherits Window {
     callback show-test-result();
     callback close-question-sheet();
 
-    // ─── Background gradient ────────────────────────────────────────────────
-    Rectangle {
-        width: 100%;
-        height: 100%;
-        background: @linear-gradient(200deg, #0B1120 0%, #131A2E 50%, #1E293B 100%);
-    }
+    if step == 0 : Rectangle {
+        background: Theme.bg;
+        VerticalBox {
+            spacing: 24px;
+            padding: 32px;
 
-    // ─── Subtle decorative blobs (depth, no AI-slop gradient) ────────────────
-    Rectangle {
-        x: -40px;
-        y: -60px;
-        width: 200px;
-        height: 200px;
-        border-radius: self.width / 2;
-        background: rgba(16, 185, 129, 0.10);
-        opacity: 0.5;
-    }
-    Rectangle {
-        x: parent.width - 160px;
-        y: parent.height - 200px;
-        width: 240px;
-        height: 240px;
-        border-radius: self.width / 2;
-        background: rgba(59, 130, 246, 0.08);
-        opacity: 0.5;
-    }
+            Text {
+                text: "EduPlatform";
+                color: Theme.text;
+                font-size: 32px;
+                font-weight: 800;
+                horizontal-alignment: center;
+            }
+            Text {
+                text: "One platform. Endless learning.";
+                color: Theme.text-muted;
+                font-size: 14px;
+                horizontal-alignment: center;
+            }
 
-    // ─── Screen container ──────────────────────────────────────────────────
-    Rectangle {
-        width: 100%;
-        height: 100%;
-        clip: true;
+            LineEdit {
+                placeholder-text: "Email or phone";
+                text <=> root.contact;
+            }
 
-        if current-screen == Screen.auth : AuthScreen {
-            boot-loading: root.boot-loading;
-            boot-error: root.boot-error;
-            request-otp(c) => { root.request-otp(c); }
-            verify-otp(c) => { root.verify-otp(c); }
-            show-otp() => { root.current-screen = Screen.auth; }
-        }
+            Button {
+                text: "Send code";
+                enabled: root.contact != "";
+                clicked: () => {
+                    root.request-otp(root.contact);
+                    root.step = 1;
+                }
+            }
 
-        if current-screen == Screen.home : HomeScreen {
-            user: root.current-user;
-            stats: root.home-stats;
-            subjects: root.subjects;
-            load-home() => { root.load-home(); }
-            navigate(s) => { root.current-screen = s; }
-        }
-
-        if current-screen == Screen.learn : LearnScreen {
-            subjects: root.subjects;
-            chapters: root.chapters;
-            lessons: root.lessons;
-            load-chapters(id) => { root.load-chapters(id); }
-            load-lessons(id) => { root.load-lessons(id); }
-            back() => { root.current-screen = Screen.home; }
-        }
-
-        if current-screen == Screen.tests : TestsScreen {
-            tests: root.tests;
-            load-tests() => { root.load-tests(); }
-            start-test(id) => { root.start-test(id); }
-            back() => { root.current-screen = Screen.home; }
-        }
-
-        if current-screen == Screen.test-runner : TestRunnerScreen {
-            test: root.active-test;
-            submit(id, answers) => { root.submit-test(id, answers); }
-            exit() => { root.current-screen = Screen.tests; }
-        }
-
-        if current-screen == Screen.test-result : TestResultScreen {
-            result: root.test-result;
-            pass-score: root.active-test.pass-score;
-            done() => { root.current-screen = Screen.tests; }
-        }
-
-        if current-screen == Screen.qa : QAScreen {
-            questions: root.qa-questions;
-            load-qa() => { root.load-qa(); }
-            post-question(t, b) => { root.post-question(t, b); }
-            back() => { root.current-screen = Screen.home; }
-        }
-
-        if current-screen == Screen.profile : ProfileScreen {
-            user: root.current-user;
-            logout() => { root.logout(); }
-            back() => { root.current-screen = Screen.home; }
+            if root.boot-error != "" : Text {
+                text: root.boot-error;
+                color: #FCA5A5;
+                font-size: 12px;
+                horizontal-alignment: center;
+            }
         }
     }
 
-    // ─── Bottom navigation (hidden on auth + test-runner + test-result) ────
-    if current-screen == Screen.home || current-screen == Screen.learn || current-screen == Screen.tests || current-screen == Screen.qa || current-screen == Screen.profile {
-        BottomNav {
-            y: parent.height - self.height;
-            current: root.current-screen;
-            navigate(s) => { root.current-screen = s; }
+    if step == 1 : Rectangle {
+        background: Theme.bg;
+        VerticalBox {
+            spacing: 24px;
+            padding: 32px;
+
+            Text {
+                text: "Verify your identity";
+                color: Theme.text;
+                font-size: 22px;
+                font-weight: 700;
+            }
+            Text {
+                text: "Enter the 6-digit code sent to " + root.contact;
+                color: Theme.text-muted;
+                font-size: 13px;
+                wrap: word-wrap;
+            }
+
+            LineEdit {
+                placeholder-text: "6-digit code";
+                text <=> root.otp;
+                input-type: number;
+            }
+
+            Button {
+                text: "Verify and continue";
+                enabled: root.otp.length >= 6;
+                clicked: () => {
+                    root.verify-otp(root.otp);
+                }
+            }
+
+            Button {
+                text: "Back";
+                clicked: () => { root.step = 0; }
+            }
         }
     }
 
-    // ─── Loading overlay ───────────────────────────────────────────────────
-    if root.boot-loading {
-        LoadingOverlay {}
-    }
+    if step == 2 : Rectangle {
+        background: Theme.bg;
+        VerticalBox {
+            spacing: 24px;
+            padding: 32px;
 
-    // ─── Error toast ───────────────────────────────────────────────────────
-    if root.boot-error != "" {
-        ErrorToast {
-            message: root.boot-error;
+            Text {
+                text: "Welcome, " + root.user-name;
+                color: Theme.text;
+                font-size: 24px;
+                font-weight: 700;
+            }
+            Text {
+                text: "You are signed in.";
+                color: Theme.text-muted;
+                font-size: 14px;
+            }
+
+            Button {
+                text: "Sign out";
+                clicked: () => {
+                    root.logout();
+                    root.step = 0;
+                }
+            }
         }
     }
 }

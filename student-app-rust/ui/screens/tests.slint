@@ -38,8 +38,7 @@ export component TestsScreen inherits Rectangle {
                 font-size: 13px;
             }
 
-            if root.tests.length == 0 {
-                GlassCard {
+            if root.tests.length == 0 : GlassCard {
                     height: 100px;
                     VerticalLayout {
                         alignment: center;
@@ -137,8 +136,7 @@ export component TestsScreen inherits Rectangle {
                             }
                         }
                         // Question count
-                        if test.question-count > 0 {
-                            HorizontalLayout {
+                        if test.question-count > 0 : HorizontalLayout {
                                 spacing: 4px;
                                 Icon {
                                     icon-name: "test";

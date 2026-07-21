@@ -92,8 +92,7 @@ export component TestRunnerScreen inherits Rectangle {
         }
 
         // ─── Question card ────────────────────────────────────────────
-        if root.test.items.length > 0 {
-            GlassCard {
+        if root.test.items.length > 0 : GlassCard {
                 vertical-stretch: 1;
                 VerticalLayout {
                     padding: 20px;
@@ -139,8 +138,7 @@ export component TestRunnerScreen inherits Rectangle {
             }
             Rectangle { horizontal-stretch: 1; }
 
-            if root.current < root.test.items.length - 1 {
-                AccentButton {
+            if root.current < root.test.items.length - 1 : AccentButton {
                     text: "Next";
                     icon: "arrow-right";
                     width: 120px;

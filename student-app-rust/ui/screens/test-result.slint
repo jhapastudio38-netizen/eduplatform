@@ -70,8 +70,7 @@ export component TestResultScreen inherits Rectangle {
                 font-size: 13px;
                 horizontal-alignment: center;
             }
-            if !root.result.graded {
-                Text {
+            if !root.result.graded : Text {
                     text: "Subjective answers will be graded by your teacher.";
                     color: Theme.text-muted;
                     font-size: 11px;

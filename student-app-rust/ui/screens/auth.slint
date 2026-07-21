@@ -96,8 +96,7 @@ export component AuthScreen inherits Rectangle {
                     }
 
                     // ─── Step 1: contact entry ───────────────────────────
-                    if root.step == 1 {
-                        VerticalLayout {
+                    if root.step == 1 : VerticalLayout {
                             spacing: 12px;
 
                             GlassTextInput {
@@ -115,8 +114,7 @@ export component AuthScreen inherits Rectangle {
                     }
 
                     // ─── Step 2: OTP entry ───────────────────────────────
-                    if root.step == 2 {
-                        VerticalLayout {
+                    if root.step == 2 : VerticalLayout {
                             spacing: 16px;
 
                             OTPInput {

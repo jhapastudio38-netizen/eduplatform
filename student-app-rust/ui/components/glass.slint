@@ -59,8 +59,7 @@ export component AccentButton inherits Rectangle {
         alignment: center;
         spacing: 8px;
 
-        if root.icon != "" {
-            Icon {
+        if root.icon != "" : Icon {
                 icon-name: root.icon;
                 color: #FFFFFF;
                 width: 18px; height: 18px;
@@ -107,8 +106,7 @@ export component GhostButton inherits Rectangle {
         alignment: center;
         spacing: 8px;
 
-        if root.icon != "" {
-            Icon {
+        if root.icon != "" : Icon {
                 icon-name: root.icon;
                 color: root.text-color;
                 width: 16px; height: 16px;

@@ -37,8 +37,7 @@ export component LearnScreen inherits Rectangle {
             HorizontalLayout {
                 spacing: 12px;
 
-                if root.step > 1 {
-                    GhostButton {
+                if root.step > 1 : GhostButton {
                         text: "";
                         icon: "arrow-left";
                         width: 44px;
@@ -62,69 +61,74 @@ export component LearnScreen inherits Rectangle {
             }
 
             // ─── Step 1: subjects ────────────────────────────────────────
-            if root.step == 1 {
-                if root.subjects.length == 0 {
-                    EmptyState { message: "No subjects available."; }
-                }
-                for subject[i] in root.subjects : GlassCard {
-                    height: 84px;
-                    ta := TouchArea {
-                        mouse-cursor: ta.has-hover ? pointer : default;
-                        clicked: () => {
-                            root.selected-subject = subject.id;
-                            root.selected-subject-name = subject.name;
-                            root.load-chapters(subject.id);
-                            root.step = 2;
-                        }
-                    }
-                    HorizontalLayout {
-                        padding: 16px;
-                        spacing: 14px;
+            if root.step == 1 : Rectangle {
+                height: 100%;
+                background: transparent;
+                VerticalLayout {
+                    spacing: 12px;
 
-                        Rectangle {
-                            width: 52px;
-                            height: 52px;
-                            radius: 14px;
-                            background: @linear-gradient(135deg, #10B981, #0D9488);
+                    if root.subjects.length == 0 : EmptyState {
+                        message: "No subjects available.";
+                    }
+                    for subject[i] in root.subjects : GlassCard {
+                        height: 84px;
+                        ta := TouchArea {
+                            mouse-cursor: ta.has-hover ? pointer : default;
+                            clicked: () => {
+                                root.selected-subject = subject.id;
+                                root.selected-subject-name = subject.name;
+                                root.load-chapters(subject.id);
+                                root.step = 2;
+                            }
+                        }
+                        HorizontalLayout {
+                            padding: 16px;
+                            spacing: 14px;
+
+                            Rectangle {
+                                width: 52px;
+                                height: 52px;
+                                radius: 14px;
+                                background: @linear-gradient(135deg, #10B981, #0D9488);
+                                Icon {
+                                    icon-name: "book";
+                                    color: #FFFFFF;
+                                    width: 24px; height: 24px;
+                                    x: (parent.width - self.width) / 2;
+                                    y: (parent.height - self.height) / 2;
+                                }
+                            }
+                            VerticalLayout {
+                                spacing: 4px;
+                                Text {
+                                    text: subject.name;
+                                    color: Theme.text-primary;
+                                    font-size: 15px;
+                                    font-weight: 600;
+                                }
+                                Text {
+                                    text: subject.description;
+                                    color: Theme.text-secondary;
+                                    font-size: 12px;
+                                    overflow: elide;
+                                    width: parent.width;
+                                }
+                            }
+                            Rectangle { horizontal-stretch: 1; }
                             Icon {
-                                icon-name: "book";
-                                color: #FFFFFF;
-                                width: 24px; height: 24px;
-                                x: (parent.width - self.width) / 2;
+                                icon-name: "chevron-right";
+                                color: Theme.text-muted;
+                                width: 18px; height: 18px;
                                 y: (parent.height - self.height) / 2;
                             }
-                        }
-                        VerticalLayout {
-                            spacing: 4px;
-                            Text {
-                                text: subject.name;
-                                color: Theme.text-primary;
-                                font-size: 15px;
-                                font-weight: 600;
-                            }
-                            Text {
-                                text: subject.description;
-                                color: Theme.text-secondary;
-                                font-size: 12px;
-                                overflow: elide;
-                                width: parent.width;
-                            }
-                        }
-                        Rectangle { horizontal-stretch: 1; }
-                        Icon {
-                            icon-name: "chevron-right";
-                            color: Theme.text-muted;
-                            width: 18px; height: 18px;
-                            y: (parent.height - self.height) / 2;
                         }
                     }
                 }
             }
 
             // ─── Step 2: chapters ────────────────────────────────────────
-            if root.step == 2 {
-                if root.chapters.length == 0 {
-                    EmptyState { message: "No chapters published yet."; }
+            if root.step == 2 : Rectangle {
+                if root.chapters.length == 0 : EmptyState {
                 }
                 for chapter[i] in root.chapters : GlassCard {
                     height: 76px;
@@ -184,8 +188,7 @@ export component LearnScreen inherits Rectangle {
 
             // ─── Step 3: lessons ─────────────────────────────────────────
             if root.step == 3 {
-                if root.lessons.length == 0 {
-                    EmptyState { message: "No lessons in this chapter."; }
+                if root.lessons.length == 0 : EmptyState {
                 }
                 for lesson[i] in root.lessons : GlassCard {
                     height: 72px;
