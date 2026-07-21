@@ -1,7 +1,8 @@
-// QAScreen — list questions, post a new one.
+// QAScreen — list questions, post new ones. Professional, no emojis.
 
 import { Theme, QAQuestionItem } from "../app.slint";
 import { GlassCard, AccentButton, GhostButton, GlassTextInput, SectionTitle } from "../components/glass.slint";
+import { Icon } from "../components/icon.slint";
 import { TouchArea, ScrollView } from "std-widgets.slint";
 
 export component QAScreen inherits Rectangle {
@@ -29,14 +30,19 @@ export component QAScreen inherits Rectangle {
 
             HorizontalLayout {
                 spacing: 12px;
-                SectionTitle {
-                    text: "Q&A";
+                Text {
+                    text: "Questions & Answers";
+                    color: Theme.text-primary;
+                    font-size: 24px;
+                    font-weight: 700;
                     vertical-alignment: center;
+                    letter-spacing: -0.3px;
                 }
                 Rectangle { horizontal-stretch: 1; }
                 AccentButton {
-                    text: "+ Ask";
-                    width: 80px;
+                    text: "Ask";
+                    icon: "plus";
+                    width: 90px;
                     height: 40px;
                     font-size: 13px;
                     clicked: () => { root.show-form = !root.show-form; }
@@ -51,9 +57,9 @@ export component QAScreen inherits Rectangle {
                         spacing: 12px;
 
                         Text {
-                            text: "Ask a question";
+                            text: "New question";
                             color: Theme.text-primary;
-                            font-size: 16px;
+                            font-size: 15px;
                             font-weight: 700;
                         }
 
@@ -72,6 +78,7 @@ export component QAScreen inherits Rectangle {
                             spacing: 8px;
                             AccentButton {
                                 text: "Post";
+                                icon: "check";
                                 disabled: root.new-title == "" || root.new-body == "";
                                 clicked: () => {
                                     root.post-question(root.new-title, root.new-body);
@@ -96,9 +103,9 @@ export component QAScreen inherits Rectangle {
                     VerticalLayout {
                         alignment: center;
                         Text {
-                            text: "No questions yet. Be the first to ask!";
+                            text: "No questions yet. Be the first to ask.";
                             color: Theme.text-muted;
-                            font-size: 14px;
+                            font-size: 13px;
                             horizontal-alignment: center;
                         }
                     }
@@ -114,7 +121,7 @@ export component QAScreen inherits Rectangle {
                     Text {
                         text: q.title;
                         color: Theme.text-primary;
-                        font-size: 15px;
+                        font-size: 14px;
                         font-weight: 600;
                         overflow: elide;
                         width: parent.width;
@@ -122,16 +129,23 @@ export component QAScreen inherits Rectangle {
                     Text {
                         text: q.body;
                         color: Theme.text-secondary;
-                        font-size: 13px;
+                        font-size: 12px;
                         overflow: elide;
                         width: parent.width;
                     }
                     HorizontalLayout {
-                        spacing: 12px;
+                        spacing: 6px;
+                        Icon {
+                            icon-name: "chat";
+                            color: Theme.text-muted;
+                            width: 12px; height: 12px;
+                            y: (parent.height - self.height) / 2;
+                        }
                         Text {
-                            text: "💬 " + q.answers-count + " answers";
+                            text: q.answers-count + " answers";
                             color: Theme.text-muted;
                             font-size: 11px;
+                            vertical-alignment: center;
                         }
                     }
                 }

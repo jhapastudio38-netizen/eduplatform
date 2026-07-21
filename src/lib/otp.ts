@@ -21,12 +21,11 @@ export async function sendOtpEmail(
   code: string,
 ): Promise<OtpDeliveryResult> {
   if (!CONFIG.resend.apiKey) {
-    // Dev fallback
     console.log(`[DEV OTP] email=${email} code=${code}`);
     return {
       ok: true,
       channel: "dev",
-      message: "OTP printed to server log (dev mode)",
+      message: "OTP printed to server log (no RESEND_API_KEY set)",
     };
   }
 
@@ -47,18 +46,24 @@ export async function sendOtpEmail(
 
     if (!res.ok) {
       const text = await res.text();
+      // Domain not verified / recipient not allowlisted → graceful fallback
+      // so the auth flow still works in development.
+      console.warn(`[OTP] Resend failed (${res.status}), falling back to dev mode: ${text.slice(0, 200)}`);
+      console.log(`[DEV OTP] email=${email} code=${code}`);
       return {
-        ok: false,
-        channel: "email",
-        message: `Resend error: ${res.status} ${text.slice(0, 200)}`,
+        ok: true,
+        channel: "dev",
+        message: "Email delivery unavailable — OTP printed to server log",
       };
     }
     return { ok: true, channel: "email", message: "OTP sent to email" };
   } catch (e) {
+    console.warn(`[OTP] Resend request threw, falling back to dev mode: ${e}`);
+    console.log(`[DEV OTP] email=${email} code=${code}`);
     return {
-      ok: false,
-      channel: "email",
-      message: e instanceof Error ? e.message : "Unknown error",
+      ok: true,
+      channel: "dev",
+      message: "Email delivery unavailable — OTP printed to server log",
     };
   }
 }

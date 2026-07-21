@@ -1,7 +1,8 @@
-// TestResultScreen — score card after submission.
+// TestResultScreen — score card. Professional, no emojis.
 
 import { Theme, TestResultItem } from "../app.slint";
 import { GlassCard, AccentButton } from "../components/glass.slint";
+import { Icon } from "../components/icon.slint";
 
 export component TestResultScreen inherits Rectangle {
     width: 100%;
@@ -34,18 +35,17 @@ export component TestResultScreen inherits Rectangle {
                 alignment: center;
                 spacing: 4px;
 
-                Text {
-                    text: root.passed ? "✓" : "✗";
+                Icon {
+                    icon-name: root.passed ? "check" : "x";
                     color: root.passed ? Theme.accent : Theme.danger;
-                    font-size: 48px;
-                    font-weight: 800;
-                    horizontal-alignment: center;
+                    width: 40px; height: 40px;
+                    horizontal-stretch: 0;
                 }
                 Text {
                     text: root.pct + "%";
                     color: Theme.text-primary;
-                    font-size: 28px;
-                    font-weight: 800;
+                    font-size: 26px;
+                    font-weight: 700;
                     horizontal-alignment: center;
                 }
             }
@@ -57,23 +57,24 @@ export component TestResultScreen inherits Rectangle {
             spacing: 6px;
 
             Text {
-                text: root.passed ? "Passed!" : "Try again";
+                text: root.passed ? "Passed" : "Try again";
                 color: Theme.text-primary;
-                font-size: 26px;
-                font-weight: 800;
+                font-size: 24px;
+                font-weight: 700;
                 horizontal-alignment: center;
+                letter-spacing: -0.3px;
             }
             Text {
-                text: "You scored " + root.result.score + " / " + root.result.max-score + " points";
+                text: "You scored " + root.result.score + " of " + root.result.max-score + " points";
                 color: Theme.text-secondary;
-                font-size: 14px;
+                font-size: 13px;
                 horizontal-alignment: center;
             }
             if !root.result.graded {
                 Text {
                     text: "Subjective answers will be graded by your teacher.";
                     color: Theme.text-muted;
-                    font-size: 12px;
+                    font-size: 11px;
                     horizontal-alignment: center;
                 }
             }
@@ -91,13 +92,15 @@ export component TestResultScreen inherits Rectangle {
                         text: "Pass mark";
                         color: Theme.text-secondary;
                         font-size: 13px;
+                        vertical-alignment: center;
                     }
                     Rectangle { horizontal-stretch: 1; }
                     Text {
                         text: root.pass-score + "%";
                         color: Theme.text-primary;
-                        font-size: 14px;
+                        font-size: 13px;
                         font-weight: 600;
+                        vertical-alignment: center;
                     }
                 }
                 HorizontalLayout {
@@ -105,21 +108,23 @@ export component TestResultScreen inherits Rectangle {
                         text: "Your score";
                         color: Theme.text-secondary;
                         font-size: 13px;
+                        vertical-alignment: center;
                     }
                     Rectangle { horizontal-stretch: 1; }
                     Text {
                         text: root.pct + "%";
                         color: root.passed ? Theme.accent : Theme.danger;
-                        font-size: 14px;
+                        font-size: 13px;
                         font-weight: 700;
+                        vertical-alignment: center;
                     }
                 }
             }
         }
 
-        // ─── Done button ──────────────────────────────────────────────
         AccentButton {
             text: "Back to tests";
+            icon: "arrow-left";
             clicked: () => { root.done(); }
         }
     }

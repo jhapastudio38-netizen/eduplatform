@@ -43,7 +43,7 @@ export function AdminContent() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold">Chapters & Lessons</h1>
-          <p className="text-sm text-muted-foreground">Organize your content into subjects → chapters → lessons.</p>
+          <p className="text-sm text-muted-foreground">Organize your content into subjects, chapters, and lessons.</p>
         </div>
         <SubjectDialog onSaved={load} subjects={subjects} />
       </div>

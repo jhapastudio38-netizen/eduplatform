@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { Plus, MessageSquare, ChevronRight } from "lucide-react";
+import { Plus, MessageSquare, ChevronRight, ArrowLeft } from "lucide-react";
 import type { QAQuestion } from "@/types";
 import { toast } from "sonner";
 import { formatDistanceToNow } from "date-fns";
@@ -148,7 +148,9 @@ function QAADetail({ question, onBack }: { question: QAQuestion; onBack: () => v
 
   return (
     <div className="space-y-4 max-w-2xl mx-auto">
-      <Button variant="ghost" size="sm" onClick={onBack}>← Back to questions</Button>
+      <Button variant="ghost" size="sm" onClick={onBack}>
+        <ArrowLeft className="mr-2 h-4 w-4" /> Back to questions
+      </Button>
       <Card>
         <CardContent className="p-5">
           <h2 className="text-lg font-bold">{question.title}</h2>

@@ -14,6 +14,8 @@ interface GenParams {
   count: number;
   type: QuestionType;
   difficulty: Difficulty;
+  /** Force the mock implementation (used as fallback when Groq is unreachable). */
+  _forceMock?: boolean;
 }
 
 interface GroqMessage {
@@ -22,7 +24,7 @@ interface GroqMessage {
 }
 
 export async function generateQuestionsWithGroq(params: GenParams): Promise<Question[]> {
-  if (!CONFIG.groq.apiKey) {
+  if (!CONFIG.groq.apiKey || params._forceMock) {
     return mockQuestions(params);
   }
 
@@ -96,20 +98,22 @@ Be specific to the topic. Avoid duplicates. Vary the angle across questions.`;
 }
 
 function mockQuestions(params: GenParams): Question[] {
-  // Dev fallback when no Groq key is set
+  // Fallback used when GROQ_API_KEY is missing or the API is unreachable.
+  // Produces clearly-labelled placeholder questions so the admin can still
+  // test the workflow end-to-end.
   const out: Question[] = [];
   for (let i = 1; i <= params.count; i++) {
     const opts = params.type === "SINGLE_CHOICE" || params.type === "MULTIPLE_CHOICE" || params.type === "TRUE_FALSE"
-      ? params.type === "TRUE_FALSE" ? ["True", "False"] : [`Option A`, `Option B`, `Option C`, `Option D`]
+      ? params.type === "TRUE_FALSE" ? ["True", "False"] : ["Option A", "Option B", "Option C", "Option D"]
       : null;
     out.push({
       id: `mock-${Date.now()}-${i}`,
       type: params.type,
       difficulty: params.difficulty,
-      stem: `[MOCK] Question ${i} about "${params.topic}". (Configure GROQ_API_KEY in .env to get real questions.)`,
+      stem: `Sample question ${i} on "${params.topic}". (Placeholder — set a valid GROQ_API_KEY to generate real questions.)`,
       options: opts,
       correctAnswer: opts ? opts[0] : "Sample answer",
-      explanation: "Mock explanation. Set GROQ_API_KEY to enable real AI generation.",
+      explanation: "This is a placeholder explanation. With a valid Groq key, the AI will write a real one.",
       tags: [],
       aiGenerated: true,
     });

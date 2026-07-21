@@ -24,7 +24,7 @@ export function TeacherDashboard({ onNavigate }: { onNavigate: (v: "live" | "sch
     <div className="space-y-6">
       <div className="rounded-2xl bg-gradient-to-br from-amber-500 via-orange-500 to-rose-500 text-white p-6 shadow-lg shadow-amber-500/20">
         <p className="text-sm text-white/80">Teacher dashboard</p>
-        <h2 className="text-2xl font-bold">Ready to teach? 🎓</h2>
+        <h2 className="text-2xl font-bold">Ready to teach?</h2>
         <div className="mt-4 flex gap-2">
           <Button size="sm" variant="secondary" onClick={() => onNavigate("live")}>
             <Radio className="mr-2 h-4 w-4" /> Go live now

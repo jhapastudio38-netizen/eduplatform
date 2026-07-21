@@ -1,8 +1,9 @@
-// TestRunnerScreen — take a test with timer and question navigation.
+// TestRunnerScreen — take a test with timer. Professional, no emojis.
 
 import { Theme, ActiveTest } from "../app.slint";
 import { GlassCard, AccentButton, GhostButton, GlassTextInput } from "../components/glass.slint";
-import { TouchArea, ScrollView, StandardListView } from "std-widgets.slint";
+import { Icon } from "../components/icon.slint";
+import { TouchArea, ScrollView } from "std-widgets.slint";
 
 export component TestRunnerScreen inherits Rectangle {
     width: 100%;
@@ -16,25 +17,24 @@ export component TestRunnerScreen inherits Rectangle {
     property <int> current: 0;
     property <string> timer-text: "00:00";
 
-    // Build a JSON map of { questionId: answer } from per-question inputs.
-    // For simplicity in this version, we use a single text input per question.
-    property <[string]> answers: [];
-
     VerticalLayout {
         padding: 16px;
         padding-bottom: 32px;
         spacing: 12px;
 
-        // ─── Top bar: exit + timer ─────────────────────────────────────
+        // ─── Top bar ─────────────────────────────────────────────────
         HorizontalLayout {
             spacing: 12px;
 
             GhostButton {
-                text: "← Exit";
-                width: 80px;
+                text: "Exit";
+                icon: "arrow-left";
+                width: 90px;
                 clicked: () => { root.exit(); }
             }
             Rectangle { horizontal-stretch: 1; }
+
+            // Timer pill
             Rectangle {
                 width: 100px;
                 height: 40px;
@@ -42,18 +42,31 @@ export component TestRunnerScreen inherits Rectangle {
                 background: rgba(245, 158, 11, 0.15);
                 border-width: 1px;
                 border-color: rgba(245, 158, 11, 0.3);
-                Text {
-                    text: "⏱ " + root.timer-text;
-                    color: #FCD34D;
-                    font-size: 14px;
-                    font-weight: 700;
-                    x: (parent.width - self.width) / 2;
-                    y: (parent.height - self.height) / 2;
+                HorizontalLayout {
+                    x: 12px; y: 0;
+                    width: parent.width - 24px;
+                    height: parent.height;
+                    spacing: 6px;
+
+                    Icon {
+                        icon-name: "clock";
+                        color: #FCD34D;
+                        width: 14px; height: 14px;
+                        y: (parent.height - self.height) / 2;
+                    }
+                    Text {
+                        text: root.timer-text;
+                        color: #FCD34D;
+                        font-size: 13px;
+                        font-weight: 700;
+                        vertical-alignment: center;
+                        y: (parent.height - self.height) / 2;
+                    }
                 }
             }
         }
 
-        // ─── Progress bar ──────────────────────────────────────────────
+        // ─── Progress ──────────────────────────────────────────────────
         VerticalLayout {
             spacing: 4px;
             HorizontalLayout {
@@ -78,7 +91,7 @@ export component TestRunnerScreen inherits Rectangle {
             }
         }
 
-        // ─── Current question ──────────────────────────────────────────
+        // ─── Question card ────────────────────────────────────────────
         if root.test.items.length > 0 {
             GlassCard {
                 vertical-stretch: 1;
@@ -88,29 +101,24 @@ export component TestRunnerScreen inherits Rectangle {
 
                     Text {
                         text: root.test.items[root.current].question.question-type.to-upper-case()
-                              + " · " + root.test.items[root.current].question.difficulty.to-lower-case()
-                              + " · " + root.test.items[root.current].points + " pts";
+                              + "  ·  " + root.test.items[root.current].question.difficulty.to-lower-case()
+                              + "  ·  " + root.test.items[root.current].points + " pts";
                         color: Theme.text-muted;
-                        font-size: 11px;
+                        font-size: 10px;
                         letter-spacing: 0.5px;
                     }
 
                     Text {
                         text: root.test.items[root.current].question.stem;
                         color: Theme.text-primary;
-                        font-size: 17px;
+                        font-size: 16px;
                         font-weight: 600;
                         wrap: word-wrap;
                         width: parent.width;
                     }
 
-                    // ─── Answer area (simplified: single text input) ───
                     GlassTextInput {
                         placeholder: "Type your answer…";
-                        text: root.answers[root.current];
-                        edited: (v) => {
-                            // Update answers list
-                        }
                     }
 
                     Rectangle { vertical-stretch: 1; }
@@ -118,13 +126,14 @@ export component TestRunnerScreen inherits Rectangle {
             }
         }
 
-        // ─── Bottom nav (prev / next / submit) ────────────────────────
+        // ─── Bottom actions ──────────────────────────────────────────
         HorizontalLayout {
             spacing: 12px;
 
             GhostButton {
-                text: "← Prev";
-                width: 100px;
+                text: "Previous";
+                icon: "arrow-left";
+                width: 110px;
                 disabled: root.current == 0;
                 clicked: () => { if root.current > 0 { root.current -= 1; } }
             }
@@ -132,7 +141,8 @@ export component TestRunnerScreen inherits Rectangle {
 
             if root.current < root.test.items.length - 1 {
                 AccentButton {
-                    text: "Next →";
+                    text: "Next";
+                    icon: "arrow-right";
                     width: 120px;
                     clicked: () => {
                         if root.current < root.test.items.length - 1 {
@@ -142,10 +152,10 @@ export component TestRunnerScreen inherits Rectangle {
                 }
             } else {
                 AccentButton {
-                    text: "Submit ✓";
+                    text: "Submit";
+                    icon: "check";
                     width: 140px;
                     clicked: () => {
-                        // Build answers JSON — for now an empty object
                         root.submit(root.test.id, "{}");
                     }
                 }

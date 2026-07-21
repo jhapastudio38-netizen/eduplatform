@@ -1,15 +1,16 @@
-// Glassmorphism design system components.
+// Glassmorphism design system — professional, no emojis.
 //
-// GlassCard: frosted translucent panel with backdrop blur, border glow,
-//            and soft shadow. Used everywhere as the primary container.
-// AccentButton: emerald-filled primary button with hover state.
-// GlassButton: ghost secondary button with glass background.
-// BottomNav: floating bottom navigation with 5 tabs.
-// LoadingOverlay: full-screen frosted overlay with spinner.
-// ErrorToast: top-anchored dismissible error banner.
-// SectionTitle: large semibold heading used at the top of each screen.
+// Design principles:
+//   1. Deep navy gradient background (#0B1120 → #131A2E → #1E293B)
+//   2. Frosted glass cards (rgba(255,255,255,0.06) + border + shadow)
+//   3. Emerald accent (#10B981) — single accent, no rainbow
+//   4. 14-24px corner radii, 18-24px shadow blur
+//   5. System sans-serif typography with tight tracking on headings
+//   6. SVG icons (see icon.slint), never emojis
+//   7. Subtle motion only — no bouncy animations
 
 import { Theme } from "../app.slint";
+import { Icon } from "icon.slint";
 import { TouchArea } from "std-widgets.slint";
 
 // ─── GlassCard ─────────────────────────────────────────────────────────────
@@ -23,7 +24,6 @@ export component GlassCard inherits Rectangle {
     drop-shadow-offset-y: 6px;
 }
 
-// ─── GlassCard strong (more opaque for primary surfaces) ───────────────────
 export component GlassCardStrong inherits Rectangle {
     radius: Theme.radius-lg;
     border-width: 1px;
@@ -45,7 +45,8 @@ export component AccentButton inherits Rectangle {
 
     property <string> text <=> label.text;
     property <bool> disabled: false;
-    property <length> font-size: 16px;
+    property <length> font-size: 15px;
+    property <string> icon: "";
 
     ta := TouchArea {
         enabled: !root.disabled;
@@ -53,21 +54,33 @@ export component AccentButton inherits Rectangle {
         clicked: () => { if !root.disabled { root.clicked(); } }
     }
 
-    label := Text {
-        text: "Button";
-        color: #FFFFFF;
-        font-size: root.font-size;
-        font-weight: 600;
-        horizontal-alignment: center;
-        vertical-alignment: center;
-        x: (parent.width - self.width) / 2;
-        y: (parent.height - self.height) / 2;
+    HorizontalLayout {
+        x: 0; y: 0; width: 100%; height: 100%;
+        alignment: center;
+        spacing: 8px;
+
+        if root.icon != "" {
+            Icon {
+                icon-name: root.icon;
+                color: #FFFFFF;
+                width: 18px; height: 18px;
+                y: (parent.height - self.height) / 2;
+            }
+        }
+        label := Text {
+            text: "Button";
+            color: #FFFFFF;
+            font-size: root.font-size;
+            font-weight: 600;
+            vertical-alignment: center;
+            y: (parent.height - self.height) / 2;
+        }
     }
 
     callback clicked();
 }
 
-// ─── GhostButton (glass background, white text) ────────────────────────────
+// ─── GhostButton ───────────────────────────────────────────────────────────
 export component GhostButton inherits Rectangle {
     radius: Theme.radius-md;
     background: ta.pressed ? Theme.glass-bg-strong
@@ -76,12 +89,13 @@ export component GhostButton inherits Rectangle {
     border-width: 1px;
     border-color: Theme.glass-border;
     height: 48px;
-    min-width: 100px;
+    min-width: 80px;
 
     property <string> text <=> label.text;
     property <color> text-color: Theme.text-primary;
-    property <length> font-size: 15px;
+    property <length> font-size: 14px;
     property <bool> disabled: false;
+    property <string> icon: "";
 
     ta := TouchArea {
         enabled: !root.disabled;
@@ -89,15 +103,26 @@ export component GhostButton inherits Rectangle {
         clicked: () => { if !root.disabled { root.clicked(); } }
     }
 
-    label := Text {
-        text: "Button";
-        color: root.text-color;
-        font-size: root.font-size;
-        font-weight: 500;
-        horizontal-alignment: center;
-        vertical-alignment: center;
-        x: (parent.width - self.width) / 2;
-        y: (parent.height - self.height) / 2;
+    HorizontalLayout {
+        alignment: center;
+        spacing: 8px;
+
+        if root.icon != "" {
+            Icon {
+                icon-name: root.icon;
+                color: root.text-color;
+                width: 16px; height: 16px;
+                y: (parent.height - self.height) / 2;
+            }
+        }
+        label := Text {
+            text: "Button";
+            color: root.text-color;
+            font-size: root.font-size;
+            font-weight: 500;
+            vertical-alignment: center;
+            y: (parent.height - self.height) / 2;
+        }
     }
 
     callback clicked();
@@ -106,14 +131,13 @@ export component GhostButton inherits Rectangle {
 // ─── GlassTextInput ────────────────────────────────────────────────────────
 export component GlassTextInput inherits Rectangle {
     radius: Theme.radius-md;
-    background: Theme.glass-bg;
-    border-width: 1px;
+    background: input.has-focus ? Theme.glass-bg-strong : Theme.glass-bg;
+    border-width: 1.5px;
     border-color: input.has-focus ? Theme.accent : Theme.glass-border;
     height: 56px;
 
     property <string> placeholder;
     property <string> text <=> input.text;
-    property <InputType> input-type: input.input-type;
     property <bool> is-password: false;
 
     input := TextInput {
@@ -121,10 +145,10 @@ export component GlassTextInput inherits Rectangle {
         y: (parent.height - self.preferred-height) / 2;
         width: parent.width - 32px;
         height: self.preferred-height;
-        font-size: 16px;
+        font-size: 15px;
         color: Theme.text-primary;
-        selection-foreground-color: Theme.accent;
-        selection-background-color: Theme.accent-soft;
+        selection-foreground-color: #FFFFFF;
+        selection-background-color: Theme.accent;
         single-line: true;
         input-type: root.is-password ? InputType.password : InputType.text;
     }
@@ -134,12 +158,12 @@ export component GlassTextInput inherits Rectangle {
         y: (parent.height - self.height) / 2;
         text: root.placeholder;
         color: Theme.text-muted;
-        font-size: 16px;
+        font-size: 15px;
         visible: input.text == "" && !input.has-focus;
     }
 }
 
-// ─── OTP input (6 boxes) ───────────────────────────────────────────────────
+// ─── OTPInput (6 boxes, professional look) ─────────────────────────────────
 export component OTPInput inherits HorizontalLayout {
     spacing: 8px;
     height: 56px;
@@ -156,7 +180,7 @@ export component OTPInput inherits HorizontalLayout {
 
 component OTPBox inherits Rectangle {
     radius: Theme.radius-md;
-    background: Theme.glass-bg;
+    background: input.has-focus ? Theme.glass-bg-strong : Theme.glass-bg;
     border-width: 1.5px;
     border-color: input.has-focus ? Theme.accent : Theme.glass-border;
     width: 48px;
@@ -170,7 +194,7 @@ component OTPBox inherits Rectangle {
         y: (parent.height - self.preferred-height) / 2;
         width: parent.width;
         height: self.preferred-height;
-        font-size: 24px;
+        font-size: 22px;
         font-weight: 700;
         color: Theme.text-primary;
         horizontal-alignment: center;
@@ -180,7 +204,7 @@ component OTPBox inherits Rectangle {
     }
 }
 
-// ─── BottomNav (floating glass) ────────────────────────────────────────────
+// ─── BottomNav (floating glass with SVG icons) ─────────────────────────────
 export component BottomNav inherits Rectangle {
     width: 100%;
     height: 88px;
@@ -208,31 +232,31 @@ export component BottomNav inherits Rectangle {
 
             NavItem {
                 label: "Home";
-                icon: "🏠";
+                icon-name: "home";
                 active: root.current == 0;
                 clicked: () => { root.navigate(0); }
             }
             NavItem {
                 label: "Learn";
-                icon: "📚";
+                icon-name: "book";
                 active: root.current == 1;
                 clicked: () => { root.navigate(1); }
             }
             NavItem {
                 label: "Tests";
-                icon: "📝";
+                icon-name: "test";
                 active: root.current == 2;
                 clicked: () => { root.navigate(2); }
             }
             NavItem {
                 label: "Q&A";
-                icon: "💬";
+                icon-name: "chat";
                 active: root.current == 3;
                 clicked: () => { root.navigate(3); }
             }
             NavItem {
                 label: "Profile";
-                icon: "👤";
+                icon-name: "user";
                 active: root.current == 4;
                 clicked: () => { root.navigate(4); }
             }
@@ -246,7 +270,7 @@ component NavItem inherits Rectangle {
     background: transparent;
 
     property <string> label;
-    property <string> icon;
+    property <string> icon-name;
     property <bool> active: false;
     callback clicked();
 
@@ -257,13 +281,13 @@ component NavItem inherits Rectangle {
 
     VerticalLayout {
         alignment: center;
-        spacing: 2px;
+        spacing: 4px;
 
-        Text {
-            text: root.icon;
-            font-size: 22px;
-            horizontal-alignment: center;
+        Icon {
+            icon-name: root.icon-name;
             color: root.active ? Theme.accent : Theme.text-secondary;
+            width: 22px; height: 22px;
+            horizontal-stretch: 0;
         }
         Text {
             text: root.label;
@@ -275,12 +299,11 @@ component NavItem inherits Rectangle {
     }
 }
 
-// ─── LoadingOverlay (frosted full-screen with spinner) ─────────────────────
+// ─── LoadingOverlay ────────────────────────────────────────────────────────
 export component LoadingOverlay inherits Rectangle {
     width: 100%;
     height: 100%;
     background: rgba(11, 17, 32, 0.7);
-    touch-visible: false;
 
     Rectangle {
         x: (parent.width - self.width) / 2;
@@ -292,16 +315,17 @@ export component LoadingOverlay inherits Rectangle {
         border-width: 1px;
         border-color: Theme.glass-border;
 
-        spinner := Rectangle {
+        // Spinner ring
+        Rectangle {
             x: (parent.width - self.width) / 2;
-            y: (parent.height - self.height) / 2;
+            y: (parent.height - self.height) / 2 - 12px;
             width: 40px;
             height: 40px;
             radius: self.width / 2;
             border-width: 3px;
             border-color: Theme.glass-border;
-            clip: false;
 
+            // Spinning arc indicator (a small dot on the ring)
             Rectangle {
                 width: 6px;
                 height: 6px;
@@ -309,15 +333,13 @@ export component LoadingOverlay inherits Rectangle {
                 y: 0;
                 radius: self.width / 2;
                 background: Theme.accent;
-
-                animate y { duration: 800ms; iteration-count: infinite; from: 0px; to: 0px; }
             }
         }
 
         Text {
-            text: "Loading…";
+            text: "Loading";
             color: Theme.text-secondary;
-            font-size: 13px;
+            font-size: 12px;
             horizontal-alignment: center;
             y: parent.height - 28px;
             width: parent.width;
@@ -343,68 +365,78 @@ export component ErrorToast inherits Rectangle {
         border-width: 1px;
         border-color: rgba(239, 68, 68, 0.3);
 
-        Text {
-            text: "⚠ " + root.message;
-            color: #FCA5A5;
-            font-size: 13px;
-            x: 16px;
-            y: (parent.height - self.height) / 2;
+        HorizontalLayout {
+            x: 16px; y: 0;
             width: parent.width - 32px;
-            overflow: elide;
+            height: parent.height;
+            spacing: 10px;
+
+            Icon {
+                icon-name: "x";
+                color: #FCA5A5;
+                width: 18px; height: 18px;
+                y: (parent.height - self.height) / 2;
+            }
+            Text {
+                text: root.message;
+                color: #FCA5A5;
+                font-size: 13px;
+                vertical-alignment: center;
+                width: parent.width - 28px;
+                overflow: elide;
+            }
         }
     }
 }
 
-// ─── SectionTitle ──────────────────────────────────────────────────────────
+// ─── SectionTitle / Subtitle ───────────────────────────────────────────────
 export component SectionTitle inherits Text {
     color: Theme.text-primary;
-    font-size: 28px;
-    font-weight: 800;
-    letter-spacing: -0.5px;
+    font-size: 26px;
+    font-weight: 700;
+    letter-spacing: -0.4px;
 }
 
 export component Subtitle inherits Text {
     color: Theme.text-secondary;
     font-size: 14px;
-    font-weight: 500;
+    font-weight: 400;
 }
 
-// ─── StatChip (small glass pill for stats) ─────────────────────────────────
+// ─── StatChip (clean, minimal — icon + value + label) ──────────────────────
 export component StatChip inherits Rectangle {
     radius: Theme.radius-md;
     background: Theme.glass-bg;
     border-width: 1px;
     border-color: Theme.glass-border;
-    height: 80px;
+    height: 92px;
 
-    property <string> icon;
-    property <string> value;
-    property <string> label;
+    property <string> icon-name: "book";
+    property <string> value: "0";
+    property <string> label: "Stat";
     property <color> icon-color: Theme.accent;
 
     VerticalLayout {
         alignment: center;
-        spacing: 4px;
-        padding: 12px;
+        spacing: 6px;
+        padding: 14px;
 
-        Text {
-            text: root.icon;
-            font-size: 20px;
-            horizontal-alignment: center;
+        Icon {
+            icon-name: root.icon-name;
             color: root.icon-color;
+            width: 20px; height: 20px;
+            horizontal-stretch: 0;
         }
         Text {
             text: root.value;
             color: Theme.text-primary;
-            font-size: 20px;
+            font-size: 22px;
             font-weight: 700;
-            horizontal-alignment: center;
         }
         Text {
             text: root.label;
             color: Theme.text-muted;
             font-size: 11px;
-            horizontal-alignment: center;
         }
     }
 }

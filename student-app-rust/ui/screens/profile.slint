@@ -1,7 +1,9 @@
-// ProfileScreen — user info + logout.
+// ProfileScreen — user info + logout. Professional, no emojis.
 
 import { Theme, UserItem } from "../app.slint";
 import { GlassCard, AccentButton, GhostButton, SectionTitle } from "../components/glass.slint";
+import { Icon } from "../components/icon.slint";
+import { ScrollView } from "std-widgets.slint";
 
 export component ProfileScreen inherits Rectangle {
     width: 100%;
@@ -35,8 +37,8 @@ export component ProfileScreen inherits Rectangle {
                     Text {
                         text: root.user.name == "" ? "S" : root.user.name;
                         color: #FFFFFF;
-                        font-size: 32px;
-                        font-weight: 800;
+                        font-size: 28px;
+                        font-weight: 700;
                         x: (parent.width - self.width) / 2;
                         y: (parent.height - self.height) / 2;
                     }
@@ -44,20 +46,27 @@ export component ProfileScreen inherits Rectangle {
                 Text {
                     text: root.user.name == "" ? "Student" : root.user.name;
                     color: Theme.text-primary;
-                    font-size: 22px;
-                    font-weight: 800;
+                    font-size: 20px;
+                    font-weight: 700;
                     horizontal-alignment: center;
+                    letter-spacing: -0.3px;
                 }
                 Text {
                     text: root.user.role.to-lower-case();
                     color: Theme.text-secondary;
-                    font-size: 13px;
+                    font-size: 12px;
                     horizontal-alignment: center;
                 }
             }
 
             // ─── Account info ────────────────────────────────────────────
-            SectionTitle { text: "Account"; }
+            Text {
+                text: "Account";
+                color: Theme.text-primary;
+                font-size: 18px;
+                font-weight: 700;
+                letter-spacing: -0.2px;
+            }
 
             GlassCard {
                 VerticalLayout {
@@ -65,6 +74,7 @@ export component ProfileScreen inherits Rectangle {
                     spacing: 12px;
 
                     ProfileRow {
+                        icon-name: "mail";
                         label: "Email";
                         value: root.user.email;
                     }
@@ -73,6 +83,7 @@ export component ProfileScreen inherits Rectangle {
                         background: Theme.glass-border;
                     }
                     ProfileRow {
+                        icon-name: "shield";
                         label: "User ID";
                         value: root.user.id;
                     }
@@ -81,14 +92,21 @@ export component ProfileScreen inherits Rectangle {
                         background: Theme.glass-border;
                     }
                     ProfileRow {
+                        icon-name: "user";
                         label: "Role";
                         value: root.user.role;
                     }
                 }
             }
 
-            // ─── Achievements (placeholder) ───────────────────────────────
-            SectionTitle { text: "Achievements"; }
+            // ─── Achievements ────────────────────────────────────────────
+            Text {
+                text: "Achievements";
+                color: Theme.text-primary;
+                font-size: 18px;
+                font-weight: 700;
+                letter-spacing: -0.2px;
+            }
             GlassCard {
                 height: 100px;
                 HorizontalLayout {
@@ -96,15 +114,16 @@ export component ProfileScreen inherits Rectangle {
                     spacing: 16px;
                     alignment: space-around;
 
-                    AchievementItem { icon: "🔥"; value: "7"; label: "Streak"; }
-                    AchievementItem { icon: "📚"; value: "12"; label: "Lessons"; }
-                    AchievementItem { icon: "🏆"; value: "3"; label: "Badges"; }
+                    AchievementItem { icon-name: "flame"; value: "7"; label: "Streak"; icon-color: #FB923C; }
+                    AchievementItem { icon-name: "book"; value: "12"; label: "Lessons"; icon-color: #10B981; }
+                    AchievementItem { icon-name: "trophy"; value: "3"; label: "Badges"; icon-color: #F59E0B; }
                 }
             }
 
             // ─── Logout ─────────────────────────────────────────────────
             AccentButton {
                 text: "Sign out";
+                icon: "logout";
                 background: Theme.danger;
                 clicked: () => { root.logout(); }
             }
@@ -112,7 +131,7 @@ export component ProfileScreen inherits Rectangle {
             Text {
                 text: "EduPlatform v0.1.0";
                 color: Theme.text-muted;
-                font-size: 12px;
+                font-size: 11px;
                 horizontal-alignment: center;
             }
         }
@@ -120,9 +139,16 @@ export component ProfileScreen inherits Rectangle {
 }
 
 component ProfileRow inherits HorizontalLayout {
+    property <string> icon-name;
     property <string> label;
     property <string> value;
-    spacing: 8px;
+    spacing: 10px;
+    Icon {
+        icon-name: root.icon-name;
+        color: Theme.text-secondary;
+        width: 16px; height: 16px;
+        y: (parent.height - self.height) / 2;
+    }
     Text {
         text: root.label;
         color: Theme.text-secondary;
@@ -143,20 +169,22 @@ component ProfileRow inherits HorizontalLayout {
 }
 
 component AchievementItem inherits VerticalLayout {
-    property <string> icon;
+    property <string> icon-name;
     property <string> value;
     property <string> label;
+    property <color> icon-color: Theme.accent;
     spacing: 4px;
     alignment: center;
-    Text {
-        text: root.icon;
-        font-size: 24px;
-        horizontal-alignment: center;
+    Icon {
+        icon-name: root.icon-name;
+        color: root.icon-color;
+        width: 22px; height: 22px;
+        horizontal-stretch: 0;
     }
     Text {
         text: root.value;
         color: Theme.text-primary;
-        font-size: 18px;
+        font-size: 16px;
         font-weight: 700;
         horizontal-alignment: center;
     }

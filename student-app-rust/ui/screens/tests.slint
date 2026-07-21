@@ -1,7 +1,8 @@
-// TestsScreen — list available tests & exams.
+// TestsScreen — list of available tests & exams. Professional, no emojis.
 
 import { Theme, TestItem } from "../app.slint";
 import { GlassCard, GhostButton, SectionTitle } from "../components/glass.slint";
+import { Icon } from "../components/icon.slint";
 import { TouchArea, ScrollView } from "std-widgets.slint";
 
 export component TestsScreen inherits Rectangle {
@@ -23,12 +24,18 @@ export component TestsScreen inherits Rectangle {
             padding-bottom: 110px;
             spacing: 16px;
 
-            SectionTitle { text: "Tests & Exams"; }
+            Text {
+                text: "Tests & Exams";
+                color: Theme.text-primary;
+                font-size: 26px;
+                font-weight: 700;
+                letter-spacing: -0.4px;
+            }
 
             Text {
                 text: "Practice quizzes and graded exams.";
                 color: Theme.text-secondary;
-                font-size: 14px;
+                font-size: 13px;
             }
 
             if root.tests.length == 0 {
@@ -39,7 +46,7 @@ export component TestsScreen inherits Rectangle {
                         Text {
                             text: "No tests available right now.";
                             color: Theme.text-muted;
-                            font-size: 14px;
+                            font-size: 13px;
                             horizontal-alignment: center;
                         }
                     }
@@ -62,21 +69,22 @@ export component TestsScreen inherits Rectangle {
                         Text {
                             text: test.title;
                             color: Theme.text-primary;
-                            font-size: 17px;
+                            font-size: 16px;
                             font-weight: 700;
                             vertical-alignment: center;
                         }
                         Rectangle { horizontal-stretch: 1; }
                         Rectangle {
-                            width: 56px;
+                            width: 70px;
                             height: 24px;
                             radius: 12px;
-                            background: test.is-exam ? rgba(239, 68, 68, 0.2) : rgba(59, 130, 246, 0.2);
+                            background: test.is-exam ? rgba(239, 68, 68, 0.18) : rgba(59, 130, 246, 0.18);
                             Text {
                                 text: test.is-exam ? "EXAM" : "PRACTICE";
                                 color: test.is-exam ? #FCA5A5 : #93C5FD;
                                 font-size: 10px;
                                 font-weight: 700;
+                                letter-spacing: 0.5px;
                                 x: (parent.width - self.width) / 2;
                                 y: (parent.height - self.height) / 2;
                             }
@@ -86,31 +94,64 @@ export component TestsScreen inherits Rectangle {
                     Text {
                         text: test.description;
                         color: Theme.text-secondary;
-                        font-size: 13px;
+                        font-size: 12px;
                         wrap: word-wrap;
                         width: parent.width;
                     }
 
-                    // Spacer
                     Rectangle { vertical-stretch: 1; }
 
                     HorizontalLayout {
                         spacing: 16px;
-                        Text {
-                            text: "⏱ " + test.duration-min + " min";
-                            color: Theme.text-muted;
-                            font-size: 12px;
-                        }
-                        Text {
-                            text: "🏆 Pass: " + test.pass-score + "%";
-                            color: Theme.text-muted;
-                            font-size: 12px;
-                        }
-                        if test.question-count > 0 {
-                            Text {
-                                text: "📝 " + test.question-count + " Q";
+
+                        // Duration
+                        HorizontalLayout {
+                            spacing: 4px;
+                            Icon {
+                                icon-name: "clock";
                                 color: Theme.text-muted;
-                                font-size: 12px;
+                                width: 12px; height: 12px;
+                                y: (parent.height - self.height) / 2;
+                            }
+                            Text {
+                                text: test.duration-min + " min";
+                                color: Theme.text-muted;
+                                font-size: 11px;
+                                vertical-alignment: center;
+                            }
+                        }
+                        // Pass mark
+                        HorizontalLayout {
+                            spacing: 4px;
+                            Icon {
+                                icon-name: "trophy";
+                                color: Theme.text-muted;
+                                width: 12px; height: 12px;
+                                y: (parent.height - self.height) / 2;
+                            }
+                            Text {
+                                text: "Pass " + test.pass-score + "%";
+                                color: Theme.text-muted;
+                                font-size: 11px;
+                                vertical-alignment: center;
+                            }
+                        }
+                        // Question count
+                        if test.question-count > 0 {
+                            HorizontalLayout {
+                                spacing: 4px;
+                                Icon {
+                                    icon-name: "test";
+                                    color: Theme.text-muted;
+                                    width: 12px; height: 12px;
+                                    y: (parent.height - self.height) / 2;
+                                }
+                                Text {
+                                    text: test.question-count + " Q";
+                                    color: Theme.text-muted;
+                                    font-size: 11px;
+                                    vertical-alignment: center;
+                                }
                             }
                         }
                     }

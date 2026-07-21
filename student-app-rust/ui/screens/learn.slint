@@ -1,11 +1,8 @@
-// LearnScreen — browse subjects → chapters → lessons.
-//
-// Uses internal step state (1=subjects, 2=chapters, 3=lessons).
-// The parent provides data via properties and the screen requests data
-// via callbacks (load-chapters, load-lessons).
+// LearnScreen — subjects → chapters → lessons. Professional, no emojis.
 
 import { Theme, SubjectItem, ChapterItem, LessonItem } from "../app.slint";
 import { GlassCard, GhostButton, SectionTitle } from "../components/glass.slint";
+import { Icon } from "../components/icon.slint";
 import { TouchArea, ScrollView } from "std-widgets.slint";
 
 export component LearnScreen inherits Rectangle {
@@ -36,13 +33,14 @@ export component LearnScreen inherits Rectangle {
             padding-bottom: 110px;
             spacing: 16px;
 
-            // ─── Header with back button ───────────────────────────────
+            // ─── Header ──────────────────────────────────────────────────
             HorizontalLayout {
                 spacing: 12px;
 
                 if root.step > 1 {
                     GhostButton {
-                        text: "←";
+                        text: "";
+                        icon: "arrow-left";
                         width: 44px;
                         clicked: () => {
                             if root.step == 3 { root.step = 2; }
@@ -51,11 +49,15 @@ export component LearnScreen inherits Rectangle {
                     }
                 }
 
-                SectionTitle {
+                Text {
                     text: root.step == 1 ? "Learn"
                         : root.step == 2 ? root.selected-subject-name
                         : root.selected-chapter-name;
+                    color: Theme.text-primary;
+                    font-size: 24px;
+                    font-weight: 700;
                     vertical-alignment: center;
+                    letter-spacing: -0.3px;
                 }
             }
 
@@ -84,9 +86,10 @@ export component LearnScreen inherits Rectangle {
                             height: 52px;
                             radius: 14px;
                             background: @linear-gradient(135deg, #10B981, #0D9488);
-                            Text {
-                                text: "📖";
-                                font-size: 24px;
+                            Icon {
+                                icon-name: "book";
+                                color: #FFFFFF;
+                                width: 24px; height: 24px;
                                 x: (parent.width - self.width) / 2;
                                 y: (parent.height - self.height) / 2;
                             }
@@ -96,7 +99,7 @@ export component LearnScreen inherits Rectangle {
                             Text {
                                 text: subject.name;
                                 color: Theme.text-primary;
-                                font-size: 16px;
+                                font-size: 15px;
                                 font-weight: 600;
                             }
                             Text {
@@ -106,6 +109,13 @@ export component LearnScreen inherits Rectangle {
                                 overflow: elide;
                                 width: parent.width;
                             }
+                        }
+                        Rectangle { horizontal-stretch: 1; }
+                        Icon {
+                            icon-name: "chevron-right";
+                            color: Theme.text-muted;
+                            width: 18px; height: 18px;
+                            y: (parent.height - self.height) / 2;
                         }
                     }
                 }
@@ -139,7 +149,7 @@ export component LearnScreen inherits Rectangle {
                             Text {
                                 text: i + 1;
                                 color: Theme.text-primary;
-                                font-size: 16px;
+                                font-size: 14px;
                                 font-weight: 700;
                                 x: (parent.width - self.width) / 2;
                                 y: (parent.height - self.height) / 2;
@@ -150,7 +160,7 @@ export component LearnScreen inherits Rectangle {
                             Text {
                                 text: chapter.title;
                                 color: Theme.text-primary;
-                                font-size: 15px;
+                                font-size: 14px;
                                 font-weight: 600;
                             }
                             Text {
@@ -160,6 +170,13 @@ export component LearnScreen inherits Rectangle {
                                 overflow: elide;
                                 width: parent.width;
                             }
+                        }
+                        Rectangle { horizontal-stretch: 1; }
+                        Icon {
+                            icon-name: "chevron-right";
+                            color: Theme.text-muted;
+                            width: 18px; height: 18px;
+                            y: (parent.height - self.height) / 2;
                         }
                     }
                 }
@@ -175,7 +192,7 @@ export component LearnScreen inherits Rectangle {
                     ta := TouchArea {
                         mouse-cursor: ta.has-hover ? pointer : default;
                         clicked: () => {
-                            // For now, no lesson detail screen — opening is a TODO.
+                            // Lesson detail screen is a TODO for v0.2.
                         }
                     }
                     HorizontalLayout {
@@ -187,9 +204,10 @@ export component LearnScreen inherits Rectangle {
                             height: 40px;
                             radius: 10px;
                             background: rgba(16, 185, 129, 0.15);
-                            Text {
-                                text: lesson.lesson-type == "VIDEO" ? "▶" : "📄";
-                                font-size: 18px;
+                            Icon {
+                                icon-name: lesson.lesson-type == "VIDEO" ? "play" : "file";
+                                color: Theme.accent;
+                                width: 18px; height: 18px;
                                 x: (parent.width - self.width) / 2;
                                 y: (parent.height - self.height) / 2;
                             }
@@ -199,11 +217,11 @@ export component LearnScreen inherits Rectangle {
                             Text {
                                 text: lesson.title;
                                 color: Theme.text-primary;
-                                font-size: 15px;
+                                font-size: 14px;
                                 font-weight: 500;
                             }
                             Text {
-                                text: lesson.duration-min + " min · " + lesson.lesson-type.to-lower-case();
+                                text: lesson.duration-min + " min  ·  " + lesson.lesson-type.to-lower-case();
                                 color: Theme.text-secondary;
                                 font-size: 12px;
                             }
@@ -223,7 +241,7 @@ component EmptyState inherits GlassCard {
         Text {
             text: root.message;
             color: Theme.text-muted;
-            font-size: 14px;
+            font-size: 13px;
             horizontal-alignment: center;
         }
     }

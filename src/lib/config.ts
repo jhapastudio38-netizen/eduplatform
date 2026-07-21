@@ -23,7 +23,10 @@ export const CONFIG = {
   },
   resend: {
     apiKey: process.env.RESEND_API_KEY || "",
-    fromEmail: process.env.RESEND_FROM || "onboarding@resend.dev",
+    // Resend's onboarding@resend.dev can ONLY send to the account owner's
+    // verified email. For all other recipients, you must verify your own
+    // domain at https://resend.com/domains and update RESEND_FROM.
+    fromEmail: process.env.RESEND_FROM || "EduPlatform <onboarding@resend.dev>",
   },
   groq: {
     apiKey: process.env.GROQ_API_KEY || "",

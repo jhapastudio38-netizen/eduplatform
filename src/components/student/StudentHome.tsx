@@ -38,7 +38,7 @@ export function StudentHome({ onNavigate }: { onNavigate: (v: "learn" | "tests" 
       {/* Greeting */}
       <div className="rounded-2xl bg-gradient-to-br from-emerald-500 via-teal-500 to-emerald-600 text-white p-6 shadow-lg shadow-emerald-500/20">
         <p className="text-sm text-white/80">Welcome back,</p>
-        <h2 className="text-2xl font-bold">{user?.name || "Student"} 👋</h2>
+        <h2 className="text-2xl font-bold">{user?.name || "Student"}</h2>
         <p className="text-sm text-white/80 mt-1">Keep your momentum going today.</p>
         <div className="mt-4 flex gap-2">
           <Button size="sm" variant="secondary" onClick={() => onNavigate("learn")}>

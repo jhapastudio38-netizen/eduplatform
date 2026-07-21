@@ -35,11 +35,16 @@ export async function POST(req: NextRequest) {
 
   try {
     const questions = await generateQuestionsWithGroq(parsed.data);
-    return NextResponse.json({ questions });
+    return NextResponse.json({ questions, provider: "groq" });
   } catch (e) {
-    return NextResponse.json(
-      { error: e instanceof Error ? e.message : "Generation failed" },
-      { status: 502 },
-    );
+    // Groq rate-limited or unreachable → fall back to mock questions
+    // so the admin can still see the UI flow end-to-end.
+    console.warn("[AI] Groq failed, using mock fallback:", e);
+    const mock = await generateQuestionsWithGroq({ ...parsed.data, _forceMock: true } as never).catch(() => []);
+    return NextResponse.json({
+      questions: mock,
+      provider: "mock",
+      warning: e instanceof Error ? e.message : "Generation failed — using mock questions",
+    });
   }
 }
