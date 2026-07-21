@@ -1,12 +1,4 @@
-# Build Android APK using a Docker image with the Android NDK + Rust cross-compiler.
-#
-# Strategy: instead of fighting cargo-mobile2 (which is Tauri-only now),
-# we use a pre-built Docker image that has the NDK + Rust Android targets,
-# and we manually invoke cargo to produce a .so, then package it into an
-# APK using a minimal Gradle project template.
-#
-# This is more verbose but 10x more reliable than depending on
-# cargo-mobile2's churn.
+# Build Android APK — compiles the Rust .so and wraps it into an installable APK.
 
 name: Build Android APK
 
@@ -29,9 +21,6 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
 
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
@@ -63,7 +52,7 @@ jobs:
             libfreetype6-dev libfontconfig1-dev libglib2.0-dev \
             pkg-config
 
-      - name: Cache cargo registry + target
+      - name: Cache cargo
         uses: actions/cache@v4
         with:
           path: |
@@ -78,46 +67,44 @@ jobs:
         env:
           EDUPLATFORM_API_URL: ${{ secrets.EDUPLATFORM_API_URL }}
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
-          CARGO_TARGET_AARCH64_LINUX_ANDROID_LINKER: ${{ env.ANDROID_NDK_HOME }}/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android24-clang
         run: |
-          # Add the NDK linker to PATH
           export PATH="$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin:$PATH"
-          # Build for Android aarch64 with the android feature
-          cargo build --target aarch64-linux-android --features android --no-default-features --release || \
-            cargo build --target aarch64-linux-android --release
+          # Build with android features (uses android-activity backend)
+          cargo build --target aarch64-linux-android --features android --no-default-features --release
+          # Copy .so into the Android wrapper's jniLibs
+          mkdir -p ../android-wrapper/app/src/main/jniLibs/arm64-v8a
+          cp target/aarch64-linux-android/release/libeduplatform_student.so \
+             ../android-wrapper/app/src/main/jniLibs/arm64-v8a/ 2>/dev/null || \
+          cp $(find target/aarch64-linux-android/release -name "*.so" | head -1) \
+             ../android-wrapper/app/src/main/jniLibs/arm64-v8a/libeduplatform_student.so
 
-      - name: Locate the built .so
-        id: find-so
-        working-directory: student-app-rust
+      - name: Build APK with Gradle
+        working-directory: student-app-rust/android-wrapper
         run: |
-          find . -name "*.so" -path "*aarch64*"
-          SO_PATH=$(find . -name "*.so" -path "*aarch64*" | head -1)
-          if [ -z "$SO_PATH" ]; then
-            echo "::error::No .so was built. Check the cargo build output above for Slint/feature errors."
+          chmod +x ./gradlew 2>/dev/null || true
+          # Use gradle wrapper if present, else system gradle
+          if [ -f ./gradlew ]; then
+            ./gradlew assembleDebug --no-daemon
+          else
+            gradle assembleDebug --no-daemon
+          fi
+
+      - name: Find built APK
+        id: find-apk
+        working-directory: student-app-rust/android-wrapper
+        run: |
+          find . -name "*.apk" -type f 2>/dev/null
+          APK_PATH=$(find . -name "*.apk" -type f 2>/dev/null | head -1)
+          if [ -z "$APK_PATH" ]; then
+            echo "::error::No APK was built"
             exit 1
           fi
-          echo "so-path=$SO_PATH" >> $GITHUB_OUTPUT
+          echo "apk-path=$APK_PATH" >> $GITHUB_OUTPUT
 
-      - name: Upload .so artifact
+      - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: eduplatform-student-android-so
-          path: student-app-rust/${{ steps.find-so.outputs.so-path }}
+          name: eduplatform-student-debug-apk
+          path: student-app-rust/android-wrapper/${{ steps.find-apk.outputs.apk-path }}
           if-no-files-found: error
           retention-days: 30
-
-      # NOTE: Producing a complete APK from a Rust .so requires a wrapping
-      # Android project (Gradle + AndroidManifest.xml + resource files +
-      # an Activity that loads the .so). For Slint specifically, see
-      # https://docs.slint.dev/latest/docs/rust/auto-animation#android —
-      # Slint's `android-activity` backend needs a `MainActivity` that
-      # calls slint::android::init().
-      #
-      # The next iteration of this workflow will include a template
-      # android/ project that wraps the .so. For now, the .so artifact
-      # above is what gets packaged into the APK in a follow-up commit.
-
-      - name: Generate APK from .so (placeholder)
-        run: |
-          echo "::notice::Rust .so built successfully. APK packaging step is being added in the next commit."
-          echo "::notice::The .so is uploaded as an artifact and can be wrapped into an APK locally with Android Studio."

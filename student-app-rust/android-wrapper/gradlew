@@ -1,0 +1,19 @@
+#!/bin/sh
+# Gradle wrapper startup script (simplified — downloads gradle if needed)
+# In CI we use system gradle as fallback if gradlew isn't fully set up.
+
+DIR="$(cd "$(dirname "$0")" && pwd)"
+APP_HOME="$DIR"
+
+# Use system gradle if available
+if command -v gradle >/dev/null 2>&1; then
+    exec gradle "$@"
+fi
+
+# Otherwise try to use the wrapper jar
+if [ -f "$APP_HOME/gradle/wrapper/gradle-wrapper.jar" ]; then
+    exec java -classpath "$APP_HOME/gradle/wrapper/gradle-wrapper.jar" org.gradle.wrapper.GradleWrapperMain "$@"
+fi
+
+echo "Error: gradle not found and wrapper jar missing"
+exit 1
