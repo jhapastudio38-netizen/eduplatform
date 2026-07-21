@@ -1,0 +1,82 @@
+import { NextResponse, NextRequest } from "next/server";
+import { db } from "@/lib/db";
+import { getCurrentUser } from "@/lib/session";
+import { audit } from "@/lib/audit";
+
+/**
+ * POST /api/student/tests/[testId]/submit
+ * Body: { answers: { [questionId]: string | string[] } }
+ *
+ * Auto-grades objective question types (single/multiple/true-false/one-word/fill-blank).
+ * Subjective answers (short / long) require teacher/admin review.
+ */
+export async function POST(req: NextRequest, ctx: { params: Promise<{ testId: string }> }) {
+  const { testId } = await ctx.params;
+  const user = await getCurrentUser();
+  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  const body = await req.json().catch(() => ({})) as { answers?: Record<string, unknown> };
+  const answers = body.answers || {};
+
+  const test = await db.test.findUnique({
+    where: { id: testId },
+    include: {
+      items: {
+        include: { question: true },
+      },
+    },
+  });
+  if (!test) return NextResponse.json({ error: "Not found" }, { status: 404 });
+
+  let score = 0;
+  let maxScore = 0;
+  let needsManualGrading = false;
+
+  for (const item of test.items) {
+    maxScore += item.points;
+    const q = item.question;
+    const ans = answers[q.id];
+    const correct = q.correctAnswer ? JSON.parse(q.correctAnswer) : null;
+
+    if (q.type === "SINGLE_CHOICE" || q.type === "TRUE_FALSE" || q.type === "ONE_WORD" || q.type === "FILL_BLANK") {
+      if (typeof ans === "string" && correct && String(ans).trim().toLowerCase() === String(correct).trim().toLowerCase()) {
+        score += item.points;
+      }
+    } else if (q.type === "MULTIPLE_CHOICE") {
+      const selected = Array.isArray(ans) ? (ans as string[]).slice().sort() : [];
+      const correctArr = Array.isArray(correct) ? (correct as string[]).slice().sort() : [];
+      if (selected.length === correctArr.length && selected.every((v, i) => v === correctArr[i])) {
+        score += item.points;
+      }
+    } else {
+      // SHORT_ANSWER / LONG_ANSWER / MATCHING — needs human review
+      needsManualGrading = true;
+    }
+  }
+
+  const submission = await db.submission.update({
+    where: { testId_userId: { testId, userId: user.id } },
+    data: {
+      answers: JSON.stringify(answers),
+      score,
+      maxScore,
+      submittedAt: new Date(),
+      graded: !needsManualGrading,
+    },
+  });
+
+  await audit({
+    actorId: user.id,
+    action: "submit_test",
+    entity: "Submission",
+    entityId: submission.id,
+    metadata: { testId, score, maxScore, graded: submission.graded },
+    ip: req.headers.get("x-forwarded-for")?.split(",")[0],
+  });
+
+  return NextResponse.json({
+    score, maxScore,
+    graded: submission.graded,
+    submissionId: submission.id,
+  });
+}

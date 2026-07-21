@@ -1,0 +1,340 @@
+// EduPlatform — Prisma schema
+// Multi-role education app: Student / Teacher / Admin
+// Optimized for indexing & 100k concurrency.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Users & Auth ─────────────────────────────────────────────────────────────
+
+enum Role {
+  STUDENT
+  TEACHER
+  ADMIN
+}
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  phone        String?  @unique
+  name         String?
+  role         Role     @default(STUDENT)
+  avatarUrl    String?
+  isVerified   Boolean  @default(false)
+  isBanned     Boolean  @default(false)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  // Relations
+  sessions     Session[]
+  // Student-side
+  submissions  Submission[]
+  enrollments  Enrollment[]
+  qaQuestions  QAQuestion[]
+  // Teacher-side
+  liveClasses  LiveClass[]   @relation("TeacherClasses")
+  taughtChapters Chapter[]   @relation("AuthorChapters")
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  userId       String
+  token        String   @unique
+  expiresAt    DateTime
+  ip           String?
+  userAgent    String?
+  createdAt    DateTime @default(now())
+
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+model OtpCode {
+  id        String   @id @default(cuid())
+  contact   String // email or phone
+  code      String
+  purpose   String   @default("login") // login | reset | verify
+  attempts  Int      @default(0)
+  expiresAt DateTime
+  consumed  Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([contact, expiresAt])
+}
+
+// ─── Content Model (Admin-managed) ────────────────────────────────────────────
+
+model Subject {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  slug        String   @unique
+  description String?
+  iconUrl     String?
+  createdAt   DateTime @default(now())
+
+  chapters    Chapter[]
+}
+
+model Chapter {
+  id          String   @id @default(cuid())
+  subjectId   String
+  title       String
+  slug        String
+  description String?
+  order       Int      @default(0)
+  authorId    String?
+  isPublished Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  subject     Subject  @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  author      User?    @relation("AuthorChapters", fields: [authorId], references: [id])
+  lessons     Lesson[]
+  tests       Test[]
+  questions   Question[]
+
+  @@unique([subjectId, slug])
+  @@index([subjectId, order])
+}
+
+enum LessonType {
+  TEXT
+  VIDEO
+  PDF
+  INTERACTIVE
+}
+
+model Lesson {
+  id          String   @id @default(cuid())
+  chapterId   String
+  title       String
+  slug        String
+  type        LessonType @default(TEXT)
+  content     String // markdown / HTML
+  videoUrl    String?
+  attachments String? // JSON array of file URLs
+  durationMin Int      @default(10)
+  order       Int      @default(0)
+  isPublished Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  chapter     Chapter  @relation(fields: [chapterId], references: [id], onDelete: Cascade)
+  progress    LessonProgress[]
+
+  @@unique([chapterId, slug])
+  @@index([chapterId, order])
+}
+
+model LessonProgress {
+  id        String   @id @default(cuid())
+  userId    String
+  lessonId  String
+  percent   Int      @default(0)
+  completed Boolean  @default(false)
+  updatedAt DateTime @updatedAt
+
+  lesson    Lesson   @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, lessonId])
+  @@index([userId])
+}
+
+// ─── Questions, Tests, Exams ──────────────────────────────────────────────────
+
+enum QuestionType {
+  SINGLE_CHOICE
+  MULTIPLE_CHOICE
+  TRUE_FALSE
+  ONE_WORD
+  SHORT_ANSWER
+  LONG_ANSWER
+  FILL_BLANK
+  MATCHING
+}
+
+enum Difficulty {
+  EASY
+  MEDIUM
+  HARD
+}
+
+model Question {
+  id          String     @id @default(cuid())
+  chapterId   String?
+  type        QuestionType
+  difficulty  Difficulty @default(MEDIUM)
+  stem        String // question text (markdown)
+  options     String? // JSON array for MCQ
+  correctAnswer String? // JSON: string | string[] | {match: ...}
+  explanation String?
+  tags        String? // JSON array
+  aiGenerated Boolean    @default(false)
+  sourceFile  String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  chapter     Chapter?  @relation(fields: [chapterId], references: [id], onDelete: SetNull)
+  testItems   TestItem[]
+
+  @@index([chapterId])
+  @@index([type, difficulty])
+}
+
+model Test {
+  id          String   @id @default(cuid())
+  chapterId   String?
+  title       String
+  description String?
+  durationMin Int      @default(30)
+  isExam      Boolean  @default(false) // exam = weighted, scheduled
+  passScore   Int      @default(40)
+  startAt     DateTime?
+  endAt       DateTime?
+  isPublished Boolean  @default(false)
+  createdAt   DateTime @default(now())
+
+  chapter     Chapter? @relation(fields: [chapterId], references: [id], onDelete: SetNull)
+  items       TestItem[]
+  submissions Submission[]
+
+  @@index([chapterId])
+  @@index([isPublished, startAt])
+}
+
+model TestItem {
+  id          String   @id @default(cuid())
+  testId      String
+  questionId  String
+  points      Int      @default(1)
+  order       Int      @default(0)
+
+  test        Test     @relation(fields: [testId], references: [id], onDelete: Cascade)
+  question    Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+
+  @@index([testId, order])
+}
+
+model Submission {
+  id          String   @id @default(cuid())
+  testId      String
+  userId      String
+  answers     String // JSON: { questionId: answer }
+  score       Int?
+  maxScore    Int?
+  startedAt   DateTime @default(now())
+  submittedAt DateTime?
+  graded      Boolean  @default(false)
+
+  test        Test     @relation(fields: [testId], references: [id], onDelete: Cascade)
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([testId, userId]) // one submission per test per user (configurable)
+  @@index([userId, submittedAt])
+}
+
+// ─── Live Classes (Teacher) ───────────────────────────────────────────────────
+
+model LiveClass {
+  id          String   @id @default(cuid())
+  teacherId   String
+  title       String
+  description String?
+  subject     String?
+  scheduledAt DateTime
+  durationMin Int      @default(60)
+  roomCode    String   @unique
+  isLive      Boolean  @default(false)
+  endedAt     DateTime?
+  recordingUrl String?
+  createdAt   DateTime @default(now())
+
+  teacher     User     @relation("TeacherClasses", fields: [teacherId], references: [id], onDelete: Cascade)
+  attendees   LiveAttendance[]
+
+  @@index([teacherId, scheduledAt])
+  @@index([isLive])
+}
+
+model LiveAttendance {
+  id        String   @id @default(cuid())
+  classId   String
+  userId    String
+  joinedAt  DateTime @default(now())
+  leftAt    DateTime?
+
+  liveClass LiveClass @relation(fields: [classId], references: [id], onDelete: Cascade)
+
+  @@unique([classId, userId])
+  @@index([classId])
+}
+
+// ─── Q&A (Student asks, Teacher/Admin answers) ────────────────────────────────
+
+model QAQuestion {
+  id         String   @id @default(cuid())
+  userId     String
+  lessonId   String?
+  title      String
+  body       String
+  tags       String? // JSON array
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  answers    QAAnswer[]
+
+  @@index([userId, createdAt])
+  @@index([lessonId])
+}
+
+model QAAnswer {
+  id         String   @id @default(cuid())
+  questionId String
+  authorId   String
+  body       String
+  isAccepted Boolean  @default(false)
+  createdAt  DateTime @default(now())
+
+  question   QAQuestion @relation(fields: [questionId], references: [id], onDelete: Cascade)
+
+  @@index([questionId, createdAt])
+}
+
+// ─── Enrollments ──────────────────────────────────────────────────────────────
+
+model Enrollment {
+  id        String   @id @default(cuid())
+  userId    String
+  subjectId String
+  enrolledAt DateTime @default(now())
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, subjectId])
+  @@index([subjectId])
+}
+
+// ─── Audit Log (Admin actions) ────────────────────────────────────────────────
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  actorId   String?
+  action    String
+  entity    String
+  entityId  String?
+  metadata  String? // JSON
+  ip        String?
+  createdAt DateTime @default(now())
+
+  @@index([entity, entityId])
+  @@index([createdAt])
+}
