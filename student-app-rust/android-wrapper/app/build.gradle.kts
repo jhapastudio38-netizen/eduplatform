@@ -48,6 +48,8 @@ android {
     }
 }
 
+// No external dependencies needed — NativeActivity is part of the Android
+// framework (android.jar included with compileSdk). The Rust .so is loaded
+// via jniLibs, not via any Gradle dependency.
 dependencies {
-    implementation("androidx.appcompat:appcompat:1.7.0")
 }
