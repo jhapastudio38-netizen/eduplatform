@@ -75,9 +75,10 @@ jobs:
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
         run: |
-          # Install Prisma CLI in the runner and push the schema to RDS
-          # The RDS instance is publicly accessible (we set --publicly-accessible)
-          npx prisma db push --skip-generate --accept-data-loss 2>&1 | tail -20
+          # Install Prisma CLI and push the schema to the RDS Postgres database
+          npm install -g prisma@6
+          # --accept-data-loss is required because we changed providers (sqlite -> postgresql)
+          prisma db push --accept-data-loss 2>&1 | tail -30
 
       - name: Render new task definition
         id: task-def
