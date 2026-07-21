@@ -1,0 +1,29 @@
+{
+  "family": "create-eduplatform-db",
+  "networkMode": "awsvpc",
+  "executionRoleArn": "arn:aws:iam::755395261031:role/ecsTaskExecutionRole",
+  "taskRoleArn": "arn:aws:iam::755395261031:role/ecsTaskExecutionRole",
+  "cpu": "256",
+  "memory": "512",
+  "requiresCompatibilities": ["FARGATE"],
+  "containerDefinitions": [
+    {
+      "name": "db-creator",
+      "image": "postgres:15-alpine",
+      "essential": true,
+      "command": ["sh", "-c", "PGPASSWORD=$DB_PASSWORD psql -h $DB_ENDPOINT -U eduplatform -d postgres -c 'CREATE DATABASE eduplatform;' || echo 'DB may already exist'"],
+      "environment": [
+        {"name": "DB_ENDPOINT", "value": "eduplatform-db.clkk64yekaq9.ap-south-1.rds.amazonaws.com"},
+        {"name": "DB_PASSWORD", "value": "yAIyW2Y0809ZGYFPTyFHqc84uesuXX8u"}
+      ],
+      "logConfiguration": {
+        "logDriver": "awslogs",
+        "options": {
+          "awslogs-group": "/ecs/eduplatform-web",
+          "awslogs-region": "ap-south-1",
+          "awslogs-stream-prefix": "db-create"
+        }
+      }
+    }
+  ]
+}
