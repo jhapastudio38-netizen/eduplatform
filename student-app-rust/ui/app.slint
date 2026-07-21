@@ -230,58 +230,58 @@ export component App inherits Window {
         if current-screen == Screen.auth : AuthScreen {
             boot-loading: root.boot-loading;
             boot-error: root.boot-error;
-            request-otp: (c) => { root.request-otp(c); }
-            verify-otp: (c) => { root.verify-otp(c); }
-            show-otp: () => { root.current-screen = Screen.auth; /* AuthScreen handles internal step */ }
+            request-otp(c) => { root.request-otp(c); }
+            verify-otp(c) => { root.verify-otp(c); }
+            show-otp() => { root.current-screen = Screen.auth; }
         }
 
         if current-screen == Screen.home : HomeScreen {
             user: root.current-user;
             stats: root.home-stats;
             subjects: root.subjects;
-            on-load-home: () => { root.load-home(); }
-            on-navigate: (s) => { root.current-screen = s; }
+            load-home() => { root.load-home(); }
+            navigate(s) => { root.current-screen = s; }
         }
 
         if current-screen == Screen.learn : LearnScreen {
             subjects: root.subjects;
             chapters: root.chapters;
             lessons: root.lessons;
-            on-load-chapters: (id) => { root.load-chapters(id); }
-            on-load-lessons: (id) => { root.load-lessons(id); }
-            on-back: () => { root.current-screen = Screen.home; }
+            load-chapters(id) => { root.load-chapters(id); }
+            load-lessons(id) => { root.load-lessons(id); }
+            back() => { root.current-screen = Screen.home; }
         }
 
         if current-screen == Screen.tests : TestsScreen {
             tests: root.tests;
-            on-load-tests: () => { root.load-tests(); }
-            on-start-test: (id) => { root.start-test(id); }
-            on-back: () => { root.current-screen = Screen.home; }
+            load-tests() => { root.load-tests(); }
+            start-test(id) => { root.start-test(id); }
+            back() => { root.current-screen = Screen.home; }
         }
 
         if current-screen == Screen.test-runner : TestRunnerScreen {
             test: root.active-test;
-            on-submit: (id, answers) => { root.submit-test(id, answers); }
-            on-exit: () => { root.current-screen = Screen.tests; }
+            submit(id, answers) => { root.submit-test(id, answers); }
+            exit() => { root.current-screen = Screen.tests; }
         }
 
         if current-screen == Screen.test-result : TestResultScreen {
             result: root.test-result;
             pass-score: root.active-test.pass-score;
-            on-done: () => { root.current-screen = Screen.tests; }
+            done() => { root.current-screen = Screen.tests; }
         }
 
         if current-screen == Screen.qa : QAScreen {
             questions: root.qa-questions;
-            on-load-qa: () => { root.load-qa(); }
-            on-post-question: (t, b) => { root.post-question(t, b); }
-            on-back: () => { root.current-screen = Screen.home; }
+            load-qa() => { root.load-qa(); }
+            post-question(t, b) => { root.post-question(t, b); }
+            back() => { root.current-screen = Screen.home; }
         }
 
         if current-screen == Screen.profile : ProfileScreen {
             user: root.current-user;
-            on-logout: () => { root.logout(); }
-            on-back: () => { root.current-screen = Screen.home; }
+            logout() => { root.logout(); }
+            back() => { root.current-screen = Screen.home; }
         }
     }
 
@@ -292,7 +292,7 @@ export component App inherits Window {
         BottomNav {
             y: parent.height - self.height;
             current: root.current-screen;
-            on-navigate: (s) => { root.current-screen = s; }
+            navigate(s) => { root.current-screen = s; }
         }
     }
 
