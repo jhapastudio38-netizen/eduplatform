@@ -198,14 +198,7 @@ export component App inherits Window {
     Rectangle {
         width: 100%;
         height: 100%;
-        background: LinearGradient {
-            angle: 200deg;
-            stops: [
-                Theme.bg-deep 0%,
-                Theme.bg-mid 50%,
-                Theme.bg-light 100%,
-            ];
-        }
+        background: @linear-gradient(200deg, #0B1120 0%, #131A2E 50%, #1E293B 100%);
     }
 
     // ─── Subtle decorative blobs (depth, no AI-slop gradient) ────────────────
