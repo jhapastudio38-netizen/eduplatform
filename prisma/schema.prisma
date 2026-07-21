@@ -7,7 +7,11 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
+  // In production (AWS RDS) we use Postgres. In local dev we use SQLite.
+  // The DATABASE_URL env var determines which — for dev it's `file:...`,
+  // for prod it's `postgresql://...`. Prisma accepts either provider
+  // value at runtime; the URL prefix wins.
+  provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
