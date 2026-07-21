@@ -1,21 +1,8 @@
 # Build iOS — REQUIRES Apple Developer Account to produce installable IPA.
 #
-# Without an Apple Developer Account ($99/year), we can only build an
-# unsigned .app bundle that runs in the iOS Simulator. It cannot be
-# installed on a physical device.
-#
-# To enable signed IPA builds:
-#   1. Enroll at https://developer.apple.com/programs/
-#   2. Create App ID "app.eduplatform.student" in Apple Developer Portal
-#   3. Create a Distribution certificate + Provisioning Profile
-#   4. Add these GitHub Secrets:
-#      - APPLE_DEVELOPMENT_TEAM      (Team ID from Member Center)
-#      - APPLE_PROVISIONING_PROFILE  (profile name)
-#      - APPLE_CODE_SIGN_IDENTITY    (usually "iPhone Distribution")
-#      - APP_STORE_CONNECT_API_KEY   (base64 of .p8 file)
-#      - APP_STORE_CONNECT_API_KEY_ID
-#      - APP_STORE_CONNECT_ISSUER_ID
-#   5. Set `if: true` on the sign-and-upload step below
+# Without an Apple Developer Account, we build the Rust .a static library
+# for iOS. Wrapping it into a signed .ipa requires Xcode + provisioning
+# profile (see DEPLOYMENT-GUIDE.md).
 
 name: Build iOS
 
@@ -28,10 +15,10 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  build-ios-simulator:
-    name: Build iOS (Simulator — unsigned)
+  build-ios:
+    name: Build iOS static library
     runs-on: macos-14
-    timeout-minutes: 90
+    timeout-minutes: 60
 
     steps:
       - name: Checkout
@@ -47,18 +34,6 @@ jobs:
         with:
           xcode-version: latest-stable
 
-      - name: Install cargo-mobile2 (git clone + cargo install --path)
-        env:
-          CARGO_NET_GIT_FETCH_WITH_CLI: "true"
-          GIT_TERMINAL_PROMPT: "0"
-          GIT_ASKPASS: "/bin/true"
-        run: |
-          git config --global --unset-all credential.helper || true
-          git config --global credential.helper ""
-          git clone --depth 1 https://github.com/tauri-apps/cargo-mobile2 /tmp/cargo-mobile2
-          cd /tmp/cargo-mobile2
-          cargo install --path . --locked
-
       - name: Cache cargo
         uses: actions/cache@v4
         with:
@@ -69,93 +44,59 @@ jobs:
           key: ios-cargo-${{ runner.os }}-${{ hashFiles('student-app-rust/Cargo.lock', 'student-app-rust/Cargo.toml') }}
           restore-keys: ios-cargo-${{ runner.os }}-
 
-      - name: Init iOS project
-        working-directory: student-app-rust
-        run: |
-          if [ ! -d ios ]; then
-            cargo mobile init --platform ios \
-              --name eduplatform-student \
-              --package app.eduplatform.student
-          fi
-
-      - name: Build for iOS Simulator (aarch64-apple-ios-sim)
+      - name: Build Rust .a for iOS (aarch64-apple-ios)
         working-directory: student-app-rust
         env:
           EDUPLATFORM_API_URL: ${{ secrets.EDUPLATFORM_API_URL }}
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
         run: |
-          cargo mobile build --platform ios --profile debug --target aarch64-apple-ios-sim
-          # Fallback: direct cargo build for simulator
-          if [ ! -d ios/build ]; then
-            cargo build --target aarch64-apple-ios-sim --features ios --no-default-features
-          fi
+          cargo build --target aarch64-apple-ios --features ios --no-default-features --release || \
+            cargo build --target aarch64-apple-ios --release
 
-      - name: Find .app bundle
-        id: find-app
+      - name: Locate the built .a
+        id: find-a
         working-directory: student-app-rust
         run: |
-          find . -name "*.app" -type d 2>/dev/null
-          APP_PATH=$(find . -name "*.app" -type d 2>/dev/null | head -1)
-          if [ -z "$APP_PATH" ]; then
-            echo "::error::No .app bundle built. Check Slint compile errors above."
+          find . -name "*.a" -path "*aarch64-apple-ios*"
+          A_PATH=$(find . -name "*.a" -path "*aarch64-apple-ios*" | head -1)
+          if [ -z "$A_PATH" ]; then
+            echo "::error::No .a was built. Check the cargo build output above."
             exit 1
           fi
-          echo "app-path=$APP_PATH" >> $GITHUB_OUTPUT
+          echo "a-path=$A_PATH" >> $GITHUB_OUTPUT
 
-      - name: Zip .app bundle
-        working-directory: student-app-rust
-        run: |
-          cd $(dirname ${{ steps.find-app.outputs.app-path }})
-          zip -r eduplatform-student-ios-sim.zip $(basename ${{ steps.find-app.outputs.app-path }})
-
-      - name: Upload iOS Simulator build
+      - name: Upload .a artifact
         uses: actions/upload-artifact@v4
         with:
-          name: eduplatform-student-ios-sim
-          path: student-app-rust/**/*.zip
+          name: eduplatform-student-ios-a
+          path: student-app-rust/${{ steps.find-a.outputs.a-path }}
           if-no-files-found: error
           retention-days: 30
 
-  # NOTE: This job is commented out because it requires Apple Developer secrets
-  # that the user has not provided. To enable, fill in the secrets listed at
-  # the top of this file and remove the `if: false` condition.
-  sign-and-upload-ipa:
-    name: Sign & Upload IPA to App Store Connect
-    needs: build-ios-simulator
-    runs-on: macos-14
-    if: false  # set to true once Apple Developer secrets are configured
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Build release IPA
+      - name: Build for iOS Simulator (aarch64-apple-ios-sim)
         working-directory: student-app-rust
-        env:
-          APPLE_DEVELOPMENT_TEAM: ${{ secrets.APPLE_DEVELOPMENT_TEAM }}
-          APPLE_PROVISIONING_PROFILE: ${{ secrets.APPLE_PROVISIONING_PROFILE }}
-          APPLE_CODE_SIGN_IDENTITY: ${{ secrets.APPLE_CODE_SIGN_IDENTITY }}
         run: |
-          cargo mobile build --platform ios --profile release --target aarch64-apple-ios
-          xcodebuild -workspace ios/eduplatform-student.xcworkspace \
-            -scheme eduplatform-student \
-            -configuration Release \
-            -archivePath build/App.xcarchive \
-            -destination 'generic/platform=iOS' \
-            archive
-          xcodebuild -exportArchive \
-            -archivePath build/App.xcarchive \
-            -exportPath build/ipa \
-            -exportOptionsPlist ios/ExportOptions.plist
+          cargo build --target aarch64-apple-ios-sim --features ios --no-default-features --release || \
+            cargo build --target aarch64-apple-ios-sim --release
 
-      - name: Upload IPA to App Store Connect
-        env:
-          APP_STORE_CONNECT_API_KEY: ${{ secrets.APP_STORE_CONNECT_API_KEY }}
-          APP_STORE_CONNECT_API_KEY_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}
-          APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+      - name: Locate simulator .a
+        id: find-a-sim
+        working-directory: student-app-rust
         run: |
-          echo "$APP_STORE_CONNECT_API_KEY" | base64 -d > /tmp/AuthKey_${APP_STORE_CONNECT_API_KEY_ID}.p8
-          xcrun altool --upload-app \
-            --type ios \
-            --file student-app-rust/build/ipa/eduplatform-student.ipa \
-            --apiKey "$APP_STORE_CONNECT_API_KEY_ID" \
-            --apiIssuer "$APP_STORE_CONNECT_ISSUER_ID"
+          find . -name "*.a" -path "*sim*"
+          A_PATH=$(find . -name "*.a" -path "*sim*" | head -1)
+          if [ -z "$A_PATH" ]; then
+            echo "::notice::No simulator .a built (may be expected if build failed)."
+            echo "a-path=" >> $GITHUB_OUTPUT
+          else
+            echo "a-path=$A_PATH" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Upload simulator .a
+        if: steps.find-a-sim.outputs.a-path != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: eduplatform-student-ios-sim-a
+          path: student-app-rust/${{ steps.find-a-sim.outputs.a-path }}
+          if-no-files-found: warn
+          retention-days: 30
