@@ -1,0 +1,16 @@
+{
+  "Changes": [
+    {
+      "Action": "CREATE",
+      "ResourceRecordSet": {
+        "Name": "api.dreamkoreansmartclass.com.",
+        "Type": "A",
+        "AliasTarget": {
+          "HostedZoneId": "ZP97RAFLXTNZK",
+          "DNSName": "dualstack.eduplatform-alb-606377009.ap-south-1.elb.amazonaws.com.",
+          "EvaluateTargetHealth": true
+        }
+      }
+    }
+  ]
+}

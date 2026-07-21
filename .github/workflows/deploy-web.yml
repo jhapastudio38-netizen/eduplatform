@@ -1,30 +1,26 @@
-# Deploy the teacher/admin web app to AWS.
+# Build and push the Next.js Docker image to ECR, then deploy to ECS Fargate.
 #
-# Builds Next.js, uploads the standalone server + static assets to S3,
-# and triggers an ECS service update.
+# Triggers:
+#   - On push to main (when src/, prisma/, public/, Dockerfile, package.json change)
+#   - Manual dispatch
 #
 # Required GitHub Secrets:
 #   AWS_ACCESS_KEY_ID
 #   AWS_SECRET_ACCESS_KEY
-#   AWS_REGION                       e.g. ap-south-1
-#   AWS_ECS_CLUSTER                  e.g. eduplatform-prod
-#   AWS_ECS_SERVICE                  e.g. eduplatform-web
-#   AWS_S3_BUCKET                    e.g. eduplatform-web-deployments
-#   AWS_ECR_REPO                     e.g. eduplatform-web
-#   DATABASE_URL                     Postgres connection string
-#   RESEND_API_KEY
-#   GROQ_API_KEY
-#   NEXTAUTH_SECRET
+#   AWS_REGION
+#   DATABASE_URL  (Postgres connection string — set with RDS endpoint)
 
-name: Deploy Web (Teacher + Admin)
+name: Deploy Web to AWS
 
 on:
   push:
     branches: [main]
     paths:
       - "src/**"
-      - "public/**"
       - "prisma/**"
+      - "public/**"
+      - "Dockerfile"
+      - ".dockerignore"
       - "package.json"
       - "bun.lock"
       - ".github/workflows/deploy-web.yml"
@@ -32,13 +28,13 @@ on:
 
 env:
   AWS_REGION: ${{ secrets.AWS_REGION }}
-  ECS_CLUSTER: ${{ secrets.AWS_ECS_CLUSTER }}
-  ECS_SERVICE: ${{ secrets.AWS_ECS_SERVICE }}
-  ECR_REPO: ${{ secrets.AWS_ECR_REPO }}
+  ECS_CLUSTER: eduplatform-prod
+  ECS_SERVICE: eduplatform-web
+  ECR_REPO: eduplatform-web
 
 jobs:
   deploy:
-    name: Build & Deploy to AWS ECS
+    name: Build & Deploy to ECS
     runs-on: ubuntu-22.04
     timeout-minutes: 30
 
@@ -63,29 +59,37 @@ jobs:
           IMAGE_TAG: ${{ github.sha }}
         run: |
           docker build \
-            --build-arg DATABASE_URL \
-            --build-arg RESEND_API_KEY \
-            --build-arg GROQ_API_KEY \
-            --build-arg NEXTAUTH_SECRET \
-            -t $ECR_REGISTRY/$ECR_REPO:$IMAGE_TAG \
             -t $ECR_REGISTRY/$ECR_REPO:latest \
+            -t $ECR_REGISTRY/$ECR_REPO:$IMAGE_TAG \
             .
-          docker push $ECR_REGISTRY/$ECR_REPO:$IMAGE_TAG
           docker push $ECR_REGISTRY/$ECR_REPO:latest
+          docker push $ECR_REGISTRY/$ECR_REPO:$IMAGE_TAG
           echo "image=$ECR_REGISTRY/$ECR_REPO:$IMAGE_TAG" >> $GITHUB_OUTPUT
 
-      - name: Update ECS task definition
+      - name: Render new task definition
         id: task-def
         uses: aws-actions/amazon-ecs-render-task-definition@v1
         with:
-          task-definition: .aws/eduplatform-web-task.json
+          task-definition: scripts/task-def.json
           container-name: eduplatform-web
-          image: ${{ steps.build-push.outputs.image }}
+          image: ${{ steps.ecr-login.outputs.registry }}/${{ env.ECR_REPO }}:latest
+
+      - name: Register task definition
+        env:
+          TASK_ROLE_ARN: arn:aws:iam::755395261031:role/ecsTaskExecutionRole
+          DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+          DB_ENDPOINT: eduplatform-db.clkk64yekaq9.ap-south-1.rds.amazonaws.com
+        run: |
+          # Replace placeholders in task-def.json
+          sed -i "s|\$TASK_ROLE_ARN|$TASK_ROLE_ARN|g" scripts/task-def.json
+          sed -i "s|\$DB_PASSWORD|$DB_PASSWORD|g" scripts/task-def.json
+          sed -i "s|\$DB_ENDPOINT|$DB_ENDPOINT|g" scripts/task-def.json
+          aws ecs register-task-definition --cli-input-json file://scripts/task-def.json
 
       - name: Deploy to ECS
         uses: aws-actions/amazon-ecs-deploy-task-definition@v1
         with:
-          task-definition: ${{ steps.task-def.outputs.task-definition }}
+          task-definition: scripts/task-def.json
           service: ${{ env.ECS_SERVICE }}
           cluster: ${{ env.ECS_CLUSTER }}
           wait-for-service-stability: true
