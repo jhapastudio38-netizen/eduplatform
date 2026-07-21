@@ -13,6 +13,7 @@ mod strings;
 use std::sync::Arc;
 
 use slint::ComponentHandle;
+use tokio::runtime::Handle;
 
 use crate::state::AppState;
 
@@ -24,8 +25,8 @@ fn main() -> anyhow::Result<()> {
     let runtime = tokio::runtime::Builder::new_multi_thread()
         .enable_all()
         .build()?;
-    let handle = std::sync::Arc::new(runtime.handle().clone());
     let _runtime_guard = runtime.enter();
+    let handle: Handle = runtime.handle().clone();
 
     let state = Arc::new(AppState::new());
     let app = App::new()?;
@@ -34,7 +35,8 @@ fn main() -> anyhow::Result<()> {
     {
         let app_handle = app.as_weak();
         let st = state.clone();
-        handle.clone().spawn(async move {
+        let h = handle.clone();
+        handle.spawn(async move {
             if st.restore_session().await.is_ok() {
                 let _ = slint::invoke_from_event_loop(move || {
                     if let Some(h) = app_handle.upgrade() {
@@ -45,7 +47,7 @@ fn main() -> anyhow::Result<()> {
         });
     }
 
-    // Stub callbacks not used in v0.1 (Slint requires them to be set)
+    // Stub callbacks not used in v0.1
     app.on_load_home(|| {});
     app.on_load_tests(|| {});
     app.on_load_qa(|| {});
@@ -66,12 +68,13 @@ fn main() -> anyhow::Result<()> {
         let app_handle = app.as_weak();
         let st = state.clone();
         let api = state.api_client();
+        let h = handle.clone();
         app.on_request_otp(move |contact: slint::SharedString| {
             let app_handle = app_handle.clone();
             let st = st.clone();
             let api = api.clone();
             let contact = contact.to_string();
-            handle.clone().spawn(async move {
+            h.spawn(async move {
                 if let Some(h) = app_handle.upgrade() { h.set_boot_loading(true); }
                 match api.request_otp(&contact).await {
                     Ok(_) => {
@@ -102,12 +105,13 @@ fn main() -> anyhow::Result<()> {
         let app_handle = app.as_weak();
         let st = state.clone();
         let api = state.api_client();
+        let h = handle.clone();
         app.on_verify_otp(move |code: slint::SharedString| {
             let app_handle = app_handle.clone();
             let st = st.clone();
             let api = api.clone();
             let code = code.to_string();
-            handle.clone().spawn(async move {
+            h.spawn(async move {
                 if let Some(h) = app_handle.upgrade() { h.set_boot_loading(true); }
                 let contact = st.pending_contact().unwrap_or_default();
                 match api.verify_otp(&contact, &code).await {
@@ -141,10 +145,11 @@ fn main() -> anyhow::Result<()> {
     {
         let app_handle = app.as_weak();
         let st = state.clone();
+        let h = handle.clone();
         app.on_logout(move || {
             let st = st.clone();
             let app_handle = app_handle.clone();
-            handle.clone().spawn(async move {
+            h.spawn(async move {
                 st.clear_session().await;
                 let _ = slint::invoke_from_event_loop(move || {
                     if let Some(h) = app_handle.upgrade() {
