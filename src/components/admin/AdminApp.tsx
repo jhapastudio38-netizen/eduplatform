@@ -6,7 +6,7 @@ import {
   LayoutDashboard, FileText, BookOpen, FileQuestion, Users, ShoppingBag,
   GraduationCap, School, Image, Layers, Package, UserCog, BookMarked,
   ClipboardList, BarChart3, Settings, LogOut, ChevronDown, ChevronRight,
-  FolderTree, Library, Award, Bell, Search, Menu, X
+  FolderTree, Library, Award, Bell, Search, Menu, X, Headphones, Radio
 } from "lucide-react";
 import { useAuthStore } from "@/stores/auth";
 import { Button } from "@/components/ui/button";
@@ -19,11 +19,15 @@ import { AdminContent } from "./AdminContent";
 import { AdminQuestions } from "./AdminQuestions";
 import { AdminTests } from "./AdminTests";
 import { AdminUsers } from "./AdminUsers";
+import { AdminBooks } from "./AdminBooks";
+import { AdminAudioLessons } from "./AdminAudioLessons";
+import { AdminLiveRooms } from "./AdminLiveRooms";
+import { AdminStudentResults } from "./AdminStudentResults";
 import { AdminPlaceholder } from "./AdminPlaceholder";
 
 type View =
-  | "overview" | "exams" | "color-vision" | "demo-exams" | "batch-exams" | "chapter-exams"
-  | "question-bank" | "question-categories" | "all-books" | "all-courses"
+  | "overview" | "exams" | "color-vision" | "demo-exams" | "batch-exams" | "chapter-exams" | "live-rooms"
+  | "question-bank" | "question-categories" | "all-books" | "all-courses" | "audio-lessons"
   | "paid-exam-orders" | "batch-orders" | "course-orders" | "qb-orders"
   | "batch" | "student-results" | "package-results" | "classroom-results"
   | "students" | "teachers" | "pdf-viewer" | "settings"
@@ -50,6 +54,7 @@ const NAV_SECTIONS: NavSection[] = [
       { id: "demo-exams", label: "Demo Exams", icon: FileText, hasAdd: true },
       { id: "batch-exams", label: "All Batch Exams", icon: Layers, hasAdd: true },
       { id: "chapter-exams", label: "Chapter Exams", icon: BookOpen, hasAdd: true },
+      { id: "live-rooms", label: "Live Rooms", icon: Radio, hasAdd: true },
     ],
   },
   {
@@ -58,6 +63,7 @@ const NAV_SECTIONS: NavSection[] = [
       { id: "question-bank", label: "Question Bank", icon: FileQuestion, hasAdd: true },
       { id: "question-categories", label: "Question Categories", icon: FolderTree, hasAdd: true },
       { id: "all-books", label: "All Books", icon: BookMarked, hasAdd: true },
+      { id: "audio-lessons", label: "Audio Lessons", icon: Headphones, hasAdd: true },
       { id: "all-courses", label: "All Courses", icon: Library, hasAdd: true },
     ],
   },
@@ -136,8 +142,9 @@ export function AdminApp() {
     switch (view) {
       case "overview":
         return <AdminOverview onNavigate={navigate} />;
-      case "question-categories":
       case "all-books":
+        return <AdminBooks />;
+      case "question-categories":
       case "all-courses":
       case "content":
         return <AdminContent />;
@@ -151,17 +158,20 @@ export function AdminApp() {
       case "tests":
         return <AdminTests />;
       case "students":
-      case "teachers":
       case "users":
         return <AdminUsers />;
+      case "teachers":
+        return <AdminUsers />;
+      case "audio-lessons":
+        return <AdminAudioLessons />;
+      case "student-results":
+        return <AdminStudentResults />;
+      case "batch":
+        return <AdminPlaceholder title="Batch Management" description="Create and manage student batches / cohorts. Assign exams and courses to batches." />;
       case "color-vision":
         return <AdminPlaceholder title="Color Vision Test" description="Ishihara-style color vision testing module for student screening." />;
       case "pdf-viewer":
         return <AdminPlaceholder title="PDF Viewer" description="Upload and view PDF documents — textbooks, worksheets, exam papers." />;
-      case "batch":
-        return <AdminPlaceholder title="Batch Management" description="Create and manage student batches / cohorts. Assign exams and courses to batches." />;
-      case "student-results":
-        return <AdminPlaceholder title="Student Results" description="Aggregated performance data across all students and exams." />;
       case "package-results":
         return <AdminPlaceholder title="Package Results" description="Results for bundled exam packages." />;
       case "classroom-results":
@@ -241,8 +251,8 @@ export function AdminApp() {
 }
 
 function isValidView(v: string): v is View {
-  const all: string[] = ["overview", "exams", "color-vision", "demo-exams", "batch-exams", "chapter-exams",
-    "question-bank", "question-categories", "all-books", "all-courses",
+  const all: string[] = ["overview", "exams", "color-vision", "demo-exams", "batch-exams", "chapter-exams", "live-rooms",
+    "question-bank", "question-categories", "all-books", "all-courses", "audio-lessons",
     "paid-exam-orders", "batch-orders", "course-orders", "qb-orders",
     "batch", "student-results", "package-results", "classroom-results",
     "students", "teachers", "pdf-viewer", "settings", "content", "questions", "tests", "users"];

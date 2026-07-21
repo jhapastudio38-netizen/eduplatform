@@ -1,0 +1,69 @@
+{
+  "Changes": [
+    {
+      "Action": "CREATE",
+      "ResourceRecordSet": {
+        "Name": "_15884b32427d61653f3ae8184720be1a.dreamkoreasmartclass.com.",
+        "Type": "CNAME",
+        "TTL": 300,
+        "ResourceRecords": [
+          {
+            "Value": "_ec54f8dc02a652d585d9dc54178364f6.jkddzztszm.acm-validations.aws."
+          }
+        ]
+      }
+    },
+    {
+      "Action": "CREATE",
+      "ResourceRecordSet": {
+        "Name": "_b904ead7dea196a2cd710e6f61327f03.api.dreamkoreasmartclass.com.",
+        "Type": "CNAME",
+        "TTL": 300,
+        "ResourceRecords": [
+          {
+            "Value": "_7ce8e24710379da6e969ecf968313cab.jkddzztszm.acm-validations.aws."
+          }
+        ]
+      }
+    },
+    {
+      "Action": "CREATE",
+      "ResourceRecordSet": {
+        "Name": "resend._domainkey.dreamkoreasmartclass.com.",
+        "Type": "TXT",
+        "TTL": 300,
+        "ResourceRecords": [
+          {
+            "Value": "\"p=MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQCj2gT2b37zr/5GxQ+Ymzp0StblJCVHMbUEVEAR1nEm0aWdMp1h0O0UBKt06bwvTJvI+mVdcfEirpYMEx5jWiLgULnv6/LcgIDZEd0GF04JhJfTs6/BJJYd8opLK26IVvK15j1+tJCqxAYvt4kOb3pycnBbWW+z++yhk7tWPr1rkwIDAQAB\""
+          }
+        ]
+      }
+    },
+    {
+      "Action": "CREATE",
+      "ResourceRecordSet": {
+        "Name": "send.dreamkoreasmartclass.com.",
+        "Type": "MX",
+        "TTL": 300,
+        "ResourceRecords": [
+          {
+            "Value": "10 feedback-smtp.us-east-1.amazonses.com"
+          }
+        ]
+      }
+    },
+    {
+      "Action": "CREATE",
+      "ResourceRecordSet": {
+        "Name": "send.dreamkoreasmartclass.com.",
+        "Type": "TXT",
+        "TTL": 300,
+        "ResourceRecords": [
+          {
+            "Value": "\"v=spf1 include:amazonses.com ~all\""
+          }
+        ]
+      }
+    }
+  ]
+}
