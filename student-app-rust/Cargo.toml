@@ -10,6 +10,13 @@ repository = "https://github.com/your-org/eduplatform"
 name = "eduplatform-student"
 path = "src/main.rs"
 
+# For Android, we need a cdylib (libeduplatform_student.so) that the
+# android-activity backend can load via JNI.
+[lib]
+name = "eduplatform_student"
+crate-type = ["cdylib", "rlib"]
+path = "src/lib.rs"
+
 [features]
 default = ["desktop"]
 # Desktop: winit window + skia (OpenGL) — best for Linux/macOS/Windows dev

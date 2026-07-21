@@ -70,12 +70,18 @@ jobs:
         run: |
           export PATH="$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin:$PATH"
           cargo build --target aarch64-linux-android --features android --no-default-features --release
-          # Copy .so into the Android wrapper's jniLibs
+          # Find the built .so (cargo names it libeduplatform_student.so for bin crates)
+          # If it's not found in release/, fall back to any .so in the target dir.
           mkdir -p ../android-wrapper/app/src/main/jniLibs/arm64-v8a
-          cp target/aarch64-linux-android/release/libeduplatform_student.so \
-             ../android-wrapper/app/src/main/jniLibs/arm64-v8a/ 2>/dev/null || \
-          cp $(find target/aarch64-linux-android/release -name "*.so" | head -1) \
-             ../android-wrapper/app/src/main/jniLibs/arm64-v8a/libeduplatform_student.so
+          SO=$(find target/aarch64-linux-android/release -name "*.so" -type f | head -1)
+          if [ -z "$SO" ]; then
+            echo "::error::No .so file found in target/aarch64-linux-android/release/"
+            ls -la target/aarch64-linux-android/release/ || true
+            exit 1
+          fi
+          echo "Found .so: $SO"
+          cp "$SO" ../android-wrapper/app/src/main/jniLibs/arm64-v8a/libeduplatform_student.so
+          ls -la ../android-wrapper/app/src/main/jniLibs/arm64-v8a/
 
       - name: Build APK with Gradle
         working-directory: student-app-rust/android-wrapper
