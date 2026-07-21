@@ -1,10 +1,7 @@
 # Build Android debug APK from the Rust student app.
 #
-# This workflow builds an UNSIGNED/debug APK that can be sideloaded for testing.
-# It does NOT publish to Play Store (that requires a verified keystore + service account).
-#
-# For iOS: see build-ios.yml — requires macOS runner + Apple Developer Account.
-# We cannot produce an installable IPA without Apple code signing.
+# Output: unsigned debug APK (sideloadable for testing)
+# For Play Store release: requires verified keystore (see DEPLOYMENT-GUIDE.md)
 
 name: Build Android APK
 
@@ -39,13 +36,15 @@ jobs:
           distribution: temurin
           java-version: 17
 
-      - name: Setup Android SDK
+      - name: Setup Android SDK (base)
         uses: android-actions/setup-android@v3
-        with:
-          packages: |
-            platforms;android-34
-            build-tools;34.0.0
-            ndk;26.1.10909125
+
+      - name: Install Android SDK packages
+        run: |
+          yes | sdkmanager --licenses > /dev/null 2>&1 || true
+          sdkmanager "platforms;android-34" "build-tools;34.0.0" "ndk;26.1.10909125"
+          echo "ANDROID_NDK_HOME=$ANDROID_HOME/ndk/26.1.10909125" >> $GITHUB_ENV
+          echo "ANDROID_NDK_ROOT=$ANDROID_HOME/ndk/26.1.10909125" >> $GITHUB_ENV
 
       - name: Install Linux deps for Slint cross-compile
         run: |
@@ -66,10 +65,14 @@ jobs:
           key: android-cargo-${{ runner.os }}-${{ hashFiles('student-app-rust/Cargo.lock', 'student-app-rust/Cargo.toml') }}
           restore-keys: android-cargo-${{ runner.os }}-
 
-      - name: Install cargo-mobile2
+      - name: Install cargo-mobile2 (git clone + cargo install --path)
         env:
           CARGO_NET_GIT_FETCH_WITH_CLI: "true"
-        run: cargo install --git https://github.com/BrainiumLLC/cargo-mobile2 --locked
+        run: |
+          # Clone directly with git (uses runner's credential helper)
+          git clone --depth 1 https://github.com/BrainiumLLC/cargo-mobile2 /tmp/cargo-mobile2
+          cd /tmp/cargo-mobile2
+          cargo install --path . --locked
 
       - name: Init Android project
         working-directory: student-app-rust
@@ -87,12 +90,6 @@ jobs:
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
         run: |
           cargo mobile build --platform android --profile debug --target aarch64
-          # Fallback: try cargo build directly with android features if cargo mobile fails
-          if [ ! -f target/aarch64-linux-android/debug/apk/eduplatform-student.apk ] && \
-             [ ! -d android/app/build/outputs/apk ]; then
-            echo "cargo-mobile2 build failed, trying direct cargo build..."
-            cargo build --target aarch64-linux-android --features android --no-default-features
-          fi
 
       - name: Find built APK
         id: find-apk

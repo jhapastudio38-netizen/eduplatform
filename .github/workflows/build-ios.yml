@@ -47,10 +47,13 @@ jobs:
         with:
           xcode-version: latest-stable
 
-      - name: Install cargo-mobile2
+      - name: Install cargo-mobile2 (git clone + cargo install --path)
         env:
           CARGO_NET_GIT_FETCH_WITH_CLI: "true"
-        run: cargo install --git https://github.com/BrainiumLLC/cargo-mobile2 --locked
+        run: |
+          git clone --depth 1 https://github.com/BrainiumLLC/cargo-mobile2 /tmp/cargo-mobile2
+          cd /tmp/cargo-mobile2
+          cargo install --path . --locked
 
       - name: Cache cargo
         uses: actions/cache@v4
