@@ -104,12 +104,14 @@ jobs:
             echo "::error::No APK was built"
             exit 1
           fi
+          # Normalize the path — remove leading ./
+          APK_PATH=$(echo "$APK_PATH" | sed 's|^\./||')
           echo "apk-path=$APK_PATH" >> $GITHUB_OUTPUT
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: eduplatform-student-debug-apk
-          path: student-app-rust/android-wrapper/${{ steps.find-apk.outputs.apk-path }}
+          name: dreamkorea-student-debug-apk
+          path: student-app-rust/android-wrapper/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
           retention-days: 30
