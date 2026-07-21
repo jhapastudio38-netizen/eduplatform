@@ -1,10 +1,17 @@
 "use client";
 
 /**
- * AppShell — teacher/admin web app only.
+ * AppShell — DreamKorea SmartClass web app shell.
  *
- * Students must use the native mobile app (Rust + Slint, see /student-app-rust).
- * If a STUDENT role logs in here, they are redirected to download the app.
+ * Routing:
+ *   - Students access via native mobile app (Rust + Slint).
+ *   - If a student logs in here, they see a "Get the mobile app" screen.
+ *   - Teachers and admins use this web dashboard.
+ *   - Admin login URL:  /admin-login/<token>  (unguessable, rotates monthly)
+ *   - Teacher login URL: /teacher-login/<token>
+ *   - The root "/" shows the regular auth flow for students (who are
+ *     expected to use the mobile app, but can still see the web app if
+ *     they insist — they just get redirected to "get mobile app" screen).
  */
 
 import { useEffect, useState } from "react";
@@ -14,7 +21,7 @@ import { useAuthStore } from "@/stores/auth";
 import { AuthFlow } from "@/components/auth/AuthFlow";
 import { TeacherApp } from "@/components/teacher/TeacherApp";
 import { AdminApp } from "@/components/admin/AdminApp";
-import { Smartphone, LogOut, Download } from "lucide-react";
+import { Smartphone, LogOut, Download, Shield } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 export default function AppShell() {

@@ -342,3 +342,256 @@ model AuditLog {
   @@index([entity, entityId])
   @@index([createdAt])
 }
+
+// ─── DreamKorea SmartClass — Extended schema (v0.2) ──────────────────────────
+
+// Books — digital library for Korean language learning
+model Book {
+  id          String   @id @default(cuid())
+  title       String
+  slug        String   @unique
+  description String?
+  author      String?
+  coverUrl    String?
+  pdfUrl      String? // S3 URL to the PDF file
+  fileSizeKb  Int?
+  pageCount   Int?
+  category    String? // e.g. "Beginner", "Intermediate", "Advanced", "TOPIK"
+  level       String? // TOPIK 1-6
+  tags        String? // JSON array
+  isPublished Boolean  @default(false)
+  downloads   Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  chapters    BookChapter[]
+  progress    BookProgress[]
+
+  @@index([category, level])
+  @@index([isPublished])
+}
+
+model BookChapter {
+  id          String   @id @default(cuid())
+  bookId      String
+  title       String
+  order       Int      @default(0)
+  startPage   Int
+  endPage     Int
+  audioUrl    String? // Optional audio narration
+
+  book        Book     @relation(fields: [bookId], references: [id], onDelete: Cascade)
+
+  @@index([bookId, order])
+}
+
+model BookProgress {
+  id           String   @id @default(cuid())
+  userId       String
+  bookId       String
+  currentPage  Int      @default(1)
+  percent      Int      @default(0)
+  completed    Boolean  @default(false)
+  lastReadAt   DateTime @default(now())
+
+  book         Book     @relation(fields: [bookId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, bookId])
+  @@index([userId])
+}
+
+// Audio lessons — listening practice for Korean language
+model AudioLesson {
+  id          String   @id @default(cuid())
+  title       String
+  slug        String   @unique
+  description String?
+  audioUrl    String // S3 URL to the audio file (MP3/M4A)
+  durationSec Int
+  transcript  String? // Full text transcript
+  translation String? // English translation
+  level       String? // Beginner / Intermediate / Advanced / TOPIK 1-6
+  category    String? // "Conversation", "News", "Story", "Pronunciation"
+  tags        String? // JSON array
+  isPublished Boolean  @default(false)
+  plays       Int      @default(0)
+  createdAt   DateTime @default(now())
+
+  progress    AudioLessonProgress[]
+
+  @@index([level, category])
+  @@index([isPublished])
+}
+
+model AudioLessonProgress {
+  id              String   @id @default(cuid())
+  userId          String
+  audioLessonId   String
+  listenedSec     Int      @default(0)
+  completed       Boolean  @default(false)
+  lastListenedAt  DateTime @default(now())
+
+  audioLesson     AudioLesson @relation(fields: [audioLessonId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, audioLessonId])
+  @@index([userId])
+}
+
+// Exam timer customization — admin/teacher sets duration per exam
+// (Already in Test model via durationMin, but we add ExamSettings for finer control)
+model ExamSettings {
+  id              String   @id @default(cuid())
+  testId          String   @unique
+  showTimer       Boolean  @default(true)
+  allowPause      Boolean  @default(false)
+  allowReview     Boolean  @default(true)
+  shuffleQuestions Boolean @default(false)
+  passingScore    Int      @default(40) // percentage
+  maxAttempts     Int      @default(1) // 0 = unlimited
+  negativeMarking Float    @default(0) // points deducted per wrong answer
+  scheduleStartAt DateTime?
+  scheduleEndAt   DateTime?
+  proctoringEnabled Boolean @default(false)
+
+  // We don't enforce a relation to Test here to avoid schema migrations
+  // breaking — Test.durationMin remains the source of truth for duration.
+}
+
+// Live rooms — real-time classroom sessions
+model LiveRoom {
+  id          String   @id @default(cuid())
+  roomCode    String   @unique // 6-char code students enter to join
+  hostId      String // teacher or admin who created the room
+  title       String
+  description String?
+  subject     String?
+  audioOnly   Boolean  @default(true) // audio room by default (no video)
+  maxStudents Int      @default(50)
+  isLive      Boolean  @default(false)
+  startedAt   DateTime?
+  endedAt     DateTime?
+  recordingUrl String?
+  createdAt   DateTime @default(now())
+
+  attendees   LiveRoomAttendee[]
+  messages    LiveRoomMessage[]
+
+  @@index([hostId, createdAt])
+  @@index([isLive])
+}
+
+model LiveRoomAttendee {
+  id          String   @id @default(cuid())
+  roomId      String
+  userId      String
+  role        String   // "host" | "student"
+  joinedAt    DateTime @default(now())
+  leftAt      DateTime?
+  handRaised  Boolean  @default(false)
+  micEnabled  Boolean  @default(false)
+
+  room        LiveRoom @relation(fields: [roomId], references: [id], onDelete: Cascade)
+
+  @@unique([roomId, userId])
+  @@index([roomId])
+}
+
+model LiveRoomMessage {
+  id        String   @id @default(cuid())
+  roomId    String
+  userId    String
+  userName  String
+  body      String
+  isSystem  Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  room      LiveRoom @relation(fields: [roomId], references: [id], onDelete: Cascade)
+
+  @@index([roomId, createdAt])
+}
+
+// Batches — groups of students for cohort-based learning
+model Batch {
+  id          String   @id @default(cuid())
+  name        String
+  slug        String   @unique
+  description String?
+  teacherId   String?
+  startDate   DateTime?
+  endDate     DateTime?
+  createdAt   DateTime @default(now())
+
+  students    BatchStudent[]
+  exams       BatchExam[]
+
+  @@index([teacherId])
+}
+
+model BatchStudent {
+  id        String   @id @default(cuid())
+  batchId   String
+  userId    String
+  joinedAt  DateTime @default(now())
+
+  batch     Batch    @relation(fields: [batchId], references: [id], onDelete: Cascade)
+
+  @@unique([batchId, userId])
+  @@index([userId])
+}
+
+model BatchExam {
+  id        String   @id @default(cuid())
+  batchId   String
+  testId    String
+  assignedAt DateTime @default(now())
+  dueAt     DateTime?
+
+  batch     Batch    @relation(fields: [batchId], references: [id], onDelete: Cascade)
+
+  @@unique([batchId, testId])
+}
+
+// User stats — aggregated progress for student dashboard
+model UserStat {
+  id                String   @id @default(cuid())
+  userId            String   @unique
+  totalExamsTaken   Int      @default(0)
+  totalCorrectAnswers Int    @default(0)
+  totalQuestionsAnswered Int @default(0)
+  averageScore      Float    @default(0) // percentage
+  studyStreakDays   Int      @default(0)
+  lastStudyDate     DateTime?
+  totalTimeSpentMin Int      @default(0)
+  booksRead         Int      @default(0)
+  audioLessonsCompleted Int  @default(0)
+  badgesEarned      Int      @default(0)
+  updatedAt         DateTime @updatedAt
+}
+
+// Secure admin/teacher URL tokens — separate login URLs
+// Admin URL: /admin-login/<token>  (token rotates monthly)
+// Teacher URL: /teacher-login/<token>
+model SecureLoginToken {
+  id        String   @id @default(cuid())
+  role      String   // "ADMIN" | "TEACHER"
+  token     String   @unique
+  createdBy String?
+  expiresAt DateTime
+  lastUsedAt DateTime?
+  createdAt DateTime @default(now())
+
+  @@index([role, expiresAt])
+}
+
+// Push notification tokens for OTA updates + exam reminders
+model DeviceToken {
+  id        String   @id @default(cuid())
+  userId    String
+  platform  String   // "android" | "ios" | "web"
+  token     String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, platform, token])
+  @@index([userId])
+}

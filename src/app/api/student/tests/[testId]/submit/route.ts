@@ -65,6 +65,37 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ testId: st
     },
   });
 
+  // Update user stats in real time
+  const pct = maxScore > 0 ? (score / maxScore) * 100 : 0;
+  await db.userStat.upsert({
+    where: { userId: user.id },
+    create: {
+      userId: user.id,
+      totalExamsTaken: 1,
+      totalCorrectAnswers: score,
+      totalQuestionsAnswered: maxScore,
+      averageScore: pct,
+      lastStudyDate: new Date(),
+    },
+    update: {
+      totalExamsTaken: { increment: 1 },
+      totalCorrectAnswers: { increment: score },
+      totalQuestionsAnswered: { increment: maxScore },
+      lastStudyDate: new Date(),
+    },
+  });
+
+  // Recalculate average score (running average)
+  const stats = await db.userStat.findUnique({ where: { userId: user.id } });
+  if (stats && stats.totalExamsTaken > 0) {
+    // Use weighted running average: newAvg = oldAvg + (newScore - oldAvg) / n
+    const newAvg = stats.averageScore + (pct - stats.averageScore) / stats.totalExamsTaken;
+    await db.userStat.update({
+      where: { userId: user.id },
+      data: { averageScore: Math.round(newAvg * 100) / 100 },
+    });
+  }
+
   await audit({
     actorId: user.id,
     action: "submit_test",
