@@ -1,9 +1,9 @@
-// App module — wraps the Rust .so into an installable APK.
-// The .so is loaded by Slint's android-activity backend.
+// App module — wraps the Rust .so (cdylib) into an installable APK.
+// Uses NativeActivity (no Kotlin/Java code needed — the Rust android_main
+// function is the entry point, driven by android-activity crate).
 
 plugins {
     id("com.android.application")
-    id("org.jetbrains.kotlin.android")
 }
 
 android {
@@ -14,8 +14,8 @@ android {
         applicationId = "app.eduplatform.student"
         minSdk = 24
         targetSdk = 34
-        versionCode = 1
-        versionName = "0.1.0"
+        versionCode = 2
+        versionName = "0.2.0"
         ndk {
             abiFilters += listOf("arm64-v8a")
         }
@@ -39,18 +39,15 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
 
-    kotlinOptions {
-        jvmTarget = "17"
-    }
-
     sourceSets {
         getByName("main") {
             jniLibs.srcDirs("src/main/jniLibs")
+            // No Java/Kotlin source needed — NativeActivity + Rust .so
+            java.srcDirs(emptyList<String>())
         }
     }
 }
 
 dependencies {
-    implementation("androidx.core:core-ktx:1.13.1")
     implementation("androidx.appcompat:appcompat:1.7.0")
 }

@@ -18,7 +18,7 @@
       "environment": [
         {"name": "NODE_ENV", "value": "production"},
         {"name": "DATABASE_URL", "value": "postgresql://eduplatform:yAIyW2Y0809ZGYFPTyFHqc84uesuXX8u@eduplatform-db.clkk64yekaq9.ap-south-1.rds.amazonaws.com:5432/eduplatform"},
-        {"name": "NEXT_PUBLIC_APP_URL", "value": "https://dreamkoreansmartclass.com"},
+        {"name": "NEXT_PUBLIC_APP_URL", "value": "https://dreamkoreasmartclass.com"},
         {"name": "GROQ_MODEL", "value": "llama-3.3-70b-versatile"}
       ],
       "secrets": [

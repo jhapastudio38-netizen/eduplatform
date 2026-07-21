@@ -141,7 +141,7 @@ export default function TeacherLoginPage() {
                     <Label className="text-slate-200">Email or phone</Label>
                     <Input
                       className="bg-slate-800 border-slate-700 text-white"
-                      placeholder="teacher@dreamkoreansmartclass.com"
+                      placeholder="teacher@dreamkoreasmartclass.com"
                       value={contact}
                       onChange={(e) => setContact(e.target.value)}
                       onKeyDown={(e) => e.key === "Enter" && requestOtp()}

@@ -24,8 +24,8 @@ async function main() {
   });
 
   console.log("Secure login tokens created (valid for 90 days):\n");
-  console.log(`Admin URL:   https://dreamkoreansmartclass.com/admin-login/${adminToken}`);
-  console.log(`Teacher URL: https://dreamkoreansmartclass.com/teacher-login/${teacherToken}`);
+  console.log(`Admin URL:   https://dreamkoreasmartclass.com/admin-login/${adminToken}`);
+  console.log(`Teacher URL: https://dreamkoreasmartclass.com/teacher-login/${teacherToken}`);
   console.log("\nSave these URLs securely. Share with admin/teacher out-of-band.");
 
   // Create sample UserStat records for existing users

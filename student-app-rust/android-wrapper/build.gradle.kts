@@ -1,6 +1,6 @@
-// Top-level build file — EduPlatform Student Android wrapper.
+// Top-level build file — DreamKorea SmartClass Android wrapper.
+// No Kotlin plugin needed — we use NativeActivity (pure Rust + C).
 
 plugins {
     id("com.android.application") version "8.5.0" apply false
-    id("org.jetbrains.kotlin.android") version "1.9.24" apply false
 }
