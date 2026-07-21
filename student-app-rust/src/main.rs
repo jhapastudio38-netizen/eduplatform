@@ -24,7 +24,7 @@ fn main() -> anyhow::Result<()> {
     let runtime = tokio::runtime::Builder::new_multi_thread()
         .enable_all()
         .build()?;
-    let handle = runtime.handle().clone();
+    let handle = std::sync::Arc::new(runtime.handle().clone());
     let _runtime_guard = runtime.enter();
 
     let state = Arc::new(AppState::new());
@@ -34,7 +34,7 @@ fn main() -> anyhow::Result<()> {
     {
         let app_handle = app.as_weak();
         let st = state.clone();
-        handle.spawn(async move {
+        handle.clone().spawn(async move {
             if st.restore_session().await.is_ok() {
                 let _ = slint::invoke_from_event_loop(move || {
                     if let Some(h) = app_handle.upgrade() {
@@ -71,7 +71,7 @@ fn main() -> anyhow::Result<()> {
             let st = st.clone();
             let api = api.clone();
             let contact = contact.to_string();
-            handle.spawn(async move {
+            handle.clone().spawn(async move {
                 if let Some(h) = app_handle.upgrade() { h.set_boot_loading(true); }
                 match api.request_otp(&contact).await {
                     Ok(_) => {
@@ -107,7 +107,7 @@ fn main() -> anyhow::Result<()> {
             let st = st.clone();
             let api = api.clone();
             let code = code.to_string();
-            handle.spawn(async move {
+            handle.clone().spawn(async move {
                 if let Some(h) = app_handle.upgrade() { h.set_boot_loading(true); }
                 let contact = st.pending_contact().unwrap_or_default();
                 match api.verify_otp(&contact, &code).await {
@@ -144,7 +144,7 @@ fn main() -> anyhow::Result<()> {
         app.on_logout(move || {
             let st = st.clone();
             let app_handle = app_handle.clone();
-            handle.spawn(async move {
+            handle.clone().spawn(async move {
                 st.clear_session().await;
                 let _ = slint::invoke_from_event_loop(move || {
                     if let Some(h) = app_handle.upgrade() {
