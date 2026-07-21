@@ -73,7 +73,8 @@ jobs:
         run: |
           git config --global --unset-all credential.helper || true
           git config --global credential.helper ""
-          git clone --depth 1 https://github.com/BrainiumLLC/cargo-mobile2 /tmp/cargo-mobile2
+          # Repo moved from BrainiumLLC/ to tauri-apps/ — use the new location
+          git clone --depth 1 https://github.com/tauri-apps/cargo-mobile2 /tmp/cargo-mobile2
           cd /tmp/cargo-mobile2
           cargo install --path . --locked
 
