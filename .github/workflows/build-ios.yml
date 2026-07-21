@@ -50,13 +50,15 @@ jobs:
       - name: Install cargo-mobile2 (git clone + cargo install --path)
         env:
           CARGO_NET_GIT_FETCH_WITH_CLI: "true"
-          GH_TOKEN: ${{ github.token }}
+          # Prevent git from prompting for credentials interactively
+          GIT_TERMINAL_PROMPT: "0"
+          GIT_ASKPASS: "/bin/true"
         run: |
-          # Disable the credential helper that intercepts github.com requests
+          # Bypass any system credential helper that may intercept github.com
           git config --global --unset-all credential.helper || true
           git config --global credential.helper ""
-          # Use the auto-injected GITHUB_TOKEN for github.com auth
-          git clone --depth 1 "https://x-access-token:${GH_TOKEN}@github.com/BrainiumLLC/cargo-mobile2" /tmp/cargo-mobile2
+          # Public repo — clone without credentials
+          git clone --depth 1 https://github.com/BrainiumLLC/cargo-mobile2 /tmp/cargo-mobile2
           cd /tmp/cargo-mobile2
           cargo install --path . --locked
 
