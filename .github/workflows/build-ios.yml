@@ -48,6 +48,8 @@ jobs:
           xcode-version: latest-stable
 
       - name: Install cargo-mobile2
+        env:
+          CARGO_NET_GIT_FETCH_WITH_CLI: "true"
         run: cargo install --git https://github.com/BrainiumLLC/cargo-mobile2 --locked
 
       - name: Cache cargo

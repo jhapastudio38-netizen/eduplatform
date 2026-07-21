@@ -67,6 +67,8 @@ jobs:
           restore-keys: android-cargo-${{ runner.os }}-
 
       - name: Install cargo-mobile2
+        env:
+          CARGO_NET_GIT_FETCH_WITH_CLI: "true"
         run: cargo install --git https://github.com/BrainiumLLC/cargo-mobile2 --locked
 
       - name: Init Android project
