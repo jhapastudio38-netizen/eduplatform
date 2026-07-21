@@ -76,7 +76,7 @@ export component App inherits Window {
             Button {
                 text: "Send code";
                 enabled: root.contact != "";
-                clicked: () => {
+                clicked => {
                     root.request-otp(root.contact);
                     root.step = 1;
                 }
@@ -119,14 +119,14 @@ export component App inherits Window {
             Button {
                 text: "Verify and continue";
                 enabled: root.otp.length >= 6;
-                clicked: () => {
+                clicked => {
                     root.verify-otp(root.otp);
                 }
             }
 
             Button {
                 text: "Back";
-                clicked: () => { root.step = 0; }
+                clicked => { root.step = 0; }
             }
         }
     }
@@ -151,7 +151,7 @@ export component App inherits Window {
 
             Button {
                 text: "Sign out";
-                clicked: () => {
+                clicked => {
                     root.logout();
                     root.step = 0;
                 }
