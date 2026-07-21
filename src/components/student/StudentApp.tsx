@@ -53,7 +53,7 @@ export function StudentApp() {
             <div className="h-7 w-7 rounded-lg bg-gradient-to-br from-emerald-500 to-teal-600 grid place-items-center text-white">
               <BookOpen className="h-4 w-4" />
             </div>
-            <span className="font-semibold">EduPlatform</span>
+            <span className="font-semibold">DreamKorea</span>
           </div>
           <div className="flex items-center gap-2">
             <span className="text-sm text-muted-foreground hidden sm:inline">

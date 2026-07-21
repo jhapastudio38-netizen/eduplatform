@@ -39,7 +39,7 @@ export default function AppShell() {
           >
             <div className="flex flex-col items-center gap-3">
               <div className="h-10 w-10 rounded-full border-2 border-primary border-t-transparent animate-spin" />
-              <p className="text-sm text-muted-foreground">Loading EduPlatform…</p>
+              <p className="text-sm text-muted-foreground">Loading DreamKorea SmartClass…</p>
             </div>
           </motion.div>
         ) : !user ? (
@@ -67,7 +67,7 @@ export default function AppShell() {
               </div>
               <h1 className="text-2xl font-bold mb-2">Get the mobile app</h1>
               <p className="text-sm text-muted-foreground mb-6">
-                Students use the native EduPlatform mobile app for the best learning experience.
+                Students use the native DreamKorea SmartClass mobile app for the best learning experience.
                 This web dashboard is for teachers and admins only.
               </p>
               <div className="flex flex-col gap-2">

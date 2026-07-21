@@ -1,7 +1,7 @@
 {
-  "name": "EduPlatform — Learn, Teach, Manage",
-  "short_name": "EduPlatform",
-  "description": "One app for students, teachers, and admins. Learn, take tests, go live, and manage content.",
+  "name": "DreamKorea SmartClass — Learn, Teach, Manage",
+  "short_name": "DreamKorea",
+  "description": "Smart learning platform for Korean education — exams, question bank, batches, courses, and live classes.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",

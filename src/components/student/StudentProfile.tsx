@@ -72,7 +72,7 @@ export function StudentProfile() {
       </Button>
 
       <p className="text-center text-xs text-muted-foreground">
-        EduPlatform v1.0.0 · <a className="underline" href="#/privacy">Privacy</a> · <a className="underline" href="#/terms">Terms</a>
+        DreamKorea SmartClass v1.0.0 · <a className="underline" href="#/privacy">Privacy</a> · <a className="underline" href="#/terms">Terms</a>
       </p>
     </div>
   );

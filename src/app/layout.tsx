@@ -14,31 +14,31 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "EduPlatform — Learn, Teach, Manage",
+  title: "DreamKorea SmartClass — Learn, Teach, Manage",
   description:
-    "A unified education platform for students, teachers, and admins. Learn, take tests, go live, and manage content.",
+    "Smart learning platform for Korean education — exams, question bank, batches, courses, and live classes.",
   keywords: [
-    "education", "learning", "online classes", "tests", "exams",
-    "teachers", "students", "live class", "EduPlatform",
+    "DreamKorea", "SmartClass", "Korean education", "exams", "question bank",
+    "teachers", "students", "live class", "TOPIK", "Korean language",
   ],
-  authors: [{ name: "EduPlatform" }],
+  authors: [{ name: "DreamKorea SmartClass" }],
   manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
-    title: "EduPlatform",
+    title: "DreamKorea",
   },
   formatDetection: { telephone: false },
   openGraph: {
-    title: "EduPlatform — Learn, Teach, Manage",
-    description: "A unified education platform for students, teachers, and admins.",
-    siteName: "EduPlatform",
+    title: "DreamKorea SmartClass",
+    description: "Smart learning platform for Korean education.",
+    siteName: "DreamKorea SmartClass",
     type: "website",
   },
   twitter: {
     card: "summary_large_image",
-    title: "EduPlatform",
-    description: "A unified education platform for students, teachers, and admins.",
+    title: "DreamKorea SmartClass",
+    description: "Smart learning platform for Korean education.",
   },
 };
 

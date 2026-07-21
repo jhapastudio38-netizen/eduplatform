@@ -5,11 +5,11 @@
 
 export const CONFIG = {
   app: {
-    name: "EduPlatform",
-    shortName: "EduPlatform",
+    name: "DreamKorea SmartClass",
+    shortName: "DreamKorea",
     description:
-      "Learn, teach, and manage — a unified education platform for students, teachers, and admins.",
-    supportEmail: "support@eduplatform.app",
+      "Smart learning platform for Korean education — exams, question bank, batches, courses, and live classes.",
+    supportEmail: "support@dreamkoreansmartclass.com",
     url: process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000",
   },
   auth: {
@@ -26,7 +26,7 @@ export const CONFIG = {
     // Resend's onboarding@resend.dev can ONLY send to the account owner's
     // verified email. For all other recipients, you must verify your own
     // domain at https://resend.com/domains and update RESEND_FROM.
-    fromEmail: process.env.RESEND_FROM || "EduPlatform <onboarding@resend.dev>",
+    fromEmail: process.env.RESEND_FROM || "DreamKorea SmartClass <noreply@dreamkoreansmartclass.com>",
   },
   groq: {
     apiKey: process.env.GROQ_API_KEY || "",

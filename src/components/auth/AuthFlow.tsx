@@ -126,7 +126,7 @@ export function AuthFlow() {
           <div className="inline-flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 text-white shadow-lg shadow-emerald-500/20 mb-3">
             <GraduationCap className="h-7 w-7" />
           </div>
-          <h1 className="text-2xl font-bold tracking-tight">EduPlatform</h1>
+          <h1 className="text-2xl font-bold tracking-tight">DreamKorea SmartClass</h1>
           <p className="text-sm text-muted-foreground mt-1">
             One app. Three roles. Endless learning.
           </p>
@@ -140,7 +140,7 @@ export function AuthFlow() {
               {step === "otp" && "Verify it's you"}
             </CardTitle>
             <CardDescription>
-              {step === "role" && "Select how you'll use EduPlatform today."}
+              {step === "role" && "Select how you'll use DreamKorea SmartClass today."}
               {step === "contact" && "Use your Gmail or phone number — we'll send a one-time code."}
               {step === "otp" && `We sent a 6-digit code to ${contact}.`}
             </CardDescription>

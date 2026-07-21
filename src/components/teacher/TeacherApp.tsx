@@ -41,7 +41,7 @@ export function TeacherApp() {
             <div className="h-7 w-7 rounded-lg bg-gradient-to-br from-amber-500 to-orange-600 grid place-items-center text-white">
               <Radio className="h-4 w-4" />
             </div>
-            <span className="font-semibold">EduPlatform · Teacher</span>
+            <span className="font-semibold">DreamKorea · Teacher</span>
           </div>
           <div className="flex items-center gap-2">
             <span className="text-sm text-muted-foreground hidden sm:inline">
