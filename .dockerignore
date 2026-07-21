@@ -1,0 +1,14 @@
+node_modules
+.next
+.git
+.env*
+!.env.example
+upload/
+download/
+skills/
+.zscripts/
+student-app-rust/target
+student-app-rust/android
+student-app-rust/ios
+*.log
+dev.log
