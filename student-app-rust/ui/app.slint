@@ -286,9 +286,9 @@ export component App inherits Window {
     }
 
     // ─── Bottom navigation (hidden on auth + test-runner + test-result) ────
-    if current-screen == Screen.home || current-screen == Screen.learn
-       || current-screen == Screen.tests || current-screen == Screen.qa
-       || current-screen == Screen.profile {
+    if (current-screen == Screen.home || current-screen == Screen.learn ||
+         current-screen == Screen.tests || current-screen == Screen.qa ||
+         current-screen == Screen.profile) {
         BottomNav {
             y: parent.height - self.height;
             current: root.current-screen;

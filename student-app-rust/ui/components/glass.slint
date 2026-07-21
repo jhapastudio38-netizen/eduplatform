@@ -210,8 +210,8 @@ export component BottomNav inherits Rectangle {
     height: 88px;
     background: transparent;
 
-    in property <int> current: 0;
-    callback navigate(int);
+    in property <Screen> current: Screen.home;
+    callback navigate(Screen);
 
     container := Rectangle {
         x: 16px;
@@ -233,32 +233,32 @@ export component BottomNav inherits Rectangle {
             NavItem {
                 label: "Home";
                 icon-name: "home";
-                active: root.current == 0;
-                clicked: () => { root.navigate(0); }
+                active: root.current == Screen.home;
+                clicked: () => { root.navigate(Screen.home); }
             }
             NavItem {
                 label: "Learn";
                 icon-name: "book";
-                active: root.current == 1;
-                clicked: () => { root.navigate(1); }
+                active: root.current == Screen.learn;
+                clicked: () => { root.navigate(Screen.learn); }
             }
             NavItem {
                 label: "Tests";
                 icon-name: "test";
-                active: root.current == 2;
-                clicked: () => { root.navigate(2); }
+                active: root.current == Screen.tests;
+                clicked: () => { root.navigate(Screen.tests); }
             }
             NavItem {
                 label: "Q&A";
                 icon-name: "chat";
-                active: root.current == 3;
-                clicked: () => { root.navigate(3); }
+                active: root.current == Screen.qa;
+                clicked: () => { root.navigate(Screen.qa); }
             }
             NavItem {
                 label: "Profile";
                 icon-name: "user";
-                active: root.current == 4;
-                clicked: () => { root.navigate(4); }
+                active: root.current == Screen.profile;
+                clicked: () => { root.navigate(Screen.profile); }
             }
         }
     }
