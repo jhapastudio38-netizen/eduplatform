@@ -50,8 +50,7 @@ jobs:
           EDUPLATFORM_API_URL: ${{ secrets.EDUPLATFORM_API_URL }}
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
         run: |
-          cargo build --target aarch64-apple-ios --features ios --no-default-features --release || \
-            cargo build --target aarch64-apple-ios --release
+          cargo build --target aarch64-apple-ios --features ios --no-default-features --release
 
       - name: Locate the built .a
         id: find-a

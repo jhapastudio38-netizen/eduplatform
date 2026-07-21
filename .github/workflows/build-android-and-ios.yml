@@ -69,7 +69,6 @@ jobs:
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
         run: |
           export PATH="$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin:$PATH"
-          # Build with android features (uses android-activity backend)
           cargo build --target aarch64-linux-android --features android --no-default-features --release
           # Copy .so into the Android wrapper's jniLibs
           mkdir -p ../android-wrapper/app/src/main/jniLibs/arm64-v8a
