@@ -10,7 +10,7 @@
  * The public website shows institute info, features, contact — NO system access.
  */
 
-import { PublicSite } from "@/components/PublicSite";
+import PublicSite from "@/components/PublicSite";
 
 export default function Home() {
   return <PublicSite />;
