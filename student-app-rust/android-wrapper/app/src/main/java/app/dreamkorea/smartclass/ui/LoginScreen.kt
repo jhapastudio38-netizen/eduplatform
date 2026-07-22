@@ -29,6 +29,15 @@ import kotlinx.coroutines.launch
 import java.io.IOException
 import java.net.UnknownHostException
 
+// Color constants (Korean flag palette)
+val White = Color(0xFFFFFFFF)
+val DarkText = Color(0xFF1A1A2E)
+val SubText = Color(0xFF6C757D)
+val Primary = Color(0xFF003478)        // Korean flag blue
+val Accent = Color(0xFFCD2E3A)         // Korean flag red
+val ErrorRed = Color(0xFFE53935)
+val Divider = Color(0xFFE0E0E0)
+
 // Email validation helper
 private fun isEmail(s: String) = android.util.Patterns.EMAIL_ADDRESS.matcher(s).matches()
 // Phone validation: digits only, 7-15 chars, optionally starts with +
