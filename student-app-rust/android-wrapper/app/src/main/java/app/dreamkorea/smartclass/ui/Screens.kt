@@ -31,6 +31,9 @@ import app.dreamkorea.smartclass.api.*
 import app.dreamkorea.smartclass.data.AppState
 import kotlinx.coroutines.launch
 
+// Color constants used in this file
+val SuccessGreen = Color(0xFF00C853)
+
 // Navigation destinations
 sealed class Screen {
     object Home : Screen()
