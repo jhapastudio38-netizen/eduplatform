@@ -80,9 +80,7 @@ export function AuthFlow() {
         return;
       }
       toast.success("Code sent. Check your inbox or SMS.");
-      if (data.devCode) {
-        toast.info(`[DEV] Your code: ${data.devCode}`, { duration: 8000 });
-      }
+      toast.success("Code sent. Check your email inbox.");
       setStep("otp");
     } finally {
       setBusy(false);

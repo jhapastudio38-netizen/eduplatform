@@ -14,32 +14,37 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "DreamKorea SmartClass — Learn, Teach, Manage",
+  title: "DreamKorea SmartClass — Learn Korean Online | TOPIK Prep, Exams & Live Classes",
   description:
-    "Smart learning platform for Korean education — exams, question bank, batches, courses, and live classes.",
+    "Master Korean with DreamKorea SmartClass. TOPIK preparation, live classes, interactive exams, audio lessons, video tutorials, and digital books. Learn Korean from beginner to advanced.",
   keywords: [
-    "DreamKorea", "SmartClass", "Korean education", "exams", "question bank",
-    "teachers", "students", "live class", "TOPIK", "Korean language",
+    "DreamKorea", "SmartClass", "Korean language learning", "TOPIK preparation",
+    "Korean exam", "learn Korean online", "Korean classes", "Hangul",
+    "Korean language institute", "TOPIK I", "TOPIK II", "Korean vocabulary",
+    "Korean grammar", "Korean pronunciation", "online Korean course",
   ],
   authors: [{ name: "DreamKorea SmartClass" }],
   manifest: "/manifest.json",
-  appleWebApp: {
-    capable: true,
-    statusBarStyle: "default",
-    title: "DreamKorea",
-  },
+  appleWebApp: { capable: true, statusBarStyle: "default", title: "DreamKorea" },
   formatDetection: { telephone: false },
   openGraph: {
-    title: "DreamKorea SmartClass",
-    description: "Smart learning platform for Korean education.",
+    title: "DreamKorea SmartClass — Learn Korean Online",
+    description: "TOPIK prep, live classes, interactive exams, audio & video lessons, digital books.",
     siteName: "DreamKorea SmartClass",
     type: "website",
+    locale: "en_US",
   },
   twitter: {
     card: "summary_large_image",
     title: "DreamKorea SmartClass",
-    description: "Smart learning platform for Korean education.",
+    description: "Learn Korean online — TOPIK prep, exams, live classes, and more.",
   },
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: { index: true, follow: true, "max-image-preview": "large" },
+  },
+  alternates: { canonical: "https://dreamkoreasmartclass.com" },
 };
 
 export const viewport: Viewport = {

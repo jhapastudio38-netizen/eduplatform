@@ -39,7 +39,7 @@ export async function createSession(userId: string): Promise<string> {
     httpOnly: true,
     // Only require HTTPS when we actually have a cert — the ALB is HTTP-only
     // until ACM validates. Once HTTPS is live, this auto-enables Secure.
-    secure: process.env.FORCE_HTTPS === "true",
+    secure: true, // HTTPS is now live via ACM cert
     sameSite: "lax",
     path: "/",
     expires: expiresAt,

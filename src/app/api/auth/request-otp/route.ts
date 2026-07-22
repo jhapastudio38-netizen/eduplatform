@@ -94,7 +94,5 @@ export async function POST(req: NextRequest) {
   return NextResponse.json({
     ok: true,
     channel: delivery.channel,
-    // In dev mode, surface the code so testing is possible without email setup
-    devCode: delivery.channel === "dev" ? code : undefined,
   });
 }
