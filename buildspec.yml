@@ -1,0 +1,27 @@
+version: 0.2
+
+phases:
+  install:
+    runtime-versions:
+      nodejs: 20
+    commands:
+      - npm install -g bun
+      - curl -sS https://dl.yarnpkg.com/debian/pubkey.gpg | apt-key add -
+  pre_build:
+    commands:
+      - echo Logging in to Amazon ECR...
+      - aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin $ECR_REPO
+      - bun install
+      - bun run db:generate
+  build:
+    commands:
+      - echo Building Docker image...
+      - docker build -t eduplatform-web .
+      - docker tag eduplatform-web:latest $ECR_REPO:latest
+  post_build:
+    commands:
+      - echo Pushing to ECR...
+      - docker push $ECR_REPO:latest
+      - echo Updating ECS service...
+      - aws ecs update-service --cluster $ECS_CLUSTER --service $ECS_SERVICE --force-new-deployment
+      - echo Deployment complete!
