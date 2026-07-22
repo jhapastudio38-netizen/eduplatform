@@ -120,12 +120,14 @@ function QuestionDialog({ chapters, onSaved }: { chapters: Chapter[]; onSaved: (
   const [options, setOptions] = useState<string[]>(["", "", "", ""]);
   const [correct, setCorrect] = useState("");
   const [explanation, setExplanation] = useState("");
+  const [imageUrl, setImageUrl] = useState("");
+  const [audioUrl, setAudioUrl] = useState("");
   const [busy, setBusy] = useState(false);
 
   async function save() {
     if (!stem.trim()) { toast.error("Question stem required"); return; }
     setBusy(true);
-    const body: Record<string, unknown> = { type, difficulty, chapterId: chapterId || undefined, stem, explanation };
+    const body: Record<string, unknown> = { type, difficulty, chapterId: chapterId || undefined, stem, explanation, imageUrl: imageUrl || undefined, audioUrl: audioUrl || undefined };
     if (type === "SINGLE_CHOICE" || type === "MULTIPLE_CHOICE" || type === "TRUE_FALSE") {
       body.options = options.filter((o) => o.trim());
       body.correctAnswer = JSON.stringify(
@@ -145,7 +147,7 @@ function QuestionDialog({ chapters, onSaved }: { chapters: Chapter[]; onSaved: (
     if (!res.ok) { const d = await res.json(); toast.error(d.error || "Failed"); return; }
     toast.success("Question added");
     setOpen(false);
-    setStem(""); setOptions(["", "", "", ""]); setCorrect(""); setExplanation("");
+    setStem(""); setOptions(["", "", "", ""]); setCorrect(""); setExplanation(""); setImageUrl(""); setAudioUrl("");
     onSaved();
   }
 
@@ -223,6 +225,16 @@ function QuestionDialog({ chapters, onSaved }: { chapters: Chapter[]; onSaved: (
           <div>
             <Label>Explanation (optional)</Label>
             <Textarea rows={2} value={explanation} onChange={(e) => setExplanation(e.target.value)} />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <Label>Image URL (optional — for visual questions)</Label>
+              <Input value={imageUrl} onChange={(e) => setImageUrl(e.target.value)} placeholder="https://..." />
+            </div>
+            <div>
+              <Label>Audio URL (optional — for listening questions)</Label>
+              <Input value={audioUrl} onChange={(e) => setAudioUrl(e.target.value)} placeholder="https://..." />
+            </div>
           </div>
           <Button onClick={save} disabled={busy}>{busy ? "Saving…" : "Create question"}</Button>
         </div>

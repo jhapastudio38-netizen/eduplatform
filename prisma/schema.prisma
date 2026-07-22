@@ -181,6 +181,8 @@ model Question {
   correctAnswer String? // JSON: string | string[] | {match: ...}
   explanation String?
   tags        String? // JSON array
+  imageUrl    String? // Optional image for visual questions
+  audioUrl    String? // Optional audio for listening questions
   aiGenerated Boolean    @default(false)
   sourceFile  String?
   createdAt   DateTime @default(now())
@@ -199,12 +201,20 @@ model Test {
   title       String
   description String?
   durationMin Int      @default(30)
-  isExam      Boolean  @default(false) // exam = weighted, scheduled
+  isExam      Boolean  @default(false)
+  examType    String   @default("REGULAR") // UBT / TOPIK_I / TOPIK_II / DEMO / CHAPTER / BATCH / PLACEMENT / REGULAR
   passScore   Int      @default(40)
   startAt     DateTime?
   endAt       DateTime?
+  isActive    Boolean  @default(true) // admin/teacher can deactivate
   isPublished Boolean  @default(false)
+  negativeMarking Float @default(0) // points deducted per wrong answer
+  shuffleQuestions Boolean @default(false)
+  showResultImmediately Boolean @default(true)
+  maxAttempts Int      @default(1) // 0 = unlimited
+  createdBy   String? // teacher/admin who created
   createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
   chapter     Chapter? @relation(fields: [chapterId], references: [id], onDelete: SetNull)
   items       TestItem[]
@@ -212,6 +222,8 @@ model Test {
 
   @@index([chapterId])
   @@index([isPublished, startAt])
+  @@index([examType])
+  @@index([isActive])
 }
 
 model TestItem {
@@ -594,4 +606,57 @@ model DeviceToken {
 
   @@unique([userId, platform, token])
   @@index([userId])
+}
+
+// ─── v0.3 — Video lessons, enhanced exams, media questions ─────────────────
+
+// Video lessons — YouTube embeds managed by teachers/admins
+model VideoLesson {
+  id          String   @id @default(cuid())
+  title       String
+  slug        String   @unique
+  description String?
+  youtubeUrl  String   // Full YouTube URL or video ID
+  youtubeId   String   // Extracted 11-char video ID for embed
+  thumbnailUrl String?
+  durationMin Int      @default(10)
+  level       String?  // Beginner / Intermediate / Advanced / TOPIK 1-6
+  category    String?  // "Grammar", "Conversation", "TOPIK Prep", "Pronunciation"
+  chapterId   String?  // Optional: link to a book chapter
+  isPublished Boolean  @default(false)
+  views       Int      @default(0)
+  sortOrder   Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  progress    VideoLessonProgress[]
+
+  @@index([isPublished, level])
+  @@index([category])
+}
+
+model VideoLessonProgress {
+  id          String   @id @default(cuid())
+  userId      String
+  videoLessonId String
+  watchedSec  Int      @default(0)
+  completed   Boolean  @default(false)
+  lastWatchedAt DateTime @default(now())
+
+  videoLesson VideoLesson @relation(fields: [videoLessonId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, videoLessonId])
+  @@index([userId])
+}
+
+// Exam types — UBT, TOPIK, regular practice, etc.
+enum ExamType {
+  REGULAR
+  UBT
+  TOPIK_I
+  TOPIK_II
+  DEMO
+  CHAPTER
+  BATCH
+  PLACEMENT
 }

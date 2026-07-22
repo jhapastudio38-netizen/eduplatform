@@ -20,7 +20,8 @@ export async function GET(_req: NextRequest, ctx: { params: Promise<{ testId: st
           question: {
             select: {
               id: true, type: true, difficulty: true, stem: true,
-              options: true, // we strip correctAnswer on the client-visible layer
+              options: true,
+              imageUrl: true, audioUrl: true,
             },
           },
         },
@@ -28,6 +29,21 @@ export async function GET(_req: NextRequest, ctx: { params: Promise<{ testId: st
     },
   });
   if (!test) return NextResponse.json({ error: "Not found" }, { status: 404 });
+
+  // Check if exam is active
+  if (!test.isActive) {
+    return NextResponse.json({ error: "This exam has been deactivated." }, { status: 403 });
+  }
+
+  // Check if exam window hasn't started yet
+  if (test.startAt && new Date(test.startAt) > new Date()) {
+    return NextResponse.json({ error: "This exam hasn't started yet." }, { status: 403 });
+  }
+
+  // Check if exam window has ended
+  if (test.endAt && new Date(test.endAt) < new Date()) {
+    return NextResponse.json({ error: "This exam has ended." }, { status: 403 });
+  }
 
   // Create or fetch a draft submission so the timer starts now
   const draft = await db.submission.upsert({

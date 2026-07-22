@@ -143,6 +143,22 @@ export function StudentTestRunner({ test, onExit }: { test: Test; onExit: () => 
           </div>
           <p className="font-medium mb-4 whitespace-pre-wrap">{q.stem}</p>
 
+          {/* Image for visual questions */}
+          {q.imageUrl && (
+            <div className="mb-4 rounded-lg overflow-hidden border">
+              <img src={q.imageUrl} alt="Question image" className="max-w-full max-h-80 mx-auto" />
+            </div>
+          )}
+
+          {/* Audio for listening questions */}
+          {q.audioUrl && (
+            <div className="mb-4">
+              <audio controls className="w-full">
+                <source src={q.audioUrl} />
+              </audio>
+            </div>
+          )}
+
           {/* Render input based on type */}
           {q.type === "SINGLE_CHOICE" || q.type === "TRUE_FALSE" ? (
             <RadioGroup

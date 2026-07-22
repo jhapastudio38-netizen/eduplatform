@@ -55,6 +55,8 @@ export interface Question {
   difficulty: Difficulty;
   stem: string;
   options?: string[] | null;
+  imageUrl?: string | null;
+  audioUrl?: string | null;
   correctAnswer?: string | null;
   explanation?: string | null;
   tags?: string[] | null;

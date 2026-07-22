@@ -28,6 +28,16 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ testId: st
   });
   if (!test) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
+  // Check if exam is active (admin/teacher may have deactivated it)
+  if (!test.isActive) {
+    return NextResponse.json({ error: "This exam has been deactivated by the administrator." }, { status: 403 });
+  }
+
+  // Check if exam window has ended
+  if (test.endAt && new Date(test.endAt) < new Date()) {
+    return NextResponse.json({ error: "The exam period has ended." }, { status: 403 });
+  }
+
   let score = 0;
   let maxScore = 0;
   let needsManualGrading = false;
@@ -41,12 +51,17 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ testId: st
     if (q.type === "SINGLE_CHOICE" || q.type === "TRUE_FALSE" || q.type === "ONE_WORD" || q.type === "FILL_BLANK") {
       if (typeof ans === "string" && correct && String(ans).trim().toLowerCase() === String(correct).trim().toLowerCase()) {
         score += item.points;
+      } else if (ans && test.negativeMarking > 0) {
+        // Wrong answer with negative marking
+        score -= test.negativeMarking;
       }
     } else if (q.type === "MULTIPLE_CHOICE") {
       const selected = Array.isArray(ans) ? (ans as string[]).slice().sort() : [];
       const correctArr = Array.isArray(correct) ? (correct as string[]).slice().sort() : [];
       if (selected.length === correctArr.length && selected.every((v, i) => v === correctArr[i])) {
         score += item.points;
+      } else if (selected.length > 0 && test.negativeMarking > 0) {
+        score -= test.negativeMarking;
       }
     } else {
       // SHORT_ANSWER / LONG_ANSWER / MATCHING — needs human review

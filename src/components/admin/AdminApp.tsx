@@ -6,7 +6,7 @@ import {
   LayoutDashboard, FileText, BookOpen, FileQuestion, Users, ShoppingBag,
   GraduationCap, School, Image, Layers, Package, UserCog, BookMarked,
   ClipboardList, BarChart3, Settings, LogOut, ChevronDown, ChevronRight,
-  FolderTree, Library, Award, Bell, Search, Menu, X, Headphones, Radio
+  FolderTree, Library, Award, Bell, Search, Menu, X, Headphones, Radio, Video
 } from "lucide-react";
 import { useAuthStore } from "@/stores/auth";
 import { Button } from "@/components/ui/button";
@@ -21,6 +21,7 @@ import { AdminTests } from "./AdminTests";
 import { AdminUsers } from "./AdminUsers";
 import { AdminBooks } from "./AdminBooks";
 import { AdminAudioLessons } from "./AdminAudioLessons";
+import { AdminVideoLessons } from "./AdminVideoLessons";
 import { AdminLiveRooms } from "./AdminLiveRooms";
 import { AdminStudentResults } from "./AdminStudentResults";
 import { AdminPlaceholder } from "./AdminPlaceholder";
@@ -33,7 +34,7 @@ import {
 
 type View =
   | "overview" | "exams" | "color-vision" | "demo-exams" | "batch-exams" | "chapter-exams" | "live-rooms"
-  | "question-bank" | "question-categories" | "all-books" | "all-courses" | "audio-lessons"
+  | "question-bank" | "question-categories" | "all-books" | "all-courses" | "audio-lessons" | "video-lessons"
   | "paid-exam-orders" | "batch-orders" | "course-orders" | "qb-orders"
   | "batch" | "student-results" | "package-results" | "classroom-results"
   | "students" | "teachers" | "pdf-viewer" | "settings"
@@ -70,6 +71,7 @@ const NAV_SECTIONS: NavSection[] = [
       { id: "question-categories", label: "Question Categories", icon: FolderTree, hasAdd: true },
       { id: "all-books", label: "All Books", icon: BookMarked, hasAdd: true },
       { id: "audio-lessons", label: "Audio Lessons", icon: Headphones, hasAdd: true },
+      { id: "video-lessons", label: "Video Lessons", icon: Video, hasAdd: true },
       { id: "all-courses", label: "All Courses", icon: Library, hasAdd: true },
     ],
   },
@@ -175,6 +177,8 @@ export function AdminApp() {
         return <AdminUsers />;
       case "audio-lessons":
         return <AdminAudioLessons />;
+      case "video-lessons":
+        return <AdminVideoLessons />;
       case "student-results":
         return <AdminStudentResults />;
       case "batch":
@@ -266,7 +270,7 @@ export function AdminApp() {
 
 function isValidView(v: string): v is View {
   const all: string[] = ["overview", "exams", "color-vision", "demo-exams", "batch-exams", "chapter-exams", "live-rooms",
-    "question-bank", "question-categories", "all-books", "all-courses", "audio-lessons",
+    "question-bank", "question-categories", "all-books", "all-courses", "audio-lessons", "video-lessons",
     "paid-exam-orders", "batch-orders", "course-orders", "qb-orders",
     "batch", "student-results", "package-results", "classroom-results",
     "students", "teachers", "pdf-viewer", "settings", "content", "questions", "tests", "users"];
