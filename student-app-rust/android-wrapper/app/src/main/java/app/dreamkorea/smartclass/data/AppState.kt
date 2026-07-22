@@ -20,6 +20,7 @@ object AppState {
     private const val KEY_TOKEN = "token"
     private const val KEY_NAME = "name"
     private const val KEY_EMAIL = "email"
+    private const val KEY_PHONE = "phone"
     private const val KEY_ROLE = "role"
 
     private lateinit var prefs: android.content.SharedPreferences
@@ -82,6 +83,7 @@ object AppState {
             putString(KEY_TOKEN, token)
             putString(KEY_NAME, user.name ?: "Student")
             putString(KEY_EMAIL, user.email)
+            putString(KEY_PHONE, user.phone ?: "")
             putString(KEY_ROLE, user.role)
             apply()
         }
@@ -101,5 +103,17 @@ object AppState {
 
     fun isLoggedIn(): Boolean = prefs.getString(KEY_TOKEN, null) != null
     fun getUserName(): String = prefs.getString(KEY_NAME, "Student") ?: "Student"
+    fun getUserEmail(): String = prefs.getString(KEY_EMAIL, "") ?: ""
+    fun getUserPhone(): String = prefs.getString(KEY_PHONE, "") ?: ""
     fun getToken(): String = prefs.getString(KEY_TOKEN, "") ?: ""
+
+    // Lightweight cached user object (for display in profile)
+    val user: User?
+        get() = if (isLoggedIn()) User(
+            id = "",
+            name = getUserName(),
+            email = getUserEmail(),
+            phone = if (getUserPhone().isNotEmpty()) getUserPhone() else null,
+            role = prefs.getString(KEY_ROLE, "STUDENT") ?: "STUDENT"
+        ) else null
 }
