@@ -18,13 +18,15 @@ import { StudentTests } from "./StudentTests";
 import { StudentQA } from "./StudentQA";
 import { StudentProfile } from "./StudentProfile";
 import { StudentVideos } from "./StudentVideos";
+import { StudentBooks } from "./StudentBooks";
 import { cn } from "@/lib/utils";
 
-type View = "home" | "learn" | "tests" | "videos" | "qa" | "profile";
+type View = "home" | "learn" | "books" | "tests" | "videos" | "qa" | "profile";
 
 const TABS: { id: View; label: string; icon: typeof Home }[] = [
   { id: "home", label: "Home", icon: Home },
   { id: "learn", label: "Learn", icon: BookOpen },
+  { id: "books", label: "Books", icon: BookOpen },
   { id: "tests", label: "Tests", icon: FileText },
   { id: "videos", label: "Videos", icon: Video },
   { id: "qa", label: "Q&A", icon: MessageSquare },
@@ -80,6 +82,7 @@ export function StudentApp() {
           >
             {view === "home" && <StudentHome onNavigate={(v) => setView(v as any)} />}
             {view === "learn" && <StudentLearn />}
+            {view === "books" && <StudentBooks />}
             {view === "tests" && <StudentTests />}
             {view === "videos" && <StudentVideos />}
             {view === "qa" && <StudentQA />}
@@ -90,7 +93,7 @@ export function StudentApp() {
 
       {/* Bottom nav (mobile-first, also fine on desktop) */}
       <nav className="fixed bottom-0 inset-x-0 z-30 border-t bg-background/95 backdrop-blur pb-[env(safe-area-inset-bottom)]">
-        <div className="max-w-5xl mx-auto grid grid-cols-5 h-16">
+        <div className="max-w-5xl mx-auto grid grid-cols-7 h-16">
           {TABS.map((t) => {
             const Icon = t.icon;
             const active = view === t.id;
