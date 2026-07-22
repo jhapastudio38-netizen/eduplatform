@@ -37,7 +37,9 @@ export async function createSession(userId: string): Promise<string> {
   const cookieStore = await cookies();
   cookieStore.set(SESSION_COOKIE, token, {
     httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
+    // Only require HTTPS when we actually have a cert — the ALB is HTTP-only
+    // until ACM validates. Once HTTPS is live, this auto-enables Secure.
+    secure: process.env.FORCE_HTTPS === "true",
     sameSite: "lax",
     path: "/",
     expires: expiresAt,

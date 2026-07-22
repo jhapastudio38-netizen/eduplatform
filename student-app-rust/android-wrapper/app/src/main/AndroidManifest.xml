@@ -9,17 +9,12 @@
     <application
         android:allowBackup="false"
         android:icon="@mipmap/ic_launcher"
+        android:roundIcon="@mipmap/ic_launcher_round"
         android:label="DreamKorea"
         android:theme="@style/Theme.EduPlatform"
         android:supportsRtl="true"
         android:hardwareAccelerated="true">
 
-        <!--
-          NativeActivity is required by Slint's android-activity backend.
-          The native library libeduplatform_student.so must export
-          ANativeActivity_onCreate (android-activity handles this internally
-          and calls our android_main function).
-        -->
         <activity
             android:name="android.app.NativeActivity"
             android:exported="true"

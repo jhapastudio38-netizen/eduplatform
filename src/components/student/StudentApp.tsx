@@ -9,7 +9,7 @@
 
 import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Home, BookOpen, FileText, MessageSquare, User, LogOut } from "lucide-react";
+import { Home, BookOpen, FileText, MessageSquare, User, LogOut, Video } from "lucide-react";
 import { useAuthStore } from "@/stores/auth";
 import { Button } from "@/components/ui/button";
 import { StudentHome } from "./StudentHome";
@@ -17,14 +17,16 @@ import { StudentLearn } from "./StudentLearn";
 import { StudentTests } from "./StudentTests";
 import { StudentQA } from "./StudentQA";
 import { StudentProfile } from "./StudentProfile";
+import { StudentVideos } from "./StudentVideos";
 import { cn } from "@/lib/utils";
 
-type View = "home" | "learn" | "tests" | "qa" | "profile";
+type View = "home" | "learn" | "tests" | "videos" | "qa" | "profile";
 
 const TABS: { id: View; label: string; icon: typeof Home }[] = [
   { id: "home", label: "Home", icon: Home },
   { id: "learn", label: "Learn", icon: BookOpen },
   { id: "tests", label: "Tests", icon: FileText },
+  { id: "videos", label: "Videos", icon: Video },
   { id: "qa", label: "Q&A", icon: MessageSquare },
   { id: "profile", label: "Profile", icon: User },
 ];
@@ -76,9 +78,10 @@ export function StudentApp() {
             exit={{ opacity: 0, y: -6 }}
             transition={{ duration: 0.2 }}
           >
-            {view === "home" && <StudentHome onNavigate={(v) => setView(v)} />}
+            {view === "home" && <StudentHome onNavigate={(v) => setView(v as any)} />}
             {view === "learn" && <StudentLearn />}
             {view === "tests" && <StudentTests />}
+            {view === "videos" && <StudentVideos />}
             {view === "qa" && <StudentQA />}
             {view === "profile" && <StudentProfile />}
           </motion.div>
