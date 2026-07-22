@@ -7,9 +7,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Upload, FileQuestion, Trash2, Sparkles, FileText } from "lucide-react";
+import { Plus, Upload, FileQuestion, Trash2, Sparkles, FileText, Languages, CheckCircle2 } from "lucide-react";
 import type { Question, QuestionType, Difficulty, Chapter } from "@/types";
 import { toast } from "sonner";
 
@@ -118,26 +118,114 @@ function QuestionDialog({ chapters, onSaved }: { chapters: Chapter[]; onSaved: (
   const [chapterId, setChapterId] = useState<string>("");
   const [stem, setStem] = useState("");
   const [options, setOptions] = useState<string[]>(["", "", "", ""]);
-  const [correct, setCorrect] = useState("");
+  const [correct, setCorrect] = useState<string>(""); // For SINGLE_CHOICE/TRUE_FALSE/ONE_WORD: the value; for MULTIPLE_CHOICE: comma-separated
+  const [selectedCorrectIndices, setSelectedCorrectIndices] = useState<number[]>([]); // For click-to-select
   const [explanation, setExplanation] = useState("");
   const [imageUrl, setImageUrl] = useState("");
   const [audioUrl, setAudioUrl] = useState("");
+  const [audioLoop, setAudioLoop] = useState(0); // 0 = no loop, N = N times, -1 = infinite
+  const [audioLoopDelay, setAudioLoopDelay] = useState(0);
   const [busy, setBusy] = useState(false);
+  const [translating, setTranslating] = useState(false);
+
+  // Reset selection when type changes
+  useEffect(() => {
+    setSelectedCorrectIndices([]);
+    setCorrect("");
+  }, [type]);
+
+  // Click-to-select handler for MCQ options
+  function toggleCorrectOption(index: number) {
+    if (type === "MULTIPLE_CHOICE") {
+      setSelectedCorrectIndices((prev) =>
+        prev.includes(index) ? prev.filter((i) => i !== index) : [...prev, index]
+      );
+    } else {
+      // SINGLE_CHOICE / TRUE_FALSE — only one selection
+      setSelectedCorrectIndices([index]);
+    }
+  }
+
+  // Auto-translate English → Korean using Groq
+  async function translateToKorean() {
+    if (!stem.trim()) { toast.error("Enter question text first"); return; }
+    setTranslating(true);
+    try {
+      const res = await fetch("/api/admin/translate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text: stem, target: "ko", source: "en" }),
+      });
+      const data = await res.json();
+      if (!res.ok) { toast.error(data.error || "Translation failed"); return; }
+      // Append translation to original (so admin can review both)
+      setStem(`${stem}\n\n[Korean]\n${data.translation}`);
+      toast.success("Translated to Korean");
+    } catch (e) {
+      toast.error("Translation failed");
+    } finally {
+      setTranslating(false);
+    }
+  }
+
+  // Translate all options to Korean
+  async function translateOptions() {
+    const validOptions = options.filter((o) => o.trim());
+    if (validOptions.length === 0) { toast.error("Add options first"); return; }
+    setTranslating(true);
+    try {
+      const newOptions: string[] = [];
+      for (const opt of options) {
+        if (!opt.trim()) { newOptions.push(opt); continue; }
+        const res = await fetch("/api/admin/translate", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ text: opt, target: "ko", source: "en" }),
+        });
+        const data = await res.json();
+        if (res.ok) {
+          newOptions.push(`${opt} / ${data.translation}`);
+        } else {
+          newOptions.push(opt);
+        }
+      }
+      setOptions(newOptions);
+      toast.success("Options translated");
+    } catch (e) {
+      toast.error("Translation failed");
+    } finally {
+      setTranslating(false);
+    }
+  }
 
   async function save() {
     if (!stem.trim()) { toast.error("Question stem required"); return; }
     setBusy(true);
-    const body: Record<string, unknown> = { type, difficulty, chapterId: chapterId || undefined, stem, explanation, imageUrl: imageUrl || undefined, audioUrl: audioUrl || undefined };
+    const body: Record<string, unknown> = {
+      type, difficulty, chapterId: chapterId || undefined,
+      stem, explanation,
+      imageUrl: imageUrl || undefined,
+      audioUrl: audioUrl || undefined,
+      audioLoop, audioLoopDelay,
+    };
+
     if (type === "SINGLE_CHOICE" || type === "MULTIPLE_CHOICE" || type === "TRUE_FALSE") {
-      body.options = options.filter((o) => o.trim());
-      body.correctAnswer = JSON.stringify(
-        type === "MULTIPLE_CHOICE" ? correct.split(",").map((s) => s.trim()).filter(Boolean) : correct,
-      );
+      const validOptions = options.filter((o) => o.trim());
+      body.options = validOptions;
+      if (type === "MULTIPLE_CHOICE") {
+        // Use selected indices
+        body.correctAnswer = JSON.stringify(selectedCorrectIndices.map((i) => validOptions[i]).filter(Boolean));
+      } else {
+        // Single selection — use the first selected index
+        const selected = selectedCorrectIndices[0];
+        body.correctAnswer = JSON.stringify(selected !== undefined ? validOptions[selected] : correct);
+      }
     } else if (type === "ONE_WORD" || type === "FILL_BLANK") {
       body.correctAnswer = JSON.stringify(correct);
     } else {
       body.correctAnswer = JSON.stringify(correct);
     }
+
     const res = await fetch("/api/admin/questions", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -148,6 +236,7 @@ function QuestionDialog({ chapters, onSaved }: { chapters: Chapter[]; onSaved: (
     toast.success("Question added");
     setOpen(false);
     setStem(""); setOptions(["", "", "", ""]); setCorrect(""); setExplanation(""); setImageUrl(""); setAudioUrl("");
+    setSelectedCorrectIndices([]);
     onSaved();
   }
 
@@ -156,10 +245,13 @@ function QuestionDialog({ chapters, onSaved }: { chapters: Chapter[]; onSaved: (
       <DialogTrigger asChild>
         <Button><Plus className="mr-1 h-4 w-4" /> Add question</Button>
       </DialogTrigger>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader><DialogTitle>New question</DialogTitle></DialogHeader>
+      <DialogContent className="max-w-3xl max-h-[92vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>New question</DialogTitle>
+          <DialogDescription>Type in English, translate to Korean with one click. Click options to mark the correct answer.</DialogDescription>
+        </DialogHeader>
         <div className="space-y-3">
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div>
               <Label>Type</Label>
               <Select value={type} onValueChange={(v) => setType(v as QuestionType)}>
@@ -196,47 +288,188 @@ function QuestionDialog({ chapters, onSaved }: { chapters: Chapter[]; onSaved: (
               </Select>
             </div>
           </div>
+
+          {/* Question text with translate button */}
           <div>
-            <Label>Question</Label>
-            <Textarea rows={3} value={stem} onChange={(e) => setStem(e.target.value)} placeholder="What is the capital of France?" />
+            <div className="flex items-center justify-between mb-1">
+              <Label>Question text</Label>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={translateToKorean}
+                disabled={translating || !stem.trim()}
+                className="h-7 text-xs"
+              >
+                <Languages className="mr-1 h-3 w-3" />
+                {translating ? "Translating…" : "EN → 한국어"}
+              </Button>
+            </div>
+            <Textarea
+              rows={3}
+              value={stem}
+              onChange={(e) => setStem(e.target.value)}
+              placeholder="Type in English… e.g. What is the capital of Korea?"
+            />
           </div>
+
+          {/* Options with click-to-select correct answer */}
           {(type === "SINGLE_CHOICE" || type === "MULTIPLE_CHOICE" || type === "TRUE_FALSE") && (
             <div>
-              <Label>Options (one per line)</Label>
-              {options.map((o, i) => (
-                <Input key={i} className="mb-1" value={o} onChange={(e) => {
-                  const next = [...options]; next[i] = e.target.value; setOptions(next);
-                }} placeholder={`Option ${String.fromCharCode(65 + i)}`} />
-              ))}
-              <Button size="sm" variant="outline" className="mt-1" onClick={() => setOptions([...options, ""])}>+ Add option</Button>
-              <div className="mt-2">
-                <Label>Correct answer</Label>
-                <Input value={correct} onChange={(e) => setCorrect(e.target.value)}
-                  placeholder={type === "MULTIPLE_CHOICE" ? "Option A, Option C" : "Option A"} />
+              <div className="flex items-center justify-between mb-1">
+                <Label>
+                  Options — <span className="text-xs text-muted-foreground">
+                    Click the {type === "MULTIPLE_CHOICE" ? "checkboxes" : "radio"} to mark correct answer(s)
+                  </span>
+                </Label>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={translateOptions}
+                  disabled={translating}
+                  className="h-7 text-xs"
+                >
+                  <Languages className="mr-1 h-3 w-3" /> Translate all
+                </Button>
               </div>
+              {options.map((o, i) => {
+                const isSelected = selectedCorrectIndices.includes(i);
+                return (
+                  <div key={i} className="flex items-center gap-2 mb-1">
+                    <button
+                      type="button"
+                      onClick={() => toggleCorrectOption(i)}
+                      className={`shrink-0 w-5 h-5 rounded-${type === "MULTIPLE_CHOICE" ? "sm" : "full"} border-2 transition ${
+                        isSelected
+                          ? "bg-green-500 border-green-500 text-white"
+                          : "bg-white border-slate-300 hover:border-slate-400"
+                      }`}
+                      title={isSelected ? "Marked as correct" : "Click to mark as correct"}
+                    >
+                      {isSelected && <CheckCircle2 className="h-4 w-4 mx-auto" />}
+                    </button>
+                    <Input
+                      className="flex-1"
+                      value={o}
+                      onChange={(e) => {
+                        const next = [...options]; next[i] = e.target.value; setOptions(next);
+                      }}
+                      placeholder={`Option ${String.fromCharCode(65 + i)}`}
+                    />
+                    {options.length > 2 && (
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-8 px-2 text-rose-500"
+                        onClick={() => {
+                          const next = options.filter((_, idx) => idx !== i);
+                          setOptions(next);
+                          setSelectedCorrectIndices(selectedCorrectIndices.filter((idx) => idx !== i).map((idx) => idx > i ? idx - 1 : idx));
+                        }}
+                      >
+                        <Trash2 className="h-3 w-3" />
+                      </Button>
+                    )}
+                  </div>
+                );
+              })}
+              <Button size="sm" variant="outline" className="mt-1" onClick={() => setOptions([...options, ""])}>+ Add option</Button>
+              {selectedCorrectIndices.length > 0 && (
+                <p className="text-xs text-green-600 mt-2">
+                  ✓ Correct answer{selectedCorrectIndices.length > 1 ? "s" : ""}: {selectedCorrectIndices.map((i) => String.fromCharCode(65 + i)).join(", ")}
+                </p>
+              )}
             </div>
           )}
+
           {(type === "ONE_WORD" || type === "FILL_BLANK") && (
             <div>
               <Label>Correct answer</Label>
               <Input value={correct} onChange={(e) => setCorrect(e.target.value)} placeholder="Paris" />
             </div>
           )}
+
+          {/* Explanation with translate */}
           <div>
-            <Label>Explanation (optional)</Label>
+            <div className="flex items-center justify-between mb-1">
+              <Label>Explanation (optional)</Label>
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={async () => {
+                  if (!explanation.trim()) return;
+                  setTranslating(true);
+                  try {
+                    const res = await fetch("/api/admin/translate", {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({ text: explanation, target: "ko" }),
+                    });
+                    const data = await res.json();
+                    if (res.ok) setExplanation(`${explanation}\n[Korean] ${data.translation}`);
+                  } finally { setTranslating(false); }
+                }}
+                disabled={translating || !explanation.trim()}
+                className="h-7 text-xs"
+              >
+                <Languages className="mr-1 h-3 w-3" /> Translate
+              </Button>
+            </div>
             <Textarea rows={2} value={explanation} onChange={(e) => setExplanation(e.target.value)} />
           </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <Label>Image URL (optional — for visual questions)</Label>
-              <Input value={imageUrl} onChange={(e) => setImageUrl(e.target.value)} placeholder="https://..." />
-            </div>
-            <div>
-              <Label>Audio URL (optional — for listening questions)</Label>
-              <Input value={audioUrl} onChange={(e) => setAudioUrl(e.target.value)} placeholder="https://..." />
-            </div>
+
+          {/* Image URL */}
+          <div>
+            <Label>Image URL (optional — for visual questions)</Label>
+            <Input value={imageUrl} onChange={(e) => setImageUrl(e.target.value)} placeholder="https://..." />
+            {imageUrl && <img src={imageUrl} alt="Preview" className="mt-2 max-h-40 rounded border" />}
           </div>
-          <Button onClick={save} disabled={busy}>{busy ? "Saving…" : "Create question"}</Button>
+
+          {/* Audio URL with loop settings */}
+          <div className="space-y-2 p-3 border rounded-lg bg-slate-50">
+            <Label>Audio (optional — for listening exams)</Label>
+            <Input value={audioUrl} onChange={(e) => setAudioUrl(e.target.value)} placeholder="https://...mp3" />
+            {audioUrl && (
+              <div className="space-y-2">
+                <audio controls src={audioUrl} className="w-full h-8" />
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <Label className="text-xs">Loop count (0 = once, -1 = infinite)</Label>
+                    <Input
+                      type="number"
+                      value={audioLoop}
+                      onChange={(e) => setAudioLoop(parseInt(e.target.value) || 0)}
+                      min={-1}
+                      max={20}
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-xs">Delay between loops (seconds)</Label>
+                    <Input
+                      type="number"
+                      value={audioLoopDelay}
+                      onChange={(e) => setAudioLoopDelay(parseInt(e.target.value) || 0)}
+                      min={0}
+                      max={60}
+                    />
+                  </div>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  {audioLoop === -1
+                    ? "Audio will loop continuously during the question"
+                    : audioLoop === 0
+                    ? "Audio plays once"
+                    : `Audio will play ${audioLoop + 1} times with ${audioLoopDelay}s delay`}
+                </p>
+              </div>
+            )}
+          </div>
+
+          <div className="flex justify-end gap-2 pt-2">
+            <Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
+            <Button onClick={save} disabled={busy}>
+              {busy ? "Saving…" : "Create question"}
+            </Button>
+          </div>
         </div>
       </DialogContent>
     </Dialog>

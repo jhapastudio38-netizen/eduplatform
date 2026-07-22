@@ -22,6 +22,7 @@ export async function GET(_req: NextRequest, ctx: { params: Promise<{ testId: st
               id: true, type: true, difficulty: true, stem: true,
               options: true,
               imageUrl: true, audioUrl: true,
+              audioLoop: true, audioLoopDelay: true,
             },
           },
         },
