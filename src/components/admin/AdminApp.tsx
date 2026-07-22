@@ -24,6 +24,12 @@ import { AdminAudioLessons } from "./AdminAudioLessons";
 import { AdminLiveRooms } from "./AdminLiveRooms";
 import { AdminStudentResults } from "./AdminStudentResults";
 import { AdminPlaceholder } from "./AdminPlaceholder";
+import {
+  AdminDemoExams, AdminBatchExams, AdminChapterExams,
+  AdminQuestionCategories, AdminAllCourses, AdminBatch,
+  AdminPDFViewer, AdminColorVision, AdminPackageResults,
+  AdminClassroomResults, AdminOrders
+} from "./AdminSections";
 
 type View =
   | "overview" | "exams" | "color-vision" | "demo-exams" | "batch-exams" | "chapter-exams" | "live-rooms"
@@ -145,18 +151,23 @@ export function AdminApp() {
       case "all-books":
         return <AdminBooks />;
       case "question-categories":
+        return <AdminQuestionCategories />;
       case "all-courses":
+        return <AdminAllCourses />;
       case "content":
         return <AdminContent />;
       case "question-bank":
       case "questions":
         return <AdminQuestions />;
       case "exams":
-      case "demo-exams":
-      case "batch-exams":
-      case "chapter-exams":
       case "tests":
         return <AdminTests />;
+      case "demo-exams":
+        return <AdminDemoExams />;
+      case "batch-exams":
+        return <AdminBatchExams />;
+      case "chapter-exams":
+        return <AdminChapterExams />;
       case "students":
       case "users":
         return <AdminUsers />;
@@ -167,20 +178,23 @@ export function AdminApp() {
       case "student-results":
         return <AdminStudentResults />;
       case "batch":
-        return <AdminPlaceholder title="Batch Management" description="Create and manage student batches / cohorts. Assign exams and courses to batches." />;
+        return <AdminBatch />;
       case "color-vision":
-        return <AdminPlaceholder title="Color Vision Test" description="Ishihara-style color vision testing module for student screening." />;
+        return <AdminColorVision />;
       case "pdf-viewer":
-        return <AdminPlaceholder title="PDF Viewer" description="Upload and view PDF documents — textbooks, worksheets, exam papers." />;
+        return <AdminPDFViewer />;
       case "package-results":
-        return <AdminPlaceholder title="Package Results" description="Results for bundled exam packages." />;
+        return <AdminPackageResults />;
       case "classroom-results":
-        return <AdminPlaceholder title="Classroom Results" description="Performance data for virtual and physical classrooms." />;
+        return <AdminClassroomResults />;
       case "paid-exam-orders":
+        return <AdminOrders type="Paid Exam Orders" />;
       case "batch-orders":
+        return <AdminOrders type="Batch Orders" />;
       case "course-orders":
+        return <AdminOrders type="Course Orders" />;
       case "qb-orders":
-        return <AdminPlaceholder title="Orders" description="Track and manage purchases for exams, courses, and question bank access." />;
+        return <AdminOrders type="Question Bank Orders" />;
       default:
         return <AdminOverview onNavigate={navigate} />;
     }
