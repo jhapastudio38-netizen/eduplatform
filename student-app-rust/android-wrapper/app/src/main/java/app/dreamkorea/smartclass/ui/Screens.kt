@@ -40,9 +40,22 @@ fun MainScreen(userName: String, onLogout: () -> Unit) {
     val theme = rememberAppTheme()
     var tab by remember { mutableStateOf(0) }
     var settingsOpen by remember { mutableStateOf(false) }
+    var currentExamId by remember { mutableStateOf<String?>(null) }
+    var liveRoomOpen by remember { mutableStateOf(false) }
 
     Surface(modifier = Modifier.fillMaxSize(), color = theme.background) {
         Box(modifier = Modifier.fillMaxSize()) {
+            // If exam is active, show exam screen instead of tabs
+            if (currentExamId != null) {
+                ExamScreen(theme = theme, testId = currentExamId!!, onExit = { currentExamId = null })
+                return@Surface
+            }
+            // If live room is open
+            if (liveRoomOpen) {
+                LiveRoomScreen(theme = theme, onBack = { liveRoomOpen = false })
+                return@Surface
+            }
+
             Column(modifier = Modifier.fillMaxSize()) {
                 // Top bar with settings gear
                 Surface(color = theme.white, shadowElevation = 2.dp) {
@@ -82,10 +95,10 @@ fun MainScreen(userName: String, onLogout: () -> Unit) {
                 // Animated content swap
                 Box(modifier = Modifier.weight(1f)) {
                     when (tab) {
-                        0 -> HomeTab(theme, onNavigate = { tab = it })
+                        0 -> HomeTab(theme, onNavigate = { tab = it }, onStartExam = { currentExamId = it }, onOpenLiveRoom = { liveRoomOpen = true })
                         1 -> LearnTab(theme)
                         2 -> BooksTab(theme)
-                        3 -> TestsTab(theme)
+                        3 -> TestsTab(theme, onStartExam = { currentExamId = it })
                         4 -> VideosTab(theme)
                         5 -> ProfileTab(theme, userName, onLogout)
                     }
@@ -146,14 +159,18 @@ private fun navItems() = listOf(
 
 // ─── Home — all features accessible from here ─────────────────────────────────
 @Composable
-fun HomeTab(theme: AppTheme, onNavigate: (Int) -> Unit) {
+fun HomeTab(theme: AppTheme, onNavigate: (Int) -> Unit, onStartExam: (String) -> Unit = {}, onOpenLiveRoom: () -> Unit = {}) {
     val scope = rememberCoroutineScope()
     var stats by remember { mutableStateOf<UserStats?>(null) }
     var statsLoading by remember { mutableStateOf(true) }
+    var recentTests by remember { mutableStateOf<List<TestItem>>(emptyList()) }
 
     LaunchedEffect(Unit) {
         scope.launch {
-            try { stats = AppState.api.getStats().stats } catch (_: Exception) {}
+            try {
+                stats = AppState.api.getStats().stats
+                recentTests = AppState.api.getTests().tests.take(3)
+            } catch (_: Exception) {}
             statsLoading = false
         }
     }
@@ -247,6 +264,32 @@ fun HomeTab(theme: AppTheme, onNavigate: (Int) -> Unit) {
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     FeatureCard(theme, "Profile", "Your account & stats", Icons.Default.Person, Color(0xFF607D8B)) { onNavigate(5) }
                     FeatureCard(theme, "Audio", "Listening practice", Icons.Default.Headphones, Color(0xFF009688)) { onNavigate(1) }
+                }
+                // Live class card (full width)
+                Spacer(Modifier.height(10.dp))
+                Surface(
+                    color = theme.cardBg,
+                    shape = RoundedCornerShape(14.dp),
+                    modifier = Modifier.fillMaxWidth().clickable { onOpenLiveRoom() },
+                    shadowElevation = 2.dp
+                ) {
+                    Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Surface(
+                            color = theme.accent.copy(alpha = 0.15f),
+                            shape = RoundedCornerShape(10.dp),
+                            modifier = Modifier.size(44.dp)
+                        ) {
+                            Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
+                                Icon(Icons.Default.VideoCall, null, tint = theme.accent, modifier = Modifier.size(22.dp))
+                            }
+                        }
+                        Spacer(Modifier.width(12.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text("Join Live Class", color = theme.darkText, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+                            Text("Enter the 6-char code from your teacher", color = theme.subText, fontSize = 11.sp)
+                        }
+                        Icon(Icons.Default.ChevronRight, null, tint = theme.subText)
+                    }
                 }
             }
         }
@@ -473,7 +516,8 @@ fun BooksTab(theme: AppTheme) {
 
 // ─── Tests ────────────────────────────────────────────────────────────────────
 @Composable
-fun TestsTab(theme: AppTheme) {
+fun TestsTab(theme: AppTheme, onStartExam: (String) -> Unit = {}) {
+    val sound = rememberSoundManager()
     val scope = rememberCoroutineScope()
     var tests by remember { mutableStateOf<List<TestItem>>(emptyList()) }
     var loading by remember { mutableStateOf(true) }
@@ -492,7 +536,7 @@ fun TestsTab(theme: AppTheme) {
         verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
         item { Text("Tests & Exams", color = theme.darkText, fontSize = 22.sp, fontWeight = FontWeight.Bold) }
-        item { Text("Take practice tests and exams", color = theme.subText, fontSize = 12.sp) }
+        item { Text("Tap a test to start. Your stats will update automatically.", color = theme.subText, fontSize = 12.sp) }
 
         if (tests.isEmpty()) {
             item {
@@ -501,18 +545,43 @@ fun TestsTab(theme: AppTheme) {
         } else {
             itemsIndexed(tests) { i, t ->
                 AnimatedListItem(index = i, theme = theme) {
-                    Surface(color = theme.cardBg, shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth(), shadowElevation = 1.dp) {
+                    Surface(
+                        color = theme.cardBg,
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier.fillMaxWidth().clickable {
+                            sound.click()
+                            onStartExam(t.id)
+                        },
+                        shadowElevation = 2.dp
+                    ) {
                         Column(modifier = Modifier.padding(14.dp)) {
                             Row(Modifier.fillMaxWidth(), Arrangement.SpaceBetween) {
                                 Text(t.title, color = theme.darkText, fontSize = 16.sp, fontWeight = FontWeight.Bold)
-                                Text(if (t.isExam) "EXAM" else "PRACTICE", color = if (t.isExam) theme.errorRed else theme.primary, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                                Surface(
+                                    color = if (t.isExam) theme.accent.copy(alpha = 0.15f) else theme.primary.copy(alpha = 0.15f),
+                                    shape = RoundedCornerShape(6.dp)
+                                ) {
+                                    Text(
+                                        if (t.isExam) "EXAM" else "PRACTICE",
+                                        color = if (t.isExam) theme.accent else theme.primary,
+                                        fontSize = 10.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                    )
+                                }
                             }
                             if (!t.description.isNullOrBlank()) { Spacer(Modifier.height(4.dp)); Text(t.description, color = theme.subText, fontSize = 12.sp, maxLines = 2, overflow = TextOverflow.Ellipsis) }
                             Spacer(Modifier.height(8.dp))
-                            Row {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(Icons.Default.Timer, null, tint = theme.subText, modifier = Modifier.size(14.dp))
+                                Spacer(Modifier.width(4.dp))
                                 Text("${t.durationMin} min", color = theme.subText, fontSize = 11.sp)
                                 Spacer(Modifier.width(16.dp))
+                                Icon(Icons.Default.CheckCircle, null, tint = theme.subText, modifier = Modifier.size(14.dp))
+                                Spacer(Modifier.width(4.dp))
                                 Text("Pass: ${t.passScore}%", color = theme.subText, fontSize = 11.sp)
+                                Spacer(Modifier.weight(1f))
+                                Text("Start →", color = theme.primary, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
                             }
                         }
                     }
