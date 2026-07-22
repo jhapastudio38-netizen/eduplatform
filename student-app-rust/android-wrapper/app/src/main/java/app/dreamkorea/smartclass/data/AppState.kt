@@ -1,6 +1,7 @@
 package app.dreamkorea.smartclass.data
 
 import android.content.Context
+import androidx.compose.ui.graphics.Color
 import app.dreamkorea.smartclass.api.DreamKoreaApi
 import app.dreamkorea.smartclass.api.User
 import okhttp3.Cookie
@@ -17,18 +18,28 @@ import java.util.concurrent.ConcurrentHashMap
 object AppState {
     private const val BASE_URL = "https://dreamkoreasmartclass.com/"
     private const val PREFS_NAME = "dreamkorea_session"
+    private const val SETTINGS_PREFS = "dreamkorea_settings"
     private const val KEY_TOKEN = "token"
     private const val KEY_NAME = "name"
     private const val KEY_EMAIL = "email"
     private const val KEY_PHONE = "phone"
     private const val KEY_ROLE = "role"
 
+    // Settings keys
+    private const val KEY_THEME_COLOR = "theme_color"
+    private const val KEY_DARK_MODE = "dark_mode"
+    private const val KEY_TEXT_SIZE = "text_size"
+    private const val KEY_ANIMATIONS = "animations_enabled"
+    private const val KEY_NOTIFICATIONS = "notifications_enabled"
+
     private lateinit var prefs: android.content.SharedPreferences
+    private lateinit var settingsPrefs: android.content.SharedPreferences
     private val cookieStore = ConcurrentHashMap<String, MutableList<Cookie>>()
     private lateinit var baseUrl: HttpUrl
 
     fun init(context: Context) {
         prefs = context.applicationContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        settingsPrefs = context.applicationContext.getSharedPreferences(SETTINGS_PREFS, Context.MODE_PRIVATE)
         baseUrl = BASE_URL.toHttpUrl()
         val savedToken = prefs.getString(KEY_TOKEN, null)
         if (savedToken != null) {
@@ -107,7 +118,6 @@ object AppState {
     fun getUserPhone(): String = prefs.getString(KEY_PHONE, "") ?: ""
     fun getToken(): String = prefs.getString(KEY_TOKEN, "") ?: ""
 
-    // Lightweight cached user object (for display in profile)
     val user: User?
         get() = if (isLoggedIn()) User(
             id = "",
@@ -116,4 +126,42 @@ object AppState {
             phone = if (getUserPhone().isNotEmpty()) getUserPhone() else null,
             role = prefs.getString(KEY_ROLE, "STUDENT") ?: "STUDENT"
         ) else null
+
+    // ─── Settings ──────────────────────────────────────────────────────────────
+
+    /** Returns the user's chosen theme color as a Color (default: Korean flag blue). */
+    fun getThemeColor(): Color {
+        val hex = settingsPrefs.getString(KEY_THEME_COLOR, "003478") ?: "003478"
+        return try { Color(parseHex(hex)) } catch (_: Exception) { Color(0xFF003478) }
+    }
+    fun setThemeColor(hex: String) {
+        settingsPrefs.edit().putString(KEY_THEME_COLOR, hex).apply()
+    }
+
+    fun isDarkMode(): Boolean = settingsPrefs.getBoolean(KEY_DARK_MODE, false)
+    fun setDarkMode(value: Boolean) {
+        settingsPrefs.edit().putBoolean(KEY_DARK_MODE, value).apply()
+    }
+
+    /** Returns text size multiplier: 0.85 (small), 1.0 (normal), 1.15 (large), 1.3 (extra large). */
+    fun getTextSizeMultiplier(): Float = settingsPrefs.getFloat(KEY_TEXT_SIZE, 1.0f)
+    fun setTextSizeMultiplier(value: Float) {
+        settingsPrefs.edit().putFloat(KEY_TEXT_SIZE, value).apply()
+    }
+
+    fun areAnimationsEnabled(): Boolean = settingsPrefs.getBoolean(KEY_ANIMATIONS, true)
+    fun setAnimationsEnabled(value: Boolean) {
+        settingsPrefs.edit().putBoolean(KEY_ANIMATIONS, value).apply()
+    }
+
+    fun areNotificationsEnabled(): Boolean = settingsPrefs.getBoolean(KEY_NOTIFICATIONS, true)
+    fun setNotificationsEnabled(value: Boolean) {
+        settingsPrefs.edit().putBoolean(KEY_NOTIFICATIONS, value).apply()
+    }
+
+    /** Parse a 6-char hex color like "CD2E3A" into an ARGB long. */
+    private fun parseHex(hex: String): Long {
+        val clean = hex.removePrefix("#").uppercase()
+        return ("FF$clean").toLong(16)
+    }
 }
