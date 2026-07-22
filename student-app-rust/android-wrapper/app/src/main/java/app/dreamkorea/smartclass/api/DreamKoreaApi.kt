@@ -14,7 +14,8 @@ data class VerifyRequest(
     val role: String = "STUDENT",
     val name: String? = null,
     val email: String? = null,
-    val phone: String? = null
+    val phone: String? = null,
+    val password: String? = null
 )
 data class User(
     val id: String,
