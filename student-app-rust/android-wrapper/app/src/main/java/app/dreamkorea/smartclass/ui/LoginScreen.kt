@@ -20,7 +20,7 @@ import app.dreamkorea.smartclass.api.VerifyRequest
 import app.dreamkorea.smartclass.data.AppState
 import kotlinx.coroutines.launch
 
-// Clean white professional palette (matches the Korean flag theme)
+// Legacy color aliases (kept for backward compat — new code should use AppTheme)
 val White = Color(0xFFFFFFFF)
 val LightGray = Color(0xFFF8F9FA)
 val MidGray = Color(0xFFE9ECEF)
