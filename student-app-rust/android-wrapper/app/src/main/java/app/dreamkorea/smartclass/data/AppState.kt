@@ -35,12 +35,10 @@ object AppState {
         val logging = HttpLoggingInterceptor().apply { level = HttpLoggingInterceptor.Level.BASIC }
         val client = OkHttpClient.Builder()
             .addInterceptor { chain ->
-                val pref = appContext.dataStore.data
                 var token = ""
-                // Synchronous read from DataStore
                 try {
-                    val prefs = kotlinx.coroutines.runBlocking { pref }
-                    token = prefs[SESSION_TOKEN] ?: ""
+                    val prefs = kotlinx.coroutines.runBlocking { appContext.dataStore.data }
+                    token = prefs.get(SESSION_TOKEN) ?: ""
                 } catch (_: Exception) {}
                 val req = chain.request().newBuilder()
                 if (token.isNotEmpty()) {

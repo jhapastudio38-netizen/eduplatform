@@ -3,8 +3,13 @@ package app.dreamkorea.smartclass
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.*
+import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import androidx.compose.runtime.collectAsState
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import app.dreamkorea.smartclass.data.AppState
 import app.dreamkorea.smartclass.ui.*
 import kotlinx.coroutines.flow.first
@@ -28,7 +33,6 @@ class MainActivity : ComponentActivity() {
             }
 
             if (!checked) {
-                // Splash
                 Box(
                     modifier = Modifier.fillMaxSize().background(BgDark),
                     contentAlignment = Alignment.Center
@@ -48,11 +52,3 @@ class MainActivity : ComponentActivity() {
         }
     }
 }
-
-// Need these imports for Compose
-import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.*
-import androidx.compose.material3.*
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color

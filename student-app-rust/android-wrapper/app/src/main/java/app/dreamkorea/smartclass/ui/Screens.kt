@@ -129,7 +129,7 @@ fun HomeTab() {
 }
 
 @Composable
-fun StatCard(label: String, value: String, color: Color) {
+fun RowScope.StatCard(label: String, value: String, color: Color) {
     Card(
         modifier = Modifier.weight(1f),
         colors = CardDefaults.cardColors(containerColor = BgCard),
