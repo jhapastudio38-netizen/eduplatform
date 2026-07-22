@@ -1,0 +1,37 @@
+{
+  "Changes": [
+    {
+      "Action": "CREATE",
+      "ResourceRecordSet": {
+        "Name": "resend._domainkey.dreamkoreasmartclass.com.",
+        "Type": "TXT",
+        "TTL": 300,
+        "ResourceRecords": [
+          {"Value": "\"p=MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQCj2gT2b37zr/5GxQ+Ymzp0StblJCVHMbUEVEAR1nEm0aWdMp1h0O0UBKt06bwvTJvI+mVdcfEirpYMEx5jWiLgULnv6/LcgIDZEd0GF04JhJfTs6/BJJYd8opLK26IVvK15j1+tJCqxAYvt4kOb3pycnBbWW+z++yhk7tWPr1rkwIDAQAB\""}
+        ]
+      }
+    },
+    {
+      "Action": "CREATE",
+      "ResourceRecordSet": {
+        "Name": "send.dreamkoreasmartclass.com.",
+        "Type": "MX",
+        "TTL": 300,
+        "ResourceRecords": [
+          {"Value": "10 feedback-smtp.us-east-1.amazonses.com"}
+        ]
+      }
+    },
+    {
+      "Action": "CREATE",
+      "ResourceRecordSet": {
+        "Name": "send.dreamkoreasmartclass.com.",
+        "Type": "TXT",
+        "TTL": 300,
+        "ResourceRecords": [
+          {"Value": "\"v=spf1 include:amazonses.com ~all\""}
+        ]
+      }
+    }
+  ]
+}
