@@ -9,16 +9,11 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.Canvas
 import app.dreamkorea.smartclass.api.OtpRequest
 import app.dreamkorea.smartclass.api.VerifyRequest
 import app.dreamkorea.smartclass.data.AppState
@@ -62,37 +57,22 @@ fun LoginScreen(onLoginSuccess: () -> Unit) {
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
-            // Taegeuk logo (Korean flag mark)
+            // Taegeuk logo (Korean flag mark) — simplified: red top half, blue bottom half
             Box(
                 modifier = Modifier.size(64.dp).background(White, RoundedCornerShape(16.dp)),
                 contentAlignment = Alignment.Center
             ) {
-                Canvas(modifier = Modifier.size(56.dp)) {
-                    val w = size.width
-                    val h = size.height
-                    val cx = w / 2f
-                    val cy = h / 2f
-                    val r = w.coerceAtMost(h) / 2f - 4f
-                    // Outer circle
-                    drawCircle(color = Primary, style = androidx.compose.ui.graphics.drawscope.Stroke(width = 3f), radius = r, center = androidx.compose.ui.geometry.Offset(cx, cy))
-                    // Taegeuk — top half red, bottom half blue (simplified)
-                    drawArc(
-                        color = Accent,
-                        startAngle = 270f,
-                        sweepAngle = 180f,
-                        useCenter = true,
-                        topLeft = androidx.compose.ui.geometry.Offset(cx - r, cy - r),
-                        size = androidx.compose.ui.geometry.Size(r * 2, r * 2)
-                    )
-                    drawArc(
-                        color = Primary,
-                        startAngle = 90f,
-                        sweepAngle = 180f,
-                        useCenter = true,
-                        topLeft = androidx.compose.ui.geometry.Offset(cx - r, cy - r),
-                        size = androidx.compose.ui.geometry.Size(r * 2, r * 2)
-                    )
-                }
+                Box(
+                    modifier = Modifier
+                        .size(48.dp)
+                        .background(Accent, RoundedCornerShape(24.dp))
+                )
+                Box(
+                    modifier = Modifier
+                        .size(48.dp)
+                        .background(Primary, RoundedCornerShape(0.dp, 0.dp, 24.dp, 24.dp))
+                )
+                Text("한", color = White, fontSize = 22.sp, fontWeight = FontWeight.Bold)
             }
 
             Spacer(modifier = Modifier.height(20.dp))
