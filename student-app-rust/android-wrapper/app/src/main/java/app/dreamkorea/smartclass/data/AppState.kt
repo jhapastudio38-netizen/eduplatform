@@ -22,23 +22,21 @@ object AppState {
     private const val KEY_ROLE = "role"
 
     private lateinit var prefs: android.content.SharedPreferences
-
-    // In-memory cookie store — captures the ep_sid session cookie
     private val cookieStore = ConcurrentHashMap<String, MutableList<Cookie>>()
+    private lateinit var baseUrl: HttpUrl
 
     fun init(context: Context) {
         prefs = context.applicationContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-        // Restore saved cookie
+        baseUrl = HttpUrl.parse(BASE_URL)!!
         val savedToken = prefs.getString(KEY_TOKEN, null)
         if (savedToken != null) {
-            val baseUrl = okhttp3.HttpUrl.parse(BASE_URL)!!
             val cookie = Cookie.Builder()
                 .name("ep_sid")
                 .value(savedToken)
-                .domain(baseUrl.host())
+                .domain(baseUrl.host)
                 .path("/")
                 .build()
-            cookieStore[baseUrl.host()] = mutableListOf(cookie)
+            cookieStore[baseUrl.host] = mutableListOf(cookie)
         }
     }
 
@@ -47,21 +45,19 @@ object AppState {
 
         val cookieJar = object : CookieJar {
             override fun saveFromResponse(url: HttpUrl, cookies: List<Cookie>) {
-                val host = url.host()
+                val host = url.host
                 val store = cookieStore.getOrPut(host) { mutableListOf() }
                 for (cookie in cookies) {
-                    // Remove old cookies with same name
-                    store.removeAll { it.name() == cookie.name() }
+                    store.removeAll { it.name == cookie.name }
                     store.add(cookie)
-                    // Save session token to prefs
-                    if (cookie.name() == "ep_sid") {
-                        prefs.edit().putString(KEY_TOKEN, cookie.value()).apply()
+                    if (cookie.name == "ep_sid") {
+                        prefs.edit().putString(KEY_TOKEN, cookie.value).apply()
                     }
                 }
             }
 
             override fun loadForRequest(url: HttpUrl): List<Cookie> {
-                return cookieStore[url.host()] ?: emptyList()
+                return cookieStore[url.host] ?: emptyList()
             }
         }
 
@@ -88,15 +84,13 @@ object AppState {
             putString(KEY_ROLE, user.role)
             apply()
         }
-        // Also store in cookie store for OkHttp
-        val baseUrl = okhttp3.HttpUrl.parse(BASE_URL)!!
         val cookie = Cookie.Builder()
             .name("ep_sid")
             .value(token)
-            .domain(baseUrl.host())
+            .domain(baseUrl.host)
             .path("/")
             .build()
-        cookieStore[baseUrl.host()] = mutableListOf(cookie)
+        cookieStore[baseUrl.host] = mutableListOf(cookie)
     }
 
     fun clearSession() {
