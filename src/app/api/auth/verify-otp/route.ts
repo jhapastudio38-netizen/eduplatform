@@ -1,12 +1,15 @@
 /**
  * POST /api/auth/verify-otp
- * Body: { contact: string, code: string, role: "STUDENT"|"TEACHER"|"ADMIN", name?: string }
+ * Body: { contact: string, code: string, role: "STUDENT"|"TEACHER"|"ADMIN", name?: string, email?: string, phone?: string }
  *
  * - Validates input
  * - Rate-limits verification attempts per contact
  * - Looks up the most recent non-consumed OTP for the contact
  * - Compares hash (constant-time)
- * - Creates / updates User, creates Session, sets cookie
+ * - Creates / updates User with name + email + phone, creates Session, sets cookie
+ *
+ * Students provide: contact (for OTP) + name + phone (if OTP was email) OR + email (if OTP was phone)
+ * Teachers/admins should NOT use this route — they use /api/auth/credentials
  */
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
@@ -37,6 +40,8 @@ export async function POST(req: NextRequest) {
     code?: unknown;
     role?: unknown;
     name?: unknown;
+    email?: unknown;
+    phone?: unknown;
   };
 
   const contact = contactSchema.safeParse(b.contact);
@@ -44,10 +49,19 @@ export async function POST(req: NextRequest) {
   const role = roleSchema.safeParse(b.role);
   const name =
     typeof b.name === "string" ? b.name.trim().slice(0, 100) : undefined;
+  // Optional supplementary contact fields (so we can store both email AND phone for students)
+  const emailRaw = typeof b.email === "string" ? b.email.trim().toLowerCase() : undefined;
+  const phoneRaw = typeof b.phone === "string" ? b.phone.trim() : undefined;
+  const emailSupp = emailRaw && emailSchema.safeParse(emailRaw).success ? emailRaw : undefined;
+  const phoneSupp = phoneRaw && phoneSchema.safeParse(phoneRaw).success ? phoneRaw : undefined;
 
   if (!contact.success) return NextResponse.json({ error: "Invalid contact" }, { status: 400 });
   if (!code.success) return NextResponse.json({ error: "Invalid code" }, { status: 400 });
   if (!role.success) return NextResponse.json({ error: "Invalid role" }, { status: 400 });
+  // Students MUST provide their name
+  if (role.data === "STUDENT" && !name) {
+    return NextResponse.json({ error: "Please enter your name" }, { status: 400 });
+  }
 
   const ip = req.headers.get("x-forwarded-for")?.split(",")[0] || "unknown";
 
@@ -96,29 +110,37 @@ export async function POST(req: NextRequest) {
       OR: [
         isEmail ? { email: contact.data } : {},
         isPhone ? { phone: contact.data } : {},
+        emailSupp ? { email: emailSupp } : {},
+        phoneSupp ? { phone: phoneSupp } : {},
       ].filter((c) => Object.keys(c).length > 0),
     },
   });
 
   if (!user) {
     // First-time login → create account
+    // Resolve final email + phone: prefer supplementary, fall back to contact
+    const finalEmail = emailSupp ?? (isEmail ? contact.data : `phone-${phoneSupp ?? contact.data}@placeholder.local`);
+    const finalPhone = phoneSupp ?? (isPhone ? contact.data : null);
     user = await db.user.create({
-    data: {
-        email: isEmail ? contact.data : `phone-${contact.data}@placeholder.local`,
-        phone: isPhone ? contact.data : null,
-        name: name || (isEmail ? contact.data.split("@")[0] : "User"),
+      data: {
+        email: finalEmail,
+        phone: finalPhone,
+        name: name || (isEmail ? contact.data.split("@")[0] : "Student"),
         role: role.data,
         isVerified: true,
+        signupMethod: isEmail ? "otp_email" : "otp_phone",
       },
     });
   } else {
     // Existing user — keep their existing role (security: cannot self-escalate)
-    // but allow admins to retain admin even if they picked "STUDENT" on the form.
     user = await db.user.update({
       where: { id: user.id },
       data: {
         isVerified: true,
+        name: name ?? user.name,
+        ...(emailSupp && !user.email?.includes("@placeholder.local") ? {} : (emailSupp ? { email: emailSupp } : {})),
         ...(isEmail && !user.email ? { email: contact.data } : {}),
+        ...(phoneSupp && !user.phone ? { phone: phoneSupp } : {}),
         ...(isPhone && !user.phone ? { phone: contact.data } : {}),
       },
     });

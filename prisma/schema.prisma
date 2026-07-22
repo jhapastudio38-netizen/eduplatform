@@ -32,6 +32,13 @@ model User {
   avatarUrl    String?
   isVerified   Boolean  @default(false)
   isBanned     Boolean  @default(false)
+  // Credential login (teachers + admins only — students use OTP)
+  passwordHash String?
+  username     String?  @unique // for teacher/admin login
+  // Student signup tracking
+  signupMethod String?  // "otp_email" | "otp_phone" | "credentials"
+  createdBy    String?  // admin who created this teacher account
+  lastActiveAt DateTime?
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
