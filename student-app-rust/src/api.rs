@@ -10,7 +10,7 @@ use std::time::Duration;
 
 use crate::models::*;
 
-const BASE_URL: &str = "https://api.dreamkoreasmartclass.com";
+const BASE_URL: &str = "http://eduplatform-alb-606377009.ap-south-1.elb.amazonaws.com";
 const STORAGE_KEY: &str = "eduplatform-student-token";
 
 #[derive(Clone)]
