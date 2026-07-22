@@ -22,7 +22,6 @@ object AppState {
     private val USER_EMAIL = stringPreferencesKey("email")
     private val USER_ROLE = stringPreferencesKey("role")
 
-    // Backend URL — the live AWS server
     private const val BASE_URL = "http://eduplatform-alb-606377009.ap-south-1.elb.amazonaws.com/"
 
     private lateinit var appContext: Context
@@ -38,7 +37,9 @@ object AppState {
                 var token = ""
                 try {
                     val prefs = kotlinx.coroutines.runBlocking { appContext.dataStore.data }
-                    token = prefs.get(SESSION_TOKEN) ?: ""
+                    if (prefs.contains(SESSION_TOKEN)) {
+                        token = prefs[SESSION_TOKEN] ?: ""
+                    }
                 } catch (_: Exception) {}
                 val req = chain.request().newBuilder()
                 if (token.isNotEmpty()) {
