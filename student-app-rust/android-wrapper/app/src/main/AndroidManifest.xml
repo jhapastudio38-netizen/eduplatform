@@ -18,15 +18,11 @@
         android:usesCleartextTraffic="true">
 
         <activity
-            android:name="android.app.NativeActivity"
+            android:name=".MainActivity"
             android:exported="true"
             android:configChanges="orientation|screenSize|keyboardHidden|uiMode|smallestScreenSize|screenLayout"
             android:windowSoftInputMode="adjustResize"
             android:launchMode="singleTask">
-
-            <meta-data
-                android:name="android.app.lib_name"
-                android:value="eduplatform_student" />
 
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />

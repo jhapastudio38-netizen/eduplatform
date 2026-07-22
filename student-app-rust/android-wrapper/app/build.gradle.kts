@@ -1,24 +1,21 @@
-// App module — wraps the Rust .so (cdylib) into an installable APK.
-// Uses NativeActivity (no Kotlin/Java code needed — the Rust android_main
-// function is the entry point, driven by android-activity crate).
+// App module — WebView wrapper for DreamKorea SmartClass
+// Loads the Next.js web app inside a native Android WebView.
+// No Rust/NDK needed — the web app IS the student app.
 
 plugins {
     id("com.android.application")
 }
 
 android {
-    namespace = "app.eduplatform.student"
+    namespace = "app.dreamkorea.smartclass"
     compileSdk = 34
 
     defaultConfig {
         applicationId = "app.dreamkorea.smartclass"
         minSdk = 24
         targetSdk = 34
-        versionCode = 3
+        versionCode = 4
         versionName = "1.0.0"
-        ndk {
-            abiFilters += listOf("arm64-v8a")
-        }
     }
 
     buildTypes {
@@ -38,18 +35,7 @@ android {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
-
-    sourceSets {
-        getByName("main") {
-            jniLibs.srcDirs("src/main/jniLibs")
-            // No Java/Kotlin source needed — NativeActivity + Rust .so
-            java.srcDirs(emptyList<String>())
-        }
-    }
 }
 
-// No external dependencies needed — NativeActivity is part of the Android
-// framework (android.jar included with compileSdk). The Rust .so is loaded
-// via jniLibs, not via any Gradle dependency.
 dependencies {
 }

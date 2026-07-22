@@ -1,6 +1,3 @@
-// Top-level Gradle settings — EduPlatform Student Android wrapper.
-// This wraps the compiled Rust .so into an installable APK.
-
 pluginManagement {
     repositories {
         google()
@@ -8,7 +5,6 @@ pluginManagement {
         gradlePluginPortal()
     }
 }
-
 dependencyResolutionManagement {
     repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
     repositories {
@@ -16,6 +12,5 @@ dependencyResolutionManagement {
         mavenCentral()
     }
 }
-
-rootProject.name = "EduPlatform"
+rootProject.name = "DreamKorea"
 include(":app")
