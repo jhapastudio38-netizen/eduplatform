@@ -1,12 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- Use Android's built-in DeviceDefault theme — no external dependency needed -->
     <style name="Theme.EduPlatform" parent="@android:style/Theme.DeviceDefault.NoActionBar">
         <item name="android:windowBackground">#0B1120</item>
         <item name="android:statusBarColor">#0B1120</item>
         <item name="android:navigationBarColor">#0B1120</item>
         <item name="android:windowLightStatusBar">false</item>
-        <item name="android:windowFullscreen">false</item>
-        <item name="android:windowContentOverlay">@null</item>
     </style>
 </resources>
