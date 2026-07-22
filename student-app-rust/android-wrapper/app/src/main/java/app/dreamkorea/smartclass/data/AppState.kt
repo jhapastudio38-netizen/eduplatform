@@ -6,6 +6,7 @@ import app.dreamkorea.smartclass.api.User
 import okhttp3.Cookie
 import okhttp3.CookieJar
 import okhttp3.HttpUrl
+import okhttp3.HttpUrl.Companion.toHttpUrl
 import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.Retrofit
@@ -27,7 +28,7 @@ object AppState {
 
     fun init(context: Context) {
         prefs = context.applicationContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-        baseUrl = HttpUrl.parse(BASE_URL)!!
+        baseUrl = BASE_URL.toHttpUrl()
         val savedToken = prefs.getString(KEY_TOKEN, null)
         if (savedToken != null) {
             val cookie = Cookie.Builder()
