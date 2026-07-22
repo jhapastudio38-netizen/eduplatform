@@ -24,6 +24,7 @@ data class User(
     val role: String
 )
 data class VerifyResponse(val ok: Boolean, val user: User)
+data class CredentialsResponse(val ok: Boolean = false, val user: User = User("", null, "", null, "STUDENT"), val error: String? = null)
 data class MeResponse(val user: User?)
 
 data class HomeStats(
@@ -177,6 +178,9 @@ interface DreamKoreaApi {
 
     @POST("api/auth/verify-otp")
     suspend fun verifyOtp(@Body body: VerifyRequest): VerifyResponse
+
+    @POST("api/auth/credentials")
+    suspend fun loginCredentials(@Body body: Map<String, String>): CredentialsResponse
 
     @GET("api/auth/me")
     suspend fun getMe(): MeResponse
