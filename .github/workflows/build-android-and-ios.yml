@@ -2,12 +2,14 @@ name: Build Android APK
 
 on:
   push:
-    branches: [main]
+    branches:
+      - main
     paths:
       - "student-app-rust/android-wrapper/**"
       - ".github/workflows/build-android-and-ios.yml"
   pull_request:
-    branches: [main]
+    branches:
+      - main
   workflow_dispatch:
 
 jobs:
