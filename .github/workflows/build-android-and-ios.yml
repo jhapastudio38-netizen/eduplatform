@@ -4,12 +4,6 @@ on:
   push:
     branches:
       - main
-    paths:
-      - "student-app-rust/android-wrapper/**"
-      - ".github/workflows/build-android-and-ios.yml"
-  pull_request:
-    branches:
-      - main
   workflow_dispatch:
 
 jobs:
