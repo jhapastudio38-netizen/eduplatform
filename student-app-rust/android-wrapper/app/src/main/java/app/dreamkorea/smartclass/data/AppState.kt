@@ -1,11 +1,6 @@
 package app.dreamkorea.smartclass.data
 
 import android.content.Context
-import androidx.datastore.core.DataStore
-import androidx.datastore.preferences.core.*
-import androidx.datastore.preferences.preferencesDataStore
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.map
 import app.dreamkorea.smartclass.api.DreamKoreaApi
 import app.dreamkorea.smartclass.api.User
 import okhttp3.OkHttpClient
@@ -14,33 +9,25 @@ import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
 import java.util.concurrent.TimeUnit
 
-private val Context.dataStore: DataStore<Preferences> by preferencesDataStore("session")
-
 object AppState {
-    private val SESSION_TOKEN = stringPreferencesKey("token")
-    private val USER_NAME = stringPreferencesKey("name")
-    private val USER_EMAIL = stringPreferencesKey("email")
-    private val USER_ROLE = stringPreferencesKey("role")
-
     private const val BASE_URL = "http://eduplatform-alb-606377009.ap-south-1.elb.amazonaws.com/"
+    private const val PREFS_NAME = "dreamkorea_session"
+    private const val KEY_TOKEN = "token"
+    private const val KEY_NAME = "name"
+    private const val KEY_EMAIL = "email"
+    private const val KEY_ROLE = "role"
 
-    private lateinit var appContext: Context
+    private lateinit var prefs: android.content.SharedPreferences
 
     fun init(context: Context) {
-        appContext = context.applicationContext
+        prefs = context.applicationContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
     }
 
     val api: DreamKoreaApi by lazy {
         val logging = HttpLoggingInterceptor().apply { level = HttpLoggingInterceptor.Level.BASIC }
         val client = OkHttpClient.Builder()
             .addInterceptor { chain ->
-                var token = ""
-                try {
-                    val prefs = kotlinx.coroutines.runBlocking { appContext.dataStore.data }
-                    if (prefs.contains(SESSION_TOKEN)) {
-                        token = prefs[SESSION_TOKEN] ?: ""
-                    }
-                } catch (_: Exception) {}
+                val token = prefs.getString(KEY_TOKEN, "") ?: ""
                 val req = chain.request().newBuilder()
                 if (token.isNotEmpty()) {
                     req.addHeader("Cookie", "ep_sid=$token")
@@ -60,21 +47,21 @@ object AppState {
             .create(DreamKoreaApi::class.java)
     }
 
-    suspend fun saveSession(token: String, user: User) {
-        appContext.dataStore.edit { prefs ->
-            prefs[SESSION_TOKEN] = token
-            prefs[USER_NAME] = user.name ?: "Student"
-            prefs[USER_EMAIL] = user.email
-            prefs[USER_ROLE] = user.role
+    fun saveSession(token: String, user: User) {
+        prefs.edit().apply {
+            putString(KEY_TOKEN, token)
+            putString(KEY_NAME, user.name ?: "Student")
+            putString(KEY_EMAIL, user.email)
+            putString(KEY_ROLE, user.role)
+            apply()
         }
     }
 
-    suspend fun clearSession() {
-        appContext.dataStore.edit { it.clear() }
+    fun clearSession() {
+        prefs.edit().clear().apply()
     }
 
-    fun tokenFlow(): Flow<String?> = appContext.dataStore.data.map { it[SESSION_TOKEN] }
-    fun nameFlow(): Flow<String> = appContext.dataStore.data.map { it[USER_NAME] ?: "" }
-    fun emailFlow(): Flow<String> = appContext.dataStore.data.map { it[USER_EMAIL] ?: "" }
-    fun roleFlow(): Flow<String> = appContext.dataStore.data.map { it[USER_ROLE] ?: "STUDENT" }
+    fun isLoggedIn(): Boolean = prefs.getString(KEY_TOKEN, "")?.isNotEmpty() == true
+    fun getUserName(): String = prefs.getString(KEY_NAME, "Student") ?: "Student"
+    fun getToken(): String = prefs.getString(KEY_TOKEN, "") ?: ""
 }

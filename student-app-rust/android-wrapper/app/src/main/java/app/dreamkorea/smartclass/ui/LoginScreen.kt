@@ -15,9 +15,10 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import app.dreamkorea.smartclass.api.OtpRequest
+import app.dreamkorea.smartclass.api.VerifyRequest
+import app.dreamkorea.smartclass.data.AppState
 import kotlinx.coroutines.launch
-
-// ─── Colors ───────────────────────────────────────────────────────────────────
 
 val BgDark = Color(0xFF0B1120)
 val BgCard = Color(0xFF1E293B)
@@ -25,8 +26,6 @@ val Accent = Color(0xFF10B981)
 val AccentDark = Color(0xFF0D9488)
 val TextPrimary = Color(0xFFF8FAFC)
 val TextSecondary = Color(0xFF94A3B8)
-
-// ─── Login Screen ─────────────────────────────────────────────────────────────
 
 @Composable
 fun LoginScreen(onLoginSuccess: () -> Unit) {
@@ -39,25 +38,16 @@ fun LoginScreen(onLoginSuccess: () -> Unit) {
     var devCode by remember { mutableStateOf("") }
 
     Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(BgDark)
-            .padding(32.dp),
+        modifier = Modifier.fillMaxSize().background(BgDark).padding(32.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
-        // Logo
         Box(
-            modifier = Modifier
-                .size(72.dp)
-                .background(
-                    Brush.linearGradient(listOf(Accent, AccentDark)),
-                    RoundedCornerShape(20.dp)
-                ),
+            modifier = Modifier.size(72.dp).background(
+                Brush.linearGradient(listOf(Accent, AccentDark)), RoundedCornerShape(20.dp)
+            ),
             contentAlignment = Alignment.Center
-        ) {
-            Text("DK", color = Color.White, fontSize = 24.sp, fontWeight = FontWeight.Bold)
-        }
+        ) { Text("DK", color = Color.White, fontSize = 24.sp, fontWeight = FontWeight.Bold) }
 
         Spacer(modifier = Modifier.height(16.dp))
         Text("DreamKorea", color = TextPrimary, fontSize = 26.sp, fontWeight = FontWeight.Bold)
@@ -76,12 +66,14 @@ fun LoginScreen(onLoginSuccess: () -> Unit) {
             Spacer(modifier = Modifier.height(24.dp))
 
             OutlinedTextField(
-                value = contact,
-                onValueChange = { contact = it },
+                value = contact, onValueChange = { contact = it },
                 label = { Text("Email or phone", color = TextSecondary) },
                 modifier = Modifier.fillMaxWidth(),
-                colors = fieldColors(),
-                singleLine = true
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedTextColor = TextPrimary, unfocusedTextColor = TextPrimary,
+                    focusedBorderColor = Accent, unfocusedBorderColor = Color(0xFF334155),
+                    focusedLabelColor = Accent, unfocusedLabelColor = TextSecondary, cursorColor = Accent
+                ), singleLine = true
             )
             Spacer(modifier = Modifier.height(16.dp))
 
@@ -91,9 +83,7 @@ fun LoginScreen(onLoginSuccess: () -> Unit) {
                     loading = true; error = ""
                     scope.launch {
                         try {
-                            val resp = app.dreamkorea.smartclass.data.AppState.api.requestOtp(
-                                app.dreamkorea.smartclass.api.OtpRequest(contact)
-                            )
+                            val resp = AppState.api.requestOtp(OtpRequest(contact))
                             devCode = resp.devCode ?: ""
                             step = 2
                         } catch (e: Exception) { error = "Failed: ${e.message}" }
@@ -101,7 +91,7 @@ fun LoginScreen(onLoginSuccess: () -> Unit) {
                     }
                 },
                 modifier = Modifier.fillMaxWidth().height(52.dp),
-                colors = buttonColors(),
+                colors = ButtonDefaults.buttonColors(containerColor = Accent, contentColor = Color.White),
                 enabled = !loading && contact.isNotBlank()
             ) { if (loading) CircularProgressIndicator(color = Color.White, modifier = Modifier.size(20.dp)) else Text("Send code") }
         }
@@ -117,13 +107,15 @@ fun LoginScreen(onLoginSuccess: () -> Unit) {
             Spacer(modifier = Modifier.height(24.dp))
 
             OutlinedTextField(
-                value = code,
-                onValueChange = { code = it.filter { c -> c.isDigit() }.take(6) },
+                value = code, onValueChange = { code = it.filter { c -> c.isDigit() }.take(6) },
                 label = { Text("6-digit code", color = TextSecondary) },
                 modifier = Modifier.fillMaxWidth(),
-                colors = fieldColors(),
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                singleLine = true
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedTextColor = TextPrimary, unfocusedTextColor = TextPrimary,
+                    focusedBorderColor = Accent, unfocusedBorderColor = Color(0xFF334155),
+                    focusedLabelColor = Accent, unfocusedLabelColor = TextSecondary, cursorColor = Accent
+                ),
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), singleLine = true
             )
             Spacer(modifier = Modifier.height(16.dp))
 
@@ -133,15 +125,9 @@ fun LoginScreen(onLoginSuccess: () -> Unit) {
                     loading = true; error = ""
                     scope.launch {
                         try {
-                            val resp = app.dreamkorea.smartclass.data.AppState.api.verifyOtp(
-                                app.dreamkorea.smartclass.api.VerifyRequest(contact, code)
-                            )
+                            val resp = AppState.api.verifyOtp(VerifyRequest(contact, code))
                             if (resp.ok) {
-                                // The session cookie is set by the server — we need to capture it
-                                // For simplicity, store the user info
-                                app.dreamkorea.smartclass.data.AppState.saveSession(
-                                    "session_active", resp.user
-                                )
+                                AppState.saveSession("session_active", resp.user)
                                 onLoginSuccess()
                             } else { error = "Verification failed" }
                         } catch (e: Exception) { error = "Failed: ${e.message}" }
@@ -149,31 +135,12 @@ fun LoginScreen(onLoginSuccess: () -> Unit) {
                     }
                 },
                 modifier = Modifier.fillMaxWidth().height(52.dp),
-                colors = buttonColors(),
+                colors = ButtonDefaults.buttonColors(containerColor = Accent, contentColor = Color.White),
                 enabled = !loading && code.length >= 6
             ) { if (loading) CircularProgressIndicator(color = Color.White, modifier = Modifier.size(20.dp)) else Text("Verify & continue") }
 
             Spacer(modifier = Modifier.height(12.dp))
-            TextButton(onClick = { step = 1; error = ""; code = "" }) {
-                Text("Back", color = TextSecondary)
-            }
+            TextButton(onClick = { step = 1; error = ""; code = "" }) { Text("Back", color = TextSecondary) }
         }
     }
 }
-
-@Composable
-private fun fieldColors() = OutlinedTextFieldDefaults.colors(
-    focusedTextColor = TextPrimary,
-    unfocusedTextColor = TextPrimary,
-    focusedBorderColor = Accent,
-    unfocusedBorderColor = Color(0xFF334155),
-    focusedLabelColor = Accent,
-    unfocusedLabelColor = TextSecondary,
-    cursorColor = Accent
-)
-
-@Composable
-private fun buttonColors() = ButtonDefaults.buttonColors(
-    containerColor = Accent,
-    contentColor = Color.White
-)

@@ -70,7 +70,4 @@ dependencies {
 
     // Coroutines
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")
-
-    // DataStore for session
-    implementation("androidx.datastore:datastore-preferences:1.1.1")
 }
