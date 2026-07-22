@@ -105,6 +105,14 @@ export async function POST(req: NextRequest) {
   const isEmail = emailSchema.safeParse(contact.data).success;
   const isPhone = phoneSchema.safeParse(contact.data).success;
 
+  // Students MUST provide a phone number (either as OTP contact, or as supplementary)
+  if (role.data === "STUDENT") {
+    const hasPhone = isPhone || !!phoneSupp;
+    if (!hasPhone) {
+      return NextResponse.json({ error: "Phone number is required" }, { status: 400 });
+    }
+  }
+
   let user = await db.user.findFirst({
     where: {
       OR: [

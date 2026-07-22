@@ -97,16 +97,29 @@ fun HomeTab() {
                 Column(modifier = Modifier.padding(20.dp)) {
                     Text("Welcome back!", color = White.copy(0.85f), fontSize = 13.sp)
                     Text("Keep learning Korean", color = White, fontSize = 22.sp, fontWeight = FontWeight.Bold)
+                    Spacer(Modifier.height(4.dp))
+                    Text("한국어를 배우세요 — let's begin today's lesson", color = White.copy(0.7f), fontSize = 12.sp)
                 }
             }
         }
-        item { Text("Quick Stats", color = DarkText, fontSize = 17.sp, fontWeight = FontWeight.SemiBold) }
+        item { Text("Quick Actions", color = DarkText, fontSize = 17.sp, fontWeight = FontWeight.SemiBold) }
         item {
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                StatCard("Lessons", "0", Primary)
-                StatCard("Tests", "0", Color(0xFFFF9800))
-                StatCard("Streak", "7", SuccessGreen)
+                QuickAction("Take Test", Icons.Default.Quiz, Accent)
+                QuickAction("Read Book", Icons.Default.Book, Primary)
+                QuickAction("Watch", Icons.Default.VideoLibrary, SuccessGreen)
             }
+        }
+    }
+}
+
+@Composable
+fun RowScope.QuickAction(label: String, icon: ImageVector, color: Color) {
+    Surface(color = White, shape = RoundedCornerShape(12.dp), modifier = Modifier.weight(1f), shadowElevation = 1.dp) {
+        Column(modifier = Modifier.padding(14.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+            Icon(icon, null, tint = color, modifier = Modifier.size(22.dp))
+            Spacer(Modifier.height(6.dp))
+            Text(label, color = DarkText, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
         }
     }
 }
@@ -270,23 +283,99 @@ fun VideosTab() {
 @Composable
 fun ProfileTab(userName: String, onLogout: () -> Unit) {
     val scope = rememberCoroutineScope()
-    Column(modifier = Modifier.fillMaxSize().padding(20.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-        Spacer(Modifier.height(24.dp))
-        Surface(color = Primary, shape = RoundedCornerShape(36.dp), modifier = Modifier.size(72.dp)) {
-            Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
-                Text(userName.take(2).uppercase(), color = White, fontSize = 24.sp, fontWeight = FontWeight.Bold)
+    var stats by remember { mutableStateOf<UserStats?>(null) }
+    var loading by remember { mutableStateOf(true) }
+
+    LaunchedEffect(Unit) {
+        scope.launch {
+            try { stats = AppState.api.getStats().stats } catch (_: Exception) {}
+            loading = false
+        }
+    }
+
+    Column(modifier = Modifier.fillMaxSize().padding(20.dp)) {
+        // ─── Top right: Stats card ──────────────────────────────────────────
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.End
+        ) {
+            Surface(
+                color = White,
+                shape = RoundedCornerShape(14.dp),
+                shadowElevation = 2.dp,
+                modifier = Modifier.width(180.dp)
+            ) {
+                Column(modifier = Modifier.padding(12.dp)) {
+                    Text(
+                        "Your Stats",
+                        color = DarkText,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(bottom = 8.dp)
+                    )
+                    if (loading) {
+                        Text("Loading…", color = SubText, fontSize = 11.sp)
+                    } else {
+                        StatsRow("Exams", "${stats?.totalExamsTaken ?: 0}")
+                        Spacer(Modifier.height(4.dp))
+                        StatsRow("Avg Score", "${String.format("%.0f", stats?.averageScore ?: 0.0)}%")
+                        Spacer(Modifier.height(4.dp))
+                        StatsRow("Streak", "${stats?.studyStreakDays ?: 0}d")
+                        Spacer(Modifier.height(4.dp))
+                        StatsRow("Books", "${stats?.booksRead ?: 0}")
+                        Spacer(Modifier.height(4.dp))
+                        StatsRow("Audio", "${stats?.audioLessonsCompleted ?: 0}")
+                    }
+                }
             }
         }
-        Spacer(Modifier.height(12.dp))
-        Text(userName, color = DarkText, fontSize = 18.sp, fontWeight = FontWeight.Bold)
-        Text("Student", color = SubText, fontSize = 13.sp)
-        Spacer(Modifier.height(24.dp))
-        Row(Modifier.fillMaxWidth(), Arrangement.SpaceEvenly) {
-            ProfileStat("7", "Streak")
-            ProfileStat("12", "Lessons")
-            ProfileStat("3", "Badges")
+
+        Spacer(Modifier.height(20.dp))
+
+        // ─── Profile header ─────────────────────────────────────────────────
+        Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
+            Surface(color = Primary, shape = RoundedCornerShape(36.dp), modifier = Modifier.size(72.dp)) {
+                Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
+                    Text(userName.take(2).uppercase(), color = White, fontSize = 24.sp, fontWeight = FontWeight.Bold)
+                }
+            }
+            Spacer(Modifier.height(12.dp))
+            Text(userName, color = DarkText, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+            Text("Student", color = SubText, fontSize = 13.sp)
         }
+
+        Spacer(Modifier.height(24.dp))
+
+        // ─── Stats grid (full width) ────────────────────────────────────────
+        Row(Modifier.fillMaxWidth(), Arrangement.SpaceEvenly) {
+            ProfileStat("${stats?.totalExamsTaken ?: 0}", "Exams")
+            ProfileStat("${String.format("%.0f", stats?.averageScore ?: 0.0)}%", "Avg")
+            ProfileStat("${stats?.studyStreakDays ?: 0}", "Streak")
+            ProfileStat("${stats?.badgesEarned ?: 0}", "Badges")
+        }
+
         Spacer(Modifier.weight(1f))
+
+        // ─── Account info ───────────────────────────────────────────────────
+        val userEmail = AppState.user?.email ?: ""
+        val userPhone = AppState.user?.phone ?: ""
+        if (userEmail.isNotEmpty() || userPhone.isNotEmpty()) {
+            Surface(color = White, shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth(), shadowElevation = 1.dp) {
+                Column(modifier = Modifier.padding(14.dp)) {
+                    if (userEmail.isNotEmpty()) {
+                        Text("Email", color = SubText, fontSize = 10.sp, fontWeight = FontWeight.SemiBold)
+                        Text(userEmail, color = DarkText, fontSize = 13.sp)
+                        Spacer(Modifier.height(6.dp))
+                    }
+                    if (userPhone.isNotEmpty()) {
+                        Text("Phone", color = SubText, fontSize = 10.sp, fontWeight = FontWeight.SemiBold)
+                        Text(userPhone, color = DarkText, fontSize = 13.sp)
+                    }
+                }
+            }
+            Spacer(Modifier.height(12.dp))
+        }
+
         Button(
             onClick = { scope.launch { try { AppState.api.logout() } catch (_: Exception) {} ; AppState.clearSession() ; onLogout() } },
             modifier = Modifier.fillMaxWidth().height(48.dp),
@@ -294,7 +383,18 @@ fun ProfileTab(userName: String, onLogout: () -> Unit) {
             shape = RoundedCornerShape(10.dp)
         ) { Text("Sign out", fontSize = 15.sp, fontWeight = FontWeight.SemiBold) }
         Spacer(Modifier.height(12.dp))
-        Text("DreamKorea SmartClass v1.0.0", color = SubText, fontSize = 11.sp)
+        Text("DreamKorea SmartClass v1.0.0", color = SubText, fontSize = 11.sp, modifier = Modifier.fillMaxWidth(), textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+    }
+}
+
+@Composable
+private fun StatsRow(label: String, value: String) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween
+    ) {
+        Text(label, color = SubText, fontSize = 11.sp)
+        Text(value, color = Primary, fontSize = 11.sp, fontWeight = FontWeight.Bold)
     }
 }
 
