@@ -8,7 +8,14 @@ import retrofit2.http.*
 data class OtpRequest(val contact: String)
 data class OtpResponse(val ok: Boolean, val channel: String, val devCode: String?)
 
-data class VerifyRequest(val contact: String, val code: String, val role: String = "STUDENT")
+data class VerifyRequest(
+    val contact: String,
+    val code: String,
+    val role: String = "STUDENT",
+    val name: String? = null,
+    val email: String? = null,
+    val phone: String? = null
+)
 data class User(
     val id: String,
     val name: String?,
