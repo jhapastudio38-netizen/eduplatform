@@ -111,6 +111,39 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ testId: st
     });
   }
 
+  // Build per-question review (correct/wrong + correct answer for student learning)
+  const review = test.items.map((item) => {
+    const q = item.question;
+    const ans = answers[q.id];
+    const correct = q.correctAnswer ? JSON.parse(q.correctAnswer) : null;
+    let isCorrect = false;
+
+    if (q.type === "SINGLE_CHOICE" || q.type === "TRUE_FALSE" || q.type === "ONE_WORD" || q.type === "FILL_BLANK") {
+      if (typeof ans === "string" && correct && String(ans).trim().toLowerCase() === String(correct).trim().toLowerCase()) {
+        isCorrect = true;
+      }
+    } else if (q.type === "MULTIPLE_CHOICE") {
+      const selected = Array.isArray(ans) ? (ans as string[]).slice().sort() : [];
+      const correctArr = Array.isArray(correct) ? (correct as string[]).slice().sort() : [];
+      isCorrect = selected.length === correctArr.length && selected.every((v, i) => v === correctArr[i]);
+    }
+
+    return {
+      questionId: q.id,
+      stem: q.stem,
+      type: q.type,
+      options: q.options ? JSON.parse(q.options) : null,
+      imageUrl: q.imageUrl,
+      audioUrl: q.audioUrl,
+      audioLoop: q.audioLoop,
+      audioLoopDelay: q.audioLoopDelay,
+      userAnswer: ans,
+      correctAnswer: correct,
+      explanation: q.explanation,
+      isCorrect,
+    };
+  });
+
   await audit({
     actorId: user.id,
     action: "submit_test",
@@ -124,5 +157,6 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ testId: st
     score, maxScore,
     graded: submission.graded,
     submissionId: submission.id,
+    review,
   });
 }

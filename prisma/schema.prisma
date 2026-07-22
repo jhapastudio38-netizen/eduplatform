@@ -190,6 +190,8 @@ model Question {
   tags        String? // JSON array
   imageUrl    String? // Optional image for visual questions
   audioUrl    String? // Optional audio for listening questions
+  audioLoop   Int      @default(0) // 0 = no loop, N = loop N times, -1 = infinite
+  audioLoopDelay Int   @default(0) // delay (seconds) between loops
   aiGenerated Boolean    @default(false)
   sourceFile  String?
   createdAt   DateTime @default(now())
