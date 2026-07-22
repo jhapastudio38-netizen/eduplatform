@@ -1,15 +1,7 @@
-# Build Android APK — WebView wrapper loading the DreamKorea SmartClass web app.
-# No Rust compilation needed. Pure Java + Gradle.
-
 name: Build Android APK
 
 on:
   push:
-    branches: [main]
-    paths:
-      - "student-app-rust/android-wrapper/**"
-      - ".github/workflows/build-android-and-ios.yml"
-  pull_request:
     branches: [main]
   workflow_dispatch:
 
@@ -49,19 +41,6 @@ jobs:
           else
             gradle assembleDebug --no-daemon
           fi
-
-      - name: Find built APK
-        id: find-apk
-        working-directory: student-app-rust/android-wrapper
-        run: |
-          find . -name "*.apk" -type f 2>/dev/null
-          APK_PATH=$(find . -name "*.apk" -type f 2>/dev/null | head -1)
-          if [ -z "$APK_PATH" ]; then
-            echo "::error::No APK was built"
-            exit 1
-          fi
-          APK_PATH=$(echo "$APK_PATH" | sed 's|^\./||')
-          echo "apk-path=$APK_PATH" >> $GITHUB_OUTPUT
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
