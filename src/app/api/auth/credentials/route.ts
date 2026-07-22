@@ -53,16 +53,15 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  // Find user by username or email — must be TEACHER or ADMIN
+  // Find user by username or email — allow any role (students can set passwords too)
   const user = await db.user.findFirst({
     where: {
       OR: [{ username }, { email: username }],
-      role: { in: ["TEACHER", "ADMIN"] },
     },
   });
 
   if (!user || !user.passwordHash) {
-    return NextResponse.json({ error: "Invalid credentials" }, { status: 401 });
+    return NextResponse.json({ error: "Invalid email or password" }, { status: 401 });
   }
 
   if (user.isBanned) {

@@ -27,6 +27,7 @@ import {
 import { rateLimited } from "@/lib/rate-limit";
 import { createSession } from "@/lib/session";
 import { audit } from "@/lib/audit";
+import { hashPassword } from "@/lib/password";
 
 export async function POST(req: NextRequest) {
   let body: unknown;
@@ -42,6 +43,7 @@ export async function POST(req: NextRequest) {
     name?: unknown;
     email?: unknown;
     phone?: unknown;
+    password?: unknown; // optional: set password after OTP
   };
 
   const contact = contactSchema.safeParse(b.contact);
@@ -54,6 +56,8 @@ export async function POST(req: NextRequest) {
   const phoneRaw = typeof b.phone === "string" ? b.phone.trim() : undefined;
   const emailSupp = emailRaw && emailSchema.safeParse(emailRaw).success ? emailRaw : undefined;
   const phoneSupp = phoneRaw && phoneSchema.safeParse(phoneRaw).success ? phoneRaw : undefined;
+  // Optional password to set after OTP verification
+  const passwordRaw = typeof b.password === "string" ? b.password : "";
 
   if (!contact.success) return NextResponse.json({ error: "Invalid contact" }, { status: 400 });
   if (!code.success) return NextResponse.json({ error: "Invalid code" }, { status: 400 });
@@ -129,6 +133,8 @@ export async function POST(req: NextRequest) {
     // Resolve final email + phone: prefer supplementary, fall back to contact
     const finalEmail = emailSupp ?? (isEmail ? contact.data : `phone-${phoneSupp ?? contact.data}@placeholder.local`);
     const finalPhone = phoneSupp ?? (isPhone ? contact.data : null);
+    // Hash password if provided
+    const passwordHash = passwordRaw && passwordRaw.length >= 6 ? await hashPassword(passwordRaw) : undefined;
     user = await db.user.create({
       data: {
         email: finalEmail,
@@ -137,10 +143,14 @@ export async function POST(req: NextRequest) {
         role: role.data,
         isVerified: true,
         signupMethod: isEmail ? "otp_email" : "otp_phone",
+        ...(passwordHash ? { passwordHash } : {}),
       },
     });
   } else {
     // Existing user — keep their existing role (security: cannot self-escalate)
+    // If password provided and user doesn't have one, set it
+    const shouldSetPassword = passwordRaw && passwordRaw.length >= 6 && !user.passwordHash;
+    const passwordHash = shouldSetPassword ? await hashPassword(passwordRaw) : undefined;
     user = await db.user.update({
       where: { id: user.id },
       data: {
@@ -150,6 +160,7 @@ export async function POST(req: NextRequest) {
         ...(isEmail && !user.email ? { email: contact.data } : {}),
         ...(phoneSupp && !user.phone ? { phone: phoneSupp } : {}),
         ...(isPhone && !user.phone ? { phone: contact.data } : {}),
+        ...(passwordHash ? { passwordHash } : {}),
       },
     });
   }

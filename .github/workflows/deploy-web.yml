@@ -32,6 +32,8 @@ jobs:
           bun run db:generate
           # Push schema changes to RDS (safe — additive only)
           bunx prisma db push --accept-data-loss || echo "Schema push skipped (may already be in sync)"
+          # Seed Korean learning content (idempotent — uses upserts)
+          bun run scripts/seed-korean.ts || echo "Seed skipped (may already exist)"
           # Build with --no-cache to ensure fresh code, tag with commit SHA
           docker build --no-cache -t $ECR/eduplatform-web:$IMAGE_TAG -t $ECR/eduplatform-web:latest .
           docker push $ECR/eduplatform-web:$IMAGE_TAG

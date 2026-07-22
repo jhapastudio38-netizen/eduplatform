@@ -43,14 +43,23 @@ data class AppTheme(
     val background get() = lightGray
 }
 
-/** Returns the current theme (reads from AppState settings). */
+/** Global theme revision counter — bump to force re-composition of all UI. */
+val themeRevision = mutableStateOf(0)
+
+/** Returns the current theme. Re-composes when settings change. */
 @Composable
 fun rememberAppTheme(): AppTheme {
     val primary = AppState.getThemeColor()
     val isDark = AppState.isDarkMode()
-    // Accent is a complementary red — keep it as Korean flag red by default
     val accent = Color(0xFFCD2E3A)
-    return remember(primary, isDark) { AppTheme(primary, accent, isDark) }
+    // Read themeRevision so we re-compose when it changes
+    val rev = themeRevision.value
+    return remember(primary, isDark, rev) { AppTheme(primary, accent, isDark) }
+}
+
+/** Call after updating any setting to force the UI to re-render with new theme. */
+fun notifySettingsChanged() {
+    themeRevision.value++
 }
 
 // ─── Animation helpers ─────────────────────────────────────────────────────────

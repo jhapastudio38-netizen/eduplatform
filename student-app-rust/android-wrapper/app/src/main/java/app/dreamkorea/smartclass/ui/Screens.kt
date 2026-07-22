@@ -38,6 +38,7 @@ import kotlinx.coroutines.launch
 @Composable
 fun MainScreen(userName: String, onLogout: () -> Unit) {
     val theme = rememberAppTheme()
+    val sound = rememberSoundManager()
     var tab by remember { mutableStateOf(0) }
     var settingsOpen by remember { mutableStateOf(false) }
     var currentExamId by remember { mutableStateOf<String?>(null) }
@@ -57,37 +58,32 @@ fun MainScreen(userName: String, onLogout: () -> Unit) {
             }
 
             Column(modifier = Modifier.fillMaxSize()) {
-                // Top bar with settings gear
+                // Top bar — clean, minimal (just logo + greeting + settings)
                 Surface(color = theme.white, shadowElevation = 2.dp) {
                     Row(
-                        modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 14.dp),
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 12.dp),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            // Mini taegeuk mark
-                            Box(modifier = Modifier.size(28.dp).clip(CircleShape).background(theme.primary)) {
-                                Box(
-                                    modifier = Modifier
-                                        .fillMaxSize()
-                                        .clip(RoundedCornerShape(0.dp, 0.dp, 14.dp, 14.dp))
-                                        .background(theme.accent)
-                                )
-                            }
-                            Spacer(Modifier.width(10.dp))
-                            Text("DreamKorea", color = theme.darkText, fontSize = 20.sp, fontWeight = FontWeight.Bold)
+                        // Taegeuk logo mark only (no text)
+                        Box(modifier = Modifier.size(32.dp).clip(CircleShape).background(theme.primary)) {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .clip(RoundedCornerShape(0.dp, 0.dp, 16.dp, 16.dp))
+                                    .background(theme.accent)
+                            )
                         }
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text("Hi, $userName", color = theme.subText, fontSize = 13.sp)
-                            Spacer(Modifier.width(12.dp))
-                            IconButton(onClick = { settingsOpen = true }) {
-                                Icon(
-                                    Icons.Default.Settings,
-                                    contentDescription = "Settings",
-                                    tint = theme.darkText,
-                                    modifier = Modifier.size(22.dp)
-                                )
-                            }
+                        // Greeting centered
+                        Text("Hi, $userName 👋", color = theme.darkText, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+                        // Settings gear
+                        IconButton(onClick = { sound.click(); settingsOpen = true }) {
+                            Icon(
+                                Icons.Default.Settings,
+                                contentDescription = "Settings",
+                                tint = theme.darkText,
+                                modifier = Modifier.size(22.dp)
+                            )
                         }
                     }
                 }
