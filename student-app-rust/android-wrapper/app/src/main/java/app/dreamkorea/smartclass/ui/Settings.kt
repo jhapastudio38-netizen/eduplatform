@@ -20,6 +20,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.lerp
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -240,7 +241,7 @@ private fun ThemeColorSwatch(theme: AppTheme, hex: String, name: String, selecte
 }
 
 @Composable
-private fun TextSizeOption(theme: AppTheme, label: String, value: Float, selected: Boolean, onClick: () -> Unit) {
+private fun RowScope.TextSizeOption(theme: AppTheme, label: String, value: Float, selected: Boolean, onClick: () -> Unit) {
     Surface(
         color = if (selected) theme.primary else theme.lightGray,
         shape = RoundedCornerShape(8.dp),
@@ -260,7 +261,7 @@ private fun TextSizeOption(theme: AppTheme, label: String, value: Float, selecte
 @Composable
 private fun ToggleRow(theme: AppTheme, title: String, subtitle: String, value: Boolean, onChange: (Boolean) -> Unit) {
     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-        Column(modifier = Modifier.weight(1f)) {
+        Column(modifier = Modifier.fillMaxWidth(0.7f)) {
             Text(title, color = theme.darkText, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
             Text(subtitle, color = theme.subText, fontSize = 11.sp)
         }
