@@ -81,19 +81,13 @@ fun MainScreen(userName: String, onLogout: () -> Unit) {
 
                 // Animated content swap
                 Box(modifier = Modifier.weight(1f)) {
-                    AnimatedVisibility(
-                        visible = true,
-                        enter = fadeIn(animationSpec = tween(300)),
-                        exit = fadeOut(animationSpec = tween(200))
-                    ) {
-                        when (tab) {
-                            0 -> HomeTab(theme, onNavigate = { tab = it })
-                            1 -> LearnTab(theme)
-                            2 -> BooksTab(theme)
-                            3 -> TestsTab(theme)
-                            4 -> VideosTab(theme)
-                            5 -> ProfileTab(theme, userName, onLogout)
-                        }
+                    when (tab) {
+                        0 -> HomeTab(theme, onNavigate = { tab = it })
+                        1 -> LearnTab(theme)
+                        2 -> BooksTab(theme)
+                        3 -> TestsTab(theme)
+                        4 -> VideosTab(theme)
+                        5 -> ProfileTab(theme, userName, onLogout)
                     }
                 }
 
