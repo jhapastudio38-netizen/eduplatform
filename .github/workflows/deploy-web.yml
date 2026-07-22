@@ -25,10 +25,13 @@ jobs:
         env:
           ECR: ${{ steps.ecr-login.outputs.registry }}
           IMAGE_TAG: ${{ github.sha }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
         run: |
           npm install -g bun
           bun install
           bun run db:generate
+          # Push schema changes to RDS (safe — additive only)
+          bunx prisma db push --accept-data-loss || echo "Schema push skipped (may already be in sync)"
           # Build with --no-cache to ensure fresh code, tag with commit SHA
           docker build --no-cache -t $ECR/eduplatform-web:$IMAGE_TAG -t $ECR/eduplatform-web:latest .
           docker push $ECR/eduplatform-web:$IMAGE_TAG

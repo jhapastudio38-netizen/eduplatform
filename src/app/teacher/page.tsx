@@ -2,14 +2,14 @@
 
 /**
  * Teacher Login — /teacher
- * Teachers enter email/phone + OTP.
+ * Teachers login with username (or email) + password.
  * Admin creates teacher accounts first, then teachers can login here.
- * No student access on this page.
+ * No OTP for teachers — students use OTP via the app.
  */
 
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { School, ArrowRight, ArrowLeft } from "lucide-react";
+import { School, ArrowRight, KeyRound, User as UserIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -20,47 +20,26 @@ import { useAuthStore } from "@/stores/auth";
 export default function TeacherLoginPage() {
   const { toast } = useToast();
   const { fetchUser } = useAuthStore();
-  const [contact, setContact] = useState("");
-  const [code, setCode] = useState("");
-  const [step, setStep] = useState<"contact" | "otp">("contact");
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
 
-  async function requestOtp() {
-    if (!contact.trim()) {
-      toast({ title: "Error", description: "Enter your email or phone", variant: "destructive" });
+  async function login(e?: React.FormEvent) {
+    e?.preventDefault();
+    if (!username.trim() || !password) {
+      toast({ title: "Error", description: "Enter your username and password", variant: "destructive" });
       return;
     }
     setBusy(true);
     try {
-      const res = await fetch("/api/auth/request-otp", {
+      const res = await fetch("/api/auth/credentials", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ contact }),
+        body: JSON.stringify({ username, password }),
       });
       const data = await res.json();
       if (!res.ok) {
-        toast({ title: "Error", description: data.error, variant: "destructive" });
-        return;
-      }
-      toast({ title: "Code sent", description: "Check your email for the verification code." });
-      setStep("otp");
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function verifyOtp() {
-    if (code.length < 6) return;
-    setBusy(true);
-    try {
-      const res = await fetch("/api/auth/verify-otp", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ contact, code, role: "TEACHER" }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        toast({ title: "Error", description: data.error, variant: "destructive" });
+        toast({ title: "Login failed", description: data.error || "Invalid credentials", variant: "destructive" });
         return;
       }
       if (data.user.role !== "TEACHER" && data.user.role !== "ADMIN") {
@@ -88,49 +67,44 @@ export default function TeacherLoginPage() {
 
         <Card>
           <CardHeader>
-            <CardTitle>{step === "contact" ? "Sign in" : "Verify identity"}</CardTitle>
+            <CardTitle>Sign in</CardTitle>
             <CardDescription>
-              {step === "contact"
-                ? "Enter your email or phone to receive a verification code."
-                : `Enter the 6-digit code sent to ${contact}. Check your email.`}
+              Enter your username and password. Contact admin if you forgot your credentials.
             </CardDescription>
           </CardHeader>
           <CardContent>
-            {step === "contact" ? (
-              <div className="space-y-4">
-                <div>
-                  <Label>Email or phone</Label>
+            <form onSubmit={login} className="space-y-4">
+              <div>
+                <Label>Username or email</Label>
+                <div className="relative">
+                  <UserIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
                   <Input
-                    placeholder="teacher@dreamkoreansmartclass.com"
-                    value={contact}
-                    onChange={(e) => setContact(e.target.value)}
-                    onKeyDown={(e) => e.key === "Enter" && requestOtp()}
+                    className="pl-9"
+                    placeholder="teacher.username"
+                    value={username}
+                    onChange={(e) => setUsername(e.target.value)}
+                    autoComplete="username"
                   />
                 </div>
-                <Button onClick={requestOtp} disabled={busy} className="w-full bg-amber-600 hover:bg-amber-700">
-                  {busy ? "Sending…" : "Send code"} <ArrowRight className="ml-2 h-4 w-4" />
-                </Button>
               </div>
-            ) : (
-              <div className="space-y-4">
-                <div>
-                  <Label>6-digit code</Label>
+              <div>
+                <Label>Password</Label>
+                <div className="relative">
+                  <KeyRound className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
                   <Input
-                    placeholder="000000"
-                    maxLength={6}
-                    value={code}
-                    onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))}
-                    onKeyDown={(e) => e.key === "Enter" && verifyOtp()}
+                    className="pl-9"
+                    type="password"
+                    placeholder="••••••••"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    autoComplete="current-password"
                   />
                 </div>
-                <Button onClick={verifyOtp} disabled={busy || code.length < 6} className="w-full bg-amber-600 hover:bg-amber-700">
-                  {busy ? "Verifying…" : "Verify and continue"}
-                </Button>
-                <Button variant="ghost" size="sm" className="w-full" onClick={() => setStep("contact")}>
-                  <ArrowLeft className="mr-1 h-3 w-3" /> Change email/phone
-                </Button>
               </div>
-            )}
+              <Button type="submit" disabled={busy} className="w-full bg-amber-600 hover:bg-amber-700">
+                {busy ? "Signing in…" : "Sign in"} <ArrowRight className="ml-2 h-4 w-4" />
+              </Button>
+            </form>
           </CardContent>
         </Card>
 
