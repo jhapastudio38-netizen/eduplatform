@@ -15,7 +15,7 @@ import java.util.concurrent.TimeUnit
 import java.util.concurrent.ConcurrentHashMap
 
 object AppState {
-    private const val BASE_URL = "http://eduplatform-alb-606377009.ap-south-1.elb.amazonaws.com/"
+    private const val BASE_URL = "https://dreamkoreasmartclass.com/"
     private const val PREFS_NAME = "dreamkorea_session"
     private const val KEY_TOKEN = "token"
     private const val KEY_NAME = "name"

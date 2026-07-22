@@ -40,7 +40,7 @@ fun LoginScreen(onLoginSuccess: () -> Unit) {
     var step by remember { mutableStateOf(1) }
     var loading by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf("") }
-    var devCode by remember { mutableStateOf("") }
+    var devCode by remember { mutableStateOf("") } // No longer used — OTP sent via email only
 
     Surface(modifier = Modifier.fillMaxSize(), color = White) {
         Column(
@@ -104,7 +104,6 @@ fun LoginScreen(onLoginSuccess: () -> Unit) {
                         scope.launch {
                             try {
                                 val resp = AppState.api.requestOtp(OtpRequest(contact))
-                                devCode = resp.devCode ?: ""
                                 step = 2
                             } catch (e: Exception) { error = "Connection error. Please check your internet." }
                             loading = false
@@ -123,13 +122,7 @@ fun LoginScreen(onLoginSuccess: () -> Unit) {
             if (step == 2) {
                 Text("Enter verification code", color = DarkText, fontSize = 20.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.fillMaxWidth())
                 Spacer(modifier = Modifier.height(6.dp))
-                Text("We sent a 6-digit code to $contact", color = SubText, fontSize = 13.sp, modifier = Modifier.fillMaxWidth())
-                if (devCode.isNotEmpty()) {
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Surface(color = PrimaryLight, shape = RoundedCornerShape(8.dp), modifier = Modifier.fillMaxWidth()) {
-                        Text("Your code: $devCode", color = Primary, fontSize = 15.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(12.dp))
-                    }
-                }
+                Text("We sent a 6-digit code to $contact. Check your email.", color = SubText, fontSize = 13.sp, modifier = Modifier.fillMaxWidth())
                 Spacer(modifier = Modifier.height(24.dp))
 
                 OutlinedTextField(
