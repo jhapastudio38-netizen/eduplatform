@@ -67,6 +67,59 @@ data class TestItem(
 )
 data class TestsResponse(val tests: List<TestItem>)
 
+// ─── Exam taking (full test detail with questions) ────────────────────────────
+data class QuestionDetail(
+    val id: String,
+    val type: String,
+    val difficulty: String,
+    val stem: String,
+    val options: List<String>?,
+    val imageUrl: String?,
+    val audioUrl: String?,
+    val audioLoop: Int = 0,
+    val audioLoopDelay: Int = 0
+)
+data class TestItemDetail(
+    val id: String,
+    val order: Int,
+    val points: Int,
+    val question: QuestionDetail
+)
+data class TestDetail(
+    val id: String,
+    val title: String,
+    val description: String?,
+    val durationMin: Int,
+    val isExam: Boolean,
+    val passScore: Int,
+    val items: List<TestItemDetail>
+)
+data class TestDetailResponse(val test: TestDetail)
+
+// ─── Exam submission + review ─────────────────────────────────────────────────
+data class SubmitRequest(val answers: Map<String, Any>)
+data class ReviewItem(
+    val questionId: String,
+    val stem: String,
+    val type: String,
+    val options: List<String>?,
+    val imageUrl: String?,
+    val audioUrl: String?,
+    val audioLoop: Int = 0,
+    val audioLoopDelay: Int = 0,
+    val userAnswer: Any?, // String or List<String>
+    val correctAnswer: Any?, // String or List<String>
+    val explanation: String?,
+    val isCorrect: Boolean
+)
+data class SubmitResponse(
+    val score: Int,
+    val maxScore: Int,
+    val graded: Boolean,
+    val submissionId: String,
+    val review: List<ReviewItem> = emptyList()
+)
+
 data class Book(
     val id: String,
     val title: String,
@@ -146,6 +199,12 @@ interface DreamKoreaApi {
     @GET("api/student/tests")
     suspend fun getTests(): TestsResponse
 
+    @GET("api/student/tests/{id}")
+    suspend fun getTestDetail(@Path("id") id: String): TestDetailResponse
+
+    @POST("api/student/tests/{id}/submit")
+    suspend fun submitTest(@Path("id") id: String, @Body body: SubmitRequest): SubmitResponse
+
     @GET("api/student/books")
     suspend fun getBooks(): BooksResponse
 
@@ -157,4 +216,27 @@ interface DreamKoreaApi {
 
     @GET("api/student/qa")
     suspend fun getQA(): QAResponse
+
+    @POST("api/student/live-rooms/join")
+    suspend fun joinLiveRoom(@Body body: Map<String, String>): LiveRoomJoinWrapper
 }
+
+data class LiveRoomJoinWrapper(val room: LiveRoomData? = null, val error: String? = null)
+data class LiveRoomData(
+    val id: String = "",
+    val roomCode: String = "",
+    val title: String = "",
+    val description: String? = null,
+    val hostId: String = "",
+    val isLive: Boolean = false,
+    val audioOnly: Boolean = true,
+    val maxStudents: Int = 50
+)
+data class LiveRoomJoinResponse(
+    val ok: Boolean = false,
+    val title: String = "",
+    val description: String? = null,
+    val hostName: String? = null,
+    val attendeeCount: Int = 0,
+    val error: String? = null
+)
