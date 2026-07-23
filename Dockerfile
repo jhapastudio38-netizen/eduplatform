@@ -29,5 +29,11 @@ COPY --from=build /app/.next/standalone ./
 COPY --from=build /app/.next/static ./.next/static
 COPY --from=build /app/public ./public
 
+# CRITICAL: Copy Prisma client + schema (not included in standalone by default)
+# Without this, the server crashes on any database query
+COPY --from=build /app/node_modules/.prisma ./node_modules/.prisma
+COPY --from=build /app/node_modules/@prisma ./node_modules/@prisma
+COPY --from=build /app/prisma ./prisma
+
 EXPOSE 3000
 CMD ["bun", "server.js"]
