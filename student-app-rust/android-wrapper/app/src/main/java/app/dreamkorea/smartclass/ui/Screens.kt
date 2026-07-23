@@ -47,6 +47,16 @@ sealed class Screen {
     object Profile : Screen()
     object LiveRoom : Screen()
     object Settings : Screen()
+    object UbtTest : Screen()
+    object FreeExam : Screen()
+    object Batch : Screen()
+    object Results : Screen()
+    object QuestionBank : Screen()
+    object AudioLessons : Screen()
+    object Classroom : Screen()
+    object RecordedVideo : Screen()
+    object ClassResult : Screen()
+    object CourseVideo : Screen()
     data class Exam(val testId: String) : Screen()
 }
 
@@ -71,10 +81,7 @@ fun MainScreen(userName: String, onLogout: () -> Unit) {
                     label = "screenTransition"
                 ) { s ->
                     when (s) {
-                        is Screen.Home -> HomeScreen(
-                            theme, sound,
-                            onNavigate = { screen = it }
-                        )
+                        is Screen.Home -> HomeScreen(theme, sound, onNavigate = { screen = it })
                         is Screen.Learn -> LearnScreen(theme, sound, onBack = { screen = Screen.Home })
                         is Screen.Books -> BooksScreen(theme, sound, onBack = { screen = Screen.Home })
                         is Screen.Tests -> TestsScreen(theme, sound, onBack = { screen = Screen.Home }, onStartExam = { screen = Screen.Exam(it) })
@@ -83,6 +90,17 @@ fun MainScreen(userName: String, onLogout: () -> Unit) {
                         is Screen.LiveRoom -> LiveRoomScreen(theme, onBack = { screen = Screen.Home })
                         is Screen.Settings -> SettingsScreen(theme, sound, onBack = { screen = Screen.Home })
                         is Screen.Exam -> ExamScreen(theme, testId = s.testId, onExit = { screen = Screen.Home })
+                        // Specific card pages — each opens a distinct screen
+                        is Screen.UbtTest -> TestsScreen(theme, sound, onBack = { screen = Screen.Home }, onStartExam = { screen = Screen.Exam(it) })
+                        is Screen.FreeExam -> TestsScreen(theme, sound, onBack = { screen = Screen.Home }, onStartExam = { screen = Screen.Exam(it) })
+                        is Screen.Batch -> TestsScreen(theme, sound, onBack = { screen = Screen.Home }, onStartExam = { screen = Screen.Exam(it) })
+                        is Screen.Results -> ProfileScreen(theme, sound, userName, onBack = { screen = Screen.Home }, onLogout = onLogout)
+                        is Screen.QuestionBank -> LearnScreen(theme, sound, onBack = { screen = Screen.Home })
+                        is Screen.AudioLessons -> LearnScreen(theme, sound, onBack = { screen = Screen.Home })
+                        is Screen.Classroom -> LiveRoomScreen(theme, onBack = { screen = Screen.Home })
+                        is Screen.RecordedVideo -> VideosScreen(theme, sound, onBack = { screen = Screen.Home })
+                        is Screen.ClassResult -> ProfileScreen(theme, sound, userName, onBack = { screen = Screen.Home }, onLogout = onLogout)
+                        is Screen.CourseVideo -> VideosScreen(theme, sound, onBack = { screen = Screen.Home })
                     }
                 }
             }
@@ -237,15 +255,29 @@ fun HomeScreen(theme: AppTheme, sound: SoundManager, onNavigate: (Screen) -> Uni
                     ) {
                         rowCards.forEach { card ->
                             ImageCard(theme, sound, card, modifier = Modifier.weight(1f)) {
-                                // Navigate based on route
-                                val dest = when (card.route) {
-                                    "tests" -> Screen.Tests
-                                    "books" -> Screen.Books
-                                    "videos" -> Screen.Videos
-                                    "learn" -> Screen.Learn
-                                    "live" -> Screen.LiveRoom
-                                    "profile" -> Screen.Profile
-                                    else -> Screen.Tests
+                                // Navigate to distinct page based on card key
+                                val dest = when (card.key) {
+                                    "ubt_test" -> Screen.UbtTest
+                                    "free_exam" -> Screen.FreeExam
+                                    "batch" -> Screen.Batch
+                                    "results" -> Screen.Results
+                                    "all_books" -> Screen.Books
+                                    "question_bank" -> Screen.QuestionBank
+                                    "course_video" -> Screen.CourseVideo
+                                    "audio_lessons" -> Screen.AudioLessons
+                                    "classroom" -> Screen.Classroom
+                                    "live_class" -> Screen.LiveRoom
+                                    "recorded_video" -> Screen.RecordedVideo
+                                    "class_result" -> Screen.ClassResult
+                                    else -> when (card.route) {
+                                        "tests" -> Screen.Tests
+                                        "books" -> Screen.Books
+                                        "videos" -> Screen.Videos
+                                        "learn" -> Screen.Learn
+                                        "live" -> Screen.LiveRoom
+                                        "profile" -> Screen.Profile
+                                        else -> Screen.Tests
+                                    }
                                 }
                                 onNavigate(dest)
                             }
