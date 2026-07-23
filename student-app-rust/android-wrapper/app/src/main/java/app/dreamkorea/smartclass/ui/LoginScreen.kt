@@ -1,6 +1,7 @@
 package app.dreamkorea.smartclass.ui
 
 import androidx.compose.animation.*
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -15,7 +16,9 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -33,14 +36,14 @@ import java.net.UnknownHostException
 val White = Color(0xFFFFFFFF)
 val DarkText = Color(0xFF1A1A2E)
 val SubText = Color(0xFF6C757D)
-val Primary = Color(0xFF003478)        // Korean flag blue
-val Accent = Color(0xFFCD2E3A)         // Korean flag red
+val Primary = Color(0xFF003478)
+val Accent = Color(0xFFCD2E3A)
 val ErrorRed = Color(0xFFE53935)
 val Divider = Color(0xFFE0E0E0)
+val SuccessGreen = Color(0xFF00C853)
 
-// Email validation helper
+// Email/phone validation helpers
 private fun isEmail(s: String) = android.util.Patterns.EMAIL_ADDRESS.matcher(s).matches()
-// Phone validation: digits only, 7-15 chars, optionally starts with +
 private fun isValidPhone(s: String): Boolean {
     val digits = s.replace("\\D".toRegex(), "")
     return digits.length in 7..15
@@ -50,11 +53,10 @@ private fun isValidPhone(s: String): Boolean {
 fun LoginScreen(onLoginSuccess: () -> Unit) {
     val scope = rememberCoroutineScope()
     val sound = rememberSoundManager()
-    val context = LocalContext.current
-    // 3 login modes: OTP_SIGNUP (new user), OTP_LOGIN (returning user via OTP), PASSWORD (email+pass)
-    var mode by remember { mutableStateOf("OTP_SIGNUP") }
+    // 2 modes: SIGNUP (new user via OTP) or LOGIN (returning user with email+password)
+    var mode by remember { mutableStateOf("SIGNUP") }
 
-    // OTP flow state
+    // OTP signup state
     var name by remember { mutableStateOf("") }
     var email by remember { mutableStateOf("") }
     var phone by remember { mutableStateOf("") }
@@ -68,6 +70,7 @@ fun LoginScreen(onLoginSuccess: () -> Unit) {
 
     var loading by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf("") }
+    var info by remember { mutableStateOf("") } // success/info message (green)
     var passwordVisible by remember { mutableStateOf(false) }
 
     Surface(modifier = Modifier.fillMaxSize(), color = Color.White) {
@@ -77,19 +80,20 @@ fun LoginScreen(onLoginSuccess: () -> Unit) {
             verticalArrangement = Arrangement.Center
         ) {
             Spacer(modifier = Modifier.height(40.dp))
-            // Taegeuk logo
-            Box(
-                modifier = Modifier.size(64.dp).background(Color.White, RoundedCornerShape(16.dp)),
-                contentAlignment = Alignment.Center
-            ) {
-                Box(modifier = Modifier.size(48.dp).background(Accent, RoundedCornerShape(24.dp)))
-                Box(modifier = Modifier.size(48.dp).background(Primary, RoundedCornerShape(0.dp, 0.dp, 24.dp, 24.dp)))
-                Text("한", color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.Bold)
-            }
-            Spacer(modifier = Modifier.height(20.dp))
+
+            // ─── DreamKorea logo (bundled in APK) ────────────────────────────
+            // Logo blends into the white background — no box, no border
+            Image(
+                painter = painterResource(id = app.dreamkorea.smartclass.R.drawable.dreamkorea_logo),
+                contentDescription = "DreamKorea Logo",
+                modifier = Modifier.size(120.dp),
+                contentScale = ContentScale.Fit
+            )
+
+            Spacer(modifier = Modifier.height(16.dp))
             Text("DreamKorea", color = DarkText, fontSize = 24.sp, fontWeight = FontWeight.Bold)
-            Text("SmartClass", color = SubText, fontSize = 12.sp, letterSpacing = 2.sp)
-            Spacer(modifier = Modifier.height(36.dp))
+            Text("Realize your dream now", color = SubText, fontSize = 12.sp)
+            Spacer(modifier = Modifier.height(28.dp))
 
             // Mode toggle
             Row(
@@ -97,22 +101,42 @@ fun LoginScreen(onLoginSuccess: () -> Unit) {
                 horizontalArrangement = Arrangement.Center
             ) {
                 FilterChip(
-                    selected = mode == "OTP_SIGNUP",
-                    onClick = { sound.click(); mode = "OTP_SIGNUP"; step = 1; error = "" },
+                    selected = mode == "SIGNUP",
+                    onClick = { sound.click(); mode = "SIGNUP"; step = 1; error = ""; info = "" },
                     label = { Text("Sign up", fontSize = 12.sp) },
                     colors = FilterChipDefaults.filterChipColors(selectedContainerColor = Primary, selectedLabelColor = Color.White)
                 )
                 Spacer(Modifier.width(8.dp))
                 FilterChip(
-                    selected = mode == "PASSWORD",
-                    onClick = { sound.click(); mode = "PASSWORD"; error = "" },
+                    selected = mode == "LOGIN",
+                    onClick = { sound.click(); mode = "LOGIN"; error = ""; info = "" },
                     label = { Text("Sign in", fontSize = 12.sp) },
                     colors = FilterChipDefaults.filterChipColors(selectedContainerColor = Primary, selectedLabelColor = Color.White)
                 )
             }
-            Spacer(modifier = Modifier.height(20.dp))
+            Spacer(modifier = Modifier.height(16.dp))
 
-            // Error display
+            // Info message (green — for success like "OTP sent")
+            AnimatedVisibility(
+                visible = info.isNotEmpty(),
+                enter = fadeIn() + slideInVertically(),
+                exit = fadeOut()
+            ) {
+                Surface(
+                    color = Color(0xFFE8F5E9),
+                    shape = RoundedCornerShape(8.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Default.CheckCircle, null, tint = SuccessGreen, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text(info, color = SuccessGreen, fontSize = 13.sp, modifier = Modifier.weight(1f))
+                    }
+                }
+                Spacer(modifier = Modifier.height(8.dp))
+            }
+
+            // Error message (red — for errors)
             AnimatedVisibility(
                 visible = error.isNotEmpty(),
                 enter = fadeIn() + slideInVertically(),
@@ -129,11 +153,11 @@ fun LoginScreen(onLoginSuccess: () -> Unit) {
                         Text(error, color = ErrorRed, fontSize = 13.sp, modifier = Modifier.weight(1f))
                     }
                 }
-                Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(8.dp))
             }
 
-            // ─── PASSWORD LOGIN MODE ───────────────────────────────────────────
-            if (mode == "PASSWORD") {
+            // ─── LOGIN MODE (email + password) ────────────────────────────────
+            if (mode == "LOGIN") {
                 Text("Welcome back", color = DarkText, fontSize = 20.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.fillMaxWidth())
                 Spacer(Modifier.height(6.dp))
                 Text("Sign in with your email and password", color = SubText, fontSize = 13.sp, modifier = Modifier.fillMaxWidth())
@@ -166,9 +190,7 @@ fun LoginScreen(onLoginSuccess: () -> Unit) {
                         IconButton(onClick = { sound.click(); passwordVisible = !passwordVisible }) {
                             Icon(
                                 if (passwordVisible) Icons.Default.Visibility else Icons.Default.VisibilityOff,
-                                null,
-                                tint = SubText,
-                                modifier = Modifier.size(18.dp)
+                                null, tint = SubText, modifier = Modifier.size(18.dp)
                             )
                         }
                     },
@@ -178,10 +200,10 @@ fun LoginScreen(onLoginSuccess: () -> Unit) {
 
                 Button(
                     onClick = {
-                        if (loginEmail.isBlank()) { error = "Please enter your email"; return@Button }
-                        if (!isEmail(loginEmail)) { error = "Please enter a valid email address"; return@Button }
-                        if (loginPassword.isBlank()) { error = "Please enter your password"; return@Button }
-                        loading = true; error = ""
+                        if (loginEmail.isBlank()) { sound.error(); error = "Please enter your email"; return@Button }
+                        if (!isEmail(loginEmail)) { sound.error(); error = "Please enter a valid email address"; return@Button }
+                        if (loginPassword.isBlank()) { sound.error(); error = "Please enter your password"; return@Button }
+                        loading = true; error = ""; info = ""
                         scope.launch {
                             try {
                                 val res = AppState.api.loginCredentials(
@@ -193,17 +215,23 @@ fun LoginScreen(onLoginSuccess: () -> Unit) {
                                     onLoginSuccess()
                                 } else {
                                     sound.error()
-                                    error = res.error ?: "Invalid email or password"
+                                    // User-friendly error messages
+                                    error = when {
+                                        res.error?.contains("password", ignoreCase = true) == true -> "Wrong password. Please try again."
+                                        res.error?.contains("not found", ignoreCase = true) == true -> "No account found with this email."
+                                        res.error?.contains("suspended", ignoreCase = true) == true -> "Your account is suspended. Contact admin."
+                                        else -> "Wrong email or password."
+                                    }
                                 }
                             } catch (e: UnknownHostException) {
                                 sound.error()
                                 error = "No internet connection. Please check your network."
                             } catch (e: IOException) {
                                 sound.error()
-                                error = "Network error. Please check your internet and try again."
+                                error = "Could not connect to server. Please check your internet."
                             } catch (e: Exception) {
                                 sound.error()
-                                error = "Could not connect to server. Try again."
+                                error = "Something went wrong. Please try again."
                             }
                             loading = false
                         }
@@ -218,13 +246,13 @@ fun LoginScreen(onLoginSuccess: () -> Unit) {
                 }
 
                 Spacer(Modifier.height(16.dp))
-                TextButton(onClick = { sound.click(); mode = "OTP_SIGNUP"; step = 1; error = "" }) {
+                TextButton(onClick = { sound.click(); mode = "SIGNUP"; step = 1; error = ""; info = "" }) {
                     Text("Don't have an account? Sign up", color = Primary, fontSize = 12.sp)
                 }
             }
 
-            // ─── OTP SIGNUP MODE ───────────────────────────────────────────────
-            if (mode == "OTP_SIGNUP") {
+            // ─── SIGNUP MODE ──────────────────────────────────────────────────
+            if (mode == "SIGNUP") {
                 // Step 1: Name + Email + Phone
                 if (step == 1) {
                     Text("Create your account", color = DarkText, fontSize = 20.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.fillMaxWidth())
@@ -273,21 +301,22 @@ fun LoginScreen(onLoginSuccess: () -> Unit) {
                             if (!isEmail(email)) { sound.error(); error = "Please enter a valid email address"; return@Button }
                             if (phone.isBlank()) { sound.error(); error = "Phone number is required"; return@Button }
                             if (!isValidPhone(phone)) { sound.error(); error = "Please enter a valid phone number (7-15 digits)"; return@Button }
-                            loading = true; error = ""
+                            loading = true; error = ""; info = ""
                             scope.launch {
                                 try {
                                     AppState.api.requestOtp(OtpRequest(email))
                                     sound.success()
+                                    info = "Verification code sent to $email. Check your inbox."
                                     step = 2
                                 } catch (e: UnknownHostException) {
                                     sound.error()
                                     error = "No internet connection. Please check your network."
                                 } catch (e: IOException) {
                                     sound.error()
-                                    error = "Network error. Please check your internet and try again."
+                                    error = "Could not connect to server. Please check your internet."
                                 } catch (e: Exception) {
                                     sound.error()
-                                    error = "Could not send OTP. Try again."
+                                    error = "Could not send code. Please try again."
                                 }
                                 loading = false
                             }
@@ -302,7 +331,7 @@ fun LoginScreen(onLoginSuccess: () -> Unit) {
                     }
 
                     Spacer(Modifier.height(12.dp))
-                    TextButton(onClick = { sound.click(); mode = "PASSWORD"; error = "" }) {
+                    TextButton(onClick = { sound.click(); mode = "LOGIN"; error = ""; info = "" }) {
                         Text("Already have an account? Sign in", color = Primary, fontSize = 12.sp)
                     }
                 }
@@ -329,7 +358,7 @@ fun LoginScreen(onLoginSuccess: () -> Unit) {
                     Button(
                         onClick = {
                             if (code.length < 6) { sound.error(); error = "Please enter all 6 digits"; return@Button }
-                            loading = true; error = ""
+                            loading = true; error = ""; info = ""
                             scope.launch {
                                 try {
                                     val resp = AppState.api.verifyOtp(
@@ -340,7 +369,9 @@ fun LoginScreen(onLoginSuccess: () -> Unit) {
                                     )
                                     if (resp.ok) {
                                         sound.success()
-                                        // If user didn't set password, ask them to
+                                        info = "Verified! Now set a password for faster login."
+                                        // Save the session so set-password works
+                                        AppState.saveSession("logged_in", resp.user)
                                         step = 3
                                     } else {
                                         sound.error()
@@ -351,7 +382,7 @@ fun LoginScreen(onLoginSuccess: () -> Unit) {
                                     error = "No internet connection. Please check your network."
                                 } catch (e: IOException) {
                                     sound.error()
-                                    error = "Network error. Please try again."
+                                    error = "Could not connect to server. Please try again."
                                 } catch (e: Exception) {
                                     sound.error()
                                     error = "Wrong code. Please check and try again."
@@ -368,16 +399,16 @@ fun LoginScreen(onLoginSuccess: () -> Unit) {
                         else Text("Verify", fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
                     }
                     Spacer(Modifier.height(12.dp))
-                    TextButton(onClick = { sound.click(); step = 1; error = ""; code = "" }) {
+                    TextButton(onClick = { sound.click(); step = 1; error = ""; info = ""; code = "" }) {
                         Text("← Change details", color = Primary, fontSize = 12.sp)
                     }
                 }
 
-                // Step 3: Set password (after OTP verified)
+                // Step 3: Set password (uses /api/auth/set-password with active session)
                 if (step == 3) {
                     Text("Set a password", color = DarkText, fontSize = 20.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.fillMaxWidth())
                     Spacer(Modifier.height(6.dp))
-                    Text("Use this with your email ($email) to sign in faster next time.", color = SubText, fontSize = 13.sp, modifier = Modifier.fillMaxWidth())
+                    Text("Use this with your email to sign in faster next time.", color = SubText, fontSize = 13.sp, modifier = Modifier.fillMaxWidth())
                     Spacer(Modifier.height(20.dp))
 
                     OutlinedTextField(
@@ -418,27 +449,30 @@ fun LoginScreen(onLoginSuccess: () -> Unit) {
                         onClick = {
                             if (password.length < 6) { sound.error(); error = "Password must be at least 6 characters"; return@Button }
                             if (password != confirmPassword) { sound.error(); error = "Passwords do not match"; return@Button }
-                            loading = true; error = ""
+                            loading = true; error = ""; info = ""
                             scope.launch {
                                 try {
-                                    // Re-verify OTP with password to set it
-                                    val resp = AppState.api.verifyOtp(
-                                        VerifyRequest(
-                                            contact = email, code = code, role = "STUDENT",
-                                            name = name, email = email, phone = phone, password = password
-                                        )
+                                    // Use the set-password endpoint (with active session from step 2)
+                                    val resp = AppState.api.setPassword(
+                                        mapOf("password" to password)
                                     )
                                     if (resp.ok) {
                                         sound.success()
-                                        AppState.saveSession("logged_in", resp.user)
+                                        // Already logged in from step 2 — just call success
                                         onLoginSuccess()
                                     } else {
                                         sound.error()
-                                        error = "Could not set password. Try again."
+                                        error = "Could not set password. Please try again."
                                     }
+                                } catch (e: UnknownHostException) {
+                                    sound.error()
+                                    error = "No internet connection. Please check your network."
+                                } catch (e: IOException) {
+                                    sound.error()
+                                    error = "Could not connect to server. Please try again."
                                 } catch (e: Exception) {
                                     sound.error()
-                                    error = "Network error. Please try again."
+                                    error = "Something went wrong. Please try again."
                                 }
                                 loading = false
                             }
@@ -455,18 +489,8 @@ fun LoginScreen(onLoginSuccess: () -> Unit) {
                     Spacer(Modifier.height(10.dp))
                     TextButton(onClick = {
                         sound.click()
-                        // Skip password — just login with the OTP session we already have
-                        scope.launch {
-                            try {
-                                val me = AppState.api.getMe()
-                                if (me.user != null) {
-                                    AppState.saveSession("logged_in", me.user)
-                                    onLoginSuccess()
-                                }
-                            } catch (_: Exception) {
-                                error = "Could not complete login. Try again."
-                            }
-                        }
+                        // Skip password — already logged in from step 2
+                        onLoginSuccess()
                     }) {
                         Text("Skip for now", color = SubText, fontSize = 12.sp)
                     }

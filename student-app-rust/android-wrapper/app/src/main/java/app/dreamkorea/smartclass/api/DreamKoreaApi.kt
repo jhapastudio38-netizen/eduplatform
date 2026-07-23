@@ -26,6 +26,7 @@ data class User(
 )
 data class VerifyResponse(val ok: Boolean, val user: User)
 data class CredentialsResponse(val ok: Boolean = false, val user: User = User("", null, "", null, "STUDENT"), val error: String? = null)
+data class SimpleResponse(val ok: Boolean = false, val error: String? = null)
 data class MeResponse(val user: User?)
 
 data class HomeStats(
@@ -194,6 +195,9 @@ interface DreamKoreaApi {
 
     @POST("api/auth/credentials")
     suspend fun loginCredentials(@Body body: Map<String, String>): CredentialsResponse
+
+    @POST("api/auth/set-password")
+    suspend fun setPassword(@Body body: Map<String, String>): SimpleResponse
 
     @GET("api/auth/me")
     suspend fun getMe(): MeResponse
