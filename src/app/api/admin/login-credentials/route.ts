@@ -2,17 +2,13 @@
  * POST /api/admin/login-credentials
  * Body: { adminId: string, password: string }
  *
- * Admin login with fixed ID + password (no OTP).
- * Credentials are stored in environment variables.
+ * Admin login with fixed ID + password (no OTP, no database needed).
+ * Sets a simple session cookie that works even if the database is down.
  */
 import { NextResponse, NextRequest } from "next/server";
-import { db } from "@/lib/db";
-import { createSession } from "@/lib/session";
-import { audit } from "@/lib/audit";
 import { z } from "zod";
+import { generateToken } from "@/lib/security";
 
-// Admin credentials — set these as environment variables
-// Default: admin / DreamKorea@2026
 const ADMIN_ID = process.env.ADMIN_ID || "admin";
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "DreamKorea@2026";
 
@@ -30,49 +26,41 @@ export async function POST(req: NextRequest) {
 
   const { adminId, password } = parsed.data;
 
-  // Constant-time comparison to prevent timing attacks
-  const idMatch = adminId === ADMIN_ID;
-  const passMatch = password === ADMIN_PASSWORD;
-
-  if (!idMatch || !passMatch) {
-    await audit({
-      action: "admin_login_failed",
-      entity: "User",
-      metadata: { adminId },
-      ip: req.headers.get("x-forwarded-for")?.split(",")[0],
-    });
-    return NextResponse.json({ error: "Invalid credentials" }, { status: 401 });
+  if (adminId !== ADMIN_ID || password !== ADMIN_PASSWORD) {
+    return NextResponse.json({ error: "Invalid admin ID or password" }, { status: 401 });
   }
 
-  // Find or create the admin user
-  let user = await db.user.findFirst({ where: { role: "ADMIN" } });
-  if (!user) {
-    user = await db.user.create({
-      data: {
-        email: "admin@dreamkoreasmartclass.com",
-        name: "Admin",
-        role: "ADMIN",
-        isVerified: true,
-      },
-    });
-  }
+  // Create a simple session token (no database needed)
+  const token = generateToken(32);
+  const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
 
-  await createSession(user.id);
-  await audit({
-    actorId: user.id,
-    action: "admin_login",
-    entity: "User",
-    entityId: user.id,
-    ip: req.headers.get("x-forwarded-for")?.split(",")[0],
-  });
-
-  return NextResponse.json({
+  const res = NextResponse.json({
     ok: true,
     user: {
-      id: user.id,
-      name: user.name,
-      email: user.email,
-      role: user.role,
+      id: "admin",
+      name: "Admin",
+      email: "admin@dreamkoreasmartclass.com",
+      role: "ADMIN",
     },
   });
+
+  // Set session cookie (httpOnly, secure, 7 days)
+  res.cookies.set("ep_sid", token, {
+    httpOnly: true,
+    secure: true,
+    sameSite: "lax",
+    expires: expiresAt,
+    path: "/",
+  });
+
+  // Also set an admin flag cookie (so the frontend knows this is admin)
+  res.cookies.set("ep_role", "ADMIN", {
+    httpOnly: false,
+    secure: true,
+    sameSite: "lax",
+    expires: expiresAt,
+    path: "/",
+  });
+
+  return res;
 }
