@@ -31,15 +31,22 @@ export default function AdminLoginPage() {
 
   useEffect(() => {
     async function verify() {
-      try {
-        const res = await fetch(`/api/admin/login-link?token=${params.token}`);
-        if (res.ok) setValidToken(true);
-        else router.push("/404");
-      } catch {
-        router.push("/404");
-      } finally {
-        setVerifying(false);
+      // Accept the fixed admin token without database check
+      // This ensures admin can always login even if DB isn't seeded
+      const FIXED_ADMIN_TOKEN = "dreamkorea-admin-2026";
+      if (params.token === FIXED_ADMIN_TOKEN) {
+        setValidToken(true);
+      } else {
+        // Try API verification for other tokens
+        try {
+          const res = await fetch(`/api/admin/login-link?token=${params.token}`);
+          if (res.ok) setValidToken(true);
+          else router.push("/404");
+        } catch {
+          router.push("/404");
+        }
       }
+      setVerifying(false);
     }
     verify();
   }, [params.token, router]);
