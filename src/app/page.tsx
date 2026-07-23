@@ -2,22 +2,25 @@
 
 import { useEffect, useState } from "react";
 import PublicSite from "@/components/PublicSite";
-import { useAuthStore } from "@/stores/auth";
+import AdminApp from "@/components/admin/AdminApp";
 
 export default function Home() {
-  const { user, fetchUser, loading } = useAuthStore();
-  const [checked, setChecked] = useState(false);
+  const [user, setUser] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetchUser().finally(() => setChecked(true));
-  }, [fetchUser]);
+    fetch("/api/auth/me")
+      .then((r) => r.json())
+      .then((d) => setUser(d.user || null))
+      .catch(() => setUser(null))
+      .finally(() => setLoading(false));
+  }, []);
 
-  // If admin or teacher is logged in, show admin panel
-  if (checked && user && (user.role === "ADMIN" || user.role === "TEACHER")) {
-    const AdminApp = require("@/components/admin/AdminApp").default;
+  if (loading) return null;
+
+  if (user && (user.role === "ADMIN" || user.role === "TEACHER")) {
     return <AdminApp />;
   }
 
-  // Otherwise show public site
   return <PublicSite />;
 }
