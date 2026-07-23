@@ -29,12 +29,15 @@ jobs:
         run: |
           npm install -g bun
           bun install
+          # CRITICAL: Remove .env FIRST (has SQLite URL that overrides RDS)
+          rm -f .env
+          # Now prisma commands will use DATABASE_URL from env (RDS Postgres)
           bun run db:generate
           bunx prisma db push --accept-data-loss || echo "Schema push skipped"
-          rm -f .env
-          export DATABASE_URL="$DATABASE_URL"
+          # Seed
           bun run scripts/seed-korean.ts || echo "Seed skipped"
           bun run scripts/seed-fixed-tokens.ts || echo "Token seed skipped"
+          # Build Docker image
           docker build --no-cache -t $ECR/eduplatform-web:$IMAGE_TAG -t $ECR/eduplatform-web:latest .
           docker push $ECR/eduplatform-web:$IMAGE_TAG
           docker push $ECR/eduplatform-web:latest
