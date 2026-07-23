@@ -304,7 +304,7 @@ fun HomeScreen(theme: AppTheme, sound: SoundManager, onNavigate: (Screen) -> Uni
     }
 }
 
-// ─── Image card (like original app) ───────────────────────────────────────────
+// ─── Image card (like original app) — bigger, not squished ────────────────────
 @Composable
 fun ImageCard(theme: AppTheme, sound: SoundManager, card: HomeCard, modifier: Modifier = Modifier, onClick: () -> Unit) {
     var pressed by remember { mutableStateOf(false) }
@@ -315,33 +315,37 @@ fun ImageCard(theme: AppTheme, sound: SoundManager, card: HomeCard, modifier: Mo
     )
     Surface(
         color = theme.cardBg,
-        shape = RoundedCornerShape(16.dp),
-        modifier = modifier.scale(scale),
-        shadowElevation = 2.dp,
+        shape = RoundedCornerShape(18.dp),
+        modifier = modifier
+            .fillMaxWidth()
+            .aspectRatio(0.85f)  // taller cards — not squished
+            .scale(scale),
+        shadowElevation = 3.dp,
         border = androidx.compose.foundation.BorderStroke(1.dp, theme.divider)
     ) {
         Column(
-            modifier = Modifier.fillMaxWidth().clickable { sound.click(); pressed = true; onClick() }
+            modifier = Modifier.fillMaxSize().clickable { sound.click(); pressed = true; onClick() }
         ) {
-            // Image area (top 60%)
+            // Image area (top 70%)
             Box(
-                modifier = Modifier.fillMaxWidth().height(100.dp).background(theme.primary.copy(alpha = 0.1f)),
+                modifier = Modifier.fillMaxWidth().weight(1f).background(theme.primary.copy(alpha = 0.08f)),
                 contentAlignment = Alignment.Center
             ) {
                 AsyncImageLoader(url = card.imageUrl ?: "", modifier = Modifier.fillMaxSize())
             }
-            // Label area (bottom 40%)
+            // Label area (bottom 30%)
             Box(
-                modifier = Modifier.fillMaxWidth().padding(10.dp),
+                modifier = Modifier.fillMaxWidth().padding(12.dp),
                 contentAlignment = Alignment.Center
             ) {
                 Text(
                     card.title,
                     color = theme.darkText,
-                    fontSize = 11.sp,
+                    fontSize = 12.sp,
                     fontWeight = FontWeight.Bold,
                     textAlign = TextAlign.Center,
-                    maxLines = 2
+                    maxLines = 2,
+                    lineHeight = 14.sp
                 )
             }
         }
