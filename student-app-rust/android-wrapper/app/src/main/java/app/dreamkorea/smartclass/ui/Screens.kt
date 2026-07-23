@@ -2,6 +2,7 @@ package app.dreamkorea.smartclass.ui
 
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -22,6 +23,8 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -95,13 +98,13 @@ fun TopBar(theme: AppTheme, userName: String, sound: SoundManager, onProfile: ()
             modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // DreamKorea logo image
-            Box(modifier = Modifier.size(40.dp).clip(RoundedCornerShape(8.dp))) {
-                AsyncImageLoader(
-                    url = "https://dreamkoreasmartclass.com/images/dreamkorea-logo.png",
-                    modifier = Modifier.fillMaxSize()
-                )
-            }
+            // DreamKorea logo (bundled in APK, blends into background)
+            Image(
+                painter = painterResource(id = app.dreamkorea.smartclass.R.drawable.dreamkorea_logo),
+                contentDescription = "DreamKorea Logo",
+                modifier = Modifier.size(40.dp),
+                contentScale = ContentScale.Fit
+            )
             Spacer(Modifier.width(10.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Text("DreamKorea", color = theme.darkText, fontSize = 16.sp, fontWeight = FontWeight.Bold)
@@ -165,13 +168,33 @@ fun HomeScreen(theme: AppTheme, sound: SoundManager, onNavigate: (Screen) -> Uni
         }
     }
 
+    // Fallback cards if API fails or returns empty — ensures home is never blank
+    val effectiveCards = remember(homeCards, loading) {
+        if (loading) emptyList()
+        else if (homeCards.isNotEmpty()) homeCards
+        else listOf(
+            HomeCard(key = "ubt_test", title = "UBT TEST", section = "test", sortOrder = 0, route = "tests", imageUrl = ""),
+            HomeCard(key = "free_exam", title = "Free Exam", section = "test", sortOrder = 1, route = "tests", imageUrl = ""),
+            HomeCard(key = "batch", title = "Batch", section = "test", sortOrder = 2, route = "tests", imageUrl = ""),
+            HomeCard(key = "results", title = "Results", section = "test", sortOrder = 3, route = "profile", imageUrl = ""),
+            HomeCard(key = "all_books", title = "ALL BOOKS", section = "resources", sortOrder = 0, route = "books", imageUrl = ""),
+            HomeCard(key = "question_bank", title = "QUESTION BANK", section = "resources", sortOrder = 1, route = "learn", imageUrl = ""),
+            HomeCard(key = "course_video", title = "COURSE VIDEO", section = "resources", sortOrder = 2, route = "videos", imageUrl = ""),
+            HomeCard(key = "audio_lessons", title = "AUDIO LESSONS", section = "resources", sortOrder = 3, route = "learn", imageUrl = ""),
+            HomeCard(key = "classroom", title = "CLASSROOM", section = "premium", sortOrder = 0, route = "live", imageUrl = ""),
+            HomeCard(key = "live_class", title = "LIVE CLASS", section = "premium", sortOrder = 1, route = "live", imageUrl = ""),
+            HomeCard(key = "recorded_video", title = "RECORDED VIDEO", section = "premium", sortOrder = 2, route = "videos", imageUrl = ""),
+            HomeCard(key = "class_result", title = "CLASS RESULT", section = "premium", sortOrder = 3, route = "profile", imageUrl = "")
+        )
+    }
+
     if (loading) {
         SkeletonGridScreen(theme, rows = 3)
         return
     }
 
     // Group cards by section
-    val sections = homeCards.groupBy { it.section }
+    val sections = effectiveCards.groupBy { it.section }
 
     LazyColumn(
         modifier = Modifier.fillMaxSize(),

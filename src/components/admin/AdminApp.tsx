@@ -6,7 +6,8 @@ import {
   LayoutDashboard, FileText, BookOpen, FileQuestion, Users, ShoppingBag,
   GraduationCap, School, Image, Layers, Package, UserCog, BookMarked,
   ClipboardList, BarChart3, Settings, LogOut, ChevronDown, ChevronRight,
-  FolderTree, Library, Award, Bell, Search, Menu, X, Headphones, Radio, Video
+  FolderTree, Library, Award, Bell, Search, Menu, X, Headphones, Radio, Video,
+  LayoutGrid
 } from "lucide-react";
 import { useAuthStore } from "@/stores/auth";
 import { Button } from "@/components/ui/button";
@@ -20,6 +21,7 @@ import { AdminQuestions } from "./AdminQuestions";
 import { AdminTests } from "./AdminTests";
 import { AdminUsers } from "./AdminUsers";
 import { AdminBooks } from "./AdminBooks";
+import { AdminHomeCards } from "./AdminHomeCards";
 import { AdminAudioLessons } from "./AdminAudioLessons";
 import { AdminVideoLessons } from "./AdminVideoLessons";
 import { AdminLiveRooms } from "./AdminLiveRooms";
@@ -37,7 +39,7 @@ type View =
   | "question-bank" | "question-categories" | "all-books" | "all-courses" | "audio-lessons" | "video-lessons"
   | "paid-exam-orders" | "batch-orders" | "course-orders" | "qb-orders"
   | "batch" | "student-results" | "package-results" | "classroom-results"
-  | "students" | "teachers" | "pdf-viewer" | "settings"
+  | "students" | "teachers" | "pdf-viewer" | "settings" | "home-cards"
   | "content" | "questions" | "tests" | "users";
 
 interface NavItem {
@@ -67,6 +69,7 @@ const NAV_SECTIONS: NavSection[] = [
   {
     title: "Content & Resources",
     items: [
+      { id: "home-cards", label: "Home Cards", icon: LayoutGrid, hasAdd: true },
       { id: "question-bank", label: "Question Bank", icon: FileQuestion, hasAdd: true },
       { id: "question-categories", label: "Question Categories", icon: FolderTree, hasAdd: true },
       { id: "all-books", label: "All Books", icon: BookMarked, hasAdd: true },
@@ -152,6 +155,8 @@ export function AdminApp() {
         return <AdminOverview onNavigate={navigate} />;
       case "all-books":
         return <AdminBooks />;
+      case "home-cards":
+        return <AdminHomeCards />;
       case "question-categories":
         return <AdminQuestionCategories />;
       case "all-courses":
@@ -273,7 +278,7 @@ function isValidView(v: string): v is View {
     "question-bank", "question-categories", "all-books", "all-courses", "audio-lessons", "video-lessons",
     "paid-exam-orders", "batch-orders", "course-orders", "qb-orders",
     "batch", "student-results", "package-results", "classroom-results",
-    "students", "teachers", "pdf-viewer", "settings", "content", "questions", "tests", "users"];
+    "students", "teachers", "pdf-viewer", "settings", "home-cards", "content", "questions", "tests", "users"];
   return all.includes(v);
 }
 
