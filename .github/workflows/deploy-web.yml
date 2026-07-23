@@ -32,7 +32,11 @@ jobs:
           bun run db:generate
           # Push schema changes to RDS (safe — additive only)
           bunx prisma db push --accept-data-loss || echo "Schema push skipped (may already be in sync)"
-          # Export DATABASE_URL so seed scripts (PrismaClient) can read it
+          # CRITICAL: Remove local .env (has SQLite DATABASE_URL that overrides RDS)
+          # The local .env has DATABASE_URL=file:... which makes PrismaClient
+          # try to connect to SQLite with the postgresql provider → fails
+          rm -f .env
+          # Export DATABASE_URL so seed scripts (PrismaClient) use RDS Postgres
           export DATABASE_URL="$DATABASE_URL"
           # Seed Korean learning content (idempotent — uses upserts)
           bun run scripts/seed-korean.ts || echo "Seed skipped (may already exist)"
