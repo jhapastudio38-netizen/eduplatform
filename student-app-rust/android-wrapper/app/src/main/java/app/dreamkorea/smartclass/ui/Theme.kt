@@ -30,17 +30,17 @@ data class AppTheme(
     val accent: Color,
     val isDark: Boolean,
 ) {
-    // Refined dark mode palette — deep navy/charcoal with good contrast
-    val white get() = if (isDark) Color(0xFF1E1E2E) else Color(0xFFFFFFFF)        // surface (top bar, bottom bar)
-    val lightGray get() = if (isDark) Color(0xFF14141F) else Color(0xFFF6F7F9)    // background
-    val midGray get() = if (isDark) Color(0xFF2E2E42) else Color(0xFFE9ECEF)      // shimmer
-    val darkText get() = if (isDark) Color(0xFFECECF4) else Color(0xFF1A1A2E)     // primary text
-    val subText get() = if (isDark) Color(0xFF9E9EB3) else Color(0xFF6C757D)      // secondary text
-    val primaryLight get() = lerp(primary, if (isDark) Color(0xFF2E2E42) else Color.White, 0.85f)
-    val errorRed get() = Color(0xFFE53935)
-    val successGreen get() = Color(0xFF00C853)
-    val divider get() = if (isDark) Color(0xFF33334A) else Color(0xFFE8E8EE)
-    val cardBg get() = if (isDark) Color(0xFF252538) else Color(0xFFFFFFFF)       // cards
+    // Refined dark mode palette — true dark with good contrast
+    val white get() = if (isDark) Color(0xFF1C1C24) else Color(0xFFFFFFFF)        // surface (top bar, cards)
+    val lightGray get() = if (isDark) Color(0xFF0D0D12) else Color(0xFFF6F7F9)    // background
+    val midGray get() = if (isDark) Color(0xFF2C2C38) else Color(0xFFE9ECEF)      // shimmer
+    val darkText get() = if (isDark) Color(0xFFF2F2F7) else Color(0xFF1A1A2E)     // primary text
+    val subText get() = if (isDark) Color(0xFFAEAEC0) else Color(0xFF6C757D)      // secondary text
+    val primaryLight get() = lerp(primary, if (isDark) Color(0xFF2C2C38) else Color.White, 0.85f)
+    val errorRed get() = Color(0xFFFF5252)  // brighter red for dark mode visibility
+    val successGreen get() = Color(0xFF4CD964) // brighter green for dark mode
+    val divider get() = if (isDark) Color(0xFF383844) else Color(0xFFE8E8EE)
+    val cardBg get() = if (isDark) Color(0xFF232330) else Color(0xFFFFFFFF)       // cards
     val background get() = lightGray
 }
 

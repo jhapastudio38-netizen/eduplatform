@@ -60,8 +60,20 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
             try {
                 test = AppState.api.getTestDetail(testId).test
                 timeLeft = (test?.durationMin ?: 30) * 60
+            } catch (e: retrofit2.HttpException) {
+                // HTTP error from server
+                error = when (e.code()) {
+                    401 -> "Please log in again to take this exam."
+                    403 -> "This exam is not active or has ended."
+                    404 -> "Exam not found. It may have been removed."
+                    else -> "Could not load exam. Please try again."
+                }
+            } catch (e: java.net.UnknownHostException) {
+                error = "No internet connection. Please check your network."
+            } catch (e: java.io.IOException) {
+                error = "Could not connect to server. Please check your internet."
             } catch (e: Exception) {
-                error = "Failed to load exam: ${e.message}"
+                error = "Could not load exam. Please try again."
             }
             loading = false
         }
@@ -80,8 +92,12 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
                 try {
                     submitResult = AppState.api.submitTest(test!!.id, SubmitRequest(answers.toMap()))
                     sound.success()
+                } catch (e: java.net.UnknownHostException) {
+                    error = "No internet connection. Please check your network."
+                } catch (e: java.io.IOException) {
+                    error = "Could not connect to server. Please check your internet."
                 } catch (e: Exception) {
-                    error = "Submit failed: ${e.message}"
+                    error = "Could not submit exam. Please try again."
                 }
                 submitting = false
             }
@@ -271,8 +287,12 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
                                 try {
                                     submitResult = AppState.api.submitTest(t.id, SubmitRequest(answers.toMap()))
                                     sound.success()
+                                } catch (e: java.net.UnknownHostException) {
+                                    error = "No internet connection. Please check your network."
+                                } catch (e: java.io.IOException) {
+                                    error = "Could not connect to server. Please check your internet."
                                 } catch (e: Exception) {
-                                    error = "Submit failed: ${e.message}"
+                                    error = "Could not submit exam. Please try again."
                                 }
                                 submitting = false
                             }
