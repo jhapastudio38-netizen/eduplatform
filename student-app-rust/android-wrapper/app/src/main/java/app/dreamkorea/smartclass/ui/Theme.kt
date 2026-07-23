@@ -30,16 +30,17 @@ data class AppTheme(
     val accent: Color,
     val isDark: Boolean,
 ) {
-    val white get() = if (isDark) Color(0xFF1A1A2E) else Color(0xFFFFFFFF)
-    val lightGray get() = if (isDark) Color(0xFF0F0F1E) else Color(0xFFF8F9FA)
-    val midGray get() = if (isDark) Color(0xFF2A2A3E) else Color(0xFFE9ECEF)
-    val darkText get() = if (isDark) Color(0xFFF8F9FA) else Color(0xFF1A1A2E)
-    val subText get() = if (isDark) Color(0xFFB0B0C0) else Color(0xFF6C757D)
-    val primaryLight get() = lerp(primary, Color.White, 0.85f)
+    // Refined dark mode palette — deep navy/charcoal with good contrast
+    val white get() = if (isDark) Color(0xFF1E1E2E) else Color(0xFFFFFFFF)        // surface (top bar, bottom bar)
+    val lightGray get() = if (isDark) Color(0xFF14141F) else Color(0xFFF6F7F9)    // background
+    val midGray get() = if (isDark) Color(0xFF2E2E42) else Color(0xFFE9ECEF)      // shimmer
+    val darkText get() = if (isDark) Color(0xFFECECF4) else Color(0xFF1A1A2E)     // primary text
+    val subText get() = if (isDark) Color(0xFF9E9EB3) else Color(0xFF6C757D)      // secondary text
+    val primaryLight get() = lerp(primary, if (isDark) Color(0xFF2E2E42) else Color.White, 0.85f)
     val errorRed get() = Color(0xFFE53935)
     val successGreen get() = Color(0xFF00C853)
-    val divider get() = if (isDark) Color(0xFF3A3A4E) else Color(0xFFE0E0E0)
-    val cardBg get() = if (isDark) Color(0xFF1F1F33) else Color(0xFFFFFFFF)
+    val divider get() = if (isDark) Color(0xFF33334A) else Color(0xFFE8E8EE)
+    val cardBg get() = if (isDark) Color(0xFF252538) else Color(0xFFFFFFFF)       // cards
     val background get() = lightGray
 }
 
