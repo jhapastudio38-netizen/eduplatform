@@ -1,39 +1,63 @@
 /**
- * Database client — lazily initialized.
- * Prisma is only loaded when a DB query is actually needed.
- * This allows the server to start even if Prisma has issues.
+ * Database client — lazy initialization with dynamic import.
+ * The server can start without Prisma. Prisma is only loaded on first DB query.
  */
-import type { PrismaClient } from '@prisma/client'
 
-let _prisma: PrismaClient | null = null
-let _initFailed = false
+let _prisma: any = null;
 
-function getPrisma(): PrismaClient {
-  if (_prisma) return _prisma
-  if (_initFailed) {
-    throw new Error('Database connection failed. Please try again later.')
-  }
+async function getPrisma() {
+  if (_prisma) return _prisma;
   try {
-    const { PrismaClient } = require('@prisma/client')
+    const { PrismaClient } = await import('@prisma/client');
     _prisma = new PrismaClient({
       log: process.env.NODE_ENV === 'development' ? ['query'] : [],
-    })
-    return _prisma
+    });
+    return _prisma;
   } catch (e) {
-    _initFailed = true
-    console.error('Prisma initialization failed:', e)
-    throw e
+    console.error('Prisma init failed:', e);
+    throw e;
   }
 }
 
-// Proxy that lazily creates the Prisma client on first use
-export const db = new Proxy({} as PrismaClient, {
-  get(_target, prop) {
-    const prisma = getPrisma()
-    const value = (prisma as any)[prop]
-    if (typeof value === 'function') {
-      return value.bind(prisma)
+// Synchronous proxy — queues calls until Prisma is ready
+const _pending: Array<{ prop: string; args: any[]; resolve: Function; reject: Function }> = [];
+let _ready = false;
+
+async function init() {
+  if (_ready) return;
+  try {
+    _prisma = await getPrisma();
+    _ready = true;
+    // Process pending calls
+    for (const p of _pending) {
+      try {
+        const result = await _prisma[p.prop](...p.args);
+        p.resolve(result);
+      } catch (e) {
+        p.reject(e);
+      }
     }
-    return value
+    _pending.length = 0;
+  } catch (e) {
+    // Reject all pending
+    for (const p of _pending) p.reject(e);
+    _pending.length = 0;
+    throw e;
+  }
+}
+
+// Create a proxy that returns async functions
+export const db = new Proxy({} as any, {
+  get(_target, prop) {
+    return async function (...args: any[]) {
+      if (!_prisma) {
+        await init();
+      }
+      const fn = _prisma[prop];
+      if (typeof fn === 'function') {
+        return fn.apply(_prisma, args);
+      }
+      return fn;
+    };
   },
-})
+});
