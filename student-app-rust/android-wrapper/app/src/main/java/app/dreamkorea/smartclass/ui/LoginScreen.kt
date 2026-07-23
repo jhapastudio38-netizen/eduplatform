@@ -40,7 +40,6 @@ val Primary = Color(0xFF003478)
 val Accent = Color(0xFFCD2E3A)
 val ErrorRed = Color(0xFFE53935)
 val Divider = Color(0xFFE0E0E0)
-val SuccessGreen = Color(0xFF00C853)
 
 // Email/phone validation helpers
 private fun isEmail(s: String) = android.util.Patterns.EMAIL_ADDRESS.matcher(s).matches()
