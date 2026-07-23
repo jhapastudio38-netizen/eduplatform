@@ -1,26 +1,20 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import PublicSite from "@/components/PublicSite";
-import { AdminApp } from "@/components/admin/AdminApp";
 
 export default function Home() {
-  const [user, setUser] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
-
   useEffect(() => {
+    // Check if user is admin/teacher and redirect
     fetch("/api/auth/me")
       .then((r) => r.json())
-      .then((d) => setUser(d.user || null))
-      .catch(() => setUser(null))
-      .finally(() => setLoading(false));
+      .then((d) => {
+        if (d.user && (d.user.role === "ADMIN" || d.user.role === "TEACHER")) {
+          window.location.href = "/admin-panel";
+        }
+      })
+      .catch(() => {});
   }, []);
-
-  if (loading) return null;
-
-  if (user && (user.role === "ADMIN" || user.role === "TEACHER")) {
-    return <AdminApp />;
-  }
 
   return <PublicSite />;
 }
