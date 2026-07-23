@@ -1,6 +1,9 @@
-# Dockerfile — Node.js only (no Bun) for full Prisma compatibility
+# Dockerfile — Node.js with OpenSSL for Prisma
 FROM node:20-slim AS build
 WORKDIR /app
+
+# Install OpenSSL for Prisma
+RUN apt-get update && apt-get install -y openssl && rm -rf /var/lib/apt/lists/*
 
 # Install dependencies
 COPY package.json bun.lock ./
@@ -9,18 +12,21 @@ RUN npm install --legacy-peer-deps
 # Copy source
 COPY . .
 
-# Generate Prisma client with Node.js
+# Generate Prisma client
 RUN npx prisma generate
 
-# Build Next.js
+# Build Next.js (copy Prisma into standalone)
 RUN npx next build && cp -r .next/static .next/standalone/.next/ && cp -r public .next/standalone/ && mkdir -p .next/standalone/node_modules && cp -r node_modules/.prisma .next/standalone/node_modules/.prisma/ && cp -r node_modules/@prisma .next/standalone/node_modules/@prisma/ && cp -r prisma .next/standalone/prisma/
 
-# Runtime
+# Runtime — with OpenSSL
 FROM node:20-slim AS runtime
 WORKDIR /app
 ENV NODE_ENV=production
 ENV PORT=3000
 ENV HOSTNAME=0.0.0.0
+
+# Install OpenSSL for Prisma runtime
+RUN apt-get update && apt-get install -y openssl && rm -rf /var/lib/apt/lists/*
 
 COPY --from=build /app/.next/standalone ./
 COPY --from=build /app/.next/static ./.next/static
