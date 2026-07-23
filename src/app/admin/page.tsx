@@ -32,14 +32,16 @@ export default function AdminLoginPage() {
       const data = await res.json();
       if (!res.ok) {
         toast({ title: "Login failed", description: data.error || "Invalid credentials", variant: "destructive" });
+        setBusy(false);
         return;
       }
+      // Fetch the user to update auth store, then redirect
       await fetchUser();
       toast({ title: "Welcome", description: "Admin access granted." });
+      // Redirect to home which will now show admin panel
       window.location.href = "/";
     } catch {
       toast({ title: "Error", description: "Could not connect to server", variant: "destructive" });
-    } finally {
       setBusy(false);
     }
   }
@@ -54,7 +56,6 @@ export default function AdminLoginPage() {
           <h1 className="text-2xl font-bold text-slate-900">Admin Login</h1>
           <p className="text-sm text-slate-500 mt-1">DreamKorea SmartClass Administration</p>
         </div>
-
         <Card>
           <CardHeader>
             <CardTitle>Sign in</CardTitle>
@@ -64,28 +65,13 @@ export default function AdminLoginPage() {
             <div className="space-y-4">
               <div>
                 <Label>Admin ID</Label>
-                <Input
-                  placeholder="admin"
-                  value={adminId}
-                  onChange={(e) => setAdminId(e.target.value)}
-                  onKeyDown={(e) => e.key === "Enter" && login()}
-                />
+                <Input placeholder="admin" value={adminId} onChange={(e) => setAdminId(e.target.value)} onKeyDown={(e) => e.key === "Enter" && login()} />
               </div>
               <div>
                 <Label>Password</Label>
                 <div className="relative">
-                  <Input
-                    type={showPassword ? "text" : "password"}
-                    placeholder="••••••••"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    onKeyDown={(e) => e.key === "Enter" && login()}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400"
-                  >
+                  <Input type={showPassword ? "text" : "password"} placeholder="••••••••" value={password} onChange={(e) => setPassword(e.target.value)} onKeyDown={(e) => e.key === "Enter" && login()} />
+                  <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400">
                     {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                   </button>
                 </div>
@@ -96,10 +82,7 @@ export default function AdminLoginPage() {
             </div>
           </CardContent>
         </Card>
-
-        <p className="text-center text-xs text-slate-400 mt-6">
-          DreamKorea SmartClass Admin Panel
-        </p>
+        <p className="text-center text-xs text-slate-400 mt-6">DreamKorea SmartClass Admin Panel</p>
       </div>
     </div>
   );

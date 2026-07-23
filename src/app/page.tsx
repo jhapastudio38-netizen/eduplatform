@@ -1,17 +1,23 @@
 "use client";
 
-/**
- * Root page — shows the PUBLIC WEBSITE (viewer only).
- *
- * Students use the mobile app.
- * Teachers login at /teacher-login/<token>
- * Admins login at /admin-login/<token>
- *
- * The public website shows institute info, features, contact — NO system access.
- */
-
+import { useEffect, useState } from "react";
 import PublicSite from "@/components/PublicSite";
+import { useAuthStore } from "@/stores/auth";
 
 export default function Home() {
+  const { user, fetchUser, loading } = useAuthStore();
+  const [checked, setChecked] = useState(false);
+
+  useEffect(() => {
+    fetchUser().finally(() => setChecked(true));
+  }, [fetchUser]);
+
+  // If admin or teacher is logged in, show admin panel
+  if (checked && user && (user.role === "ADMIN" || user.role === "TEACHER")) {
+    const AdminApp = require("@/components/admin/AdminApp").default;
+    return <AdminApp />;
+  }
+
+  // Otherwise show public site
   return <PublicSite />;
 }
