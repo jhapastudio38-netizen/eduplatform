@@ -29,6 +29,133 @@ import androidx.compose.ui.unit.sp
 import app.dreamkorea.smartclass.data.AppState
 
 /**
+ * SettingsScreen — full-page settings (replaces bottom sheet).
+ * Theme color, dark mode, text size, animations, notifications, about.
+ */
+@Composable
+fun SettingsScreen(theme: AppTheme, sound: SoundManager, onBack: () -> Unit) {
+    var localTheme by remember { mutableStateOf(AppState.getThemeColor()) }
+    var darkMode by remember { mutableStateOf(AppState.isDarkMode()) }
+    var animations by remember { mutableStateOf(AppState.areAnimationsEnabled()) }
+    var notifications by remember { mutableStateOf(AppState.areNotificationsEnabled()) }
+    var textSize by remember { mutableStateOf(AppState.getTextSizeMultiplier()) }
+
+    LazyColumn(
+        modifier = Modifier.fillMaxSize().background(theme.background),
+        contentPadding = PaddingValues(16.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
+        // Header with back button
+        item {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                IconButton(onClick = { sound.click(); onBack() }, modifier = Modifier.size(36.dp)) {
+                    Icon(Icons.Default.ArrowBack, "Back", tint = theme.darkText, modifier = Modifier.size(20.dp))
+                }
+                Spacer(Modifier.width(8.dp))
+                Text("Settings", color = theme.darkText, fontSize = 22.sp, fontWeight = FontWeight.Bold)
+            }
+        }
+
+        // ─── Theme color ────────────────────────────────────────────────────
+        item {
+            SettingsSection(theme, "Theme Color", Icons.Default.Palette) {
+                Text("Pick your app's primary color", color = theme.subText, fontSize = 12.sp, modifier = Modifier.padding(bottom = 10.dp))
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    ThemeColorSwatch(theme, "003478", "Blue", localTheme == Color(0xFF003478)) {
+                        localTheme = Color(0xFF003478); AppState.setThemeColor("003478"); notifySettingsChanged()
+                    }
+                    ThemeColorSwatch(theme, "CD2E3A", "Red", localTheme == Color(0xFFCD2E3A)) {
+                        localTheme = Color(0xFFCD2E3A); AppState.setThemeColor("CD2E3A"); notifySettingsChanged()
+                    }
+                    ThemeColorSwatch(theme, "00695C", "Teal", localTheme == Color(0xFF00695C)) {
+                        localTheme = Color(0xFF00695C); AppState.setThemeColor("00695C"); notifySettingsChanged()
+                    }
+                }
+                Spacer(Modifier.height(8.dp))
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    ThemeColorSwatch(theme, "6A1B9A", "Purple", localTheme == Color(0xFF6A1B9A)) {
+                        localTheme = Color(0xFF6A1B9A); AppState.setThemeColor("6A1B9A"); notifySettingsChanged()
+                    }
+                    ThemeColorSwatch(theme, "E65100", "Orange", localTheme == Color(0xFFE65100)) {
+                        localTheme = Color(0xFFE65100); AppState.setThemeColor("E65100"); notifySettingsChanged()
+                    }
+                    ThemeColorSwatch(theme, "2E7D32", "Green", localTheme == Color(0xFF2E7D32)) {
+                        localTheme = Color(0xFF2E7D32); AppState.setThemeColor("2E7D32"); notifySettingsChanged()
+                    }
+                }
+            }
+        }
+
+        // ─── Display ────────────────────────────────────────────────────────
+        item {
+            SettingsSection(theme, "Display", Icons.Default.Brightness6) {
+                ToggleRow(theme, "Dark Mode", "Easier on eyes at night", darkMode) {
+                    darkMode = it; AppState.setDarkMode(it); notifySettingsChanged()
+                }
+                Divider(color = theme.divider, thickness = 0.5.dp, modifier = Modifier.padding(vertical = 10.dp))
+                Text("Text Size", color = theme.darkText, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                Text("Adjust font size throughout the app", color = theme.subText, fontSize = 11.sp, modifier = Modifier.padding(bottom = 8.dp))
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    TextSizeOption(theme, "S", 0.85f, textSize == 0.85f) { textSize = 0.85f; AppState.setTextSizeMultiplier(0.85f); notifySettingsChanged() }
+                    TextSizeOption(theme, "M", 1.0f, textSize == 1.0f) { textSize = 1.0f; AppState.setTextSizeMultiplier(1.0f); notifySettingsChanged() }
+                    TextSizeOption(theme, "L", 1.15f, textSize == 1.15f) { textSize = 1.15f; AppState.setTextSizeMultiplier(1.15f); notifySettingsChanged() }
+                    TextSizeOption(theme, "XL", 1.3f, textSize == 1.3f) { textSize = 1.3f; AppState.setTextSizeMultiplier(1.3f); notifySettingsChanged() }
+                }
+            }
+        }
+
+        // ─── Experience ─────────────────────────────────────────────────────
+        item {
+            SettingsSection(theme, "Experience", Icons.Default.Smartphone) {
+                ToggleRow(theme, "Animations", "Smooth transitions and effects", animations) {
+                    animations = it; AppState.setAnimationsEnabled(it); notifySettingsChanged()
+                }
+                Divider(color = theme.divider, thickness = 0.5.dp, modifier = Modifier.padding(vertical = 10.dp))
+                ToggleRow(theme, "Notifications", "Exam reminders and updates", notifications) {
+                    notifications = it; AppState.setNotificationsEnabled(it); notifySettingsChanged()
+                }
+            }
+        }
+
+        // ─── About ──────────────────────────────────────────────────────────
+        item {
+            SettingsSection(theme, "About", Icons.Default.Info) {
+                InfoRow(theme, "Version", "1.0.0")
+                Divider(color = theme.divider, thickness = 0.5.dp, modifier = Modifier.padding(vertical = 6.dp))
+                InfoRow(theme, "Build", "2026.07.23")
+                Divider(color = theme.divider, thickness = 0.5.dp, modifier = Modifier.padding(vertical = 6.dp))
+                InfoRow(theme, "Server", "dreamkoreasmartclass.com")
+            }
+        }
+
+        // ─── Footer ─────────────────────────────────────────────────────────
+        item {
+            Surface(color = theme.cardBg, shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth(), shadowElevation = 1.dp) {
+                Column(modifier = Modifier.padding(14.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text("DreamKorea SmartClass", color = theme.darkText, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                    Text("드림코리아 스마트클래스", color = theme.subText, fontSize = 11.sp)
+                    Text("Birtamod, Jhapa, Nepal", color = theme.subText, fontSize = 11.sp, modifier = Modifier.padding(top = 6.dp))
+                }
+            }
+        }
+
+        // Back button at bottom
+        item {
+            Button(
+                onClick = { sound.click(); onBack() },
+                modifier = Modifier.fillMaxWidth().height(48.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = theme.primary),
+                shape = RoundedCornerShape(10.dp)
+            ) {
+                Text("Back to Home", fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+            }
+        }
+
+        item { Spacer(Modifier.height(20.dp)) }
+    }
+}
+
+/**
  * Settings bottom sheet — appears as overlay with theme customization,
  * text size, dark mode, animation toggle, notifications.
  */
