@@ -175,7 +175,7 @@ fun HomeScreen(theme: AppTheme, sound: SoundManager, onNavigate: (Screen) -> Uni
         scope.launch {
             try {
                 stats = AppState.api.getStats().stats
-                recentTests = AppState.api.getTests().tests.take(4)
+                recentTests = AppState.api.getTests().tests.take(3)
             } catch (_: Exception) {}
             statsLoading = false
             testsLoading = false
@@ -184,58 +184,33 @@ fun HomeScreen(theme: AppTheme, sound: SoundManager, onNavigate: (Screen) -> Uni
 
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(16.dp),
+        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        // Hero card with gradient + quick CTA
+        // ─── Stats hero (compact, no welcome text) ───────────────────────────
         item {
-            var pressed by remember { mutableStateOf(false) }
-            val scale by animateFloatAsState(
-                targetValue = if (pressed) 0.98f else 1f,
-                animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy),
-                label = "heroScale"
-            )
             Surface(
-                shape = RoundedCornerShape(20.dp),
-                modifier = Modifier.fillMaxWidth().scale(scale),
-                shadowElevation = 3.dp
+                shape = RoundedCornerShape(18.dp),
+                modifier = Modifier.fillMaxWidth(),
+                shadowElevation = 2.dp,
+                color = theme.cardBg
             ) {
-                Box(
-                    modifier = Modifier.fillMaxWidth()
-                        .background(Brush.linearGradient(listOf(theme.primary, lerp(theme.primary, Color.Black, 0.3f))))
-                        .clickable { sound.click(); pressed = true }
-                        .padding(22.dp)
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(16.dp),
+                    horizontalArrangement = Arrangement.SpaceEvenly
                 ) {
-                    Column {
-                        Text("안녕하세요! 👋", color = Color.White.copy(0.85f), fontSize = 13.sp)
-                        Text("Welcome back", color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.Bold)
-                        Spacer(Modifier.height(4.dp))
-                        Text("Let's continue your Korean journey today.", color = Color.White.copy(0.75f), fontSize = 12.sp)
-                        Spacer(Modifier.height(14.dp))
-                        Row {
-                            Button(
-                                onClick = { sound.click(); onNavigate(Screen.Tests) },
-                                colors = ButtonDefaults.buttonColors(containerColor = Color.White, contentColor = theme.primary),
-                                shape = RoundedCornerShape(10.dp),
-                                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 6.dp)
-                            ) { Text("Take a Test", fontSize = 12.sp, fontWeight = FontWeight.SemiBold) }
-                            Spacer(Modifier.width(8.dp))
-                            OutlinedButton(
-                                onClick = { sound.click(); onNavigate(Screen.Learn) },
-                                colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White),
-                                border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(0.4f)),
-                                shape = RoundedCornerShape(10.dp),
-                                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 6.dp)
-                            ) { Text("Learn", fontSize = 12.sp, fontWeight = FontWeight.SemiBold) }
-                        }
-                    }
+                    StatHero(theme, "${stats?.totalExamsTaken ?: 0}", "Exams", Icons.Default.Quiz, if (statsLoading) null else theme.primary)
+                    VerticalDivider(theme)
+                    StatHero(theme, "${String.format("%.0f", stats?.averageScore ?: 0.0)}%", "Avg Score", Icons.Default.TrendingUp, if (statsLoading) null else theme.accent)
+                    VerticalDivider(theme)
+                    StatHero(theme, "${stats?.studyStreakDays ?: 0}", "Day Streak", Icons.Default.LocalFireDepartment, if (statsLoading) null else Color(0xFFFF9800))
                 }
             }
         }
 
-        // Quick access grid — all features from home
+        // ─── Quick access grid — all features ────────────────────────────────
         item {
-            Text("Explore", color = theme.darkText, fontSize = 16.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 4.dp))
+            Text("Explore", color = theme.darkText, fontSize = 15.sp, fontWeight = FontWeight.Bold)
         }
         item {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -254,16 +229,16 @@ fun HomeScreen(theme: AppTheme, sound: SoundManager, onNavigate: (Screen) -> Uni
             }
         }
 
-        // Recent tests
+        // ─── Recent tests ────────────────────────────────────────────────────
         item {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text("Recent Tests", color = theme.darkText, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                Text("Recent Tests", color = theme.darkText, fontSize = 15.sp, fontWeight = FontWeight.Bold)
                 if (recentTests.isNotEmpty()) {
-                    TextButton(onClick = { sound.click(); onNavigate(Screen.Tests) }) {
+                    TextButton(onClick = { sound.click(); onNavigate(Screen.Tests) }, contentPadding = PaddingValues(0.dp)) {
                         Text("See all", color = theme.primary, fontSize = 12.sp)
                     }
                 }
@@ -281,16 +256,15 @@ fun HomeScreen(theme: AppTheme, sound: SoundManager, onNavigate: (Screen) -> Uni
             }
         }
 
-        // Daily tip
+        // ─── Daily tip ───────────────────────────────────────────────────────
         item {
             Surface(
-                color = theme.cardBg,
+                color = theme.primary.copy(alpha = 0.06f),
                 shape = RoundedCornerShape(14.dp),
-                modifier = Modifier.fillMaxWidth(),
-                shadowElevation = 1.dp
+                modifier = Modifier.fillMaxWidth()
             ) {
                 Row(modifier = Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Surface(color = theme.primary.copy(alpha = 0.1f), shape = RoundedCornerShape(10.dp), modifier = Modifier.size(36.dp)) {
+                    Surface(color = theme.primary.copy(alpha = 0.15f), shape = RoundedCornerShape(10.dp), modifier = Modifier.size(34.dp)) {
                         Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
                             Icon(Icons.Default.Lightbulb, null, tint = theme.primary, modifier = Modifier.size(18.dp))
                         }
@@ -305,6 +279,26 @@ fun HomeScreen(theme: AppTheme, sound: SoundManager, onNavigate: (Screen) -> Uni
         }
         item { Spacer(Modifier.height(8.dp)) }
     }
+}
+
+@Composable
+fun StatHero(theme: AppTheme, value: String, label: String, icon: ImageVector, color: Color?) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Icon(icon, null, tint = color ?: theme.subText, modifier = Modifier.size(18.dp))
+        Spacer(Modifier.height(4.dp))
+        if (color == null) {
+            // Loading state — show a small shimmer box
+            ShimmerBox(modifier = Modifier.width(30.dp).height(16.dp), cornerRadius = 4.dp, theme = theme)
+        } else {
+            Text(value, color = theme.darkText, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+        }
+        Text(label, color = theme.subText, fontSize = 9.sp)
+    }
+}
+
+@Composable
+fun VerticalDivider(theme: AppTheme) {
+    Box(modifier = Modifier.width(1.dp).height(32.dp).background(theme.divider))
 }
 
 @Composable
