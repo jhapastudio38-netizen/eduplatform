@@ -27,18 +27,14 @@ jobs:
           IMAGE_TAG: ${{ github.sha }}
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
         run: |
-          # Install deps with npm (Node.js compatible)
-          npm install --legacy-peer-deps
-          npx prisma generate
-          # Push schema changes to RDS
-          npx prisma db push --accept-data-loss || echo "Schema push skipped"
-          # Remove local .env (has SQLite URL that overrides RDS)
+          npm install -g bun
+          bun install
+          bun run db:generate
+          bunx prisma db push --accept-data-loss || echo "Schema push skipped"
           rm -f .env
           export DATABASE_URL="$DATABASE_URL"
-          # Seed using npx tsx (Node.js TypeScript runner)
-          npx tsx scripts/seed-korean.ts || echo "Seed skipped"
-          npx tsx scripts/seed-fixed-tokens.ts || echo "Token seed skipped"
-          # Build Docker image (uses Node.js only — no Bun)
+          bun run scripts/seed-korean.ts || echo "Seed skipped"
+          bun run scripts/seed-fixed-tokens.ts || echo "Token seed skipped"
           docker build --no-cache -t $ECR/eduplatform-web:$IMAGE_TAG -t $ECR/eduplatform-web:latest .
           docker push $ECR/eduplatform-web:$IMAGE_TAG
           docker push $ECR/eduplatform-web:latest
@@ -53,7 +49,6 @@ jobs:
           NEW_TD=$(aws ecs register-task-definition --cli-input-json file://task-def-rendered.json --region ${{ secrets.AWS_REGION }})
           NEW_TD_ARN=$(echo "$NEW_TD" | jq -r '.taskDefinition.taskDefinitionArn')
           echo "NEW_TD_ARN=$NEW_TD_ARN" >> $GITHUB_ENV
-          echo "Registered new task definition: $NEW_TD_ARN"
 
       - name: Update ECS service with new task definition
         run: |
