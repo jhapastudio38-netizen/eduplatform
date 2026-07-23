@@ -27,22 +27,18 @@ jobs:
           IMAGE_TAG: ${{ github.sha }}
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
         run: |
-          npm install -g bun
-          bun install
-          bun run db:generate
-          # Push schema changes to RDS (safe — additive only)
-          bunx prisma db push --accept-data-loss || echo "Schema push skipped (may already be in sync)"
-          # CRITICAL: Remove local .env (has SQLite DATABASE_URL that overrides RDS)
-          # The local .env has DATABASE_URL=file:... which makes PrismaClient
-          # try to connect to SQLite with the postgresql provider → fails
+          # Install deps with npm (Node.js compatible)
+          npm install --legacy-peer-deps
+          npx prisma generate
+          # Push schema changes to RDS
+          npx prisma db push --accept-data-loss || echo "Schema push skipped"
+          # Remove local .env (has SQLite URL that overrides RDS)
           rm -f .env
-          # Export DATABASE_URL so seed scripts (PrismaClient) use RDS Postgres
           export DATABASE_URL="$DATABASE_URL"
-          # Seed Korean learning content (idempotent — uses upserts)
-          bun run scripts/seed-korean.ts || echo "Seed skipped (may already exist)"
-          # Seed fixed admin/teacher login tokens (idempotent)
-          bun run scripts/seed-fixed-tokens.ts || echo "Token seed skipped"
-          # Build with --no-cache to ensure fresh code, tag with commit SHA
+          # Seed using npx tsx (Node.js TypeScript runner)
+          npx tsx scripts/seed-korean.ts || echo "Seed skipped"
+          npx tsx scripts/seed-fixed-tokens.ts || echo "Token seed skipped"
+          # Build Docker image (uses Node.js only — no Bun)
           docker build --no-cache -t $ECR/eduplatform-web:$IMAGE_TAG -t $ECR/eduplatform-web:latest .
           docker push $ECR/eduplatform-web:$IMAGE_TAG
           docker push $ECR/eduplatform-web:latest
@@ -53,9 +49,7 @@ jobs:
           ECR: ${{ steps.ecr-login.outputs.registry }}
           IMAGE_TAG: ${{ github.sha }}
         run: |
-          # Render the task-def template with the new image tag
           sed "s|IMAGE_PLACEHOLDER|$ECR/eduplatform-web:$IMAGE_TAG|g" .github/ecs/task-def.json > task-def-rendered.json
-          # Register a new task definition revision
           NEW_TD=$(aws ecs register-task-definition --cli-input-json file://task-def-rendered.json --region ${{ secrets.AWS_REGION }})
           NEW_TD_ARN=$(echo "$NEW_TD" | jq -r '.taskDefinition.taskDefinitionArn')
           echo "NEW_TD_ARN=$NEW_TD_ARN" >> $GITHUB_ENV
