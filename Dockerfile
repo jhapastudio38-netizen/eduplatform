@@ -13,9 +13,18 @@ ENV NODE_ENV=production
 ENV PORT=3000
 ENV HOSTNAME=0.0.0.0
 
+# Copy standalone server
 COPY --from=build /app/.next/standalone ./
+# Copy static assets
 COPY --from=build /app/.next/static ./.next/static
+# Copy public assets
 COPY --from=build /app/public ./public
+
+# CRITICAL: Copy Prisma client (in case build script didn't)
+RUN mkdir -p /app/node_modules/.prisma /app/node_modules/@prisma /app/prisma
+COPY --from=build /app/node_modules/.prisma ./node_modules/.prisma
+COPY --from=build /app/node_modules/@prisma ./node_modules/@prisma
+COPY --from=build /app/prisma ./prisma
 
 EXPOSE 3000
 CMD ["bun", "server.js"]
