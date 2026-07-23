@@ -751,6 +751,34 @@ fun ProfileScreen(theme: AppTheme, sound: SoundManager, userName: String, onBack
             }
         }
 
+        // Contact info — institute details
+        item {
+            Surface(color = theme.cardBg, shape = RoundedCornerShape(14.dp), modifier = Modifier.fillMaxWidth(), shadowElevation = 1.dp) {
+                Column(modifier = Modifier.padding(14.dp)) {
+                    Text("Contact DreamKorea", color = theme.darkText, fontSize = 14.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(bottom = 10.dp))
+
+                    // Phone numbers (tappable)
+                    ContactRow(theme, Icons.Default.Phone, "023-591658", "tel:023591658")
+                    Spacer(Modifier.height(8.dp))
+                    ContactRow(theme, Icons.Default.Phone, "9852677658", "tel:9852677658")
+                    Spacer(Modifier.height(8.dp))
+                    ContactRow(theme, Icons.Default.Phone, "9765308000", "tel:9765308000")
+                    Spacer(Modifier.height(10.dp))
+                    Divider(color = theme.divider, thickness = 0.5.dp)
+                    Spacer(Modifier.height(10.dp))
+
+                    // Location (tappable — opens maps)
+                    ContactRow(theme, Icons.Default.LocationOn, "Krishithok Road, Birtamod, Jhapa", "geo:26.67,87.99?q=Krishithok+Road+Birtamod+Jhapa+Nepal")
+                    Spacer(Modifier.height(10.dp))
+                    Divider(color = theme.divider, thickness = 0.5.dp)
+                    Spacer(Modifier.height(10.dp))
+
+                    // Website (tappable — opens browser)
+                    ContactRow(theme, Icons.Default.Language, "dreamkoreasmartclass.com", "https://dreamkoreasmartclass.com")
+                }
+            }
+        }
+
         // Logout
         item {
             Button(
@@ -806,6 +834,24 @@ fun StatRow(theme: AppTheme, label: String, value: String, icon: ImageVector) {
             Text(label, color = theme.subText, fontSize = 12.sp)
         }
         Text(value, color = theme.darkText, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+    }
+}
+
+@Composable
+fun ContactRow(theme: AppTheme, icon: ImageVector, text: String, link: String) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    Row(
+        modifier = Modifier.fillMaxWidth().clickable {
+            // Open the link (tel:, geo:, https:)
+            val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(link))
+            context.startActivity(intent)
+        }.padding(vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Icon(icon, null, tint = theme.primary, modifier = Modifier.size(18.dp))
+        Spacer(Modifier.width(10.dp))
+        Text(text, color = theme.darkText, fontSize = 13.sp, fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f))
+        Icon(Icons.Default.ChevronRight, null, tint = theme.subText, modifier = Modifier.size(16.dp))
     }
 }
 
