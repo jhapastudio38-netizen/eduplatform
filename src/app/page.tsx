@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import PublicSite from "@/components/PublicSite";
-import AdminApp from "@/components/admin/AdminApp";
+import { AdminApp } from "@/components/admin/AdminApp";
 
 export default function Home() {
   const [user, setUser] = useState<any>(null);
