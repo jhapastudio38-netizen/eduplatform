@@ -32,14 +32,12 @@ jobs:
           bun run db:generate
           # Push schema changes to RDS (safe — additive only)
           bunx prisma db push --accept-data-loss || echo "Schema push skipped (may already be in sync)"
-          # Create .env file so seed scripts can read DATABASE_URL
-          echo "DATABASE_URL=$DATABASE_URL" > .env
+          # Export DATABASE_URL so seed scripts (PrismaClient) can read it
+          export DATABASE_URL="$DATABASE_URL"
           # Seed Korean learning content (idempotent — uses upserts)
           bun run scripts/seed-korean.ts || echo "Seed skipped (may already exist)"
           # Seed fixed admin/teacher login tokens (idempotent)
           bun run scripts/seed-fixed-tokens.ts || echo "Token seed skipped"
-          # Remove .env before Docker build (don't bake secrets into image)
-          rm -f .env
           # Build with --no-cache to ensure fresh code, tag with commit SHA
           docker build --no-cache -t $ECR/eduplatform-web:$IMAGE_TAG -t $ECR/eduplatform-web:latest .
           docker push $ECR/eduplatform-web:$IMAGE_TAG
