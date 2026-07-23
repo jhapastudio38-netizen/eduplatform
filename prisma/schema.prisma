@@ -617,6 +617,23 @@ model DeviceToken {
   @@index([userId])
 }
 
+// ─── v0.4 — Home screen cards (admin-editable images) ────────────────────────
+
+model HomeCard {
+  id          String   @id @default(cuid())
+  key         String   @unique // "ubt_test", "results", "all_books", "question_bank", etc.
+  title       String   // Display title (e.g. "UBT TEST")
+  section     String   @default("test") // "test" | "resources" | "premium"
+  imageUrl    String?  // Image URL (admin uploads)
+  sortOrder   Int      @default(0)
+  isActive    Boolean  @default(true)
+  route       String?  // App route to navigate to when tapped (e.g. "tests", "books")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([section, sortOrder])
+}
+
 // ─── v0.3 — Video lessons, enhanced exams, media questions ─────────────────
 
 // Video lessons — YouTube embeds managed by teachers/admins

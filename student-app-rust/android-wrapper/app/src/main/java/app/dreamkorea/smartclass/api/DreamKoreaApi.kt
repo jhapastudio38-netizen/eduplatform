@@ -49,6 +49,18 @@ data class UserStats(
 )
 data class StatsResponse(val stats: UserStats = UserStats())
 
+data class HomeCard(
+    val id: String = "",
+    val key: String = "",
+    val title: String = "",
+    val section: String = "test",
+    val imageUrl: String? = null,
+    val sortOrder: Int = 0,
+    val isActive: Boolean = true,
+    val route: String? = null
+)
+data class HomeCardsResponse(val cards: List<HomeCard> = emptyList(), val sections: Map<String, List<HomeCard>> = emptyMap())
+
 data class Subject(val id: String, val name: String, val slug: String, val description: String?)
 data class SubjectsResponse(val subjects: List<Subject>)
 
@@ -188,6 +200,9 @@ interface DreamKoreaApi {
 
     @GET("api/student/stats")
     suspend fun getStats(): StatsResponse
+
+    @GET("api/student/home-cards")
+    suspend fun getHomeCards(): HomeCardsResponse
 
     @POST("api/auth/logout")
     suspend fun logout(): retrofit2.Response<Unit>

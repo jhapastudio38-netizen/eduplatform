@@ -320,3 +320,36 @@ async function main() {
 main()
   .catch((e) => { console.error("Seed error:", e); process.exit(1); })
   .finally(() => db.$disconnect());
+
+// ─── Home Cards (admin-editable images) ────────────────────────────────────────
+async function seedHomeCards() {
+  console.log("\n  Seeding home cards...");
+  const defaultCards = [
+    // TEST section
+    { key: "ubt_test", title: "UBT TEST", section: "test", sortOrder: 0, route: "tests", imageUrl: "https://images.unsplash.com/photo-1606326608606-aa0b62935fde?w=400&q=80" },
+    { key: "free_exam", title: "Free Exam", section: "test", sortOrder: 1, route: "tests", imageUrl: "https://images.unsplash.com/photo-1513258496099-48168024aec0?w=400&q=80" },
+    { key: "batch", title: "Batch", section: "test", sortOrder: 2, route: "tests", imageUrl: "https://images.unsplash.com/photo-1522202176988-66273c2fd55f?w=400&q=80" },
+    { key: "results", title: "Results", section: "test", sortOrder: 3, route: "profile", imageUrl: "https://images.unsplash.com/photo-1454165804606-c3d57bc86b40?w=400&q=80" },
+    // RESOURCES section
+    { key: "all_books", title: "ALL BOOKS", section: "resources", sortOrder: 0, route: "books", imageUrl: "https://images.unsplash.com/photo-1543002588-bfa74002ed7e?w=400&q=80" },
+    { key: "question_bank", title: "QUESTION BANK", section: "resources", sortOrder: 1, route: "learn", imageUrl: "https://images.unsplash.com/photo-1606326608606-aa0b62935fde?w=400&q=80" },
+    { key: "course_video", title: "COURSE VIDEO", section: "resources", sortOrder: 2, route: "videos", imageUrl: "https://images.unsplash.com/photo-1611162617213-7d7a39e9b1d7?w=400&q=80" },
+    { key: "audio_lessons", title: "AUDIO LESSONS", section: "resources", sortOrder: 3, route: "learn", imageUrl: "https://images.unsplash.com/photo-1478737270239-2f02b77fc618?w=400&q=80" },
+    // PREMIUM section
+    { key: "classroom", title: "CLASSROOM", section: "premium", sortOrder: 0, route: "live", imageUrl: "https://images.unsplash.com/photo-1580582932707-520aed937b7b?w=400&q=80" },
+    { key: "live_class", title: "LIVE CLASS", section: "premium", sortOrder: 1, route: "live", imageUrl: "https://images.unsplash.com/photo-1591115765373-5207764f72e7?w=400&q=80" },
+    { key: "recorded_video", title: "RECORDED VIDEO", section: "premium", sortOrder: 2, route: "videos", imageUrl: "https://images.unsplash.com/photo-1568871391783-83f7a36dfe23?w=400&q=80" },
+    { key: "class_result", title: "CLASS RESULT", section: "premium", sortOrder: 3, route: "profile", imageUrl: "https://images.unsplash.com/photo-1551288049-bebda4e38f71?w=400&q=80" },
+  ];
+
+  for (const c of defaultCards) {
+    await db.homeCard.upsert({
+      where: { key: c.key },
+      create: c,
+      update: { title: c.title, section: c.section, sortOrder: c.sortOrder, route: c.route },
+    });
+  }
+  console.log(`  ✓ ${defaultCards.length} home cards`);
+}
+
+await seedHomeCards();
