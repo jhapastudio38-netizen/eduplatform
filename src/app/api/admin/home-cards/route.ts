@@ -11,7 +11,7 @@ import { getCurrentUser } from "@/lib/session";
 import { audit } from "@/lib/audit";
 import { z } from "zod";
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   const user = await getCurrentUser(req);
   if (!user || (user.role !== "ADMIN" && user.role !== "TEACHER")) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
