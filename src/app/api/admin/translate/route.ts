@@ -18,7 +18,7 @@ const GROQ_URL = "https://api.groq.com/openai/v1/chat/completions";
 const GROQ_MODEL = process.env.GROQ_MODEL || "llama-3.3-70b-versatile";
 
 export async function POST(req: NextRequest) {
-  const user = await getCurrentUser();
+  const user = await getCurrentUser(req);
   if (!user || (user.role !== "ADMIN" && user.role !== "TEACHER")) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }

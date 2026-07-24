@@ -8,7 +8,7 @@ import { getCurrentUser } from "@/lib/session";
  */
 export async function GET(_req: NextRequest, ctx: { params: Promise<{ testId: string }> }) {
   const { testId } = await ctx.params;
-  const user = await getCurrentUser();
+  const user = await getCurrentUser(req);
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const test = await db.test.findUnique({

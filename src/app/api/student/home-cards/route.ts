@@ -8,7 +8,7 @@ import { db } from "@/lib/db";
 import { getCurrentUser } from "@/lib/session";
 
 export async function GET() {
-  const user = await getCurrentUser();
+  const user = await getCurrentUser(req);
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const cards = await db.homeCard.findMany({

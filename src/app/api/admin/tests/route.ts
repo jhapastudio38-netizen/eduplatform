@@ -5,7 +5,7 @@ import { z } from "zod";
 import { audit } from "@/lib/audit";
 
 export async function GET() {
-  const user = await getCurrentUser();
+  const user = await getCurrentUser(req);
   if (!user || user.role !== "ADMIN") return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   const tests = await db.test.findMany({
     orderBy: { createdAt: "desc" },
@@ -26,7 +26,7 @@ const schema = z.object({
 });
 
 export async function POST(req: NextRequest) {
-  const user = await getCurrentUser();
+  const user = await getCurrentUser(req);
   if (!user || user.role !== "ADMIN") return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   const body = await req.json().catch(() => null);
   const parsed = schema.safeParse(body);
