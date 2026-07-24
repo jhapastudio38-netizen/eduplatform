@@ -311,8 +311,11 @@ fun QuestionBankScreen(theme: AppTheme, sound: SoundManager, onBack: () -> Unit)
                                 color = if (isCorrectOpt) SuccessGreen else (if (isWrongOpt) theme.errorRed else theme.primary.copy(alpha = 0.1f)),
                                 shape = RoundedCornerShape(6.dp)
                             ) {
+                                val letter = options.indexOf(opt).let { idx ->
+                                    if (idx in 0..3) "ABCD"[idx].toString() else "?"
+                                }
                                 Text(
-                                    "ABCD".getOrElse(options.indexOf(opt)) { "?" },
+                                    letter,
                                     color = Color.White,
                                     fontSize = 12.sp,
                                     fontWeight = FontWeight.Bold,
