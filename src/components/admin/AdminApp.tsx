@@ -58,11 +58,8 @@ const NAV_SECTIONS: NavSection[] = [
   {
     title: "Exam Management",
     items: [
-      { id: "exams", label: "Exams", icon: FileText, hasAdd: true },
-      { id: "color-vision", label: "Color Vision", icon: Image },
-      { id: "demo-exams", label: "Demo Exams", icon: FileText, hasAdd: true },
-      { id: "batch-exams", label: "All Batch Exams", icon: Layers, hasAdd: true },
-      { id: "chapter-exams", label: "Chapter Exams", icon: BookOpen, hasAdd: true },
+      { id: "exams", label: "Exams & Tests", icon: FileText, hasAdd: true },
+      { id: "question-bank", label: "Question Bank", icon: FileQuestion, hasAdd: true },
       { id: "live-rooms", label: "Live Rooms", icon: Radio, hasAdd: true },
     ],
   },
@@ -70,40 +67,17 @@ const NAV_SECTIONS: NavSection[] = [
     title: "Content & Resources",
     items: [
       { id: "home-cards", label: "Home Cards", icon: LayoutGrid, hasAdd: true },
-      { id: "question-bank", label: "Question Bank", icon: FileQuestion, hasAdd: true },
-      { id: "question-categories", label: "Question Categories", icon: FolderTree, hasAdd: true },
-      { id: "all-books", label: "All Books", icon: BookMarked, hasAdd: true },
+      { id: "all-books", label: "Books", icon: BookMarked, hasAdd: true },
       { id: "audio-lessons", label: "Audio Lessons", icon: Headphones, hasAdd: true },
       { id: "video-lessons", label: "Video Lessons", icon: Video, hasAdd: true },
-      { id: "all-courses", label: "All Courses", icon: Library, hasAdd: true },
     ],
   },
   {
-    title: "Orders & Commerce",
+    title: "User Management",
     items: [
-      { id: "paid-exam-orders", label: "Paid Exam Orders", icon: ShoppingBag, hasAdd: true },
-      { id: "batch-orders", label: "Batch Orders", icon: ShoppingBag, hasAdd: true },
-      { id: "course-orders", label: "Course Orders", icon: ShoppingBag, hasAdd: true },
-      { id: "qb-orders", label: "Question Bank Orders", icon: ShoppingBag, hasAdd: true },
-    ],
-  },
-  {
-    title: "User & Batch Administration",
-    items: [
-      { id: "batch", label: "Batch", icon: Layers, hasAdd: true },
-      { id: "student-results", label: "Student Results", icon: BarChart3 },
-      { id: "package-results", label: "Package Results", icon: Package },
-      { id: "classroom-results", label: "Classroom Results", icon: School },
-    ],
-  },
-  {
-    title: "User Roles & Tools",
-    items: [
-      { id: "students", label: "Student", icon: GraduationCap, hasAdd: true },
+      { id: "students", label: "Students", icon: GraduationCap, hasAdd: true },
       { id: "teachers", label: "Teachers", icon: UserCog, hasAdd: true },
-      { id: "all-courses", label: "Courses", icon: BookOpen, hasAdd: true },
-      { id: "pdf-viewer", label: "PDF Viewer", icon: FileText },
-      { id: "color-vision", label: "Color Vision", icon: Image },
+      { id: "student-results", label: "Student Results", icon: BarChart3 },
     ],
   },
 ];
