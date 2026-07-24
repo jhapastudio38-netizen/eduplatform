@@ -4,6 +4,11 @@ import android.content.Context
 import androidx.compose.ui.graphics.Color
 import app.dreamkorea.smartclass.api.DreamKoreaApi
 import app.dreamkorea.smartclass.api.User
+import app.dreamkorea.smartclass.api.HomeCard
+import app.dreamkorea.smartclass.api.TestItem
+import app.dreamkorea.smartclass.api.Book
+import app.dreamkorea.smartclass.api.VideoLesson
+import app.dreamkorea.smartclass.api.AudioLesson
 import okhttp3.Cookie
 import okhttp3.CookieJar
 import okhttp3.HttpUrl
@@ -14,6 +19,8 @@ import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.ConcurrentHashMap
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
 object AppState {
     private const val BASE_URL = "https://my-project-five-sepia.vercel.app/"
@@ -36,6 +43,47 @@ object AppState {
     private lateinit var settingsPrefs: android.content.SharedPreferences
     private val cookieStore = ConcurrentHashMap<String, MutableList<Cookie>>()
     private lateinit var baseUrl: HttpUrl
+
+    // ─── In-memory cache (fixes back/forth reload storms) ──────────────────────
+    // Each entry stores (data, timestamp). Cache is valid for CACHE_TTL_MS.
+    private const val CACHE_TTL_MS = 60_000L // 1 minute
+    private data class CacheEntry<T>(val data: T, val savedAt: Long)
+    private val cache = ConcurrentHashMap<String, CacheEntry<*>>()
+    private val cacheMutex = Mutex()
+
+    private suspend fun <T> cached(key: String, loader: suspend () -> T): T {
+        val now = System.currentTimeMillis()
+        @Suppress("UNCHECKED_CAST")
+        val hit = cache[key] as? CacheEntry<T>
+        if (hit != null && now - hit.savedAt < CACHE_TTL_MS) {
+            return hit.data
+        }
+        val fresh = loader()
+        cache[key] = CacheEntry(fresh, System.currentTimeMillis())
+        return fresh
+    }
+
+    /** Force-invalidate a cache key (call after a mutation or pull-to-refresh). */
+    fun invalidateCache(key: String? = null) {
+        if (key == null) cache.clear() else cache.remove(key)
+    }
+
+    // Cached API helpers — used by screens so navigating back doesn't refetch.
+    suspend fun getCachedHomeCards() = cached("home_cards") {
+        AppState.api.getHomeCards().cards
+    }
+    suspend fun getCachedTests(filter: String) = cached("tests_$filter") {
+        AppState.api.getTests(filter).tests
+    }
+    suspend fun getCachedBooks() = cached("books") {
+        AppState.api.getBooks().books
+    }
+    suspend fun getCachedVideos() = cached("videos") {
+        AppState.api.getVideoLessons().videos
+    }
+    suspend fun getCachedAudio() = cached("audio") {
+        AppState.api.getAudioLessons().lessons
+    }
 
     fun init(context: Context) {
         prefs = context.applicationContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)

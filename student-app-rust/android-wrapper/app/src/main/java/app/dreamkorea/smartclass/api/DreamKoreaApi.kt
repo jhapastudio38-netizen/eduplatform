@@ -78,7 +78,9 @@ data class TestItem(
     val durationMin: Int,
     val isExam: Boolean,
     val passScore: Int,
-    val questionCount: Int = 0
+    val questionCount: Int = 0,
+    val examType: String = "REGULAR",
+    val isActive: Boolean = true
 )
 data class TestsResponse(val tests: List<TestItem>)
 
@@ -221,7 +223,7 @@ interface DreamKoreaApi {
     suspend fun getLessons(@Path("id") id: String): LessonsResponse
 
     @GET("api/student/tests")
-    suspend fun getTests(): TestsResponse
+    suspend fun getTests(@Query("filter") filter: String = "all"): TestsResponse
 
     @GET("api/student/tests/{id}")
     suspend fun getTestDetail(@Path("id") id: String): TestDetailResponse

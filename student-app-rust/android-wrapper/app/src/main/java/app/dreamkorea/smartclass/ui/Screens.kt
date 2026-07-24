@@ -59,6 +59,8 @@ sealed class Screen {
     object CourseVideo : Screen()
     data class Exam(val testId: String) : Screen()
     data class BookReader(val book: Book) : Screen()
+    /** Filtered test list. filter: "all" | "practice" | "exam" | "ubt" | "free" | "batch" */
+    data class TestList(val filter: String, val title: String) : Screen()
 }
 
 @Composable
@@ -72,12 +74,14 @@ fun MainScreen(userName: String, onLogout: () -> Unit) {
             // ─── Top bar with DreamKorea logo ──────────────────────────────────
             TopBar(theme, userName, sound, onProfile = { screen = Screen.Profile }, onSettings = { screen = Screen.Settings })
 
-            // ─── Animated screen content ────────────────────────────────────
+            // ─── Animated screen content — modern slide+fade transition ───────
             Box(modifier = Modifier.weight(1f)) {
                 AnimatedContent(
                     targetState = screen,
                     transitionSpec = {
-                        fadeIn(tween(250)) togetherWith fadeOut(tween(150))
+                        // Modern slide-in from right + fade, like native Android navigation
+                        (fadeIn(tween(300)) + slideInHorizontally(tween(300), initialOffsetX = { it / 6 })) togetherWith
+                        (fadeOut(tween(200)) + slideOutHorizontally(tween(200), targetOffsetX = { -it / 8 }))
                     },
                     label = "screenTransition"
                 ) { s ->
@@ -85,17 +89,17 @@ fun MainScreen(userName: String, onLogout: () -> Unit) {
                         is Screen.Home -> HomeScreen(theme, sound, onNavigate = { screen = it })
                         is Screen.Learn -> LearnScreen(theme, sound, onBack = { screen = Screen.Home })
                         is Screen.Books -> BooksScreen(theme, sound, onBack = { screen = Screen.Home }, onBookClick = { screen = Screen.BookReader(it) })
-                        is Screen.Tests -> TestsScreen(theme, sound, onBack = { screen = Screen.Home }, onStartExam = { screen = Screen.Exam(it) })
+                        is Screen.Tests -> TestsScreen(theme, sound, filter = "all", title = "All Tests & Exams", onBack = { screen = Screen.Home }, onStartExam = { screen = Screen.Exam(it) })
                         is Screen.Videos -> VideosScreen(theme, sound, onBack = { screen = Screen.Home })
                         is Screen.Profile -> ProfileScreen(theme, sound, userName, onBack = { screen = Screen.Home }, onLogout = onLogout)
                         is Screen.LiveRoom -> LiveRoomScreen(theme, onBack = { screen = Screen.Home })
                         is Screen.Settings -> SettingsScreen(theme, sound, onBack = { screen = Screen.Home })
                         is Screen.Exam -> ExamScreen(theme, testId = s.testId, onExit = { screen = Screen.Home })
                         is Screen.BookReader -> BookReaderScreen(theme, sound, s.book, onBack = { screen = Screen.Books })
-                        // Specific card pages — each opens a distinct screen
-                        is Screen.UbtTest -> TestsScreen(theme, sound, onBack = { screen = Screen.Home }, onStartExam = { screen = Screen.Exam(it) })
-                        is Screen.FreeExam -> TestsScreen(theme, sound, onBack = { screen = Screen.Home }, onStartExam = { screen = Screen.Exam(it) })
-                        is Screen.Batch -> TestsScreen(theme, sound, onBack = { screen = Screen.Home }, onStartExam = { screen = Screen.Exam(it) })
+                        // Specific card pages — each opens a DISTINCT filtered test list
+                        is Screen.UbtTest -> TestsScreen(theme, sound, filter = "ubt", title = "UBT Tests", onBack = { screen = Screen.Home }, onStartExam = { screen = Screen.Exam(it) })
+                        is Screen.FreeExam -> TestsScreen(theme, sound, filter = "free", title = "Free Practice Tests", onBack = { screen = Screen.Home }, onStartExam = { screen = Screen.Exam(it) })
+                        is Screen.Batch -> TestsScreen(theme, sound, filter = "batch", title = "Batch Exams", onBack = { screen = Screen.Home }, onStartExam = { screen = Screen.Exam(it) })
                         is Screen.Results -> ProfileScreen(theme, sound, userName, onBack = { screen = Screen.Home }, onLogout = onLogout)
                         is Screen.QuestionBank -> LearnScreen(theme, sound, onBack = { screen = Screen.Home })
                         is Screen.AudioLessons -> LearnScreen(theme, sound, onBack = { screen = Screen.Home })
@@ -103,6 +107,7 @@ fun MainScreen(userName: String, onLogout: () -> Unit) {
                         is Screen.RecordedVideo -> VideosScreen(theme, sound, onBack = { screen = Screen.Home })
                         is Screen.ClassResult -> ProfileScreen(theme, sound, userName, onBack = { screen = Screen.Home }, onLogout = onLogout)
                         is Screen.CourseVideo -> VideosScreen(theme, sound, onBack = { screen = Screen.Home })
+                        is Screen.TestList -> TestsScreen(theme, sound, filter = s.filter, title = s.title, onBack = { screen = Screen.Home }, onStartExam = { screen = Screen.Exam(it) })
                     }
                 }
             }
@@ -113,45 +118,94 @@ fun MainScreen(userName: String, onLogout: () -> Unit) {
 // ─── Top bar with DreamKorea logo ─────────────────────────────────────────────
 @Composable
 fun TopBar(theme: AppTheme, userName: String, sound: SoundManager, onProfile: () -> Unit, onSettings: () -> Unit) {
-    Surface(color = theme.white, shadowElevation = 1.dp) {
+    Surface(
+        color = theme.white,
+        shadowElevation = 2.dp,
+        tonalElevation = 0.dp
+    ) {
         Row(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             // DreamKorea logo (bundled in APK, blends into background)
             Image(
                 painter = painterResource(id = app.dreamkorea.smartclass.R.drawable.dreamkorea_logo),
                 contentDescription = "DreamKorea Logo",
-                modifier = Modifier.size(40.dp),
+                modifier = Modifier.size(42.dp),
                 contentScale = ContentScale.Fit
             )
             Spacer(Modifier.width(10.dp))
             Column(modifier = Modifier.weight(1f)) {
-                Text("DreamKorea", color = theme.darkText, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                Text("DreamKorea", color = theme.darkText, fontSize = 17.sp, fontWeight = FontWeight.Bold)
                 Text("Realize your dream now", color = theme.subText, fontSize = 9.sp)
             }
-            // Profile icon
-            IconButton(onClick = { sound.click(); onProfile() }, modifier = Modifier.size(36.dp)) {
-                Icon(Icons.Default.Person, "Profile", tint = theme.darkText, modifier = Modifier.size(22.dp))
+            // Profile icon with subtle background
+            Box(
+                modifier = Modifier
+                    .size(38.dp)
+                    .clip(CircleShape)
+                    .background(theme.primary.copy(alpha = 0.08f))
+                    .clickable { sound.click(); onProfile() },
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(Icons.Default.Person, "Profile", tint = theme.primary, modifier = Modifier.size(20.dp))
             }
-            // Settings icon
-            IconButton(onClick = { sound.click(); onSettings() }, modifier = Modifier.size(36.dp)) {
-                Icon(Icons.Default.Settings, "Settings", tint = theme.darkText, modifier = Modifier.size(22.dp))
+            Spacer(Modifier.width(6.dp))
+            // Settings icon with subtle background
+            Box(
+                modifier = Modifier
+                    .size(38.dp)
+                    .clip(CircleShape)
+                    .background(theme.primary.copy(alpha = 0.08f))
+                    .clickable { sound.click(); onSettings() },
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(Icons.Default.Settings, "Settings", tint = theme.primary, modifier = Modifier.size(20.dp))
             }
         }
     }
 }
 
-// Simple async image loader — uses Coil if available, falls back to colored box
+// Async image loader — uses Coil to load admin-uploaded images from URLs
 @Composable
 fun AsyncImageLoader(url: String, modifier: Modifier = Modifier) {
     val theme = rememberAppTheme()
-    Box(
-        modifier = modifier.background(theme.primary.copy(alpha = 0.1f)),
-        contentAlignment = Alignment.Center
-    ) {
-        Text("DK", color = theme.primary, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+    if (url.isBlank()) {
+        // Placeholder when no image URL
+        Box(
+            modifier = modifier.background(theme.primary.copy(alpha = 0.1f)),
+            contentAlignment = Alignment.Center
+        ) {
+            Text("DK", color = theme.primary, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+        }
+        return
     }
+    coil.compose.AsyncImage(
+        model = url,
+        contentDescription = null,
+        modifier = modifier,
+        contentScale = ContentScale.Crop,
+        loading = {
+            Box(
+                modifier = Modifier.fillMaxSize().background(theme.midGray),
+                contentAlignment = Alignment.Center
+            ) {
+                CircularProgressIndicator(
+                    color = theme.primary,
+                    modifier = Modifier.size(24.dp),
+                    strokeWidth = 2.dp
+                )
+            }
+        },
+        error = {
+            Box(
+                modifier = Modifier.fillMaxSize().background(theme.primary.copy(alpha = 0.1f)),
+                contentAlignment = Alignment.Center
+            ) {
+                Text("DK", color = theme.primary, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+            }
+        }
+    )
 }
 
 @Composable
@@ -181,8 +235,8 @@ fun HomeScreen(theme: AppTheme, sound: SoundManager, onNavigate: (Screen) -> Uni
     LaunchedEffect(Unit) {
         scope.launch {
             try {
-                val resp = AppState.api.getHomeCards()
-                homeCards = resp.cards
+                // Use cached API — avoids reload storm on back/forth navigation
+                homeCards = AppState.getCachedHomeCards()
             } catch (_: Exception) {}
             loading = false
         }
@@ -470,7 +524,7 @@ fun BooksScreen(theme: AppTheme, sound: SoundManager, onBack: () -> Unit, onBook
     var loading by remember { mutableStateOf(true) }
 
     LaunchedEffect(Unit) {
-        scope.launch { try { books = AppState.api.getBooks().books } catch (_: Exception) {} ; loading = false }
+        scope.launch { try { books = AppState.getCachedBooks() } catch (_: Exception) {} ; loading = false }
     }
 
     if (loading) {
@@ -525,17 +579,46 @@ fun BooksScreen(theme: AppTheme, sound: SoundManager, onBack: () -> Unit, onBook
 
 // ─── Tests Screen ─────────────────────────────────────────────────────────────
 @Composable
-fun TestsScreen(theme: AppTheme, sound: SoundManager, onBack: () -> Unit, onStartExam: (String) -> Unit) {
+fun TestsScreen(theme: AppTheme, sound: SoundManager, filter: String = "all", title: String = "Tests & Exams", onBack: () -> Unit, onStartExam: (String) -> Unit) {
     val scope = rememberCoroutineScope()
     var tests by remember { mutableStateOf<List<TestItem>>(emptyList()) }
     var loading by remember { mutableStateOf(true) }
+    var error by remember { mutableStateOf("") }
 
-    LaunchedEffect(Unit) {
-        scope.launch { try { tests = AppState.api.getTests().tests } catch (_: Exception) {} ; loading = false }
+    LaunchedEffect(filter) {
+        scope.launch {
+            loading = true
+            error = ""
+            try {
+                // Use cached API — avoids reload storm on back/forth navigation
+                tests = AppState.getCachedTests(filter)
+            } catch (e: java.net.UnknownHostException) {
+                error = "No internet connection."
+            } catch (e: java.io.IOException) {
+                error = "Could not connect to server."
+            } catch (e: Exception) {
+                error = "Could not load tests. Please try again."
+            }
+            loading = false
+        }
     }
 
     if (loading) {
-        SkeletonListScreen(theme, itemCount = 5)
+        Column(Modifier.fillMaxSize()) {
+            ScreenHeader(theme, sound, title, "Tap a test to start.", onBack)
+            SkeletonListScreen(theme, itemCount = 5)
+        }
+        return
+    }
+
+    if (error.isNotEmpty()) {
+        Column(Modifier.fillMaxSize().padding(20.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
+            Icon(Icons.Default.WifiOff, null, tint = theme.errorRed, modifier = Modifier.size(48.dp))
+            Spacer(Modifier.height(12.dp))
+            Text(error, color = theme.darkText, fontSize = 14.sp, textAlign = TextAlign.Center)
+            Spacer(Modifier.height(16.dp))
+            Button(onClick = onBack, colors = ButtonDefaults.buttonColors(containerColor = theme.primary)) { Text("Go back") }
+        }
         return
     }
 
@@ -544,9 +627,9 @@ fun TestsScreen(theme: AppTheme, sound: SoundManager, onBack: () -> Unit, onStar
         contentPadding = PaddingValues(16.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
-        item { ScreenHeader(theme, sound, "Tests & Exams", "Tap a test to start. Stats update automatically.", onBack) }
+        item { ScreenHeader(theme, sound, title, if (tests.isEmpty()) "No tests in this category yet." else "Tap a test to start. Stats update automatically.", onBack) }
         if (tests.isEmpty()) {
-            item { EmptyState(theme, "No tests yet", "Your teacher will assign tests here soon.", Icons.Default.Quiz) }
+            item { EmptyState(theme, "Nothing here yet", "Your teacher will add content to this section soon.", Icons.Default.Quiz) }
         } else {
             itemsIndexed(tests) { i, t ->
                 AnimatedListItem(index = i, theme = theme) {
@@ -557,52 +640,69 @@ fun TestsScreen(theme: AppTheme, sound: SoundManager, onBack: () -> Unit, onStar
     }
 }
 
-// ─── Test Card with rich info ─────────────────────────────────────────────────
+// ─── Test Card with rich info + gradient accent ──────────────────────────────
 @Composable
 fun TestCard(theme: AppTheme, sound: SoundManager, t: TestItem, onClick: () -> Unit) {
     var pressed by remember { mutableStateOf(false) }
     val scale by animateFloatAsState(
-        targetValue = if (pressed) 0.98f else 1f,
+        targetValue = if (pressed) 0.97f else 1f,
         animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy),
         label = "testScale"
     )
+    val accentColor = if (t.isExam) theme.accent else theme.primary
     Surface(
         color = theme.cardBg,
-        shape = RoundedCornerShape(14.dp),
-        modifier = Modifier.fillMaxWidth().scale(scale).clickable { sound.click(); pressed = true; onClick() },
-        shadowElevation = 2.dp
+        shape = RoundedCornerShape(16.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .scale(scale)
+            .clickable { sound.click(); pressed = true; onClick() },
+        shadowElevation = 3.dp
     ) {
-        Column(modifier = Modifier.padding(14.dp)) {
-            Row(Modifier.fillMaxWidth(), Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                Text(t.title, color = theme.darkText, fontSize = 15.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
-                Surface(
-                    color = if (t.isExam) theme.accent.copy(alpha = 0.15f) else theme.primary.copy(alpha = 0.15f),
-                    shape = RoundedCornerShape(6.dp)
-                ) {
-                    Text(
-                        if (t.isExam) "EXAM" else "PRACTICE",
-                        color = if (t.isExam) theme.accent else theme.primary,
-                        fontSize = 9.sp, fontWeight = FontWeight.Bold,
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+        Row(modifier = Modifier.fillMaxWidth()) {
+            // Left gradient accent bar — color-coded by exam/practice
+            Box(
+                modifier = Modifier
+                    .width(5.dp)
+                    .height(92.dp)
+                    .background(
+                        Brush.verticalGradient(
+                            listOf(accentColor, accentColor.copy(alpha = 0.5f))
+                        )
                     )
+            )
+            Column(modifier = Modifier.padding(14.dp).weight(1f)) {
+                Row(Modifier.fillMaxWidth(), Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                    Text(t.title, color = theme.darkText, fontSize = 15.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+                    Surface(
+                        color = accentColor.copy(alpha = 0.15f),
+                        shape = RoundedCornerShape(6.dp)
+                    ) {
+                        Text(
+                            if (t.isExam) "EXAM" else "PRACTICE",
+                            color = accentColor,
+                            fontSize = 9.sp, fontWeight = FontWeight.Bold,
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                        )
+                    }
                 }
-            }
-            if (!t.description.isNullOrBlank()) {
-                Spacer(Modifier.height(4.dp))
-                Text(t.description, color = theme.subText, fontSize = 11.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
-            }
-            Spacer(Modifier.height(8.dp))
-            // Info chips row
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                InfoChipWithIcon(theme, Icons.Default.Timer, "${t.durationMin} min", theme.primary)
-                Spacer(Modifier.width(6.dp))
-                InfoChipWithIcon(theme, Icons.Default.CheckCircle, "Pass ${t.passScore}%", SuccessGreen)
-                if (t.questionCount > 0) {
+                if (!t.description.isNullOrBlank()) {
+                    Spacer(Modifier.height(4.dp))
+                    Text(t.description, color = theme.subText, fontSize = 11.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                }
+                Spacer(Modifier.height(8.dp))
+                // Info chips row
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    InfoChipWithIcon(theme, Icons.Default.Timer, "${t.durationMin} min", theme.primary)
                     Spacer(Modifier.width(6.dp))
-                    InfoChipWithIcon(theme, Icons.Default.Quiz, "${t.questionCount} Q", theme.accent)
+                    InfoChipWithIcon(theme, Icons.Default.CheckCircle, "Pass ${t.passScore}%", SuccessGreen)
+                    if (t.questionCount > 0) {
+                        Spacer(Modifier.width(6.dp))
+                        InfoChipWithIcon(theme, Icons.Default.Quiz, "${t.questionCount} Q", theme.accent)
+                    }
+                    Spacer(Modifier.weight(1f))
+                    Text("Start →", color = accentColor, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
                 }
-                Spacer(Modifier.weight(1f))
-                Text("Start →", color = theme.primary, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
             }
         }
     }
@@ -616,7 +716,7 @@ fun VideosScreen(theme: AppTheme, sound: SoundManager, onBack: () -> Unit) {
     var loading by remember { mutableStateOf(true) }
 
     LaunchedEffect(Unit) {
-        scope.launch { try { videos = AppState.api.getVideoLessons().videos } catch (_: Exception) {} ; loading = false }
+        scope.launch { try { videos = AppState.getCachedVideos() } catch (_: Exception) {} ; loading = false }
     }
 
     if (loading) {
