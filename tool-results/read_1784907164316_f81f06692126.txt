@@ -1,0 +1,513 @@
+     1→     1→package app.dreamkorea.smartclass.ui
+     2→     2→
+     3→     3→import androidx.compose.animation.*
+     4→     4→import androidx.compose.foundation.Image
+     5→     5→import androidx.compose.foundation.background
+     6→     6→import androidx.compose.foundation.clickable
+     7→     7→import androidx.compose.foundation.layout.*
+     8→     8→import androidx.compose.foundation.rememberScrollState
+     9→     9→import androidx.compose.foundation.shape.RoundedCornerShape
+    10→    10→import androidx.compose.foundation.text.KeyboardOptions
+    11→    11→import androidx.compose.foundation.verticalScroll
+    12→    12→import androidx.compose.material.icons.Icons
+    13→    13→import androidx.compose.material.icons.filled.*
+    14→    14→import androidx.compose.material3.*
+    15→    15→import androidx.compose.runtime.*
+    16→    16→import androidx.compose.ui.Alignment
+    17→    17→import androidx.compose.ui.Modifier
+    18→    18→import androidx.compose.ui.graphics.Color
+    19→    19→import androidx.compose.ui.layout.ContentScale
+    20→    20→import androidx.compose.ui.platform.LocalContext
+    21→    21→import androidx.compose.ui.res.painterResource
+    22→    22→import androidx.compose.ui.text.font.FontWeight
+    23→    23→import androidx.compose.ui.text.input.KeyboardType
+    24→    24→import androidx.compose.ui.text.input.PasswordVisualTransformation
+    25→    25→import androidx.compose.ui.text.input.VisualTransformation
+    26→    26→import androidx.compose.ui.unit.dp
+    27→    27→import androidx.compose.ui.unit.sp
+    28→    28→import app.dreamkorea.smartclass.api.OtpRequest
+    29→    29→import app.dreamkorea.smartclass.api.VerifyRequest
+    30→    30→import app.dreamkorea.smartclass.data.AppState
+    31→    31→import kotlinx.coroutines.launch
+    32→    32→import java.io.IOException
+    33→    33→import java.net.UnknownHostException
+    34→    34→
+    35→    35→// Color constants (Korean flag palette)
+    36→    36→val White = Color(0xFFFFFFFF)
+    37→    37→val DarkText = Color(0xFF1A1A2E)
+    38→    38→val SubText = Color(0xFF6C757D)
+    39→    39→val Primary = Color(0xFF003478)
+    40→    40→val Accent = Color(0xFFCD2E3A)
+    41→    41→val ErrorRed = Color(0xFFE53935)
+    42→    42→val Divider = Color(0xFFE0E0E0)
+    43→    43→
+    44→    44→// Email/phone validation helpers
+    45→    45→private fun isEmail(s: String) = android.util.Patterns.EMAIL_ADDRESS.matcher(s).matches()
+    46→    46→private fun isValidPhone(s: String): Boolean {
+    47→    47→    val digits = s.replace("\\D".toRegex(), "")
+    48→    48→    return digits.length in 7..15
+    49→    49→}
+    50→    50→
+    51→    51→@Composable
+    52→    52→fun LoginScreen(onLoginSuccess: () -> Unit) {
+    53→    53→    val scope = rememberCoroutineScope()
+    54→    54→    val sound = rememberSoundManager()
+    55→    55→    // 2 modes: SIGNUP (new user via OTP) or LOGIN (returning user with email+password)
+    56→    56→    var mode by remember { mutableStateOf("SIGNUP") }
+    57→    57→
+    58→    58→    // OTP signup state
+    59→    59→    var name by remember { mutableStateOf("") }
+    60→    60→    var email by remember { mutableStateOf("") }
+    61→    61→    var phone by remember { mutableStateOf("") }
+    62→    62→    var code by remember { mutableStateOf("") }
+    63→    63→    var password by remember { mutableStateOf("") }
+    64→    64→    var confirmPassword by remember { mutableStateOf("") }
+    65→    65→    var step by remember { mutableStateOf(1) } // 1=details, 2=OTP, 3=password setup
+    66→    66→    // Password login state
+    67→    67→    var loginEmail by remember { mutableStateOf("") }
+    68→    68→    var loginPassword by remember { mutableStateOf("") }
+    69→    69→
+    70→    70→    var loading by remember { mutableStateOf(false) }
+    71→    71→    var error by remember { mutableStateOf("") }
+    72→    72→    var info by remember { mutableStateOf("") } // success/info message (green)
+    73→    73→    var passwordVisible by remember { mutableStateOf(false) }
+    74→    74→
+    75→    75→    Surface(modifier = Modifier.fillMaxSize(), color = Color.White) {
+    76→    76→        Column(
+    77→    77→            modifier = Modifier.fillMaxSize().padding(horizontal = 28.dp).verticalScroll(rememberScrollState()),
+    78→    78→            horizontalAlignment = Alignment.CenterHorizontally,
+    79→    79→            verticalArrangement = Arrangement.Center
+    80→    80→        ) {
+    81→    81→            Spacer(modifier = Modifier.height(40.dp))
+    82→    82→
+    83→    83→            // ─── DreamKorea logo (bundled in APK) ────────────────────────────
+    84→    84→            // Logo blends into the white background — no box, no border
+    85→    85→            Image(
+    86→    86→                painter = painterResource(id = app.dreamkorea.smartclass.R.drawable.dreamkorea_logo),
+    87→    87→                contentDescription = "DreamKorea Logo",
+    88→    88→                modifier = Modifier.size(120.dp),
+    89→    89→                contentScale = ContentScale.Fit
+    90→    90→            )
+    91→    91→
+    92→    92→            Spacer(modifier = Modifier.height(16.dp))
+    93→    93→            Text("DreamKorea", color = DarkText, fontSize = 24.sp, fontWeight = FontWeight.Bold)
+    94→    94→            Text("Realize your dream now", color = SubText, fontSize = 12.sp)
+    95→    95→            Spacer(modifier = Modifier.height(28.dp))
+    96→    96→
+    97→    97→            // Mode toggle
+    98→    98→            Row(
+    99→    99→                modifier = Modifier.fillMaxWidth(),
+   100→   100→                horizontalArrangement = Arrangement.Center
+   101→   101→            ) {
+   102→   102→                FilterChip(
+   103→   103→                    selected = mode == "SIGNUP",
+   104→   104→                    onClick = { sound.click(); mode = "SIGNUP"; step = 1; error = ""; info = "" },
+   105→   105→                    label = { Text("Sign up", fontSize = 12.sp) },
+   106→   106→                    colors = FilterChipDefaults.filterChipColors(selectedContainerColor = Primary, selectedLabelColor = Color.White)
+   107→   107→                )
+   108→   108→                Spacer(Modifier.width(8.dp))
+   109→   109→                FilterChip(
+   110→   110→                    selected = mode == "LOGIN",
+   111→   111→                    onClick = { sound.click(); mode = "LOGIN"; error = ""; info = "" },
+   112→   112→                    label = { Text("Sign in", fontSize = 12.sp) },
+   113→   113→                    colors = FilterChipDefaults.filterChipColors(selectedContainerColor = Primary, selectedLabelColor = Color.White)
+   114→   114→                )
+   115→   115→            }
+   116→   116→            Spacer(modifier = Modifier.height(16.dp))
+   117→   117→
+   118→   118→            // Info message (green — for success like "OTP sent")
+   119→   119→            AnimatedVisibility(
+   120→   120→                visible = info.isNotEmpty(),
+   121→   121→                enter = fadeIn() + slideInVertically(),
+   122→   122→                exit = fadeOut()
+   123→   123→            ) {
+   124→   124→                Surface(
+   125→   125→                    color = Color(0xFFE8F5E9),
+   126→   126→                    shape = RoundedCornerShape(8.dp),
+   127→   127→                    modifier = Modifier.fillMaxWidth()
+   128→   128→                ) {
+   129→   129→                    Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+   130→   130→                        Icon(Icons.Default.CheckCircle, null, tint = SuccessGreen, modifier = Modifier.size(18.dp))
+   131→   131→                        Spacer(Modifier.width(8.dp))
+   132→   132→                        Text(info, color = SuccessGreen, fontSize = 13.sp, modifier = Modifier.weight(1f))
+   133→   133→                    }
+   134→   134→                }
+   135→   135→                Spacer(modifier = Modifier.height(8.dp))
+   136→   136→            }
+   137→   137→
+   138→   138→            // Error message (red — for errors)
+   139→   139→            AnimatedVisibility(
+   140→   140→                visible = error.isNotEmpty(),
+   141→   141→                enter = fadeIn() + slideInVertically(),
+   142→   142→                exit = fadeOut()
+   143→   143→            ) {
+   144→   144→                Surface(
+   145→   145→                    color = Color(0xFFFFEBEE),
+   146→   146→                    shape = RoundedCornerShape(8.dp),
+   147→   147→                    modifier = Modifier.fillMaxWidth()
+   148→   148→                ) {
+   149→   149→                    Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+   150→   150→                        Icon(Icons.Default.Error, null, tint = ErrorRed, modifier = Modifier.size(18.dp))
+   151→   151→                        Spacer(Modifier.width(8.dp))
+   152→   152→                        Text(error, color = ErrorRed, fontSize = 13.sp, modifier = Modifier.weight(1f))
+   153→   153→                    }
+   154→   154→                }
+   155→   155→                Spacer(modifier = Modifier.height(8.dp))
+   156→   156→            }
+   157→   157→
+   158→   158→            // ─── LOGIN MODE (email + password) ────────────────────────────────
+   159→   159→            if (mode == "LOGIN") {
+   160→   160→                Text("Welcome back", color = DarkText, fontSize = 20.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.fillMaxWidth())
+   161→   161→                Spacer(Modifier.height(6.dp))
+   162→   162→                Text("Sign in with your email and password", color = SubText, fontSize = 13.sp, modifier = Modifier.fillMaxWidth())
+   163→   163→                Spacer(Modifier.height(20.dp))
+   164→   164→
+   165→   165→                OutlinedTextField(
+   166→   166→                    value = loginEmail,
+   167→   167→                    onValueChange = { loginEmail = it },
+   168→   168→                    label = { Text("Email") },
+   169→   169→                    modifier = Modifier.fillMaxWidth(),
+   170→   170→                    colors = fieldColors(),
+   171→   171→                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
+   172→   172→                    shape = RoundedCornerShape(10.dp),
+   173→   173→                    singleLine = true,
+   174→   174→                    leadingIcon = { Icon(Icons.Default.Email, null, tint = SubText, modifier = Modifier.size(18.dp)) }
+   175→   175→                )
+   176→   176→                Spacer(Modifier.height(12.dp))
+   177→   177→
+   178→   178→                OutlinedTextField(
+   179→   179→                    value = loginPassword,
+   180→   180→                    onValueChange = { loginPassword = it },
+   181→   181→                    label = { Text("Password") },
+   182→   182→                    modifier = Modifier.fillMaxWidth(),
+   183→   183→                    colors = fieldColors(),
+   184→   184→                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+   185→   185→                    shape = RoundedCornerShape(10.dp),
+   186→   186→                    singleLine = true,
+   187→   187→                    leadingIcon = { Icon(Icons.Default.Lock, null, tint = SubText, modifier = Modifier.size(18.dp)) },
+   188→   188→                    trailingIcon = {
+   189→   189→                        IconButton(onClick = { sound.click(); passwordVisible = !passwordVisible }) {
+   190→   190→                            Icon(
+   191→   191→                                if (passwordVisible) Icons.Default.Visibility else Icons.Default.VisibilityOff,
+   192→   192→                                null, tint = SubText, modifier = Modifier.size(18.dp)
+   193→   193→                            )
+   194→   194→                        }
+   195→   195→                    },
+   196→   196→                    visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation()
+   197→   197→                )
+   198→   198→                Spacer(Modifier.height(16.dp))
+   199→   199→
+   200→   200→                Button(
+   201→   201→                    onClick = {
+   202→   202→                        if (loginEmail.isBlank()) { sound.error(); error = "Please enter your email"; return@Button }
+   203→   203→                        if (!isEmail(loginEmail)) { sound.error(); error = "Please enter a valid email address"; return@Button }
+   204→   204→                        if (loginPassword.isBlank()) { sound.error(); error = "Please enter your password"; return@Button }
+   205→   205→                        loading = true; error = ""; info = ""
+   206→   206→                        scope.launch {
+   207→   207→                            try {
+   208→   208→                                val res = AppState.api.loginCredentials(
+   209→   209→                                    mapOf("username" to loginEmail, "password" to loginPassword)
+   210→   210→                                )
+   211→   211→                                if (res.ok) {
+   212→   212→                                    sound.success()
+   213→   213→                                    AppState.saveSession("logged_in", res.user)
+   214→   214→                                    onLoginSuccess()
+   215→   215→                                } else {
+   216→   216→                                    sound.error()
+   217→   217→                                    // User-friendly error messages
+   218→   218→                                    error = when {
+   219→   219→                                        res.error?.contains("password", ignoreCase = true) == true -> "Wrong password. Please try again."
+   220→   220→                                        res.error?.contains("not found", ignoreCase = true) == true -> "No account found with this email."
+   221→   221→                                        res.error?.contains("suspended", ignoreCase = true) == true -> "Your account is suspended. Contact admin."
+   222→   222→                                        else -> "Wrong email or password."
+   223→   223→                                    }
+   224→   224→                                }
+   225→   225→                            } catch (e: UnknownHostException) {
+   226→   226→                                sound.error()
+   227→   227→                                error = "No internet connection. Please check your network."
+   228→   228→                            } catch (e: IOException) {
+   229→   229→                                sound.error()
+   230→   230→                                error = "Could not connect to server. Please check your internet."
+   231→   231→                            } catch (e: Exception) {
+   232→   232→                                sound.error()
+   233→   233→                                error = "Something went wrong. Please try again."
+   234→   234→                            }
+   235→   235→                            loading = false
+   236→   236→                        }
+   237→   237→                    },
+   238→   238→                    modifier = Modifier.fillMaxWidth().height(50.dp),
+   239→   239→                    colors = ButtonDefaults.buttonColors(containerColor = Primary),
+   240→   240→                    shape = RoundedCornerShape(10.dp),
+   241→   241→                    enabled = !loading && loginEmail.isNotBlank() && loginPassword.isNotBlank()
+   242→   242→                ) {
+   243→   243→                    if (loading) CircularProgressIndicator(color = Color.White, modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+   244→   244→                    else Text("Sign in", fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+   245→   245→                }
+   246→   246→
+   247→   247→                Spacer(Modifier.height(16.dp))
+   248→   248→                TextButton(onClick = { sound.click(); mode = "SIGNUP"; step = 1; error = ""; info = "" }) {
+   249→   249→                    Text("Don't have an account? Sign up", color = Primary, fontSize = 12.sp)
+   250→   250→                }
+   251→   251→            }
+   252→   252→
+   253→   253→            // ─── SIGNUP MODE ──────────────────────────────────────────────────
+   254→   254→            if (mode == "SIGNUP") {
+   255→   255→                // Step 1: Name + Email + Phone
+   256→   256→                if (step == 1) {
+   257→   257→                    Text("Create your account", color = DarkText, fontSize = 20.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.fillMaxWidth())
+   258→   258→                    Spacer(Modifier.height(6.dp))
+   259→   259→                    Text("We'll send a verification code to your email.", color = SubText, fontSize = 13.sp, modifier = Modifier.fillMaxWidth())
+   260→   260→                    Spacer(Modifier.height(20.dp))
+   261→   261→
+   262→   262→                    OutlinedTextField(
+   263→   263→                        value = name, onValueChange = { name = it },
+   264→   264→                        label = { Text("Full name *") },
+   265→   265→                        modifier = Modifier.fillMaxWidth(),
+   266→   266→                        colors = fieldColors(), shape = RoundedCornerShape(10.dp), singleLine = true,
+   267→   267→                        leadingIcon = { Icon(Icons.Default.Person, null, tint = SubText, modifier = Modifier.size(18.dp)) }
+   268→   268→                    )
+   269→   269→                    Spacer(Modifier.height(10.dp))
+   270→   270→
+   271→   271→                    OutlinedTextField(
+   272→   272→                        value = email, onValueChange = { email = it },
+   273→   273→                        label = { Text("Email *") },
+   274→   274→                        modifier = Modifier.fillMaxWidth(),
+   275→   275→                        colors = fieldColors(),
+   276→   276→                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
+   277→   277→                        shape = RoundedCornerShape(10.dp), singleLine = true,
+   278→   278→                        leadingIcon = { Icon(Icons.Default.Email, null, tint = SubText, modifier = Modifier.size(18.dp)) }
+   279→   279→                    )
+   280→   280→                    Spacer(Modifier.height(10.dp))
+   281→   281→
+   282→   282→                    OutlinedTextField(
+   283→   283→                        value = phone, onValueChange = { phone = it.filter { c -> c.isDigit() || c == '+' } },
+   284→   284→                        label = { Text("Phone number *") },
+   285→   285→                        placeholder = { Text("+977 98XXXXXXXX") },
+   286→   286→                        modifier = Modifier.fillMaxWidth(),
+   287→   287→                        colors = fieldColors(),
+   288→   288→                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
+   289→   289→                        shape = RoundedCornerShape(10.dp), singleLine = true,
+   290→   290→                        leadingIcon = { Icon(Icons.Default.Phone, null, tint = SubText, modifier = Modifier.size(18.dp)) }
+   291→   291→                    )
+   292→   292→                    Spacer(Modifier.height(6.dp))
+   293→   293→                    Text("Phone is required for verification.", color = SubText, fontSize = 11.sp, modifier = Modifier.fillMaxWidth())
+   294→   294→                    Spacer(Modifier.height(14.dp))
+   295→   295→
+   296→   296→                    Button(
+   297→   297→                        onClick = {
+   298→   298→                            if (name.isBlank()) { sound.error(); error = "Please enter your name"; return@Button }
+   299→   299→                            if (email.isBlank()) { sound.error(); error = "Please enter your email"; return@Button }
+   300→   300→                            if (!isEmail(email)) { sound.error(); error = "Please enter a valid email address"; return@Button }
+   301→   301→                            if (phone.isBlank()) { sound.error(); error = "Phone number is required"; return@Button }
+   302→   302→                            if (!isValidPhone(phone)) { sound.error(); error = "Please enter a valid phone number (7-15 digits)"; return@Button }
+   303→   303→                            loading = true; error = ""; info = ""
+   304→   304→                            scope.launch {
+   305→   305→                                try {
+   306→   306→                                    AppState.api.requestOtp(OtpRequest(email))
+   307→   307→                                    sound.success()
+   308→   308→                                    info = "Verification code sent to $email. Check your inbox."
+   309→   309→                                    step = 2
+   310→   310→                                } catch (e: UnknownHostException) {
+   311→   311→                                    sound.error()
+   312→   312→                                    error = "No internet connection. Please check your network."
+   313→   313→                                } catch (e: IOException) {
+   314→   314→                                    sound.error()
+   315→   315→                                    error = "Could not connect to server. Please check your internet."
+   316→   316→                                } catch (e: Exception) {
+   317→   317→                                    sound.error()
+   318→   318→                                    error = "Could not send code. Please try again."
+   319→   319→                                }
+   320→   320→                                loading = false
+   321→   321→                            }
+   322→   322→                        },
+   323→   323→                        modifier = Modifier.fillMaxWidth().height(50.dp),
+   324→   324→                        colors = ButtonDefaults.buttonColors(containerColor = Primary),
+   325→   325→                        shape = RoundedCornerShape(10.dp),
+   326→   326→                        enabled = !loading && name.isNotBlank() && email.isNotBlank() && phone.isNotBlank()
+   327→   327→                    ) {
+   328→   328→                        if (loading) CircularProgressIndicator(color = Color.White, modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+   329→   329→                        else Text("Send verification code", fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+   330→   330→                    }
+   331→   331→
+   332→   332→                    Spacer(Modifier.height(12.dp))
+   333→   333→                    TextButton(onClick = { sound.click(); mode = "LOGIN"; error = ""; info = "" }) {
+   334→   334→                        Text("Already have an account? Sign in", color = Primary, fontSize = 12.sp)
+   335→   335→                    }
+   336→   336→                }
+   337→   337→
+   338→   338→                // Step 2: OTP verification
+   339→   339→                if (step == 2) {
+   340→   340→                    Text("Enter verification code", color = DarkText, fontSize = 20.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.fillMaxWidth())
+   341→   341→                    Spacer(Modifier.height(6.dp))
+   342→   342→                    Text("We sent a 6-digit code to $email", color = SubText, fontSize = 13.sp, modifier = Modifier.fillMaxWidth())
+   343→   343→                    Spacer(Modifier.height(20.dp))
+   344→   344→
+   345→   345→                    OutlinedTextField(
+   346→   346→                        value = code,
+   347→   347→                        onValueChange = { code = it.filter { c -> c.isDigit() }.take(6) },
+   348→   348→                        label = { Text("6-digit code") },
+   349→   349→                        modifier = Modifier.fillMaxWidth(),
+   350→   350→                        colors = fieldColors(),
+   351→   351→                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+   352→   352→                        shape = RoundedCornerShape(10.dp), singleLine = true,
+   353→   353→                        leadingIcon = { Icon(Icons.Default.Password, null, tint = SubText, modifier = Modifier.size(18.dp)) }
+   354→   354→                    )
+   355→   355→                    Spacer(Modifier.height(14.dp))
+   356→   356→
+   357→   357→                    Button(
+   358→   358→                        onClick = {
+   359→   359→                            if (code.length < 6) { sound.error(); error = "Please enter all 6 digits"; return@Button }
+   360→   360→                            loading = true; error = ""; info = ""
+   361→   361→                            scope.launch {
+   362→   362→                                try {
+   363→   363→                                    val resp = AppState.api.verifyOtp(
+   364→   364→                                        VerifyRequest(
+   365→   365→                                            contact = email, code = code, role = "STUDENT",
+   366→   366→                                            name = name, email = email, phone = phone
+   367→   367→                                        )
+   368→   368→                                    )
+   369→   369→                                    if (resp.ok) {
+   370→   370→                                        sound.success()
+   371→   371→                                        info = "Verified! Now set a password for faster login."
+   372→   372→                                        // Save the session so set-password works
+   373→   373→                                        AppState.saveSession("logged_in", resp.user)
+   374→   374→                                        step = 3
+   375→   375→                                    } else {
+   376→   376→                                        sound.error()
+   377→   377→                                        error = "Verification failed. Please try again."
+   378→   378→                                    }
+   379→   379→                                } catch (e: UnknownHostException) {
+   380→   380→                                    sound.error()
+   381→   381→                                    error = "No internet connection. Please check your network."
+   382→   382→                                } catch (e: IOException) {
+   383→   383→                                    sound.error()
+   384→   384→                                    error = "Could not connect to server. Please try again."
+   385→   385→                                } catch (e: Exception) {
+   386→   386→                                    sound.error()
+   387→   387→                                    error = "Wrong code. Please check and try again."
+   388→   388→                                }
+   389→   389→                                loading = false
+   390→   390→                            }
+   391→   391→                        },
+   392→   392→                        modifier = Modifier.fillMaxWidth().height(50.dp),
+   393→   393→                        colors = ButtonDefaults.buttonColors(containerColor = Primary),
+   394→   394→                        shape = RoundedCornerShape(10.dp),
+   395→   395→                        enabled = !loading && code.length >= 6
+   396→   396→                    ) {
+   397→   397→                        if (loading) CircularProgressIndicator(color = Color.White, modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+   398→   398→                        else Text("Verify", fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+   399→   399→                    }
+   400→   400→                    Spacer(Modifier.height(12.dp))
+   401→   401→                    TextButton(onClick = { sound.click(); step = 1; error = ""; info = ""; code = "" }) {
+   402→   402→                        Text("← Change details", color = Primary, fontSize = 12.sp)
+   403→   403→                    }
+   404→   404→                }
+   405→   405→
+   406→   406→                // Step 3: Set password (uses /api/auth/set-password with active session)
+   407→   407→                if (step == 3) {
+   408→   408→                    Text("Set a password", color = DarkText, fontSize = 20.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.fillMaxWidth())
+   409→   409→                    Spacer(Modifier.height(6.dp))
+   410→   410→                    Text("Use this with your email to sign in faster next time.", color = SubText, fontSize = 13.sp, modifier = Modifier.fillMaxWidth())
+   411→   411→                    Spacer(Modifier.height(20.dp))
+   412→   412→
+   413→   413→                    OutlinedTextField(
+   414→   414→                        value = password,
+   415→   415→                        onValueChange = { password = it },
+   416→   416→                        label = { Text("Password (min 6 chars)") },
+   417→   417→                        modifier = Modifier.fillMaxWidth(),
+   418→   418→                        colors = fieldColors(),
+   419→   419→                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+   420→   420→                        shape = RoundedCornerShape(10.dp), singleLine = true,
+   421→   421→                        leadingIcon = { Icon(Icons.Default.Lock, null, tint = SubText, modifier = Modifier.size(18.dp)) },
+   422→   422→                        trailingIcon = {
+   423→   423→                            IconButton(onClick = { sound.click(); passwordVisible = !passwordVisible }) {
+   424→   424→                                Icon(
+   425→   425→                                    if (passwordVisible) Icons.Default.Visibility else Icons.Default.VisibilityOff,
+   426→   426→                                    null, tint = SubText, modifier = Modifier.size(18.dp)
+   427→   427→                                )
+   428→   428→                            }
+   429→   429→                        },
+   430→   430→                        visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation()
+   431→   431→                    )
+   432→   432→                    Spacer(Modifier.height(10.dp))
+   433→   433→
+   434→   434→                    OutlinedTextField(
+   435→   435→                        value = confirmPassword,
+   436→   436→                        onValueChange = { confirmPassword = it },
+   437→   437→                        label = { Text("Confirm password") },
+   438→   438→                        modifier = Modifier.fillMaxWidth(),
+   439→   439→                        colors = fieldColors(),
+   440→   440→                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+   441→   441→                        shape = RoundedCornerShape(10.dp), singleLine = true,
+   442→   442→                        leadingIcon = { Icon(Icons.Default.Lock, null, tint = SubText, modifier = Modifier.size(18.dp)) },
+   443→   443→                        visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation()
+   444→   444→                    )
+   445→   445→                    Spacer(Modifier.height(14.dp))
+   446→   446→
+   447→   447→                    Button(
+   448→   448→                        onClick = {
+   449→   449→                            if (password.length < 6) { sound.error(); error = "Password must be at least 6 characters"; return@Button }
+   450→   450→                            if (password != confirmPassword) { sound.error(); error = "Passwords do not match"; return@Button }
+   451→   451→                            loading = true; error = ""; info = ""
+   452→   452→                            scope.launch {
+   453→   453→                                try {
+   454→   454→                                    // Use the set-password endpoint (with active session from step 2)
+   455→   455→                                    val resp = AppState.api.setPassword(
+   456→   456→                                        mapOf("password" to password)
+   457→   457→                                    )
+   458→   458→                                    if (resp.ok) {
+   459→   459→                                        sound.success()
+   460→   460→                                        // Already logged in from step 2 — just call success
+   461→   461→                                        onLoginSuccess()
+   462→   462→                                    } else {
+   463→   463→                                        sound.error()
+   464→   464→                                        error = "Could not set password. Please try again."
+   465→   465→                                    }
+   466→   466→                                } catch (e: UnknownHostException) {
+   467→   467→                                    sound.error()
+   468→   468→                                    error = "No internet connection. Please check your network."
+   469→   469→                                } catch (e: IOException) {
+   470→   470→                                    sound.error()
+   471→   471→                                    error = "Could not connect to server. Please try again."
+   472→   472→                                } catch (e: Exception) {
+   473→   473→                                    sound.error()
+   474→   474→                                    error = "Something went wrong. Please try again."
+   475→   475→                                }
+   476→   476→                                loading = false
+   477→   477→                            }
+   478→   478→                        },
+   479→   479→                        modifier = Modifier.fillMaxWidth().height(50.dp),
+   480→   480→                        colors = ButtonDefaults.buttonColors(containerColor = Primary),
+   481→   481→                        shape = RoundedCornerShape(10.dp),
+   482→   482→                        enabled = !loading && password.length >= 6 && password == confirmPassword
+   483→   483→                    ) {
+   484→   484→                        if (loading) CircularProgressIndicator(color = Color.White, modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+   485→   485→                        else Text("Set password & continue", fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+   486→   486→                    }
+   487→   487→
+   488→   488→                    Spacer(Modifier.height(10.dp))
+   489→   489→                    TextButton(onClick = {
+   490→   490→                        sound.click()
+   491→   491→                        // Skip password — already logged in from step 2
+   492→   492→                        onLoginSuccess()
+   493→   493→                    }) {
+   494→   494→                        Text("Skip for now", color = SubText, fontSize = 12.sp)
+   495→   495→                    }
+   496→   496→                }
+   497→   497→            }
+   498→   498→            Spacer(modifier = Modifier.height(40.dp))
+   499→   499→        }
+   500→   500→    }
+   501→   501→}
+   502→   502→
+   503→   503→@Composable
+   504→   504→private fun fieldColors() = OutlinedTextFieldDefaults.colors(
+   505→   505→    focusedTextColor = DarkText,
+   506→   506→    unfocusedTextColor = DarkText,
+   507→   507→    focusedBorderColor = Primary,
+   508→   508→    unfocusedBorderColor = Divider,
+   509→   509→    focusedLabelColor = Primary,
+   510→   510→    unfocusedLabelColor = SubText,
+   511→   511→    cursorColor = Primary
+   512→   512→)
+   513→   513→
