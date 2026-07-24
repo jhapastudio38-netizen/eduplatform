@@ -245,7 +245,31 @@ interface DreamKoreaApi {
 
     @POST("api/student/live-rooms/join")
     suspend fun joinLiveRoom(@Body body: Map<String, String>): LiveRoomJoinWrapper
+
+    @GET("api/student/question-bank")
+    suspend fun getQuestionBank(): QuestionBankResponse
 }
+
+// ─── Question Bank ────────────────────────────────────────────────────────────
+data class QuestionBankQuestion(
+    val id: String,
+    val type: String,
+    val difficulty: String,
+    val stem: String,
+    val options: List<String>? = null,
+    val correctAnswer: Any? = null, // String or List<String>
+    val explanation: String? = null,
+    val imageUrl: String? = null,
+    val audioUrl: String? = null,
+    val audioLoop: Int = 0,
+    val audioLoopDelay: Int = 0,
+    val category: String = "General"
+)
+data class QuestionBankResponse(
+    val questions: List<QuestionBankQuestion> = emptyList(),
+    val categories: List<String> = emptyList(),
+    val total: Int = 0
+)
 
 data class LiveRoomJoinWrapper(val room: LiveRoomData? = null, val error: String? = null)
 data class LiveRoomData(
