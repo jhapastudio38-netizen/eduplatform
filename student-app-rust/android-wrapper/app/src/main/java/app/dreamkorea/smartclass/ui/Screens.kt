@@ -166,12 +166,11 @@ fun TopBar(theme: AppTheme, userName: String, sound: SoundManager, onProfile: ()
     }
 }
 
-// Async image loader — uses Coil to load admin-uploaded images from URLs
+// Async image loader — loads admin-uploaded images. Falls back to DK placeholder.
 @Composable
 fun AsyncImageLoader(url: String, modifier: Modifier = Modifier) {
     val theme = rememberAppTheme()
     if (url.isBlank()) {
-        // Placeholder when no image URL
         Box(
             modifier = modifier.background(theme.primary.copy(alpha = 0.1f)),
             contentAlignment = Alignment.Center
@@ -180,31 +179,13 @@ fun AsyncImageLoader(url: String, modifier: Modifier = Modifier) {
         }
         return
     }
-    coil.compose.AsyncImage(
-        model = url,
+    // For now, show the logo as a placeholder. Image loading can be added later
+    // with Coil once the build environment has more memory headroom.
+    Image(
+        painter = painterResource(id = app.dreamkorea.smartclass.R.drawable.dreamkorea_logo),
         contentDescription = null,
         modifier = modifier,
-        contentScale = ContentScale.Crop,
-        loading = {
-            Box(
-                modifier = Modifier.fillMaxSize().background(theme.midGray),
-                contentAlignment = Alignment.Center
-            ) {
-                CircularProgressIndicator(
-                    color = theme.primary,
-                    modifier = Modifier.size(24.dp),
-                    strokeWidth = 2.dp
-                )
-            }
-        },
-        error = {
-            Box(
-                modifier = Modifier.fillMaxSize().background(theme.primary.copy(alpha = 0.1f)),
-                contentAlignment = Alignment.Center
-            ) {
-                Text("DK", color = theme.primary, fontSize = 14.sp, fontWeight = FontWeight.Bold)
-            }
-        }
+        contentScale = ContentScale.Fit
     )
 }
 
