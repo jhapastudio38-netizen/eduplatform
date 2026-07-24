@@ -7,66 +7,25 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-22.04
-    timeout-minutes: 30
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 20
-      - uses: aws-actions/configure-aws-credentials@v4
-        with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ secrets.AWS_REGION }}
-      - id: ecr-login
-        uses: aws-actions/amazon-ecr-login@v2
-
-      - name: Build and push with unique tag
+      - name: Install deps
+        run: npm install --legacy-peer-deps
+      - name: Generate Prisma client
+        run: npx prisma generate
+      - name: Push schema to Supabase
         env:
-          ECR: ${{ steps.ecr-login.outputs.registry }}
-          IMAGE_TAG: ${{ github.sha }}
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
         run: |
-          npm install -g bun
-          bun install
-          # CRITICAL: Remove .env FIRST (has SQLite URL that overrides RDS)
           rm -f .env
-          # Now prisma commands will use DATABASE_URL from env (RDS Postgres)
-          bun run db:generate
-          bunx prisma db push --accept-data-loss || echo "Schema push skipped"
-          # Seed
-          bun run scripts/seed-korean.ts || echo "Seed skipped"
-          bun run scripts/seed-fixed-tokens.ts || echo "Token seed skipped"
-          # Build Docker image
-          docker build --no-cache -t $ECR/eduplatform-web:$IMAGE_TAG -t $ECR/eduplatform-web:latest .
-          docker push $ECR/eduplatform-web:$IMAGE_TAG
-          docker push $ECR/eduplatform-web:latest
-          echo "IMAGE_TAG=$IMAGE_TAG" >> $GITHUB_ENV
-
-      - name: Render and register new task definition
+          npx prisma db push --accept-data-loss || echo "Schema push skipped"
+      - name: Seed
         env:
-          ECR: ${{ steps.ecr-login.outputs.registry }}
-          IMAGE_TAG: ${{ github.sha }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
         run: |
-          sed "s|IMAGE_PLACEHOLDER|$ECR/eduplatform-web:$IMAGE_TAG|g" .github/ecs/task-def.json > task-def-rendered.json
-          NEW_TD=$(aws ecs register-task-definition --cli-input-json file://task-def-rendered.json --region ${{ secrets.AWS_REGION }})
-          NEW_TD_ARN=$(echo "$NEW_TD" | jq -r '.taskDefinition.taskDefinitionArn')
-          echo "NEW_TD_ARN=$NEW_TD_ARN" >> $GITHUB_ENV
-
-      - name: Update ECS service with new task definition
-        run: |
-          aws ecs update-service \
-            --cluster eduplatform-prod \
-            --service eduplatform-web \
-            --task-definition "$NEW_TD_ARN" \
-            --force-new-deployment \
-            --region ${{ secrets.AWS_REGION }}
-
-      - name: Wait for service stabilization
-        run: |
-          echo "Waiting for service to stabilize..."
-          aws ecs wait services-stable \
-            --cluster eduplatform-prod \
-            --services eduplatform-web \
-            --region ${{ secrets.AWS_REGION }} || echo "Service did not stabilize within timeout, but deployment was triggered"
-          echo "Deployment complete."
+          npx tsx scripts/seed-korean.ts || echo "Seed skipped"
+          npx tsx scripts/seed-fixed-tokens.ts || echo "Token seed skipped"
