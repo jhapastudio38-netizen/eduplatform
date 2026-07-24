@@ -17,7 +17,7 @@ const schema = z.object({
 });
 
 export async function POST(req: NextRequest) {
-  const user = await getCurrentUser();
+  const user = await getCurrentUser(req);
   if (!user || user.role !== "ADMIN") {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }

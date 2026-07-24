@@ -20,7 +20,7 @@ import { rateLimited } from "@/lib/rate-limit";
  * Admin-only.
  */
 export async function GET(req: NextRequest) {
-  const user = await getCurrentUser();
+  const user = await getCurrentUser(req);
   if (!user || user.role !== "ADMIN") {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
@@ -88,7 +88,7 @@ export async function GET(req: NextRequest) {
  * Admin creates a new teacher account with credentials (no OTP for teacher).
  */
 export async function POST(req: NextRequest) {
-  const admin = await getCurrentUser();
+  const admin = await getCurrentUser(req);
   if (!admin || admin.role !== "ADMIN") {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
