@@ -436,9 +436,9 @@ fun ScreenHeader(theme: AppTheme, sound: SoundManager, title: String, subtitle: 
         }
         Spacer(Modifier.width(8.dp))
         Column {
-            Text(title, color = theme.darkText, fontSize = 20.sp, fontWeight = FontWeight.Bold)
+            Text(title, color = theme.darkText, fontSize = 20.sp, fontWeight = FontWeight.ExtraBold)
             if (subtitle != null) {
-                Text(subtitle, color = theme.subText, fontSize = 11.sp)
+                Text(subtitle, color = theme.subText, fontSize = 12.sp, fontWeight = FontWeight.Medium)
             }
         }
     }
@@ -644,17 +644,23 @@ fun TestCard(theme: AppTheme, sound: SoundManager, t: TestItem, onClick: () -> U
             // Left gradient accent bar — color-coded by exam/practice
             Box(
                 modifier = Modifier
-                    .width(5.dp)
-                    .height(92.dp)
+                    .width(6.dp)
+                    .height(100.dp)
                     .background(
                         Brush.verticalGradient(
-                            listOf(accentColor, accentColor.copy(alpha = 0.5f))
+                            listOf(accentColor, accentColor.copy(alpha = 0.4f))
                         )
                     )
             )
-            Column(modifier = Modifier.padding(14.dp).weight(1f)) {
+            Column(modifier = Modifier.padding(16.dp).weight(1f)) {
                 Row(Modifier.fillMaxWidth(), Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                    Text(t.title, color = theme.darkText, fontSize = 15.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+                    Text(
+                        t.title,
+                        color = theme.darkText,
+                        fontSize = 17.sp,
+                        fontWeight = FontWeight.ExtraBold,
+                        modifier = Modifier.weight(1f)
+                    )
                     Surface(
                         color = accentColor.copy(alpha = 0.15f),
                         shape = RoundedCornerShape(6.dp)
@@ -669,9 +675,9 @@ fun TestCard(theme: AppTheme, sound: SoundManager, t: TestItem, onClick: () -> U
                 }
                 if (!t.description.isNullOrBlank()) {
                     Spacer(Modifier.height(4.dp))
-                    Text(t.description, color = theme.subText, fontSize = 11.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                    Text(t.description, color = theme.subText, fontSize = 12.sp, fontWeight = FontWeight.Medium, maxLines = 2, overflow = TextOverflow.Ellipsis)
                 }
-                Spacer(Modifier.height(8.dp))
+                Spacer(Modifier.height(10.dp))
                 // Info chips row
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     InfoChipWithIcon(theme, Icons.Default.Timer, "${t.durationMin} min", theme.primary)
@@ -682,7 +688,7 @@ fun TestCard(theme: AppTheme, sound: SoundManager, t: TestItem, onClick: () -> U
                         InfoChipWithIcon(theme, Icons.Default.Quiz, "${t.questionCount} Q", theme.accent)
                     }
                     Spacer(Modifier.weight(1f))
-                    Text("Start →", color = accentColor, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+                    Text("Start →", color = accentColor, fontSize = 13.sp, fontWeight = FontWeight.Bold)
                 }
             }
         }

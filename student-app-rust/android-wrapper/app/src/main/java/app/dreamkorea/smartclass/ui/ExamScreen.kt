@@ -121,6 +121,22 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
     }
 
     val t = test ?: return
+    // Guard: if the test has no questions, show a friendly message instead of crashing
+    if (t.items.isEmpty()) {
+        Column(
+            Modifier.fillMaxSize().padding(20.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
+        ) {
+            Icon(Icons.Default.Quiz, null, tint = theme.subText, modifier = Modifier.size(48.dp))
+            Spacer(Modifier.height(12.dp))
+            Text("This test has no questions yet.", color = theme.darkText, fontSize = 14.sp, textAlign = TextAlign.Center)
+            Spacer(Modifier.height(16.dp))
+            Button(onClick = onExit, colors = ButtonDefaults.buttonColors(containerColor = theme.primary)) { Text("Go back") }
+        }
+        return
+    }
+
     val currentQuestion = t.items.getOrNull(currentIdx)
 
     // ─── Result screen ──────────────────────────────────────────────────────
@@ -144,9 +160,9 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
                     }
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         Text("Question ${currentIdx + 1} of ${t.items.size}", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
-                        val progress = (currentIdx + 1f) / t.items.size
+                        val progress = if (t.items.size > 0) (currentIdx + 1f) / t.items.size else 0f
                         LinearProgressIndicator(
-                            progress = { progress },
+                            progress = { progress.coerceIn(0f, 1f) },
                             color = Color.White,
                             trackColor = Color.White.copy(alpha = 0.3f),
                             modifier = Modifier.width(120.dp).padding(top = 4.dp)
@@ -186,21 +202,21 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
         ) {
             // Question stem
             item {
-                Surface(color = theme.cardBg, shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth(), shadowElevation = 1.dp) {
+                Surface(color = theme.cardBg, shape = RoundedCornerShape(14.dp), modifier = Modifier.fillMaxWidth(), shadowElevation = 2.dp) {
                     Column(modifier = Modifier.padding(16.dp)) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Surface(color = theme.primary, shape = RoundedCornerShape(6.dp), modifier = Modifier.size(28.dp)) {
+                            Surface(color = theme.primary, shape = RoundedCornerShape(6.dp), modifier = Modifier.size(30.dp)) {
                                 Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
-                                    Text("${currentIdx + 1}", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                                    Text("${currentIdx + 1}", color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Bold)
                                 }
                             }
                             Spacer(Modifier.width(8.dp))
                             Text(q.difficulty, color = theme.subText, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
                             Spacer(Modifier.weight(1f))
-                            Text("${currentQuestion.points} pts", color = theme.primary, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                            Text("${currentQuestion.points} pts", color = theme.primary, fontSize = 12.sp, fontWeight = FontWeight.Bold)
                         }
-                        Spacer(Modifier.height(10.dp))
-                        Text(q.stem, color = theme.darkText, fontSize = 15.sp, fontWeight = FontWeight.Medium, modifier = Modifier.verticalScroll(rememberScrollState()))
+                        Spacer(Modifier.height(12.dp))
+                        Text(q.stem, color = theme.darkText, fontSize = 17.sp, fontWeight = FontWeight.Bold, modifier = Modifier.verticalScroll(rememberScrollState()))
                     }
                 }
             }
@@ -463,7 +479,7 @@ fun AnswerInput(
                                 }
                             }
                             Spacer(Modifier.width(12.dp))
-                            Text(opt, color = theme.darkText, fontSize = 14.sp, modifier = Modifier.weight(1f))
+                            Text(opt, color = theme.darkText, fontSize = 15.sp, fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f))
                             if (isCorrectFeedback == true) {
                                 Icon(Icons.Default.CheckCircle, null, tint = Color(0xFF28A745))
                             } else if (isWrongSelected) {
@@ -499,7 +515,7 @@ fun AnswerInput(
                                 }
                             }
                             Spacer(Modifier.width(12.dp))
-                            Text(opt, color = theme.darkText, fontSize = 14.sp, modifier = Modifier.weight(1f))
+                            Text(opt, color = theme.darkText, fontSize = 15.sp, fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f))
                         }
                     }
                 }
@@ -651,7 +667,7 @@ fun ReviewCard(theme: AppTheme, review: ReviewItem) {
                         Row(modifier = Modifier.padding(8.dp), verticalAlignment = Alignment.CenterVertically) {
                             Text("${'A' + i}.", color = theme.subText, fontSize = 12.sp, fontWeight = FontWeight.Bold)
                             Spacer(Modifier.width(8.dp))
-                            Text(opt, color = theme.darkText, fontSize = 12.sp, modifier = Modifier.weight(1f))
+                            Text(opt, color = theme.darkText, fontSize = 13.sp, fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f))
                             if (isCorrectAns) Icon(Icons.Default.Check, null, tint = Color(0xFF28A745), modifier = Modifier.size(14.dp))
                         }
                     }
