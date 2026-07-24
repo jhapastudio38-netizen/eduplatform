@@ -1,14 +1,7 @@
 "use client";
 
-/**
- * Admin Login — ID + Password (no OTP, fixed credentials).
- * Shows login form immediately — no token verification needed.
- * The actual auth happens via /api/admin/login-credentials.
- */
-
 import { useState } from "react";
-import { motion } from "framer-motion";
-import { Shield, Lock, ArrowRight, Eye, EyeOff } from "lucide-react";
+import { Shield, ArrowRight, Eye, EyeOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -39,21 +32,21 @@ export default function AdminLoginPage() {
       const data = await res.json();
       if (!res.ok) {
         toast({ title: "Login failed", description: data.error || "Invalid credentials", variant: "destructive" });
+        setBusy(false);
         return;
       }
       await fetchUser();
       toast({ title: "Welcome", description: "Admin access granted." });
-      window.location.href = "/";
+      window.location.href = "/admin-panel";
     } catch {
       toast({ title: "Error", description: "Could not connect to server", variant: "destructive" });
-    } finally {
       setBusy(false);
     }
   }
 
   return (
     <div className="min-h-screen grid place-items-center bg-slate-50 p-4">
-      <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="w-full max-w-md">
+      <div className="w-full max-w-md">
         <div className="text-center mb-6">
           <div className="inline-flex h-14 w-14 items-center justify-center rounded-2xl bg-slate-900 text-white shadow-lg mb-3">
             <Shield className="h-7 w-7" />
@@ -61,7 +54,6 @@ export default function AdminLoginPage() {
           <h1 className="text-2xl font-bold text-slate-900">Admin Login</h1>
           <p className="text-sm text-slate-500 mt-1">DreamKorea SmartClass Administration</p>
         </div>
-
         <Card>
           <CardHeader>
             <CardTitle>Sign in</CardTitle>
@@ -71,28 +63,13 @@ export default function AdminLoginPage() {
             <div className="space-y-4">
               <div>
                 <Label>Admin ID</Label>
-                <Input
-                  placeholder="admin"
-                  value={adminId}
-                  onChange={(e) => setAdminId(e.target.value)}
-                  onKeyDown={(e) => e.key === "Enter" && login()}
-                />
+                <Input placeholder="admin" value={adminId} onChange={(e) => setAdminId(e.target.value)} onKeyDown={(e) => e.key === "Enter" && login()} />
               </div>
               <div>
                 <Label>Password</Label>
                 <div className="relative">
-                  <Input
-                    type={showPassword ? "text" : "password"}
-                    placeholder="••••••••"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    onKeyDown={(e) => e.key === "Enter" && login()}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400"
-                  >
+                  <Input type={showPassword ? "text" : "password"} placeholder="••••••••" value={password} onChange={(e) => setPassword(e.target.value)} onKeyDown={(e) => e.key === "Enter" && login()} />
+                  <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400">
                     {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                   </button>
                 </div>
@@ -103,11 +80,7 @@ export default function AdminLoginPage() {
             </div>
           </CardContent>
         </Card>
-
-        <p className="text-center text-xs text-slate-400 mt-6">
-          DreamKorea SmartClass Admin Panel
-        </p>
-      </motion.div>
+      </div>
     </div>
   );
 }

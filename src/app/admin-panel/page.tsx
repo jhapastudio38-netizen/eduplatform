@@ -1,8 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { AdminApp } from "@/components/admin/AdminApp";
 import { useRouter } from "next/navigation";
+import dynamic from "next/dynamic";
+
+const AdminApp = dynamic(() => import("@/components/admin/AdminApp").then(m => ({ default: m.AdminApp })), { ssr: false });
 
 export default function AdminPanelPage() {
   const router = useRouter();

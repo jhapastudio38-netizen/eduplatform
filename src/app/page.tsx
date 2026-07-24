@@ -5,7 +5,6 @@ import PublicSite from "@/components/PublicSite";
 
 export default function Home() {
   useEffect(() => {
-    // Check if user is admin/teacher and redirect
     fetch("/api/auth/me")
       .then((r) => r.json())
       .then((d) => {
