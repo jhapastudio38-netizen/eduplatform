@@ -58,6 +58,7 @@ sealed class Screen {
     object ClassResult : Screen()
     object CourseVideo : Screen()
     data class Exam(val testId: String) : Screen()
+    data class BookReader(val book: Book) : Screen()
 }
 
 @Composable
@@ -83,13 +84,14 @@ fun MainScreen(userName: String, onLogout: () -> Unit) {
                     when (s) {
                         is Screen.Home -> HomeScreen(theme, sound, onNavigate = { screen = it })
                         is Screen.Learn -> LearnScreen(theme, sound, onBack = { screen = Screen.Home })
-                        is Screen.Books -> BooksScreen(theme, sound, onBack = { screen = Screen.Home })
+                        is Screen.Books -> BooksScreen(theme, sound, onBack = { screen = Screen.Home }, onBookClick = { screen = Screen.BookReader(it) })
                         is Screen.Tests -> TestsScreen(theme, sound, onBack = { screen = Screen.Home }, onStartExam = { screen = Screen.Exam(it) })
                         is Screen.Videos -> VideosScreen(theme, sound, onBack = { screen = Screen.Home })
                         is Screen.Profile -> ProfileScreen(theme, sound, userName, onBack = { screen = Screen.Home }, onLogout = onLogout)
                         is Screen.LiveRoom -> LiveRoomScreen(theme, onBack = { screen = Screen.Home })
                         is Screen.Settings -> SettingsScreen(theme, sound, onBack = { screen = Screen.Home })
                         is Screen.Exam -> ExamScreen(theme, testId = s.testId, onExit = { screen = Screen.Home })
+                        is Screen.BookReader -> BookReaderScreen(theme, sound, s.book, onBack = { screen = Screen.Books })
                         // Specific card pages — each opens a distinct screen
                         is Screen.UbtTest -> TestsScreen(theme, sound, onBack = { screen = Screen.Home }, onStartExam = { screen = Screen.Exam(it) })
                         is Screen.FreeExam -> TestsScreen(theme, sound, onBack = { screen = Screen.Home }, onStartExam = { screen = Screen.Exam(it) })
@@ -318,7 +320,7 @@ fun ImageCard(theme: AppTheme, sound: SoundManager, card: HomeCard, modifier: Mo
         shape = RoundedCornerShape(18.dp),
         modifier = modifier
             .fillMaxWidth()
-            .aspectRatio(0.85f)  // taller cards — not squished
+            .aspectRatio(0.75f)  // taller cards — better fit for images
             .scale(scale),
         shadowElevation = 3.dp,
         border = androidx.compose.foundation.BorderStroke(1.dp, theme.divider)
@@ -326,16 +328,16 @@ fun ImageCard(theme: AppTheme, sound: SoundManager, card: HomeCard, modifier: Mo
         Column(
             modifier = Modifier.fillMaxSize().clickable { sound.click(); pressed = true; onClick() }
         ) {
-            // Image area (top 70%)
+            // Image area (top 75% — bigger for uploaded images)
             Box(
-                modifier = Modifier.fillMaxWidth().weight(1f).background(theme.primary.copy(alpha = 0.08f)),
+                modifier = Modifier.fillMaxWidth().weight(1f).background(theme.lightGray),
                 contentAlignment = Alignment.Center
             ) {
                 AsyncImageLoader(url = card.imageUrl ?: "", modifier = Modifier.fillMaxSize())
             }
-            // Label area (bottom 30%)
+            // Label area (bottom 25%)
             Box(
-                modifier = Modifier.fillMaxWidth().padding(12.dp),
+                modifier = Modifier.fillMaxWidth().padding(14.dp),
                 contentAlignment = Alignment.Center
             ) {
                 Text(
@@ -462,7 +464,7 @@ fun LearnScreen(theme: AppTheme, sound: SoundManager, onBack: () -> Unit) {
 
 // ─── Books Screen ─────────────────────────────────────────────────────────────
 @Composable
-fun BooksScreen(theme: AppTheme, sound: SoundManager, onBack: () -> Unit) {
+fun BooksScreen(theme: AppTheme, sound: SoundManager, onBack: () -> Unit, onBookClick: (Book) -> Unit = {}) {
     val scope = rememberCoroutineScope()
     var books by remember { mutableStateOf<List<Book>>(emptyList()) }
     var loading by remember { mutableStateOf(true) }
@@ -892,5 +894,63 @@ fun AnimatedListItem(index: Int, theme: AppTheme, content: @Composable () -> Uni
         enter = fadeIn(tween(300)) + slideInVertically(initialOffsetY = { it / 4 }, animationSpec = tween(300))
     ) {
         content()
+    }
+}
+
+// ─── Book Reader Screen — opens PDF in browser ────────────────────────────────
+@Composable
+fun BookReaderScreen(theme: AppTheme, sound: SoundManager, book: Book, onBack: () -> Unit) {
+    Column(modifier = Modifier.fillMaxSize().background(theme.background)) {
+        // Header
+        ScreenHeader(theme, sound, book.title, "Tap 'Open PDF' to read", onBack)
+        
+        Column(
+            modifier = Modifier.fillMaxSize().padding(20.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
+        ) {
+            // Book cover
+            Surface(
+                color = theme.primary,
+                shape = RoundedCornerShape(8.dp),
+                modifier = Modifier.size(120.dp, 160.dp),
+                shadowElevation = 4.dp
+            ) {
+                Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
+                    Icon(Icons.Default.Book, null, tint = Color.White, modifier = Modifier.size(48.dp))
+                }
+            }
+            Spacer(Modifier.height(16.dp))
+            Text(book.title, color = theme.darkText, fontSize = 18.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
+            if (!book.author.isNullOrBlank()) {
+                Text("by ${book.author}", color = theme.subText, fontSize = 13.sp)
+            }
+            Spacer(Modifier.height(8.dp))
+            if (!book.description.isNullOrBlank()) {
+                Text(book.description ?: "", color = theme.subText, fontSize = 12.sp, textAlign = TextAlign.Center, maxLines = 3)
+            }
+            Spacer(Modifier.height(24.dp))
+            
+            // Open PDF button
+            if (!book.pdfUrl.isNullOrBlank()) {
+                val context = androidx.compose.ui.platform.LocalContext.current
+                Button(
+                    onClick = {
+                        sound.click()
+                        val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(book.pdfUrl))
+                        context.startActivity(intent)
+                    },
+                    modifier = Modifier.fillMaxWidth().height(48.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = theme.primary),
+                    shape = RoundedCornerShape(10.dp)
+                ) {
+                    Icon(Icons.Default.Book, null, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text("Open PDF", fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+                }
+            } else {
+                Text("No PDF available", color = theme.subText, fontSize = 13.sp)
+            }
+        }
     }
 }
