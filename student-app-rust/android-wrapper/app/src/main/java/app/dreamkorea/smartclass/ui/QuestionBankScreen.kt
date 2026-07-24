@@ -387,39 +387,36 @@ fun QuestionBankScreen(theme: AppTheme, sound: SoundManager, onBack: () -> Unit)
             // Feedback / explanation
             if (showFeedback) {
                 item {
-                    AnimatedVisibility(
-                        visible = true,
-                        enter = fadeIn(tween(300)) + slideInVertically(tween(300))
+                    // AnimatedVisibility requires ColumnScope, but we're in LazyListScope.
+                    // The item block itself handles appearance — just render the feedback.
+                    Surface(
+                        color = if (isCorrect) Color(0xFFE8F5E9) else Color(0xFFFFEBEE),
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier.fillMaxWidth()
                     ) {
-                        Surface(
-                            color = if (isCorrect) Color(0xFFE8F5E9) else Color(0xFFFFEBEE),
-                            shape = RoundedCornerShape(12.dp),
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Column(modifier = Modifier.padding(14.dp)) {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Icon(
-                                        if (isCorrect) Icons.Default.CheckCircle else Icons.Default.Error,
-                                        null,
-                                        tint = if (isCorrect) SuccessGreen else theme.errorRed,
-                                        modifier = Modifier.size(20.dp)
-                                    )
-                                    Spacer(Modifier.width(8.dp))
-                                    Text(
-                                        if (isCorrect) "Correct!" else "Not quite — correct answer highlighted above.",
-                                        color = if (isCorrect) SuccessGreen else theme.errorRed,
-                                        fontSize = 14.sp,
-                                        fontWeight = FontWeight.Bold
-                                    )
-                                }
-                                if (!q.explanation.isNullOrBlank()) {
-                                    Spacer(Modifier.height(8.dp))
-                                    Text(
-                                        "Explanation: ${q.explanation}",
-                                        color = theme.darkText,
-                                        fontSize = 12.sp
-                                    )
-                                }
+                        Column(modifier = Modifier.padding(14.dp)) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(
+                                    if (isCorrect) Icons.Default.CheckCircle else Icons.Default.Error,
+                                    null,
+                                    tint = if (isCorrect) SuccessGreen else theme.errorRed,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                                Spacer(Modifier.width(8.dp))
+                                Text(
+                                    if (isCorrect) "Correct!" else "Not quite — correct answer highlighted above.",
+                                    color = if (isCorrect) SuccessGreen else theme.errorRed,
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                            if (!q.explanation.isNullOrBlank()) {
+                                Spacer(Modifier.height(8.dp))
+                                Text(
+                                    "Explanation: ${q.explanation}",
+                                    color = theme.darkText,
+                                    fontSize = 12.sp
+                                )
                             }
                         }
                     }
