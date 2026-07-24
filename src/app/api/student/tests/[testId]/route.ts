@@ -6,7 +6,7 @@ import { getCurrentUser } from "@/lib/session";
  * GET /api/student/tests/[testId]
  * Returns the test with questions & options (but NEVER the correct answers).
  */
-export async function GET(_req: NextRequest, ctx: { params: Promise<{ testId: string }> }) {
+export async function GET(req: NextRequest, ctx: { params: Promise<{ testId: string }> }) {
   const { testId } = await ctx.params;
   const user = await getCurrentUser(req);
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
