@@ -780,7 +780,7 @@ fun ProfileScreen(theme: AppTheme, sound: SoundManager, userName: String, onBack
                     Spacer(Modifier.height(10.dp))
 
                     // Website (tappable — opens browser)
-                    ContactRow(theme, Icons.Default.Language, "dreamkoreasmartclass.com", "https://dreamkoreasmartclass.com")
+                    ContactRow(theme, Icons.Default.Language, "DreamKorea SmartClass", "https://my-project-five-sepia.vercel.app")
                 }
             }
         }

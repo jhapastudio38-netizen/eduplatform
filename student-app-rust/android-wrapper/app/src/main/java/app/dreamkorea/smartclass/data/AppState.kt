@@ -16,7 +16,7 @@ import java.util.concurrent.TimeUnit
 import java.util.concurrent.ConcurrentHashMap
 
 object AppState {
-    private const val BASE_URL = "https://dreamkoreasmartclass.com/"
+    private const val BASE_URL = "https://my-project-five-sepia.vercel.app/"
     private const val PREFS_NAME = "dreamkorea_session"
     private const val SETTINGS_PREFS = "dreamkorea_settings"
     private const val KEY_TOKEN = "token"
