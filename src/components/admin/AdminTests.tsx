@@ -212,9 +212,9 @@ function MultiStepExamCreator({ open, onOpenChange, onSaved }: {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          prompt: aiPrompt,
+          topic: aiPrompt,
           type: aiQuestionType,
-          count: aiCount,
+          count: aiCount, difficulty: 'EASY',
         }),
       });
       const data = await res.json();
