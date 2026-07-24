@@ -12,7 +12,7 @@ import { audit } from "@/lib/audit";
  */
 export async function POST(req: NextRequest, ctx: { params: Promise<{ testId: string }> }) {
   const { testId } = await ctx.params;
-  const user = await getCurrentUser();
+  const user = await getCurrentUser(req);
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const body = await req.json().catch(() => ({})) as { answers?: Record<string, unknown> };
