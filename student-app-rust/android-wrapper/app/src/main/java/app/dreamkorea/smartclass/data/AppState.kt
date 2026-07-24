@@ -9,6 +9,7 @@ import app.dreamkorea.smartclass.api.TestItem
 import app.dreamkorea.smartclass.api.Book
 import app.dreamkorea.smartclass.api.VideoLesson
 import app.dreamkorea.smartclass.api.AudioLesson
+import app.dreamkorea.smartclass.api.QuestionBankQuestion
 import okhttp3.Cookie
 import okhttp3.CookieJar
 import okhttp3.HttpUrl
@@ -83,6 +84,9 @@ object AppState {
     }
     suspend fun getCachedAudio() = cached("audio") {
         AppState.api.getAudioLessons().lessons
+    }
+    suspend fun getCachedQuestionBank() = cached("question_bank") {
+        AppState.api.getQuestionBank().questions
     }
 
     fun init(context: Context) {

@@ -194,6 +194,9 @@ model Question {
   audioLoopDelay Int   @default(0) // delay (seconds) between loops
   aiGenerated Boolean    @default(false)
   sourceFile  String?
+  // Question Bank: standalone practice questions (not tied to a test)
+  inQuestionBank Boolean @default(false)
+  category    String?  // e.g. "Vocabulary", "Grammar", "Listening", "Reading"
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
@@ -202,6 +205,8 @@ model Question {
 
   @@index([chapterId])
   @@index([type, difficulty])
+  @@index([inQuestionBank])
+  @@index([category])
 }
 
 model Test {
@@ -636,7 +641,7 @@ model HomeCard {
 
 // ─── v0.3 — Video lessons, enhanced exams, media questions ─────────────────
 
-// Video lessons — YouTube embeds managed by teachers/admins
+// Video lessons — YouTube embeds OR uploaded video files, managed by teachers/admins
 model VideoLesson {
   id          String   @id @default(cuid())
   title       String
@@ -644,6 +649,8 @@ model VideoLesson {
   description String?
   youtubeUrl  String   // Full YouTube URL or video ID
   youtubeId   String   // Extracted 11-char video ID for embed
+  videoUrl    String?  // Direct video URL (uploaded to R2) — takes priority over YouTube
+  videoSource String   @default("youtube") // "youtube" | "upload"
   thumbnailUrl String?
   durationMin Int      @default(10)
   level       String?  // Beginner / Intermediate / Advanced / TOPIK 1-6
