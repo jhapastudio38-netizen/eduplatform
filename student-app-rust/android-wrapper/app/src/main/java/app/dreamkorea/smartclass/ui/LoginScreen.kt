@@ -310,7 +310,11 @@ fun LoginScreen(onLoginSuccess: () -> Unit) {
                                         )
                                         if (resp.ok) {
                                             sound.success()
-                                            AppState.saveSession("logged_in", resp.user)
+                                            // Use the REAL session token returned by the server.
+                                            // The cookie jar also captures it from Set-Cookie, but
+                                            // we persist it in prefs so it survives app restarts.
+                                            val token = resp.sessionToken ?: "session_via_cookie"
+                                            AppState.saveSession(token, resp.user)
                                             // Invalidate cache so fresh data loads after login
                                             AppState.invalidateCache()
                                             onLoginSuccess()

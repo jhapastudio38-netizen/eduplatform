@@ -24,7 +24,7 @@ data class User(
     val phone: String?,
     val role: String
 )
-data class VerifyResponse(val ok: Boolean, val user: User)
+data class VerifyResponse(val ok: Boolean, val sessionToken: String? = null, val user: User)
 data class CredentialsResponse(val ok: Boolean = false, val user: User = User("", null, "", null, "STUDENT"), val error: String? = null)
 data class SimpleResponse(val ok: Boolean = false, val error: String? = null)
 data class MeResponse(val user: User?)

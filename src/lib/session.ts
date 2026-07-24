@@ -14,7 +14,15 @@ export async function createSession(userId: string): Promise<string> {
     await db.session.create({ data: { userId, token: sha256(token), expiresAt } });
   } catch (e) { console.error("Session save failed:", e); }
   const cookieStore = await cookies();
-  cookieStore.set(SESSION_COOKIE, token, { httpOnly: true, secure: true, sameSite: "lax", expires: expiresAt, path: "/" });
+  // Note: secure=true requires HTTPS (always true on Vercel).
+  // sameSite=lax allows the cookie to be sent on same-site API requests.
+  cookieStore.set(SESSION_COOKIE, token, {
+    httpOnly: true,
+    secure: true,
+    sameSite: "lax",
+    expires: expiresAt,
+    path: "/",
+  });
   return token;
 }
 
@@ -55,8 +63,9 @@ export async function getCurrentUser(req?: NextRequest) {
 
   // DB lookup for students/teachers
   try {
+    const hashedToken = sha256(sessionToken);
     const session = await db.session.findFirst({
-      where: { token: sha256(sessionToken), expiresAt: { gt: new Date() } },
+      where: { token: hashedToken, expiresAt: { gt: new Date() } },
     });
     if (!session) return null;
     const user = await db.user.findUnique({ where: { id: session.userId } });
@@ -65,7 +74,8 @@ export async function getCurrentUser(req?: NextRequest) {
       id: user.id, name: user.name, email: user.email, role: user.role,
       phone: user.phone, avatarUrl: user.avatarUrl, isBanned: user.isBanned, isVerified: user.isVerified,
     };
-  } catch {
+  } catch (e) {
+    console.error("Session lookup error:", e);
     return null;
   }
 }

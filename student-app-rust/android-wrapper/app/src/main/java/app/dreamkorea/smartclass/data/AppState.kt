@@ -94,12 +94,15 @@ object AppState {
         settingsPrefs = context.applicationContext.getSharedPreferences(SETTINGS_PREFS, Context.MODE_PRIVATE)
         baseUrl = BASE_URL.toHttpUrl()
         val savedToken = prefs.getString(KEY_TOKEN, null)
-        if (savedToken != null) {
+        if (savedToken != null && savedToken != "session_via_cookie") {
+            // Restore the real session cookie from persisted token
             val cookie = Cookie.Builder()
                 .name("ep_sid")
                 .value(savedToken)
                 .domain(baseUrl.host)
                 .path("/")
+                .secure()
+                .httpOnly()
                 .build()
             cookieStore[baseUrl.host] = mutableListOf(cookie)
         }
@@ -155,8 +158,32 @@ object AppState {
             .value(token)
             .domain(baseUrl.host)
             .path("/")
+            .secure()
+            .httpOnly()
             .build()
         cookieStore[baseUrl.host] = mutableListOf(cookie)
+    }
+
+    /**
+     * Save only the user profile (name/email/phone/role) WITHOUT touching the
+     * session token. Used after OTP login — the real ep_sid cookie is already
+     * captured by the OkHttp CookieJar from the server's Set-Cookie header.
+     * Calling saveSession() with a fake token would overwrite the real cookie
+     * and break all authenticated requests.
+     */
+    fun saveUserProfile(user: User) {
+        prefs.edit().apply {
+            putString(KEY_NAME, user.name ?: "Student")
+            putString(KEY_EMAIL, user.email)
+            putString(KEY_PHONE, user.phone ?: "")
+            putString(KEY_ROLE, user.role)
+            // Mark that we have a session (token presence is checked by the cookie jar)
+            // We store a marker so isLoggedIn() returns true.
+            if (prefs.getString(KEY_TOKEN, null) == null) {
+                putString(KEY_TOKEN, "session_via_cookie")
+            }
+            apply()
+        }
     }
 
     fun clearSession() {

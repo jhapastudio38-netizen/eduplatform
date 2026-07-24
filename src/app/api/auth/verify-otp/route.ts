@@ -165,7 +165,7 @@ export async function POST(req: NextRequest) {
     });
   }
 
-  await createSession(user.id);
+  const sessionToken = await createSession(user.id);
   await audit({
     actorId: user.id,
     action: "login",
@@ -176,6 +176,7 @@ export async function POST(req: NextRequest) {
 
   return NextResponse.json({
     ok: true,
+    sessionToken, // returned so mobile apps can persist it across app restarts
     user: {
       id: user.id,
       name: user.name,
