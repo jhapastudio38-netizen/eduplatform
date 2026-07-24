@@ -13,7 +13,7 @@ const extendedQuestionSchema = createQuestionSchema.extend({
   audioLoopDelay: z.number().int().min(0).max(60).default(0),
 });
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   const user = await getCurrentUser(req);
   if (!user || user.role !== "ADMIN") return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   const questions = await db.question.findMany({

@@ -4,7 +4,7 @@ import { getCurrentUser } from "@/lib/session";
 import { z } from "zod";
 import { audit } from "@/lib/audit";
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   const user = await getCurrentUser(req);
   if (!user || user.role !== "ADMIN") return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   const tests = await db.test.findMany({
