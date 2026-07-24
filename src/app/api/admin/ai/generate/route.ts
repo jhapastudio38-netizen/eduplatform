@@ -6,25 +6,22 @@ import { rateLimited } from "@/lib/rate-limit";
 import { rateLimitKey } from "@/lib/security";
 
 const schema = z.object({
-  topic: z.string().trim().min(3).max(500),
-  count: z.number().int().min(1).max(20),
-  type: z.enum([
-    "SINGLE_CHOICE", "MULTIPLE_CHOICE", "TRUE_FALSE",
-    "ONE_WORD", "SHORT_ANSWER", "LONG_ANSWER", "FILL_BLANK",
-  ]),
-  difficulty: z.enum(["EASY", "MEDIUM", "HARD"]),
+  topic: z.string().trim().min(3).max(500).optional(),
+  prompt: z.string().trim().min(3).max(500).optional(),
+  count: z.number().int().min(1).max(50).default(5),
+  type: z.string().default("SINGLE_CHOICE"),
+  difficulty: z.string().default("MEDIUM"),
   chapterId: z.string().optional(),
-});
+}).refine(d => d.topic || d.prompt, { message: "topic or prompt required" });
 
 export async function POST(req: NextRequest) {
   const user = await getCurrentUser(req);
-  if (!user || user.role !== "ADMIN") {
+  if (!user || (user.role !== "ADMIN" && user.role !== "TEACHER")) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
-  // Rate-limit AI generation per admin (10/hour)
-  if (rateLimited(rateLimitKey("ai-gen", user.id), 10, 3600)) {
-    return NextResponse.json({ error: "AI generation rate limit hit. Try again later." }, { status: 429 });
+  if (rateLimited(rateLimitKey("ai-gen", user.id), 50, 3600)) {
+    return NextResponse.json({ error: "Rate limit. Try again later." }, { status: 429 });
   }
 
   const body = await req.json().catch(() => null);
@@ -33,18 +30,35 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: parsed.error.issues[0]?.message }, { status: 400 });
   }
 
+  const data = {
+    topic: parsed.data.topic || parsed.data.prompt || "",
+    count: parsed.data.count,
+    type: parsed.data.type as any,
+    difficulty: parsed.data.difficulty as any,
+    chapterId: parsed.data.chapterId,
+  };
+
   try {
-    const questions = await generateQuestionsWithGroq(parsed.data);
+    const questions = await generateQuestionsWithGroq(data);
     return NextResponse.json({ questions, provider: "groq" });
-  } catch (e) {
-    // Groq rate-limited or unreachable → fall back to mock questions
-    // so the admin can still see the UI flow end-to-end.
-    console.warn("[AI] Groq failed, using mock fallback:", e);
-    const mock = await generateQuestionsWithGroq({ ...parsed.data, _forceMock: true } as never).catch(() => []);
-    return NextResponse.json({
-      questions: mock,
+  } catch (e: any) {
+    // Fallback: generate simple mock questions
+    const mockQuestions = [];
+    for (let i = 0; i < data.count; i++) {
+      mockQuestions.push({
+        type: data.type,
+        difficulty: data.difficulty,
+        stem: `[AI] Question ${i+1} about: ${data.topic}`,
+        options: ["Option A", "Option B", "Option C", "Option D"],
+        correctAnswer: '"Option A"',
+        explanation: `Generated for: ${data.topic}`,
+        aiGenerated: true,
+      });
+    }
+    return NextResponse.json({ 
+      questions: mockQuestions, 
       provider: "mock",
-      warning: e instanceof Error ? e.message : "Generation failed — using mock questions",
+      warning: e.message || "Using mock questions" 
     });
   }
 }
