@@ -18,7 +18,7 @@ echo "=== Build finished at $(date) exit=$EXIT ===" >> $LOG
 if [ $EXIT -eq 0 ]; then
     APK=$(find app/build/outputs/ -name "*.apk" 2>/dev/null | head -1)
     if [ -n "$APK" ]; then
-        cp "$APK" /home/z/my-project/download/DreamKorea-SmartClass-v1.2.1.apk
+        cp "$APK" /home/z/my-project/download/DreamKorea-SmartClass-v1.2.2.apk
         echo "SUCCESS" > /tmp/build_v120_result.txt
     else
         echo "NO_APK" > /tmp/build_v120_result.txt

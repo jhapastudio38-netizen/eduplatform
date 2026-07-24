@@ -146,10 +146,13 @@ fun QuestionBankScreen(theme: AppTheme, sound: SoundManager, onBack: () -> Unit)
     // ─── Question practice view ──────────────────────────────────────────────
     val q = currentQuestion
     val options = q.options ?: emptyList()
-    val correctAnswerStr = when (val ca = q.correctAnswer) {
+    // Safely extract the correct answer as a string (handles String, List, Number, etc.)
+    val correctAnswerStr: String = when (val ca = q.correctAnswer) {
+        null -> ""
         is String -> ca
         is List<*> -> ca.firstOrNull()?.toString() ?: ""
-        else -> ""
+        is Number -> ca.toString()
+        else -> ca.toString()
     }
 
     Column(modifier = Modifier.fillMaxSize().background(theme.background)) {
@@ -178,7 +181,7 @@ fun QuestionBankScreen(theme: AppTheme, sound: SoundManager, onBack: () -> Unit)
                             fontWeight = FontWeight.SemiBold
                         )
                         LinearProgressIndicator(
-                            progress = { (currentIdx + 1f) / filteredQuestions.size },
+                            progress = { if (filteredQuestions.size > 0) ((currentIdx + 1f) / filteredQuestions.size).coerceIn(0f, 1f) else 0f },
                             color = Color.White,
                             trackColor = Color.White.copy(alpha = 0.3f),
                             modifier = Modifier.width(120.dp).padding(top = 4.dp)
@@ -198,12 +201,56 @@ fun QuestionBankScreen(theme: AppTheme, sound: SoundManager, onBack: () -> Unit)
             }
         }
 
-        // Question content
-        LazyColumn(
-            modifier = Modifier.weight(1f).fillMaxWidth(),
-            contentPadding = PaddingValues(16.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp)
-        ) {
+        // Question content — responsive layout for landscape (side-by-side) vs portrait
+        BoxWithConstraints(modifier = Modifier.weight(1f).fillMaxWidth()) {
+            val isLandscape = maxWidth > maxHeight
+            if (isLandscape) {
+                // Landscape: question on left, options on right
+                Row(modifier = Modifier.fillMaxSize()) {
+                    // Left: question stem + image
+                    LazyColumn(
+                        modifier = Modifier.weight(1f).fillMaxHeight().padding(12.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        item { QuestionHeaderBadges(theme, q) }
+                        item { QuestionStemCard(theme, q) }
+                        if (!q.imageUrl.isNullOrBlank()) {
+                            item {
+                                Surface(color = theme.cardBg, shape = RoundedCornerShape(14.dp), shadowElevation = 2.dp, modifier = Modifier.fillMaxWidth()) {
+                                    AsyncImageLoader(url = q.imageUrl!!, modifier = Modifier.fillMaxWidth().height(160.dp))
+                                }
+                            }
+                        }
+                        if (showFeedback) {
+                            item { FeedbackCard(theme, q, isCorrect) }
+                        }
+                    }
+                    // Right: options
+                    LazyColumn(
+                        modifier = Modifier.weight(1f).fillMaxHeight().padding(12.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        if (options.isNotEmpty()) {
+                            itemsIndexed(options) { optIdx, opt ->
+                                OptionCard(theme, sound, opt, optIdx, selectedAnswer, correctAnswerStr, showFeedback, isSelected = selectedAnswer == opt) {
+                                    if (!showFeedback) {
+                                        sound.click()
+                                        selectedAnswer = opt
+                                    }
+                                }
+                            }
+                        } else {
+                            item { EmptyState(theme, "No options", "This question type has no multiple-choice options.", Icons.Default.Info) }
+                        }
+                    }
+                }
+            } else {
+                // Portrait: single column scroll
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
             // Difficulty badge
             item {
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -264,7 +311,7 @@ fun QuestionBankScreen(theme: AppTheme, sound: SoundManager, onBack: () -> Unit)
 
             // Options
             if (options.isNotEmpty()) {
-                itemsIndexed(options) { _, opt ->
+                itemsIndexed(options) { optIdx, opt ->
                     val isSelected = selectedAnswer == opt
                     val isCorrectOpt = showFeedback && opt == correctAnswerStr
                     val isWrongOpt = showFeedback && isSelected && opt != correctAnswerStr
@@ -311,9 +358,7 @@ fun QuestionBankScreen(theme: AppTheme, sound: SoundManager, onBack: () -> Unit)
                                 color = if (isCorrectOpt) SuccessGreen else (if (isWrongOpt) theme.errorRed else theme.primary.copy(alpha = 0.1f)),
                                 shape = RoundedCornerShape(6.dp)
                             ) {
-                                val letter = options.indexOf(opt).let { idx ->
-                                    if (idx in 0..3) "ABCD"[idx].toString() else "?"
-                                }
+                                val letter = if (optIdx in 0..3) "ABCD"[optIdx].toString() else "?"
                                 Text(
                                     letter,
                                     color = Color.White,
@@ -380,7 +425,9 @@ fun QuestionBankScreen(theme: AppTheme, sound: SoundManager, onBack: () -> Unit)
                     }
                 }
             }
-        }
+                } // end portrait LazyColumn
+            } // end else (portrait)
+        } // end BoxWithConstraints
 
         // Bottom action bar
         Surface(color = theme.white, shadowElevation = 4.dp) {
@@ -487,6 +534,168 @@ private fun CategoryCard(
                 Text(subtitle, color = theme.subText, fontSize = 12.sp)
             }
             Icon(Icons.Default.ChevronRight, null, tint = theme.subText, modifier = Modifier.size(24.dp))
+        }
+    }
+}
+
+// ─── Helper composables for question practice (shared between landscape & portrait) ───
+
+@Composable
+private fun QuestionHeaderBadges(theme: AppTheme, q: QuestionBankQuestion) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        val diffColor = when (q.difficulty) {
+            "EASY" -> SuccessGreen
+            "MEDIUM" -> Color(0xFFFFA000)
+            "HARD" -> theme.errorRed
+            else -> theme.subText
+        }
+        Surface(color = diffColor.copy(alpha = 0.15f), shape = RoundedCornerShape(6.dp)) {
+            Text(
+                q.difficulty,
+                color = diffColor,
+                fontSize = 10.sp,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+            )
+        }
+        Spacer(Modifier.width(8.dp))
+        Surface(color = theme.primary.copy(alpha = 0.1f), shape = RoundedCornerShape(6.dp)) {
+            Text(
+                q.type.replace("_", " "),
+                color = theme.primary,
+                fontSize = 10.sp,
+                fontWeight = FontWeight.SemiBold,
+                modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+            )
+        }
+    }
+}
+
+@Composable
+private fun QuestionStemCard(theme: AppTheme, q: QuestionBankQuestion) {
+    Surface(color = theme.cardBg, shape = RoundedCornerShape(14.dp), shadowElevation = 2.dp, modifier = Modifier.fillMaxWidth()) {
+        Text(
+            q.stem,
+            color = theme.darkText,
+            fontSize = 17.sp,
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier.padding(16.dp)
+        )
+    }
+}
+
+@Composable
+private fun FeedbackCard(theme: AppTheme, q: QuestionBankQuestion, isCorrect: Boolean) {
+    AnimatedVisibility(
+        visible = true,
+        enter = fadeIn(tween(300)) + slideInVertically(tween(300))
+    ) {
+        Surface(
+            color = if (isCorrect) Color(0xFFE8F5E9) else Color(0xFFFFEBEE),
+            shape = RoundedCornerShape(12.dp),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Column(modifier = Modifier.padding(14.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        if (isCorrect) Icons.Default.CheckCircle else Icons.Default.Error,
+                        null,
+                        tint = if (isCorrect) SuccessGreen else theme.errorRed,
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        if (isCorrect) "Correct!" else "Not quite — correct answer highlighted above.",
+                        color = if (isCorrect) SuccessGreen else theme.errorRed,
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+                if (!q.explanation.isNullOrBlank()) {
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        "Explanation: ${q.explanation}",
+                        color = theme.darkText,
+                        fontSize = 12.sp
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun OptionCard(
+    theme: AppTheme,
+    sound: SoundManager,
+    opt: String,
+    optIdx: Int,
+    selectedAnswer: String?,
+    correctAnswerStr: String,
+    showFeedback: Boolean,
+    isSelected: Boolean,
+    onClick: () -> Unit
+) {
+    val isCorrectOpt = showFeedback && opt == correctAnswerStr
+    val isWrongOpt = showFeedback && isSelected && opt != correctAnswerStr
+
+    val bgColor = when {
+        isCorrectOpt -> SuccessGreen.copy(alpha = 0.15f)
+        isWrongOpt -> theme.errorRed.copy(alpha = 0.15f)
+        isSelected -> theme.primary.copy(alpha = 0.1f)
+        else -> theme.cardBg
+    }
+    val borderColor = when {
+        isCorrectOpt -> SuccessGreen
+        isWrongOpt -> theme.errorRed
+        isSelected -> theme.primary
+        else -> theme.divider
+    }
+
+    var pressed by remember { mutableStateOf(false) }
+    val scale by animateFloatAsState(
+        targetValue = if (pressed) 0.98f else 1f,
+        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy),
+        label = "optScale"
+    )
+
+    Surface(
+        color = bgColor,
+        shape = RoundedCornerShape(12.dp),
+        border = androidx.compose.foundation.BorderStroke(2.dp, borderColor),
+        modifier = Modifier
+            .fillMaxWidth()
+            .scale(scale)
+            .clickable { onClick() },
+        shadowElevation = 1.dp
+    ) {
+        Row(modifier = Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
+            Surface(
+                color = if (isCorrectOpt) SuccessGreen else (if (isWrongOpt) theme.errorRed else theme.primary.copy(alpha = 0.1f)),
+                shape = RoundedCornerShape(6.dp)
+            ) {
+                val letter = if (optIdx in 0..3) "ABCD"[optIdx].toString() else "?"
+                Text(
+                    letter,
+                    color = Color.White,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                )
+            }
+            Spacer(Modifier.width(12.dp))
+            Text(
+                opt,
+                color = theme.darkText,
+                fontSize = 15.sp,
+                fontWeight = FontWeight.Medium,
+                modifier = Modifier.weight(1f)
+            )
+            if (isCorrectOpt) {
+                Icon(Icons.Default.CheckCircle, null, tint = SuccessGreen, modifier = Modifier.size(20.dp))
+            } else if (isWrongOpt) {
+                Icon(Icons.Default.Cancel, null, tint = theme.errorRed, modifier = Modifier.size(20.dp))
+            }
         }
     }
 }
