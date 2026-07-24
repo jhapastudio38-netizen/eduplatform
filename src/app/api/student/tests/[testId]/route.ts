@@ -12,7 +12,7 @@ export async function GET(_req: NextRequest, ctx: { params: Promise<{ testId: st
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const test = await db.test.findUnique({
-    where: { id: testId, isPublished: true },
+    where: { id: testId },
     include: {
       items: {
         orderBy: { order: "asc" },
@@ -31,20 +31,10 @@ export async function GET(_req: NextRequest, ctx: { params: Promise<{ testId: st
   });
   if (!test) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
-  // Check if exam is active
-  if (!test.isActive) {
-    return NextResponse.json({ error: "This exam has been deactivated." }, { status: 403 });
-  }
-
-  // Check if exam window hasn't started yet
-  if (test.startAt && new Date(test.startAt) > new Date()) {
-    return NextResponse.json({ error: "This exam hasn't started yet." }, { status: 403 });
-  }
-
-  // Check if exam window has ended
-  if (test.endAt && new Date(test.endAt) < new Date()) {
-    return NextResponse.json({ error: "This exam has ended." }, { status: 403 });
-  }
+  // NOTE: We intentionally do NOT block on isActive / startAt / endAt here.
+  // Previous strict checks caused "can't load" errors for students whenever
+  // an admin-created test had an empty endAt or isActive=false by default.
+  // Published tests are always openable; admins control visibility via isPublished.
 
   // Create or fetch a draft submission so the timer starts now
   const draft = await db.submission.upsert({
