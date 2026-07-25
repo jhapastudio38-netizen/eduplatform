@@ -455,6 +455,28 @@ model EyeVisionTest {
   @@index([category])
 }
 
+// ─── Live Sessions — teacher creates a join code + meeting link ──────────────
+// Teacher generates a code, adds a Zoom/Meet link. Student enters code to
+// reveal the link and credentials.
+model LiveSession {
+  id          String   @id @default(cuid())
+  title       String
+  description String?
+  joinCode    String   @unique // the code students enter (e.g. "DK2024")
+  meetingUrl  String   // Zoom / Google Meet / any link
+  credentials String?  // optional: meeting ID, password, etc.
+  hostName    String?  // teacher name
+  isActive    Boolean  @default(true)
+  createdBy   String?
+  startedAt   DateTime?
+  endedAt     DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([isActive])
+  @@index([joinCode])
+}
+
 model BookChapter {
   id          String   @id @default(cuid())
   bookId      String
