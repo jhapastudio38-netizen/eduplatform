@@ -15,7 +15,8 @@ echo "=== Build started at $(date) ===" > $LOG
 echo "Working dir: $PROJECT_DIR" >> $LOG
 
 cd "$PROJECT_DIR" || { echo "FAILED:cd" > $RESULT; exit 1; }
-bash ./gradlew :app:assembleDebug --no-daemon --console=plain --max-workers=1 >> $LOG 2>&1
+export GRADLE_USER_HOME=/home/z/.gradle
+/home/z/.gradle/wrapper/dists/gradle-8.7-bin/gradle-8.7/bin/gradle :app:assembleDebug --no-daemon --console=plain --max-workers=1 >> $LOG 2>&1
 EXIT=$?
 
 echo "=== Build finished at $(date) exit=$EXIT ===" >> $LOG
