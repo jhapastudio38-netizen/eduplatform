@@ -1,0 +1,859 @@
+     1→"use client";
+     2→
+     3→import { useEffect, useState, useRef } from "react";
+     4→import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+     5→import { Button } from "@/components/ui/button";
+     6→import { Input } from "@/components/ui/input";
+     7→import { Label } from "@/components/ui/label";
+     8→import { Textarea } from "@/components/ui/textarea";
+     9→import { Badge } from "@/components/ui/badge";
+    10→import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+    11→import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+    12→import { FileText, Plus, Trash2, Clock, Upload, X, ChevronRight, ChevronLeft, Image as ImageIcon, Headphones, CheckCircle2, Copy, ClipboardPaste, Save } from "lucide-react";
+    13→import { toast } from "sonner";
+    14→
+    15→interface Test {
+    16→  id: string;
+    17→  title: string;
+    18→  description?: string;
+    19→  durationMin: number;
+    20→  isExam: boolean;
+    21→  examType: string;
+    22→  passScore: number;
+    23→  isActive: boolean;
+    24→  isPublished: boolean;
+    25→  category?: string | null;
+    26→  featuredImage?: string | null;
+    27→  price?: number | null;
+    28→  audioPlayMode?: string | null;
+    29→  audioGapSec?: number | null;
+    30→  textBlockCount?: number | null;
+    31→  audioBlockCount?: number | null;
+    32→  _count?: { items: number };
+    33→}
+    34→
+    35→interface QuestionData {
+    36→  id?: string;
+    37→  testItemId?: string;
+    38→  blockType: "text" | "audio";
+    39→  blockNumber: number;
+    40→  stem: string;
+    41→  descType: "none" | "text" | "image" | "audio";
+    42→  descText: string;
+    43→  descImageUrl: string;
+    44→  descAudioUrl: string;
+    45→  mediaType: "none" | "text" | "image" | "audio";
+    46→  mediaText: string;
+    47→  mediaImageUrl: string;
+    48→  mediaAudioUrl: string;
+    49→  answerType: "text" | "image" | "audio" | "choose";
+    50→  options: string[];
+    51→  optionImages: string[];
+    52→  optionAudios: string[];
+    53→  correctOption: number;
+    54→  explanation: string;
+    55→}
+    56→
+    57→function emptyQuestion(blockType: "text" | "audio", blockNumber: number): QuestionData {
+    58→  return {
+    59→    blockType,
+    60→    blockNumber,
+    61→    stem: "",
+    62→    descType: "none",
+    63→    descText: "",
+    64→    descImageUrl: "",
+    65→    descAudioUrl: "",
+    66→    mediaType: blockType === "audio" ? "audio" : "none",
+    67→    mediaText: "",
+    68→    mediaImageUrl: "",
+    69→    mediaAudioUrl: "",
+    70→    answerType: "text",
+    71→    options: ["", "", "", ""],
+    72→    optionImages: ["", "", "", ""],
+    73→    optionAudios: ["", "", "", ""],
+    74→    correctOption: 0,
+    75→    explanation: "",
+    76→  };
+    77→}
+    78→
+    79→export function AdminTests() {
+    80→  const [tests, setTests] = useState<Test[]>([]);
+    81→  const [loading, setLoading] = useState(true);
+    82→  const [createOpen, setCreateOpen] = useState(false);
+    83→  const [editingTest, setEditingTest] = useState<Test | null>(null);
+    84→
+    85→  function load() {
+    86→    setLoading(true);
+    87→    fetch("/api/admin/tests")
+    88→      .then((r) => r.json())
+    89→      .then((d) => setTests(d.tests || []))
+    90→      .finally(() => setLoading(false));
+    91→  }
+    92→  useEffect(load, []);
+    93→
+    94→  async function deleteTest(test: Test) {
+    95→    if (!confirm(`Delete "${test.title}"? This removes all questions.`)) return;
+    96→    await fetch(`/api/admin/tests/${test.id}`, { method: "DELETE" });
+    97→    toast.success("Exam deleted");
+    98→    load();
+    99→  }
+   100→
+   101→  return (
+   102→    <div className="space-y-4">
+   103→      <div className="flex items-center justify-between">
+   104→        <div>
+   105→          <h1 className="text-2xl font-bold">Exams ({tests.length})</h1>
+   106→          <p className="text-sm text-muted-foreground">Block-based exam builder — 20 text + 20 audio questions</p>
+   107→        </div>
+   108→        <Button onClick={() => setCreateOpen(true)}>
+   109→          <Plus className="w-4 h-4 mr-1" /> New Exam
+   110→        </Button>
+   111→      </div>
+   112→
+   113→      {loading ? (
+   114→        <p className="text-center py-8 text-muted-foreground">Loading…</p>
+   115→      ) : tests.length === 0 ? (
+   116→        <Card>
+   117→          <CardContent className="py-12 text-center">
+   118→            <FileText className="w-12 h-12 mx-auto mb-3 text-muted-foreground" />
+   119→            <p className="text-muted-foreground">No exams yet. Click "New Exam" to create one.</p>
+   120→          </CardContent>
+   121→        </Card>
+   122→      ) : (
+   123→        <div className="grid gap-3">
+   124→          {tests.map((t) => (
+   125→            <Card key={t.id} className="hover:shadow-md transition-shadow cursor-pointer" onClick={() => setEditingTest(t)}>
+   126→              <CardContent className="flex items-center gap-4 py-4">
+   127→                {t.featuredImage ? (
+   128→                  <img src={t.featuredImage} alt="" className="w-16 h-16 rounded-lg object-cover" />
+   129→                ) : (
+   130→                  <div className="w-16 h-16 rounded-lg bg-slate-100 flex items-center justify-center">
+   131→                    <FileText className="w-6 h-6 text-slate-400" />
+   132→                  </div>
+   133→                )}
+   134→                <div className="flex-1 min-w-0">
+   135→                  <div className="flex items-center gap-2 flex-wrap">
+   136→                    <h3 className="font-semibold truncate">{t.title}</h3>
+   137→                    <Badge variant="outline">{t.examType}</Badge>
+   138→                    {t.category && <Badge variant="secondary">{t.category}</Badge>}
+   139→                    {t.price ? <Badge>₩{t.price}</Badge> : <Badge variant="outline">Free</Badge>}
+   140→                  </div>
+   141→                  <p className="text-sm text-muted-foreground mt-1">
+   142→                    {t.durationMin} min • {t._count?.items || 0} questions • Pass {t.passScore}%
+   143→                  </p>
+   144→                </div>
+   145→                <div className="flex items-center gap-2">
+   146→                  {t.isPublished ? (
+   147→                    <Badge className="bg-green-500">🚀 Live</Badge>
+   148→                  ) : (
+   149→                    <Badge variant="secondary">📝 Draft</Badge>
+   150→                  )}
+   151→                  <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); deleteTest(t); }}>
+   152→                    <Trash2 className="w-4 h-4 text-red-500" />
+   153→                  </Button>
+   154→                  <ChevronRight className="w-5 h-5 text-muted-foreground" />
+   155→                </div>
+   156→              </CardContent>
+   157→            </Card>
+   158→          ))}
+   159→        </div>
+   160→      )}
+   161→
+   162→      {createOpen && (
+   163→        <CreateExamDialog
+   164→          open={createOpen}
+   165→          onOpenChange={setCreateOpen}
+   166→          onCreated={(t) => { setCreateOpen(false); setEditingTest(t); load(); }}
+   167→        />
+   168→      )}
+   169→
+   170→      {editingTest && (
+   171→        <ExamEditor
+   172→          test={editingTest}
+   173→          onClose={() => { setEditingTest(null); load(); }}
+   174→        />
+   175→      )}
+   176→    </div>
+   177→  );
+   178→}
+   179→
+   180→// ═══════════════════════════════════════════════════════════════════════════
+   181→// CREATE EXAM DIALOG — Step 1: exam details
+   182→// ═══════════════════════════════════════════════════════════════════════════
+   183→
+   184→function CreateExamDialog({ open, onOpenChange, onCreated }: {
+   185→  open: boolean;
+   186→  onOpenChange: (v: boolean) => void;
+   187→  onCreated: (t: Test) => void;
+   188→}) {
+   189→  const [busy, setBusy] = useState(false);
+   190→  const [form, setForm] = useState({
+   191→    title: "",
+   192→    description: "",
+   193→    durationMin: 60,
+   194→    examType: "UBT",
+   195→    category: "",
+   196→    price: "",
+   197→    featuredImage: "",
+   198→    audioPlayMode: "single" as "single" | "double",
+   199→    audioGapSec: 2,
+   200→    textBlockCount: 20,
+   201→    audioBlockCount: 20,
+   202→  });
+   203→
+   204→  async function uploadFile(file: File, folder: string): Promise<string> {
+   205→    const fd = new FormData();
+   206→    fd.append("file", file);
+   207→    fd.append("folder", folder);
+   208→    const res = await fetch("/api/admin/file-upload", { method: "POST", body: fd });
+   209→    if (!res.ok) { const d = await res.json(); throw new Error(d.error || "Upload failed"); }
+   210→    const d = await res.json();
+   211→    return d.url;
+   212→  }
+   213→
+   214→  async function create() {
+   215→    if (!form.title.trim()) { toast.error("Exam name required"); return; }
+   216→    setBusy(true);
+   217→    try {
+   218→      const res = await fetch("/api/admin/tests", {
+   219→        method: "POST",
+   220→        headers: { "Content-Type": "application/json" },
+   221→        body: JSON.stringify({
+   222→          ...form,
+   223→          price: form.price ? parseFloat(form.price) : undefined,
+   224→          isExam: true,
+   225→          isPublished: true,
+   226→        }),
+   227→      });
+   228→      if (!res.ok) { const d = await res.json(); toast.error(d.error || "Failed"); return; }
+   229→      const d = await res.json();
+   230→      toast.success("Exam created — now add questions");
+   231→      onCreated(d.test);
+   232→    } finally { setBusy(false); }
+   233→  }
+   234→
+   235→  return (
+   236→    <Dialog open={open} onOpenChange={onOpenChange}>
+   237→      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+   238→        <DialogHeader><DialogTitle>Create New Exam</DialogTitle></DialogHeader>
+   239→        <div className="space-y-3">
+   240→          {/* Exam Name */}
+   241→          <div>
+   242→            <Label>Exam Name *</Label>
+   243→            <Input value={form.title} onChange={(e) => setForm(f => ({ ...f, title: e.target.value }))} placeholder="e.g. UBT Mock Test 1" />
+   244→          </div>
+   245→
+   246→          {/* Exam Details */}
+   247→          <div>
+   248→            <Label>Exam Details</Label>
+   249→            <Textarea rows={2} value={form.description} onChange={(e) => setForm(f => ({ ...f, description: e.target.value }))} placeholder="Brief description of the exam" />
+   250→          </div>
+   251→
+   252→          {/* Exam Time + Price */}
+   253→          <div className="grid grid-cols-2 gap-3">
+   254→            <div>
+   255→              <Label>Exam Time (minutes) *</Label>
+   256→              <Input type="number" value={form.durationMin} onChange={(e) => setForm(f => ({ ...f, durationMin: parseInt(e.target.value) || 60 }))} min={1} />
+   257→            </div>
+   258→            <div>
+   259→              <Label>Exam Price (optional)</Label>
+   260→              <Input type="number" value={form.price} onChange={(e) => setForm(f => ({ ...f, price: e.target.value }))} placeholder="0 = free" min={0} />
+   261→            </div>
+   262→          </div>
+   263→
+   264→          {/* Exam Type + Category */}
+   265→          <div className="grid grid-cols-2 gap-3">
+   266→            <div>
+   267→              <Label>Exam Type *</Label>
+   268→              <Select value={form.examType} onValueChange={(v) => setForm(f => ({ ...f, examType: v }))}>
+   269→                <SelectTrigger><SelectValue /></SelectTrigger>
+   270→                <SelectContent>
+   271→                  <SelectItem value="UBT">UBT</SelectItem>
+   272→                  <SelectItem value="CBT">CBT</SelectItem>
+   273→                  <SelectItem value="CHAPTER">Chapter</SelectItem>
+   274→                </SelectContent>
+   275→              </Select>
+   276→            </div>
+   277→            <div>
+   278→              <Label>Category (shows in app)</Label>
+   279→              <Input value={form.category} onChange={(e) => setForm(f => ({ ...f, category: e.target.value }))} placeholder="e.g. Beginner, TOPIK 1" />
+   280→            </div>
+   281→          </div>
+   282→
+   283→          {/* Featured Image */}
+   284→          <div>
+   285→            <Label>Featured Image</Label>
+   286→            <div className="flex gap-2">
+   287→              <Input value={form.featuredImage} onChange={(e) => setForm(f => ({ ...f, featuredImage: e.target.value }))} placeholder="Upload or paste URL…" className="flex-1" />
+   288→              <label className="cursor-pointer">
+   289→                <input type="file" accept="image/*" className="hidden" onChange={async (e) => {
+   290→                  const f = e.target.files?.[0]; if (!f) return;
+   291→                  try { const url = await uploadFile(f, "exam-featured"); setForm(p => ({ ...p, featuredImage: url })); toast.success("Image uploaded"); }
+   292→                  catch (err: any) { toast.error(err.message); }
+   293→                }} />
+   294→                <span className="inline-flex items-center h-9 px-3 rounded-md bg-primary text-primary-foreground text-sm cursor-pointer hover:bg-primary/90">📁 Upload</span>
+   295→              </label>
+   296→            </div>
+   297→            {form.featuredImage && <img src={form.featuredImage} alt="Featured" className="mt-2 max-h-32 rounded border" />}
+   298→          </div>
+   299→
+   300→          {/* Audio Settings */}
+   301→          <div className="p-3 border rounded-lg bg-slate-50 space-y-3">
+   302→            <Label className="text-base font-semibold">Audio Settings (optional)</Label>
+   303→            <div className="grid grid-cols-2 gap-3">
+   304→              <div>
+   305→                <Label>Play Mode</Label>
+   306→                <Select value={form.audioPlayMode} onValueChange={(v: any) => setForm(f => ({ ...f, audioPlayMode: v }))}>
+   307→                  <SelectTrigger><SelectValue /></SelectTrigger>
+   308→                  <SelectContent>
+   309→                    <SelectItem value="single">Single (play once)</SelectItem>
+   310→                    <SelectItem value="double">Double (play twice)</SelectItem>
+   311→                  </SelectContent>
+   312→                </Select>
+   313→              </div>
+   314→              <div>
+   315→                <Label>Gap Between Plays (seconds)</Label>
+   316→                <Input type="number" value={form.audioGapSec} onChange={(e) => setForm(f => ({ ...f, audioGapSec: parseInt(e.target.value) || 2 }))} min={0} max={60} />
+   317→              </div>
+   318→            </div>
+   319→          </div>
+   320→
+   321→          {/* Block Counts */}
+   322→          <div className="grid grid-cols-2 gap-3">
+   323→            <div>
+   324→              <Label>Text Questions Count</Label>
+   325→              <Input type="number" value={form.textBlockCount} onChange={(e) => setForm(f => ({ ...f, textBlockCount: parseInt(e.target.value) || 20 }))} min={1} max={100} />
+   326→            </div>
+   327→            <div>
+   328→              <Label>Audio Questions Count</Label>
+   329→              <Input type="number" value={form.audioBlockCount} onChange={(e) => setForm(f => ({ ...f, audioBlockCount: parseInt(e.target.value) || 20 }))} min={1} max={100} />
+   330→            </div>
+   331→          </div>
+   332→        </div>
+   333→
+   334→        <div className="flex justify-end gap-2 pt-2">
+   335→          <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
+   336→          <Button onClick={create} disabled={busy}>{busy ? "Creating…" : "Create Exam"}</Button>
+   337→        </div>
+   338→      </DialogContent>
+   339→    </Dialog>
+   340→  );
+   341→}
+   342→
+   343→// ═══════════════════════════════════════════════════════════════════════════
+   344→// EXAM EDITOR — Step 2: block-based question editor
+   345→// ═══════════════════════════════════════════════════════════════════════════
+   346→
+   347→function ExamEditor({ test, onClose }: { test: Test; onClose: () => void }) {
+   348→  const [activeBlock, setActiveBlock] = useState<"text" | "audio">("text");
+   349→  const [activeNumber, setActiveNumber] = useState(1);
+   350→  const [questions, setQuestions] = useState<Record<string, QuestionData>>({});
+   351→  const [loading, setLoading] = useState(true);
+   352→  const [clipboard, setClipboard] = useState<string>("");
+   353→  const [showPasteDialog, setShowPasteDialog] = useState(false);
+   354→  const [pasteCode, setPasteCode] = useState("");
+   355→  const [pushing, setPushing] = useState(false);
+   356→  const [isPublished, setIsPublished] = useState(test.isPublished);
+   357→
+   358→  const textCount = test.textBlockCount || 20;
+   359→  const audioCount = test.audioBlockCount || 20;
+   360→
+   361→  function key(blockType: string, blockNumber: number) {
+   362→    return `${blockType}-${blockNumber}`;
+   363→  }
+   364→
+   365→  useEffect(() => {
+   366→    // Load existing questions
+   367→    fetch(`/api/admin/tests/${test.id}/questions`)
+   368→      .then((r) => r.json())
+   369→      .then((d) => {
+   370→        const map: Record<string, QuestionData> = {};
+   371→        for (const q of d.questions || []) {
+   372→          map[key(q.blockType, q.blockNumber)] = q;
+   373→        }
+   374→        setQuestions(map);
+   375→      })
+   376→      .finally(() => setLoading(false));
+   377→  }, [test.id]);
+   378→
+   379→  const currentKey = key(activeBlock, activeNumber);
+   380→  const currentQuestion = questions[currentKey] || emptyQuestion(activeBlock, activeNumber);
+   381→
+   382→  function updateQuestion(q: QuestionData) {
+   383→    setQuestions((prev) => ({ ...prev, [currentKey]: q }));
+   384→  }
+   385→
+   386→  async function saveQuestion() {
+   387→    const q = currentQuestion;
+   388→    if (!q.stem.trim()) { toast.error("Question text required"); return; }
+   389→    try {
+   390→      const res = await fetch(`/api/admin/tests/${test.id}/questions`, {
+   391→        method: "POST",
+   392→        headers: { "Content-Type": "application/json" },
+   393→        body: JSON.stringify(q),
+   394→      });
+   395→      if (!res.ok) { const d = await res.json(); toast.error(d.error || "Save failed"); return; }
+   396→      toast.success(`Question ${q.blockNumber} saved`);
+   397→    } catch {
+   398→      toast.error("Save failed");
+   399→    }
+   400→  }
+   401→
+   402→  function copyQuestion() {
+   403→    const q = currentQuestion;
+   404→    if (!q.stem.trim()) { toast.error("Nothing to copy — question is empty"); return; }
+   405→    // Generate a copy code — admin can define their own prefix
+   406→    const code = `DK-${activeBlock.toUpperCase()}-${q.blockNumber}-${Date.now().toString(36).toUpperCase()}`;
+   407→    const data = JSON.stringify({ code, question: q });
+   408→    // Store in localStorage so admin can paste later
+   409→    const allCopies = JSON.parse(localStorage.getItem("dk_copies") || "{}");
+   410→    allCopies[code] = data;
+   411→    localStorage.setItem("dk_copies", JSON.stringify(allCopies));
+   412→    setClipboard(code);
+   413→    // Copy code to clipboard
+   414→    navigator.clipboard.writeText(code);
+   415→    toast.success(`Copied! Code: ${code}`);
+   416→  }
+   417→
+   418→  function pasteQuestion() {
+   419→    setShowPasteDialog(true);
+   420→  }
+   421→
+   422→  async function pushToApp() {
+   423→    const filledCount = Object.values(questions).filter(q => q.stem.trim()).length;
+   424→    if (filledCount === 0) {
+   425→      toast.error("Cannot push: add at least one question first");
+   426→      return;
+   427→    }
+   428→    if (!confirm(`Push this exam to all student apps?\n\n${filledCount} question(s) will be live.\n\nStudents will see it in their Exams page immediately.`)) {
+   429→      return;
+   430→    }
+   431→    setPushing(true);
+   432→    try {
+   433→      const res = await fetch(`/api/admin/tests/${test.id}/publish`, { method: "POST" });
+   434→      const d = await res.json();
+   435→      if (!res.ok) { toast.error(d.error || "Push failed"); return; }
+   436→      setIsPublished(true);
+   437→      toast.success(d.message || "Pushed to app — students can now see this exam");
+   438→    } catch {
+   439→      toast.error("Push failed — check your connection");
+   440→    } finally {
+   441→      setPushing(false);
+   442→    }
+   443→  }
+   444→
+   445→  function doPaste() {
+   446→    const allCopies = JSON.parse(localStorage.getItem("dk_copies") || "{}");
+   447→    const data = allCopies[pasteCode.trim()];
+   448→    if (!data) { toast.error("Invalid paste code"); return; }
+   449→    const parsed = JSON.parse(data);
+   450→    const q = parsed.question as QuestionData;
+   451→    // Paste into current slot — keep current block number/type
+   452→    const pasted: QuestionData = {
+   453→      ...q,
+   454→      blockType: activeBlock,
+   455→      blockNumber: activeNumber,
+   456→    };
+   457→    updateQuestion(pasted);
+   458→    toast.success("Question pasted — click Save to persist");
+   459→    setShowPasteDialog(false);
+   460→    setPasteCode("");
+   461→  }
+   462→
+   463→  const blockNumbers = activeBlock === "text"
+   464→    ? Array.from({ length: textCount }, (_, i) => i + 1)
+   465→    : Array.from({ length: audioCount }, (_, i) => i + 1);
+   466→
+   467→  return (
+   468→    <Dialog open={true} onOpenChange={(v) => { if (!v) onClose(); }}>
+   469→      <DialogContent className="max-w-5xl max-h-[95vh] overflow-hidden flex flex-col">
+   470→        <DialogHeader>
+   471→          <DialogTitle className="flex items-center gap-2">
+   472→            <span>{test.title}</span>
+   473→            <Badge variant="outline">{test.examType}</Badge>
+   474→            {test.category && <Badge variant="secondary">{test.category}</Badge>}
+   475→          </DialogTitle>
+   476→        </DialogHeader>
+   477→
+   478→        {/* Block tabs */}
+   479→        <div className="flex gap-2 border-b pb-2">
+   480→          <Button
+   481→            variant={activeBlock === "text" ? "default" : "outline"}
+   482→            size="sm"
+   483→            onClick={() => { setActiveBlock("text"); setActiveNumber(1); }}
+   484→          >
+   485→            <FileText className="w-4 h-4 mr-1" /> Text Block (1-{textCount})
+   486→          </Button>
+   487→          <Button
+   488→            variant={activeBlock === "audio" ? "default" : "outline"}
+   489→            size="sm"
+   490→            onClick={() => { setActiveBlock("audio"); setActiveNumber(1); }}
+   491→          >
+   492→            <Headphones className="w-4 h-4 mr-1" /> Audio Block ({textCount + 1}-{textCount + audioCount})
+   493→          </Button>
+   494→        </div>
+   495→
+   496→        {/* Block number selector — grid of numbered buttons */}
+   497→        <div className="grid grid-cols-10 gap-1 max-h-24 overflow-y-auto p-1 bg-slate-50 rounded">
+   498→          {blockNumbers.map((num) => {
+   499→            const k = key(activeBlock, num);
+   500→            const isFilled = questions[k] && questions[k].stem.trim();
+   501→            const isActive = num === activeNumber;
+   502→            return (
+   503→              <button
+   504→                key={num}
+   505→                onClick={() => setActiveNumber(num)}
+   506→                className={`h-8 rounded text-xs font-medium transition-colors ${
+   507→                  isActive ? "bg-primary text-primary-foreground" :
+   508→                  isFilled ? "bg-green-100 text-green-700 border border-green-300" :
+   509→                  "bg-white border hover:bg-slate-100"
+   510→                }`}
+   511→              >
+   512→                {num}
+   513→              </button>
+   514→            );
+   515→          })}
+   516→        </div>
+   517→
+   518→        {/* Question editor */}
+   519→        <div className="flex-1 overflow-y-auto pr-1">
+   520→          {loading ? (
+   521→            <p className="text-center py-8 text-muted-foreground">Loading questions…</p>
+   522→          ) : (
+   523→            <QuestionEditor
+   524→              question={currentQuestion}
+   525→              onChange={updateQuestion}
+   526→              blockLabel={`Question ${activeBlock === "audio" ? textCount + activeNumber : activeNumber}`}
+   527→              isAudioBlock={activeBlock === "audio"}
+   528→            />
+   529→          )}
+   530→        </div>
+   531→
+   532→        {/* Action buttons — Done, Copy, Paste, Push to App */}
+   533→        <div className="flex items-center justify-between border-t pt-3">
+   534→          <div className="flex gap-2 flex-wrap">
+   535→            <Button onClick={saveQuestion} variant="default">
+   536→              <Save className="w-4 h-4 mr-1" /> Done
+   537→            </Button>
+   538→            <Button onClick={copyQuestion} variant="outline">
+   539→              <Copy className="w-4 h-4 mr-1" /> Copy
+   540→            </Button>
+   541→            <Button onClick={pasteQuestion} variant="outline">
+   542→              <ClipboardPaste className="w-4 h-4 mr-1" /> Paste
+   543→            </Button>
+   544→          </div>
+   545→          <div className="flex items-center gap-2">
+   546→            {isPublished && (
+   547→              <Badge className="bg-green-500">
+   548→                <CheckCircle2 className="w-3 h-3 mr-1" /> Live in App
+   549→              </Badge>
+   550→            )}
+   551→            <Button
+   552→              onClick={pushToApp}
+   553→              disabled={pushing || isPublished}
+   554→              variant={isPublished ? "outline" : "default"}
+   555→              className={isPublished ? "" : "bg-green-600 hover:bg-green-700"}
+   556→            >
+   557→              {pushing ? (
+   558→                <><span className="animate-spin mr-1">⏳</span> Pushing…</>
+   559→              ) : isPublished ? (
+   560→                <><CheckCircle2 className="w-4 h-4 mr-1" /> Pushed</>
+   561→              ) : (
+   562→                <><span className="mr-1">🚀</span> Push to App</>
+   563→              )}
+   564→            </Button>
+   565→            <Button variant="ghost" onClick={onClose}>Close</Button>
+   566→          </div>
+   567→        </div>
+   568→      </DialogContent>
+   569→
+   570→      {/* Paste dialog */}
+   571→      {showPasteDialog && (
+   572→        <Dialog open={true} onOpenChange={setShowPasteDialog}>
+   573→          <DialogContent className="max-w-md">
+   574→            <DialogHeader><DialogTitle>Paste Question</DialogTitle></DialogHeader>
+   575→            <div className="space-y-3">
+   576→              <Label>Enter paste code</Label>
+   577→              <Input value={pasteCode} onChange={(e) => setPasteCode(e.target.value)} placeholder="DK-TEXT-1-XXXX" />
+   578→              <p className="text-xs text-muted-foreground">Paste the code you got from "Copy Question" to duplicate that question here.</p>
+   579→            </div>
+   580→            <div className="flex justify-end gap-2">
+   581→              <Button variant="outline" onClick={() => setShowPasteDialog(false)}>Cancel</Button>
+   582→              <Button onClick={doPaste}>Paste</Button>
+   583→            </div>
+   584→          </DialogContent>
+   585→        </Dialog>
+   586→      )}
+   587→    </Dialog>
+   588→  );
+   589→}
+   590→
+   591→// ═══════════════════════════════════════════════════════════════════════════
+   592→// QUESTION EDITOR — individual question form
+   593→// ═══════════════════════════════════════════════════════════════════════════
+   594→
+   595→function QuestionEditor({ question, onChange, blockLabel, isAudioBlock }: {
+   596→  question: QuestionData;
+   597→  onChange: (q: QuestionData) => void;
+   598→  blockLabel: string;
+   599→  isAudioBlock: boolean;
+   600→}) {
+   601→  async function uploadFile(file: File, folder: string): Promise<string> {
+   602→    const fd = new FormData();
+   603→    fd.append("file", file);
+   604→    fd.append("folder", folder);
+   605→    const res = await fetch("/api/admin/file-upload", { method: "POST", body: fd });
+   606→    if (!res.ok) { const d = await res.json(); throw new Error(d.error || "Upload failed"); }
+   607→    const d = await res.json();
+   608→    return d.url;
+   609→  }
+   610→
+   611→  function UploadButton({ onUpload, accept }: { onUpload: (url: string) => void; accept: string }) {
+   612→    return (
+   613→      <label className="cursor-pointer">
+   614→        <input type="file" accept={accept} className="hidden" onChange={async (e) => {
+   615→          const f = e.target.files?.[0]; if (!f) return;
+   616→          try { const url = await uploadFile(f, "questions"); onUpload(url); toast.success("File uploaded"); }
+   617→          catch (err: any) { toast.error(err.message); }
+   618→        }} />
+   619→        <span className="inline-flex items-center h-8 px-2 rounded-md bg-primary text-primary-foreground text-xs cursor-pointer hover:bg-primary/90">📁 Upload</span>
+   620→      </label>
+   621→    );
+   622→  }
+   623→
+   624→  return (
+   625→    <div className="space-y-4">
+   626→      {/* Question number badge */}
+   627→      <div className="flex items-center gap-2">
+   628→        <div className="w-10 h-10 rounded-full bg-primary text-primary-foreground flex items-center justify-center font-bold">
+   629→          {question.blockNumber}
+   630→        </div>
+   631→        <div>
+   632→          <p className="font-semibold">{blockLabel}</p>
+   633→          <p className="text-xs text-muted-foreground">{isAudioBlock ? "Audio question" : "Text question"}</p>
+   634→        </div>
+   635→      </div>
+   636→
+   637→      {/* Question Description type */}
+   638→      <div className="space-y-2">
+   639→        <Label className="text-sm font-semibold">Question Description Type</Label>
+   640→        <div className="flex gap-2 flex-wrap">
+   641→          {(["none", "text", "image", "audio"] as const).map((t) => (
+   642→            <Button
+   643→              key={t}
+   644→              variant={question.descType === t ? "default" : "outline"}
+   645→              size="sm"
+   646→              onClick={() => onChange({ ...question, descType: t })}
+   647→            >
+   648→              {t === "none" ? "None" : t === "text" ? "Text" : t === "image" ? "Image" : "Audio"}
+   649→            </Button>
+   650→          ))}
+   651→        </div>
+   652→        {/* Description content based on type */}
+   653→        {question.descType === "text" && (
+   654→          <Textarea rows={2} value={question.descText} onChange={(e) => onChange({ ...question, descText: e.target.value })} placeholder="Description text…" />
+   655→        )}
+   656→        {question.descType === "image" && (
+   657→          <div className="flex gap-2">
+   658→            <Input value={question.descImageUrl} onChange={(e) => onChange({ ...question, descImageUrl: e.target.value })} placeholder="Image URL…" className="flex-1" />
+   659→            <UploadButton accept="image/*" onUpload={(url) => onChange({ ...question, descImageUrl: url })} />
+   660→          </div>
+   661→        )}
+   662→        {question.descType === "image" && question.descImageUrl && (
+   663→          <img src={question.descImageUrl} alt="Desc" className="max-h-32 rounded border" />
+   664→        )}
+   665→        {question.descType === "audio" && (
+   666→          <div className="flex gap-2">
+   667→            <Input value={question.descAudioUrl} onChange={(e) => onChange({ ...question, descAudioUrl: e.target.value })} placeholder="Audio URL…" className="flex-1" />
+   668→            <UploadButton accept="audio/*" onUpload={(url) => onChange({ ...question, descAudioUrl: url })} />
+   669→          </div>
+   670→        )}
+   671→        {question.descType === "audio" && question.descAudioUrl && (
+   672→          <audio controls src={question.descAudioUrl} className="w-full h-8" />
+   673→        )}
+   674→      </div>
+   675→
+   676→      {/* Question text */}
+   677→      <div className="space-y-2">
+   678→        <Label className="text-sm font-semibold">Question *</Label>
+   679→        <Textarea rows={2} value={question.stem} onChange={(e) => onChange({ ...question, stem: e.target.value })} placeholder="What is the question?" />
+   680→      </div>
+   681→
+   682→      {/* Question Media type */}
+   683→      <div className="space-y-2">
+   684→        <Label className="text-sm font-semibold">Question Media (shows in exam)</Label>
+   685→        <div className="flex gap-2 flex-wrap">
+   686→          {(["none", "text", "image", "audio"] as const).map((t) => (
+   687→            <Button
+   688→              key={t}
+   689→              variant={question.mediaType === t ? "default" : "outline"}
+   690→              size="sm"
+   691→              onClick={() => onChange({ ...question, mediaType: t })}
+   692→              disabled={isAudioBlock && t === "none"} // audio block must have audio media
+   693→            >
+   694→              {t === "none" ? "None" : t === "text" ? "Text" : t === "image" ? "Image" : "Audio"}
+   695→            </Button>
+   696→          ))}
+   697→        </div>
+   698→        {isAudioBlock && (
+   699→          <p className="text-xs text-amber-600">Audio block: media type is set to Audio automatically</p>
+   700→        )}
+   701→        {question.mediaType === "text" && (
+   702→          <Textarea rows={2} value={question.mediaText} onChange={(e) => onChange({ ...question, mediaText: e.target.value })} placeholder="Media text…" />
+   703→        )}
+   704→        {question.mediaType === "image" && (
+   705→          <>
+   706→            <div className="flex gap-2">
+   707→              <Input value={question.mediaImageUrl} onChange={(e) => onChange({ ...question, mediaImageUrl: e.target.value })} placeholder="Image URL…" className="flex-1" />
+   708→              <UploadButton accept="image/*" onUpload={(url) => onChange({ ...question, mediaImageUrl: url })} />
+   709→            </div>
+   710→            {question.mediaImageUrl && <img src={question.mediaImageUrl} alt="Media" className="max-h-40 rounded border" />}
+   711→          </>
+   712→        )}
+   713→        {question.mediaType === "audio" && (
+   714→          <>
+   715→            <div className="flex gap-2">
+   716→              <Input value={question.mediaAudioUrl} onChange={(e) => onChange({ ...question, mediaAudioUrl: e.target.value })} placeholder="Audio URL…" className="flex-1" />
+   717→              <UploadButton accept="audio/*" onUpload={(url) => onChange({ ...question, mediaAudioUrl: url })} />
+   718→            </div>
+   719→            {question.mediaAudioUrl && <audio controls src={question.mediaAudioUrl} className="w-full h-8" />}
+   720→          </>
+   721→        )}
+   722→      </div>
+   723→
+   724→      {/* Answer type */}
+   725→      <div className="space-y-2">
+   726→        <Label className="text-sm font-semibold">Answer Type</Label>
+   727→        <div className="flex gap-2 flex-wrap">
+   728→          {(["text", "image", "audio", "choose"] as const).map((t) => (
+   729→            <Button
+   730→              key={t}
+   731→              variant={question.answerType === t ? "default" : "outline"}
+   732→              size="sm"
+   733→              onClick={() => onChange({ ...question, answerType: t })}
+   734→            >
+   735→              {t === "text" ? "Text" : t === "image" ? "Image" : t === "audio" ? "Audio" : "Choose Correct"}
+   736→            </Button>
+   737→          ))}
+   738→        </div>
+   739→      </div>
+   740→
+   741→      {/* Options based on answer type */}
+   742→      {(question.answerType === "text" || question.answerType === "choose") && (
+   743→        <div className="space-y-2 p-3 border rounded-lg bg-slate-50">
+   744→          <Label className="text-sm font-semibold">Options (4)</Label>
+   745→          <div className="grid grid-cols-2 gap-2">
+   746→            {[0, 1, 2, 3].map((i) => (
+   747→              <div key={i} className="flex items-center gap-2">
+   748→                <button
+   749→                  onClick={() => onChange({ ...question, correctOption: i })}
+   750→                  className={`w-6 h-6 rounded-full border-2 flex items-center justify-center text-xs font-bold ${
+   751→                    question.correctOption === i ? "bg-green-500 text-white border-green-500" : "border-slate-300"
+   752→                  }`}
+   753→                >
+   754→                  {question.correctOption === i ? "✓" : String.fromCharCode(65 + i)}
+   755→                </button>
+   756→                <Input
+   757→                  value={question.options[i] || ""}
+   758→                  onChange={(e) => {
+   759→                    const opts = [...question.options];
+   760→                    opts[i] = e.target.value;
+   761→                    onChange({ ...question, options: opts });
+   762→                  }}
+   763→                  placeholder={`Option ${String.fromCharCode(65 + i)}`}
+   764→                  className="flex-1"
+   765→                />
+   766→              </div>
+   767→            ))}
+   768→          </div>
+   769→          {question.answerType === "choose" && (
+   770→            <p className="text-xs text-muted-foreground">Underline style: correct option has ✓ green circle</p>
+   771→          )}
+   772→        </div>
+   773→      )}
+   774→
+   775→      {question.answerType === "image" && (
+   776→        <div className="space-y-2 p-3 border rounded-lg bg-slate-50">
+   777→          <Label className="text-sm font-semibold">Image Options (4)</Label>
+   778→          <div className="grid grid-cols-2 gap-2">
+   779→            {[0, 1, 2, 3].map((i) => (
+   780→              <div key={i} className="space-y-1">
+   781→                <div className="flex items-center gap-2">
+   782→                  <button
+   783→                    onClick={() => onChange({ ...question, correctOption: i })}
+   784→                    className={`w-6 h-6 rounded-full border-2 flex items-center justify-center text-xs font-bold ${
+   785→                      question.correctOption === i ? "bg-green-500 text-white border-green-500" : "border-slate-300"
+   786→                    }`}
+   787→                  >
+   788→                    {question.correctOption === i ? "✓" : String.fromCharCode(65 + i)}
+   789→                  </button>
+   790→                  <span className="text-xs">Option {String.fromCharCode(65 + i)}</span>
+   791→                  <UploadButton accept="image/*" onUpload={(url) => {
+   792→                    const imgs = [...question.optionImages];
+   793→                    imgs[i] = url;
+   794→                    onChange({ ...question, optionImages: imgs });
+   795→                  }} />
+   796→                </div>
+   797→                <Input
+   798→                  value={question.optionImages[i] || ""}
+   799→                  onChange={(e) => {
+   800→                    const imgs = [...question.optionImages];
+   801→                    imgs[i] = e.target.value;
+   802→                    onChange({ ...question, optionImages: imgs });
+   803→                  }}
+   804→                  placeholder="Image URL…"
+   805→                />
+   806→                {question.optionImages[i] && <img src={question.optionImages[i]} alt="" className="h-20 rounded border" />}
+   807→              </div>
+   808→            ))}
+   809→          </div>
+   810→        </div>
+   811→      )}
+   812→
+   813→      {question.answerType === "audio" && (
+   814→        <div className="space-y-2 p-3 border rounded-lg bg-slate-50">
+   815→          <Label className="text-sm font-semibold">Audio Options (4) — click to play</Label>
+   816→          <div className="grid grid-cols-2 gap-2">
+   817→            {[0, 1, 2, 3].map((i) => (
+   818→              <div key={i} className="space-y-1">
+   819→                <div className="flex items-center gap-2">
+   820→                  <button
+   821→                    onClick={() => onChange({ ...question, correctOption: i })}
+   822→                    className={`w-6 h-6 rounded-full border-2 flex items-center justify-center text-xs font-bold ${
+   823→                      question.correctOption === i ? "bg-green-500 text-white border-green-500" : "border-slate-300"
+   824→                    }`}
+   825→                  >
+   826→                    {question.correctOption === i ? "✓" : String.fromCharCode(65 + i)}
+   827→                  </button>
+   828→                  <span className="text-xs">Audio {String.fromCharCode(65 + i)}</span>
+   829→                  <UploadButton accept="audio/*" onUpload={(url) => {
+   830→                    const auds = [...question.optionAudios];
+   831→                    auds[i] = url;
+   832→                    onChange({ ...question, optionAudios: auds });
+   833→                  }} />
+   834→                </div>
+   835→                <Input
+   836→                  value={question.optionAudios[i] || ""}
+   837→                  onChange={(e) => {
+   838→                    const auds = [...question.optionAudios];
+   839→                    auds[i] = e.target.value;
+   840→                    onChange({ ...question, optionAudios: auds });
+   841→                  }}
+   842→                  placeholder="Audio URL…"
+   843→                />
+   844→                {question.optionAudios[i] && <audio controls src={question.optionAudios[i]} className="w-full h-8" />}
+   845→              </div>
+   846→            ))}
+   847→          </div>
+   848→        </div>
+   849→      )}
+   850→
+   851→      {/* Answer description */}
+   852→      <div className="space-y-2">
+   853→        <Label className="text-sm font-semibold">Answer Description (optional)</Label>
+   854→        <Textarea rows={2} value={question.explanation} onChange={(e) => onChange({ ...question, explanation: e.target.value })} placeholder="Explanation shown after answering…" />
+   855→      </div>
+   856→    </div>
+   857→  );
+   858→}
+   859→

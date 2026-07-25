@@ -9,7 +9,17 @@ export async function GET(req: NextRequest) {
   if (!user || (user.role !== "ADMIN" && user.role !== "TEACHER")) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
+  const url = new URL(req.url);
+  const category = url.searchParams.get("category"); // exam | demo | batch | chapter | question_bank
+  const where: Record<string, unknown> = {};
+  if (
+    category &&
+    ["exam", "demo", "batch", "chapter", "question_bank"].includes(category)
+  ) {
+    where.testCategory = category;
+  }
   const tests = await db.test.findMany({
+    where,
     orderBy: { createdAt: "desc" },
     take: 200,
     include: { _count: { select: { items: true } } },
@@ -22,9 +32,10 @@ const testSchema = z.object({
   description: z.string().max(2000).optional().default(""),
   durationMin: z.number().int().min(1).max(600).default(30),
   isExam: z.boolean().default(true),
-  examType: z.string().default("UBT"), // UBT / CBT / CHAPTER / REGULAR
+  examType: z.string().default("UBT"),
+  testCategory: z.enum(["exam", "demo", "batch", "chapter", "question_bank"]).default("exam"),
   passScore: z.number().int().min(0).max(100).default(40),
-  isPublished: z.boolean().default(false), // Draft by default — admin pushes when ready
+  isPublished: z.boolean().default(false),
   // New fields
   price: z.number().min(0).optional(),
   featuredImage: z.string().optional().or(z.literal("")),
@@ -54,6 +65,7 @@ export async function POST(req: NextRequest) {
         durationMin: d.durationMin,
         isExam: d.isExam,
         examType: d.examType,
+        testCategory: d.testCategory,
         passScore: d.passScore,
         isPublished: d.isPublished,
         isActive: true,
