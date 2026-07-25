@@ -25,6 +25,7 @@ import app.dreamkorea.smartclass.api.QuestionBankQuestion
 import app.dreamkorea.smartclass.data.AppState
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 
 /**
  * Question Bank Screen — browse practice questions by category, answer one at a
@@ -32,7 +33,6 @@ import kotlinx.coroutines.launch
  */
 @Composable
 fun QuestionBankScreen(theme: AppTheme, sound: SoundManager, onBack: () -> Unit) {
-    val scope = rememberCoroutineScope()
     var questions by remember { mutableStateOf<List<QuestionBankQuestion>>(emptyList()) }
     var loading by remember { mutableStateOf(true) }
     var error by remember { mutableStateOf("") }
@@ -41,20 +41,37 @@ fun QuestionBankScreen(theme: AppTheme, sound: SoundManager, onBack: () -> Unit)
     var selectedAnswer by remember { mutableStateOf<String?>(null) }
     var showFeedback by remember { mutableStateOf(false) }
     var isCorrect by remember { mutableStateOf(false) }
+    var retryCount by remember { mutableStateOf(0) }
 
-    LaunchedEffect(Unit) {
-        scope.launch {
-            loading = true
-            error = ""
-            try {
-                questions = AppState.getCachedQuestionBank()
-            } catch (e: java.net.UnknownHostException) {
-                error = "No internet connection."
-            } catch (e: java.io.IOException) {
-                error = "Could not connect to server."
-            } catch (e: Exception) {
-                error = "Could not load questions."
+    LaunchedEffect(retryCount) {
+        loading = true
+        error = ""
+        try {
+            // Invalidate cache on retry so we get fresh data
+            if (retryCount > 0) AppState.invalidateCache("question_bank")
+            val result = withTimeoutOrNull(20_000L) {
+                AppState.getCachedQuestionBank()
             }
+            if (result != null) {
+                questions = result
+            } else {
+                error = "The request timed out. Check your internet and try again."
+            }
+        } catch (e: retrofit2.HttpException) {
+            val rawBody = try { e.response()?.errorBody()?.string() } catch (_: Exception) { null }
+            error = when (e.code()) {
+                401 -> "Your session has expired. Please log out and sign in again."
+                else -> "Could not load questions (HTTP ${e.code()}).${if (rawBody != null) " $rawBody" else ""}"
+            }
+        } catch (e: java.net.UnknownHostException) {
+            error = "No internet connection. Please check your network."
+        } catch (e: java.net.SocketTimeoutException) {
+            error = "The request timed out. Please try again."
+        } catch (e: java.io.IOException) {
+            error = "Network error: ${e.message ?: "Could not connect."}"
+        } catch (e: Exception) {
+            error = "Unexpected error: ${e.message ?: "Please try again."}"
+        } finally {
             loading = false
         }
     }
@@ -78,16 +95,27 @@ fun QuestionBankScreen(theme: AppTheme, sound: SoundManager, onBack: () -> Unit)
 
     if (error.isNotEmpty()) {
         Column(
-            Modifier.fillMaxSize().padding(20.dp),
+            Modifier.fillMaxSize().padding(24.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
-            Icon(Icons.Default.WifiOff, null, tint = theme.errorRed, modifier = Modifier.size(48.dp))
-            Spacer(Modifier.height(12.dp))
-            Text(error, color = theme.darkText, fontSize = 14.sp, textAlign = TextAlign.Center)
+            Icon(Icons.Default.CloudOff, null, tint = theme.errorRed.copy(alpha = 0.7f), modifier = Modifier.size(56.dp))
             Spacer(Modifier.height(16.dp))
-            Button(onClick = onBack, colors = ButtonDefaults.buttonColors(containerColor = theme.primary)) {
-                Text("Go back")
+            Text("Couldn't load questions", color = theme.darkText, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+            Spacer(Modifier.height(8.dp))
+            Text(error, color = theme.subText, fontSize = 13.sp, textAlign = TextAlign.Center, modifier = Modifier.padding(horizontal = 16.dp))
+            Spacer(Modifier.height(24.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                OutlinedButton(onClick = onBack, shape = RoundedCornerShape(10.dp)) { Text("Go back") }
+                Button(
+                    onClick = { sound.click(); retryCount++ },
+                    colors = ButtonDefaults.buttonColors(containerColor = theme.primary),
+                    shape = RoundedCornerShape(10.dp)
+                ) {
+                    Icon(Icons.Default.Refresh, null, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(6.dp))
+                    Text("Retry")
+                }
             }
         }
         return

@@ -27,10 +27,11 @@ import app.dreamkorea.smartclass.api.*
 import app.dreamkorea.smartclass.data.AppState
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 
 /**
  * Exam taking screen — full flow:
- * 1. Loading skeleton
+ * 1. Loading skeleton (with timeout + retry)
  * 2. Question-by-question with audio (loops N times), image, options
  * 3. Click sound on every interaction
  * 4. Wrong → shows correct answer in red
@@ -41,7 +42,6 @@ import kotlinx.coroutines.launch
  */
 @Composable
 fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
-    val scope = rememberCoroutineScope()
     val sound = rememberSoundManager()
     var test by remember { mutableStateOf<TestDetail?>(null) }
     var loading by remember { mutableStateOf(true) }
@@ -54,27 +54,44 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
     var questionFeedback by remember { mutableStateOf<QuestionFeedback?>(null) }
     // Timer
     var timeLeft by remember { mutableStateOf(0) }
+    // Retry trigger — increment to force reload
+    var retryCount by remember { mutableStateOf(0) }
 
-    LaunchedEffect(testId) {
-        scope.launch {
-            try {
-                test = AppState.api.getTestDetail(testId).test
-                timeLeft = (test?.durationMin ?: 30) * 60
-            } catch (e: retrofit2.HttpException) {
-                // HTTP error from server
-                error = when (e.code()) {
-                    401 -> "Please log in again to take this exam."
-                    403 -> "This exam is not active or has ended."
-                    404 -> "Exam not found. It may have been removed."
-                    else -> "Could not load exam. Please try again."
-                }
-            } catch (e: java.net.UnknownHostException) {
-                error = "No internet connection. Please check your network."
-            } catch (e: java.io.IOException) {
-                error = "Could not connect to server. Please check your internet."
-            } catch (e: Exception) {
-                error = "Could not load exam. Please try again."
+    // Load test detail — uses LaunchedEffect's own scope, finally block guarantees loading cleanup
+    LaunchedEffect(testId, retryCount) {
+        loading = true
+        error = ""
+        try {
+            // 20-second timeout — if the API hangs, show a timeout error
+            val result = withTimeoutOrNull(20_000L) {
+                AppState.api.getTestDetail(testId).test
             }
+            if (result != null) {
+                test = result
+                timeLeft = (result.durationMin.coerceAtLeast(1)) * 60
+            } else {
+                error = "The request timed out. Check your internet connection and try again."
+            }
+        } catch (e: retrofit2.HttpException) {
+            // Try to read the actual error message from the response body
+            val rawBody = try { e.response()?.errorBody()?.string() } catch (_: Exception) { null }
+            error = when (e.code()) {
+                401 -> "Your session has expired. Please log out and sign in again."
+                403 -> "This exam is not available right now."
+                404 -> "This test could not be found. It may have been removed."
+                500 -> "Server error. Please try again in a moment.${if (rawBody != null) " ($rawBody)" else ""}"
+                else -> "Could not load the test (HTTP ${e.code()}).${if (rawBody != null) " $rawBody" else ""}"
+            }
+        } catch (e: java.net.UnknownHostException) {
+            error = "No internet connection. Please check your network and try again."
+        } catch (e: java.net.SocketTimeoutException) {
+            error = "The request timed out. Please try again."
+        } catch (e: java.io.IOException) {
+            error = "Network error: ${e.message ?: "Could not connect to server."}"
+        } catch (e: Exception) {
+            error = "Unexpected error: ${e.message ?: "Please try again."}"
+        } finally {
+            // GUARANTEED: loading is always reset, even if the coroutine is cancelled
             loading = false
         }
     }
@@ -86,18 +103,20 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
                 delay(1000)
                 timeLeft--
             }
-            if (timeLeft == 0 && test != null && submitResult == null && !submitting) {
+            // Auto-submit when timer reaches zero
+            val currentTest = test
+            if (timeLeft == 0 && currentTest != null && submitResult == null && !submitting) {
                 submitting = true
                 sound.swoosh()
                 try {
-                    submitResult = AppState.api.submitTest(test!!.id, SubmitRequest(answers.toMap()))
+                    submitResult = AppState.api.submitTest(currentTest.id, SubmitRequest(answers.toMap()))
                     sound.success()
                 } catch (e: java.net.UnknownHostException) {
-                    error = "No internet connection. Please check your network."
+                    error = "No internet connection. Could not submit your answers."
                 } catch (e: java.io.IOException) {
-                    error = "Could not connect to server. Please check your internet."
+                    error = "Network error. Could not submit your answers."
                 } catch (e: Exception) {
-                    error = "Could not submit exam. Please try again."
+                    error = "Could not submit: ${e.message ?: "Unknown error"}"
                 }
                 submitting = false
             }
@@ -105,17 +124,71 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
     }
 
     if (loading) {
-        SkeletonListScreen(theme, itemCount = 4)
+        // Loading skeleton with a subtle "Loading..." label so users know it's working
+        Column(Modifier.fillMaxSize()) {
+            LinearProgressIndicator(
+                modifier = Modifier.fillMaxWidth(),
+                color = theme.primary,
+                trackColor = theme.primary.copy(alpha = 0.1f),
+            )
+            SkeletonListScreen(theme, itemCount = 4)
+        }
         return
     }
 
     if (error.isNotEmpty()) {
-        Column(Modifier.fillMaxSize().padding(20.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
-            Icon(Icons.Default.Error, null, tint = theme.errorRed, modifier = Modifier.size(48.dp))
-            Spacer(Modifier.height(12.dp))
-            Text(error, color = theme.darkText, fontSize = 14.sp, textAlign = TextAlign.Center)
+        Column(
+            Modifier.fillMaxSize().padding(24.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
+        ) {
+            Icon(
+                Icons.Default.CloudOff,
+                null,
+                tint = theme.errorRed.copy(alpha = 0.7f),
+                modifier = Modifier.size(56.dp)
+            )
             Spacer(Modifier.height(16.dp))
-            Button(onClick = onExit) { Text("Go back") }
+            Text(
+                "Couldn't load the test",
+                color = theme.darkText,
+                fontSize = 18.sp,
+                fontWeight = FontWeight.Bold
+            )
+            Spacer(Modifier.height(8.dp))
+            Text(
+                error,
+                color = theme.subText,
+                fontSize = 13.sp,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.padding(horizontal = 16.dp)
+            )
+            Spacer(Modifier.height(8.dp))
+            Text(
+                "Test ID: $testId",
+                color = theme.subText.copy(alpha = 0.5f),
+                fontSize = 10.sp,
+                fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
+            )
+            Spacer(Modifier.height(24.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                OutlinedButton(
+                    onClick = onExit,
+                    shape = RoundedCornerShape(10.dp)
+                ) { Text("Go back") }
+                Button(
+                    onClick = {
+                        sound.click()
+                        retryCount++ // triggers LaunchedEffect reload
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = theme.primary),
+                    shape = RoundedCornerShape(10.dp)
+                ) {
+                    Icon(Icons.Default.Refresh, null, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(6.dp))
+                    Text("Retry")
+                }
+            }
         }
         return
     }

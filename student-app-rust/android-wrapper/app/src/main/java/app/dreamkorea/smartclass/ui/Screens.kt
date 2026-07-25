@@ -561,31 +561,49 @@ fun BooksScreen(theme: AppTheme, sound: SoundManager, onBack: () -> Unit, onBook
 // ─── Tests Screen ─────────────────────────────────────────────────────────────
 @Composable
 fun TestsScreen(theme: AppTheme, sound: SoundManager, filter: String = "all", title: String = "Tests & Exams", onBack: () -> Unit, onStartExam: (String) -> Unit) {
-    val scope = rememberCoroutineScope()
     var tests by remember { mutableStateOf<List<TestItem>>(emptyList()) }
     var loading by remember { mutableStateOf(true) }
     var error by remember { mutableStateOf("") }
+    var retryCount by remember { mutableStateOf(0) }
 
-    LaunchedEffect(filter) {
-        scope.launch {
-            loading = true
-            error = ""
-            try {
-                // Use cached API — avoids reload storm on back/forth navigation
-                tests = AppState.getCachedTests(filter)
-            } catch (e: java.net.UnknownHostException) {
-                error = "No internet connection."
-            } catch (e: java.io.IOException) {
-                error = "Could not connect to server."
-            } catch (e: Exception) {
-                error = "Could not load tests. Please try again."
+    LaunchedEffect(filter, retryCount) {
+        loading = true
+        error = ""
+        try {
+            if (retryCount > 0) AppState.invalidateCache("tests_$filter")
+            val result = kotlinx.coroutines.withTimeoutOrNull(20_000L) {
+                AppState.getCachedTests(filter)
             }
+            if (result != null) {
+                tests = result
+            } else {
+                error = "The request timed out. Check your internet and try again."
+            }
+        } catch (e: retrofit2.HttpException) {
+            error = when (e.code()) {
+                401 -> "Your session has expired. Please log out and sign in again."
+                else -> "Could not load tests (HTTP ${e.code()})."
+            }
+        } catch (e: java.net.UnknownHostException) {
+            error = "No internet connection. Please check your network."
+        } catch (e: java.net.SocketTimeoutException) {
+            error = "The request timed out. Please try again."
+        } catch (e: java.io.IOException) {
+            error = "Network error: ${e.message ?: "Could not connect."}"
+        } catch (e: Exception) {
+            error = "Unexpected error: ${e.message ?: "Please try again."}"
+        } finally {
             loading = false
         }
     }
 
     if (loading) {
         Column(Modifier.fillMaxSize()) {
+            LinearProgressIndicator(
+                modifier = Modifier.fillMaxWidth(),
+                color = theme.primary,
+                trackColor = theme.primary.copy(alpha = 0.1f),
+            )
             ScreenHeader(theme, sound, title, "Tap a test to start.", onBack)
             SkeletonListScreen(theme, itemCount = 5)
         }
@@ -593,12 +611,29 @@ fun TestsScreen(theme: AppTheme, sound: SoundManager, filter: String = "all", ti
     }
 
     if (error.isNotEmpty()) {
-        Column(Modifier.fillMaxSize().padding(20.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
-            Icon(Icons.Default.WifiOff, null, tint = theme.errorRed, modifier = Modifier.size(48.dp))
-            Spacer(Modifier.height(12.dp))
-            Text(error, color = theme.darkText, fontSize = 14.sp, textAlign = TextAlign.Center)
+        Column(
+            Modifier.fillMaxSize().padding(24.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
+        ) {
+            Icon(Icons.Default.CloudOff, null, tint = theme.errorRed.copy(alpha = 0.7f), modifier = Modifier.size(56.dp))
             Spacer(Modifier.height(16.dp))
-            Button(onClick = onBack, colors = ButtonDefaults.buttonColors(containerColor = theme.primary)) { Text("Go back") }
+            Text("Couldn't load tests", color = theme.darkText, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+            Spacer(Modifier.height(8.dp))
+            Text(error, color = theme.subText, fontSize = 13.sp, textAlign = TextAlign.Center, modifier = Modifier.padding(horizontal = 16.dp))
+            Spacer(Modifier.height(24.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                OutlinedButton(onClick = onBack, shape = RoundedCornerShape(10.dp)) { Text("Go back") }
+                Button(
+                    onClick = { sound.click(); retryCount++ },
+                    colors = ButtonDefaults.buttonColors(containerColor = theme.primary),
+                    shape = RoundedCornerShape(10.dp)
+                ) {
+                    Icon(Icons.Default.Refresh, null, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(6.dp))
+                    Text("Retry")
+                }
+            }
         }
         return
     }
