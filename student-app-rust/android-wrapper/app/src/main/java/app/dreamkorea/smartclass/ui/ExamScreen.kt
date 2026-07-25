@@ -290,7 +290,7 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
                             Text("${currentQuestion.points} pts", color = theme.primary, fontSize = 12.sp, fontWeight = FontWeight.Bold)
                         }
                         Spacer(Modifier.height(12.dp))
-                        Text(q.stem, color = theme.darkText, fontSize = 17.sp, fontWeight = FontWeight.Bold, modifier = Modifier.verticalScroll(rememberScrollState()))
+                        Text(q.stem, color = theme.darkText, fontSize = 17.sp, fontWeight = FontWeight.Bold)
                     }
                 }
             }
