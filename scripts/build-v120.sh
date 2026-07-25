@@ -7,22 +7,27 @@ export GRADLE_OPTS="-Dorg.gradle.daemon=false -Dorg.gradle.jvmargs=-Xmx1024m"
 export PATH="/usr/lib/jvm/java-21-openjdk-amd64/bin:/usr/bin:/bin:$PATH"
 
 LOG=/tmp/gradle-v120.log
-echo "=== Build started at $(date) ===" > $LOG
+RESULT=/tmp/build_v120_result.txt
+APK_OUT=/home/z/my-project/download/DreamKorea-SmartClass-v1.3.0.apk
+PROJECT_DIR=/home/z/my-project/student-app-rust/android-wrapper
 
-cd /home/z/my-project/student-app-rust/android-wrapper
-./gradlew :app:assembleDebug --no-daemon --console=plain --max-workers=1 >> $LOG 2>&1
+echo "=== Build started at $(date) ===" > $LOG
+echo "Working dir: $PROJECT_DIR" >> $LOG
+
+cd "$PROJECT_DIR" || { echo "FAILED:cd" > $RESULT; exit 1; }
+bash ./gradlew :app:assembleDebug --no-daemon --console=plain --max-workers=1 >> $LOG 2>&1
 EXIT=$?
 
 echo "=== Build finished at $(date) exit=$EXIT ===" >> $LOG
 
 if [ $EXIT -eq 0 ]; then
-    APK=$(find app/build/outputs/ -name "*.apk" 2>/dev/null | head -1)
+    APK=$(find "$PROJECT_DIR/app/build/outputs/" -name "*.apk" 2>/dev/null | head -1)
     if [ -n "$APK" ]; then
-        cp "$APK" /home/z/my-project/download/DreamKorea-SmartClass-v1.3.0.apk
-        echo "SUCCESS" > /tmp/build_v120_result.txt
+        cp "$APK" "$APK_OUT"
+        echo "SUCCESS" > $RESULT
     else
-        echo "NO_APK" > /tmp/build_v120_result.txt
+        echo "NO_APK" > $RESULT
     fi
 else
-    echo "FAILED:$EXIT" > /tmp/build_v120_result.txt
+    echo "FAILED:$EXIT" > $RESULT
 fi

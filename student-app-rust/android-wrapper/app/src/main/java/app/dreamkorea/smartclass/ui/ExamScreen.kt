@@ -43,6 +43,7 @@ import kotlinx.coroutines.withTimeoutOrNull
 @Composable
 fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
     val sound = rememberSoundManager()
+    val scope = rememberCoroutineScope()
     var test by remember { mutableStateOf<TestDetail?>(null) }
     var loading by remember { mutableStateOf(true) }
     var error by remember { mutableStateOf("") }
