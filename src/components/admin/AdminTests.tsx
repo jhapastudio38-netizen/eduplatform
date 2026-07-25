@@ -19,6 +19,7 @@ interface Test {
   durationMin: number;
   isExam: boolean;
   examType: string;
+  testCategory?: string | null;
   passScore: number;
   isActive: boolean;
   isPublished: boolean;
@@ -76,20 +77,34 @@ function emptyQuestion(blockType: "text" | "audio", blockNumber: number): Questi
   };
 }
 
-export function AdminTests() {
+// Categories that use the simple "flat list" question editor
+// (instead of the 20+20 block grid used by exam & demo).
+const SIMPLE_CATEGORIES = ["batch", "chapter", "question_bank"];
+
+const CATEGORY_META: Record<string, { title: string; subtitle: string; createLabel: string }> = {
+  exam:          { title: "Exams",          subtitle: "Block-based exam builder — 20 text + 20 audio questions", createLabel: "New Exam" },
+  demo:          { title: "Demo Exams",     subtitle: "Practice tests — same block builder as exams",            createLabel: "New Demo Exam" },
+  batch:         { title: "Batch Exams",    subtitle: "Exams assigned to student batches — add questions freely",  createLabel: "New Batch Exam" },
+  chapter:       { title: "Chapter Exams",  subtitle: "Chapter-scoped exams — add questions freely",                createLabel: "New Chapter Exam" },
+  question_bank: { title: "Question Bank",  subtitle: "Reusable question bank — add questions freely",              createLabel: "New Question Set" },
+};
+
+export function AdminTests({ testCategory = "exam" }: { testCategory?: string }) {
   const [tests, setTests] = useState<Test[]>([]);
   const [loading, setLoading] = useState(true);
   const [createOpen, setCreateOpen] = useState(false);
   const [editingTest, setEditingTest] = useState<Test | null>(null);
 
+  const meta = CATEGORY_META[testCategory] || CATEGORY_META.exam;
+
   function load() {
     setLoading(true);
-    fetch("/api/admin/tests")
+    fetch(`/api/admin/tests?category=${encodeURIComponent(testCategory)}`)
       .then((r) => r.json())
       .then((d) => setTests(d.tests || []))
       .finally(() => setLoading(false));
   }
-  useEffect(load, []);
+  useEffect(load, [testCategory]);
 
   async function deleteTest(test: Test) {
     if (!confirm(`Delete "${test.title}"? This removes all questions.`)) return;
@@ -102,11 +117,11 @@ export function AdminTests() {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold">Exams ({tests.length})</h1>
-          <p className="text-sm text-muted-foreground">Block-based exam builder — 20 text + 20 audio questions</p>
+          <h1 className="text-2xl font-bold">{meta.title} ({tests.length})</h1>
+          <p className="text-sm text-muted-foreground">{meta.subtitle}</p>
         </div>
-        <Button onClick={() => setCreateOpen(true)}>
-          <Plus className="w-4 h-4 mr-1" /> New Exam
+        <Button size="lg" onClick={() => setCreateOpen(true)}>
+          <Plus className="w-4 h-4 mr-1" /> {meta.createLabel}
         </Button>
       </div>
 
@@ -116,7 +131,7 @@ export function AdminTests() {
         <Card>
           <CardContent className="py-12 text-center">
             <FileText className="w-12 h-12 mx-auto mb-3 text-muted-foreground" />
-            <p className="text-muted-foreground">No exams yet. Click "New Exam" to create one.</p>
+            <p className="text-muted-foreground">Nothing here yet. Click "{meta.createLabel}" to create one.</p>
           </CardContent>
         </Card>
       ) : (
@@ -162,6 +177,7 @@ export function AdminTests() {
       {createOpen && (
         <CreateExamDialog
           open={createOpen}
+          testCategory={testCategory}
           onOpenChange={setCreateOpen}
           onCreated={(t) => { setCreateOpen(false); setEditingTest(t); load(); }}
         />
@@ -170,6 +186,7 @@ export function AdminTests() {
       {editingTest && (
         <ExamEditor
           test={editingTest}
+          testCategory={testCategory}
           onClose={() => { setEditingTest(null); load(); }}
         />
       )}
@@ -181,11 +198,13 @@ export function AdminTests() {
 // CREATE EXAM DIALOG — Step 1: exam details
 // ═══════════════════════════════════════════════════════════════════════════
 
-function CreateExamDialog({ open, onOpenChange, onCreated }: {
+function CreateExamDialog({ open, testCategory, onOpenChange, onCreated }: {
   open: boolean;
+  testCategory: string;
   onOpenChange: (v: boolean) => void;
   onCreated: (t: Test) => void;
 }) {
+  const isSimple = SIMPLE_CATEGORIES.includes(testCategory);
   const [busy, setBusy] = useState(false);
   const [form, setForm] = useState({
     title: "",
@@ -197,8 +216,8 @@ function CreateExamDialog({ open, onOpenChange, onCreated }: {
     featuredImage: "",
     audioPlayMode: "single" as "single" | "double",
     audioGapSec: 2,
-    textBlockCount: 20,
-    audioBlockCount: 20,
+    textBlockCount: isSimple ? 0 : 20,
+    audioBlockCount: isSimple ? 0 : 20,
   });
 
   async function uploadFile(file: File, folder: string): Promise<string> {
@@ -220,6 +239,7 @@ function CreateExamDialog({ open, onOpenChange, onCreated }: {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           ...form,
+          testCategory,
           price: form.price ? parseFloat(form.price) : undefined,
           isExam: true,
           isPublished: true,
@@ -227,36 +247,50 @@ function CreateExamDialog({ open, onOpenChange, onCreated }: {
       });
       if (!res.ok) { const d = await res.json(); toast.error(d.error || "Failed"); return; }
       const d = await res.json();
-      toast.success("Exam created — now add questions");
+      toast.success("Created — now add questions");
       onCreated(d.test);
     } finally { setBusy(false); }
   }
 
+  const dialogTitle = isSimple
+    ? `Create New ${CATEGORY_META[testCategory]?.title || "Set"}`
+    : "Create New Exam";
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader><DialogTitle>Create New Exam</DialogTitle></DialogHeader>
-        <div className="space-y-3">
+      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+        <DialogHeader><DialogTitle className="text-xl">{dialogTitle}</DialogTitle></DialogHeader>
+        <div className="space-y-4">
           {/* Exam Name */}
           <div>
-            <Label>Exam Name *</Label>
-            <Input value={form.title} onChange={(e) => setForm(f => ({ ...f, title: e.target.value }))} placeholder="e.g. UBT Mock Test 1" />
+            <Label className="text-sm font-semibold">Name *</Label>
+            <Input
+              value={form.title}
+              onChange={(e) => setForm(f => ({ ...f, title: e.target.value }))}
+              placeholder="e.g. UBT Mock Test 1"
+              className="h-12 text-base"
+            />
           </div>
 
           {/* Exam Details */}
           <div>
-            <Label>Exam Details</Label>
-            <Textarea rows={2} value={form.description} onChange={(e) => setForm(f => ({ ...f, description: e.target.value }))} placeholder="Brief description of the exam" />
+            <Label className="text-sm font-semibold">Description</Label>
+            <Textarea
+              rows={2}
+              value={form.description}
+              onChange={(e) => setForm(f => ({ ...f, description: e.target.value }))}
+              placeholder="Brief description of the exam"
+            />
           </div>
 
           {/* Exam Time + Price */}
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <Label>Exam Time (minutes) *</Label>
+              <Label className="text-sm font-semibold">Time (minutes) *</Label>
               <Input type="number" value={form.durationMin} onChange={(e) => setForm(f => ({ ...f, durationMin: parseInt(e.target.value) || 60 }))} min={1} />
             </div>
             <div>
-              <Label>Exam Price (optional)</Label>
+              <Label className="text-sm font-semibold">Price (optional)</Label>
               <Input type="number" value={form.price} onChange={(e) => setForm(f => ({ ...f, price: e.target.value }))} placeholder="0 = free" min={0} />
             </div>
           </div>
@@ -264,7 +298,7 @@ function CreateExamDialog({ open, onOpenChange, onCreated }: {
           {/* Exam Type + Category */}
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <Label>Exam Type *</Label>
+              <Label className="text-sm font-semibold">Exam Type *</Label>
               <Select value={form.examType} onValueChange={(v) => setForm(f => ({ ...f, examType: v }))}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
@@ -275,14 +309,14 @@ function CreateExamDialog({ open, onOpenChange, onCreated }: {
               </Select>
             </div>
             <div>
-              <Label>Category (shows in app)</Label>
+              <Label className="text-sm font-semibold">Category (shows in app)</Label>
               <Input value={form.category} onChange={(e) => setForm(f => ({ ...f, category: e.target.value }))} placeholder="e.g. Beginner, TOPIK 1" />
             </div>
           </div>
 
           {/* Featured Image */}
           <div>
-            <Label>Featured Image</Label>
+            <Label className="text-sm font-semibold">Featured Image</Label>
             <div className="flex gap-2">
               <Input value={form.featuredImage} onChange={(e) => setForm(f => ({ ...f, featuredImage: e.target.value }))} placeholder="Upload or paste URL…" className="flex-1" />
               <label className="cursor-pointer">
@@ -291,49 +325,62 @@ function CreateExamDialog({ open, onOpenChange, onCreated }: {
                   try { const url = await uploadFile(f, "exam-featured"); setForm(p => ({ ...p, featuredImage: url })); toast.success("Image uploaded"); }
                   catch (err: any) { toast.error(err.message); }
                 }} />
-                <span className="inline-flex items-center h-9 px-3 rounded-md bg-primary text-primary-foreground text-sm cursor-pointer hover:bg-primary/90">📁 Upload</span>
+                <span className="inline-flex items-center h-10 px-4 rounded-md bg-primary text-primary-foreground text-sm cursor-pointer hover:bg-primary/90">📁 Upload</span>
               </label>
             </div>
             {form.featuredImage && <img src={form.featuredImage} alt="Featured" className="mt-2 max-h-32 rounded border" />}
           </div>
 
-          {/* Audio Settings */}
-          <div className="p-3 border rounded-lg bg-slate-50 space-y-3">
-            <Label className="text-base font-semibold">Audio Settings (optional)</Label>
+          {/* Audio Settings — only for exam & demo (block-based) */}
+          {!isSimple && (
+            <div className="p-4 border rounded-lg bg-slate-50 space-y-3">
+              <Label className="text-base font-semibold">Audio Settings (optional)</Label>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <Label>Play Mode</Label>
+                  <Select value={form.audioPlayMode} onValueChange={(v: any) => setForm(f => ({ ...f, audioPlayMode: v }))}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="single">Single (play once)</SelectItem>
+                      <SelectItem value="double">Double (play twice)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label>Gap Between Plays (seconds)</Label>
+                  <Input type="number" value={form.audioGapSec} onChange={(e) => setForm(f => ({ ...f, audioGapSec: parseInt(e.target.value) || 2 }))} min={0} max={60} />
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Block Counts — only for exam & demo */}
+          {!isSimple && (
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <Label>Play Mode</Label>
-                <Select value={form.audioPlayMode} onValueChange={(v: any) => setForm(f => ({ ...f, audioPlayMode: v }))}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="single">Single (play once)</SelectItem>
-                    <SelectItem value="double">Double (play twice)</SelectItem>
-                  </SelectContent>
-                </Select>
+                <Label className="text-sm font-semibold">Text Questions Count</Label>
+                <Input type="number" value={form.textBlockCount} onChange={(e) => setForm(f => ({ ...f, textBlockCount: parseInt(e.target.value) || 20 }))} min={1} max={100} />
               </div>
               <div>
-                <Label>Gap Between Plays (seconds)</Label>
-                <Input type="number" value={form.audioGapSec} onChange={(e) => setForm(f => ({ ...f, audioGapSec: parseInt(e.target.value) || 2 }))} min={0} max={60} />
+                <Label className="text-sm font-semibold">Audio Questions Count</Label>
+                <Input type="number" value={form.audioBlockCount} onChange={(e) => setForm(f => ({ ...f, audioBlockCount: parseInt(e.target.value) || 20 }))} min={1} max={100} />
               </div>
             </div>
-          </div>
+          )}
 
-          {/* Block Counts */}
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <Label>Text Questions Count</Label>
-              <Input type="number" value={form.textBlockCount} onChange={(e) => setForm(f => ({ ...f, textBlockCount: parseInt(e.target.value) || 20 }))} min={1} max={100} />
+          {/* Simple mode hint */}
+          {isSimple && (
+            <div className="p-4 border rounded-lg bg-emerald-50 border-emerald-200 text-sm text-emerald-800">
+              Questions can be added freely after creation — there is no fixed block layout for this category.
             </div>
-            <div>
-              <Label>Audio Questions Count</Label>
-              <Input type="number" value={form.audioBlockCount} onChange={(e) => setForm(f => ({ ...f, audioBlockCount: parseInt(e.target.value) || 20 }))} min={1} max={100} />
-            </div>
-          </div>
+          )}
         </div>
 
-        <div className="flex justify-end gap-2 pt-2">
-          <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
-          <Button onClick={create} disabled={busy}>{busy ? "Creating…" : "Create Exam"}</Button>
+        <div className="flex justify-end gap-2 pt-2 border-t">
+          <Button variant="outline" size="lg" onClick={() => onOpenChange(false)}>Cancel</Button>
+          <Button size="lg" onClick={create} disabled={busy}>
+            {busy ? "Creating…" : <><Plus className="w-4 h-4 mr-1" /> Create</>}
+          </Button>
         </div>
       </DialogContent>
     </Dialog>
@@ -344,7 +391,8 @@ function CreateExamDialog({ open, onOpenChange, onCreated }: {
 // EXAM EDITOR — Step 2: block-based question editor
 // ═══════════════════════════════════════════════════════════════════════════
 
-function ExamEditor({ test, onClose }: { test: Test; onClose: () => void }) {
+function ExamEditor({ test, testCategory, onClose }: { test: Test; testCategory: string; onClose: () => void }) {
+  const isSimple = SIMPLE_CATEGORIES.includes(testCategory);
   const [activeBlock, setActiveBlock] = useState<"text" | "audio">("text");
   const [activeNumber, setActiveNumber] = useState(1);
   const [questions, setQuestions] = useState<Record<string, QuestionData>>({});
@@ -355,8 +403,8 @@ function ExamEditor({ test, onClose }: { test: Test; onClose: () => void }) {
   const [pushing, setPushing] = useState(false);
   const [isPublished, setIsPublished] = useState(test.isPublished);
 
-  const textCount = test.textBlockCount || 20;
-  const audioCount = test.audioBlockCount || 20;
+  const textCount = test.textBlockCount || (isSimple ? 0 : 20);
+  const audioCount = test.audioBlockCount || (isSimple ? 0 : 20);
 
   function key(blockType: string, blockNumber: number) {
     return `${blockType}-${blockNumber}`;
@@ -464,6 +512,47 @@ function ExamEditor({ test, onClose }: { test: Test; onClose: () => void }) {
     ? Array.from({ length: textCount }, (_, i) => i + 1)
     : Array.from({ length: audioCount }, (_, i) => i + 1);
 
+  // Simple-mode list of saved questions (sorted by block number)
+  const simpleList = Object.values(questions)
+    .filter((q) => q.stem.trim())
+    .sort((a, b) => a.blockNumber - b.blockNumber);
+
+  function addQuestion() {
+    // Pick the next free block number for the "text" block type
+    const used = new Set(Object.values(questions).map((q) => q.blockNumber));
+    let next = 1;
+    while (used.has(next)) next++;
+    setActiveBlock("text");
+    setActiveNumber(next);
+    // Pre-seed an empty question so it appears in the list immediately
+    const k = key("text", next);
+    if (!questions[k]) {
+      setQuestions((prev) => ({ ...prev, [k]: emptyQuestion("text", next) }));
+    }
+  }
+
+  function deleteActiveQuestion() {
+    const k = key(activeBlock, activeNumber);
+    const q = questions[k];
+    if (!q) return;
+    if (!confirm(`Delete question ${q.blockNumber}?`)) return;
+    // Remove locally
+    const next = { ...questions };
+    delete next[k];
+    setQuestions(next);
+    // If it was persisted server-side, also delete via API
+    if (q.testItemId) {
+      fetch(`/api/admin/tests/${test.id}/questions/${q.testItemId}`, { method: "DELETE" }).catch(() => {});
+    }
+    toast.success("Question removed");
+    // Move selection to the first remaining question
+    const remaining = Object.values(next).sort((a, b) => a.blockNumber - b.blockNumber);
+    if (remaining.length > 0) {
+      setActiveBlock(remaining[0].blockType);
+      setActiveNumber(remaining[0].blockNumber);
+    }
+  }
+
   return (
     <Dialog open={true} onOpenChange={(v) => { if (!v) onClose(); }}>
       <DialogContent className="max-w-5xl max-h-[95vh] overflow-hidden flex flex-col">
@@ -475,45 +564,86 @@ function ExamEditor({ test, onClose }: { test: Test; onClose: () => void }) {
           </DialogTitle>
         </DialogHeader>
 
-        {/* Block tabs */}
-        <div className="flex gap-2 border-b pb-2">
-          <Button
-            variant={activeBlock === "text" ? "default" : "outline"}
-            size="sm"
-            onClick={() => { setActiveBlock("text"); setActiveNumber(1); }}
-          >
-            <FileText className="w-4 h-4 mr-1" /> Text Block (1-{textCount})
-          </Button>
-          <Button
-            variant={activeBlock === "audio" ? "default" : "outline"}
-            size="sm"
-            onClick={() => { setActiveBlock("audio"); setActiveNumber(1); }}
-          >
-            <Headphones className="w-4 h-4 mr-1" /> Audio Block ({textCount + 1}-{textCount + audioCount})
-          </Button>
-        </div>
+        {/* Block tabs — only for exam & demo */}
+        {!isSimple && (
+          <div className="flex gap-2 border-b pb-2">
+            <Button
+              variant={activeBlock === "text" ? "default" : "outline"}
+              size="sm"
+              onClick={() => { setActiveBlock("text"); setActiveNumber(1); }}
+            >
+              <FileText className="w-4 h-4 mr-1" /> Text Block (1-{textCount})
+            </Button>
+            <Button
+              variant={activeBlock === "audio" ? "default" : "outline"}
+              size="sm"
+              onClick={() => { setActiveBlock("audio"); setActiveNumber(1); }}
+            >
+              <Headphones className="w-4 h-4 mr-1" /> Audio Block ({textCount + 1}-{textCount + audioCount})
+            </Button>
+          </div>
+        )}
 
-        {/* Block number selector — grid of numbered buttons */}
-        <div className="grid grid-cols-10 gap-1 max-h-24 overflow-y-auto p-1 bg-slate-50 rounded">
-          {blockNumbers.map((num) => {
-            const k = key(activeBlock, num);
-            const isFilled = questions[k] && questions[k].stem.trim();
-            const isActive = num === activeNumber;
-            return (
-              <button
-                key={num}
-                onClick={() => setActiveNumber(num)}
-                className={`h-8 rounded text-xs font-medium transition-colors ${
-                  isActive ? "bg-primary text-primary-foreground" :
-                  isFilled ? "bg-green-100 text-green-700 border border-green-300" :
-                  "bg-white border hover:bg-slate-100"
-                }`}
-              >
-                {num}
-              </button>
-            );
-          })}
-        </div>
+        {/* Block number selector — grid of numbered buttons (exam & demo only) */}
+        {!isSimple && (
+          <div className="grid grid-cols-10 gap-1 max-h-24 overflow-y-auto p-1 bg-slate-50 rounded">
+            {blockNumbers.map((num) => {
+              const k = key(activeBlock, num);
+              const isFilled = questions[k] && questions[k].stem.trim();
+              const isActive = num === activeNumber;
+              return (
+                <button
+                  key={num}
+                  onClick={() => setActiveNumber(num)}
+                  className={`h-8 rounded text-xs font-medium transition-colors ${
+                    isActive ? "bg-primary text-primary-foreground" :
+                    isFilled ? "bg-green-100 text-green-700 border border-green-300" :
+                    "bg-white border hover:bg-slate-100"
+                  }`}
+                >
+                  {num}
+                </button>
+              );
+            })}
+          </div>
+        )}
+
+        {/* Simple question list — for batch / chapter / question_bank */}
+        {isSimple && (
+          <div className="space-y-2 border-b pb-3">
+            <div className="flex items-center justify-between">
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                Questions ({simpleList.length})
+              </p>
+              <Button size="sm" onClick={addQuestion}>
+                <Plus className="w-4 h-4 mr-1" /> Add Question
+              </Button>
+            </div>
+            <div className="flex gap-2 flex-wrap max-h-24 overflow-y-auto p-1 bg-slate-50 rounded">
+              {simpleList.length === 0 && (
+                <p className="text-xs text-muted-foreground p-2">
+                  No questions yet. Click &ldquo;Add Question&rdquo; to start.
+                </p>
+              )}
+              {simpleList.map((q) => {
+                const isActive = q.blockType === activeBlock && q.blockNumber === activeNumber;
+                return (
+                  <button
+                    key={key(q.blockType, q.blockNumber)}
+                    onClick={() => { setActiveBlock(q.blockType); setActiveNumber(q.blockNumber); }}
+                    className={`h-8 px-3 rounded text-xs font-medium transition-colors ${
+                      isActive ? "bg-primary text-primary-foreground" :
+                      "bg-green-100 text-green-700 border border-green-300 hover:bg-green-200"
+                    }`}
+                    title={q.stem}
+                  >
+                    Q{q.blockNumber}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
 
         {/* Question editor */}
         <div className="flex-1 overflow-y-auto pr-1">
@@ -529,18 +659,23 @@ function ExamEditor({ test, onClose }: { test: Test; onClose: () => void }) {
           )}
         </div>
 
-        {/* Action buttons — Done, Copy, Paste, Push to App */}
+        {/* Action buttons — Done, Copy, Paste, Delete (simple), Push to App */}
         <div className="flex items-center justify-between border-t pt-3">
           <div className="flex gap-2 flex-wrap">
-            <Button onClick={saveQuestion} variant="default">
-              <Save className="w-4 h-4 mr-1" /> Done
+            <Button onClick={saveQuestion} variant="default" size="lg">
+              <Save className="w-4 h-4 mr-1" /> Save
             </Button>
-            <Button onClick={copyQuestion} variant="outline">
+            <Button onClick={copyQuestion} variant="outline" size="lg">
               <Copy className="w-4 h-4 mr-1" /> Copy
             </Button>
-            <Button onClick={pasteQuestion} variant="outline">
+            <Button onClick={pasteQuestion} variant="outline" size="lg">
               <ClipboardPaste className="w-4 h-4 mr-1" /> Paste
             </Button>
+            {isSimple && (
+              <Button onClick={deleteActiveQuestion} variant="outline" size="lg" className="text-rose-600 hover:text-rose-700">
+                <Trash2 className="w-4 h-4 mr-1" /> Delete
+              </Button>
+            )}
           </div>
           <div className="flex items-center gap-2">
             {isPublished && (
@@ -552,6 +687,7 @@ function ExamEditor({ test, onClose }: { test: Test; onClose: () => void }) {
               onClick={pushToApp}
               disabled={pushing || isPublished}
               variant={isPublished ? "outline" : "default"}
+              size="lg"
               className={isPublished ? "" : "bg-green-600 hover:bg-green-700"}
             >
               {pushing ? (
@@ -562,7 +698,7 @@ function ExamEditor({ test, onClose }: { test: Test; onClose: () => void }) {
                 <><span className="mr-1">🚀</span> Push to App</>
               )}
             </Button>
-            <Button variant="ghost" onClick={onClose}>Close</Button>
+            <Button variant="ghost" size="lg" onClick={onClose}>Close</Button>
           </div>
         </div>
       </DialogContent>

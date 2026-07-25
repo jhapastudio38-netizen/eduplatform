@@ -1,5 +1,5 @@
 /**
- * GET /api/student/books — list published books
+ * GET /api/admin/books — list all books (admin only)
  * POST /api/admin/books — admin creates a book (requires ADMIN role)
  */
 import { NextResponse, NextRequest } from "next/server";
@@ -8,8 +8,11 @@ import { getCurrentUser } from "@/lib/session";
 import { z } from "zod";
 
 export async function GET() {
+  const user = await getCurrentUser();
+  if (!user || (user.role !== "ADMIN" && user.role !== "TEACHER")) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
   const books = await db.book.findMany({
-    where: { isPublished: true },
     orderBy: { createdAt: "desc" },
     include: { _count: { select: { chapters: true } } },
   });
@@ -26,6 +29,7 @@ const createBookSchema = z.object({
   pageCount: z.number().int().min(1).max(10000).optional(),
   category: z.string().max(50).optional(),
   level: z.string().max(50).optional(),
+  publishedDate: z.string().max(50).optional().or(z.literal("")),
   isPublished: z.boolean().default(false),
 });
 

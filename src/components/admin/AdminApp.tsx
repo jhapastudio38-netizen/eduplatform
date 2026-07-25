@@ -7,7 +7,7 @@ import {
   GraduationCap, School, Image, Layers, Package, UserCog, BookMarked,
   ClipboardList, BarChart3, Settings, LogOut, ChevronDown, ChevronRight,
   FolderTree, Library, Award, Bell, Search, Menu, X, Headphones, Radio, Video,
-  LayoutGrid
+  LayoutGrid, Eye
 } from "lucide-react";
 import { useAuthStore } from "@/stores/auth";
 import { Button } from "@/components/ui/button";
@@ -17,11 +17,12 @@ import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { AdminOverview } from "./AdminOverview";
 import { AdminContent } from "./AdminContent";
-import { AdminQuestions } from "./AdminQuestions";
 import { AdminTests } from "./AdminTests";
+import { AdminAIGenerate } from "./AdminAIGenerate";
 import { AdminUsers } from "./AdminUsers";
 import { AdminNotifications } from "./AdminNotifications";
 import { AdminBooks } from "./AdminBooks";
+import { AdminEyeVision } from "./AdminEyeVision";
 import { AdminHomeCards } from "./AdminHomeCards";
 import { AdminAudioLessons } from "./AdminAudioLessons";
 import { AdminVideoLessons } from "./AdminVideoLessons";
@@ -29,7 +30,6 @@ import { AdminLiveRooms } from "./AdminLiveRooms";
 import { AdminStudentResults } from "./AdminStudentResults";
 import { AdminPlaceholder } from "./AdminPlaceholder";
 import {
-  AdminDemoExams, AdminBatchExams, AdminChapterExams,
   AdminQuestionCategories, AdminAllCourses, AdminBatch,
   AdminPDFViewer, AdminColorVision, AdminPackageResults,
   AdminClassroomResults, AdminOrders
@@ -41,7 +41,8 @@ type View =
   | "paid-exam-orders" | "batch-orders" | "course-orders" | "qb-orders"
   | "batch" | "student-results" | "package-results" | "classroom-results"
   | "students" | "teachers" | "pdf-viewer" | "settings" | "home-cards"
-  | "content" | "questions" | "tests" | "users" | "notifications";
+  | "content" | "questions" | "tests" | "users" | "notifications" | "ai"
+  | "eye-vision" | "books";
 
 interface NavItem {
   id: View;
@@ -60,6 +61,25 @@ const NAV_SECTIONS: NavSection[] = [
     title: "Exam Management",
     items: [
       { id: "exams", label: "Exams", icon: FileText, hasAdd: true },
+      { id: "demo-exams", label: "Demo Exams", icon: FileText, hasAdd: true },
+      { id: "batch-exams", label: "Batch Exams", icon: Layers, hasAdd: true },
+      { id: "chapter-exams", label: "Chapter Exams", icon: BookOpen, hasAdd: true },
+      { id: "question-bank", label: "Question Bank", icon: FileQuestion, hasAdd: true },
+    ],
+  },
+  {
+    title: "Content",
+    items: [
+      { id: "eye-vision", label: "Eye Vision", icon: Eye, hasAdd: true },
+      { id: "books", label: "Books", icon: BookMarked, hasAdd: true },
+    ],
+  },
+  {
+    title: "Management",
+    items: [
+      { id: "student-results", label: "Student Results", icon: BarChart3 },
+      { id: "students", label: "Students", icon: GraduationCap },
+      { id: "teachers", label: "Teachers", icon: UserCog, hasAdd: true },
     ],
   },
   {
@@ -125,23 +145,29 @@ export function AdminApp() {
         return <AdminAllCourses />;
       case "content":
         return <AdminContent />;
-      case "question-bank":
-      case "questions":
-        return <AdminQuestions />;
+      case "ai":
+        return <AdminAIGenerate />;
       case "exams":
       case "tests":
-        return <AdminTests />;
+        return <AdminTests testCategory="exam" />;
       case "demo-exams":
-        return <AdminDemoExams />;
+        return <AdminTests testCategory="demo" />;
       case "batch-exams":
-        return <AdminBatchExams />;
+        return <AdminTests testCategory="batch" />;
       case "chapter-exams":
-        return <AdminChapterExams />;
+        return <AdminTests testCategory="chapter" />;
+      case "question-bank":
+      case "questions":
+        return <AdminTests testCategory="question_bank" />;
+      case "eye-vision":
+        return <AdminEyeVision />;
+      case "books":
+        return <AdminBooks />;
       case "students":
       case "users":
-        return <AdminUsers />;
+        return <AdminUsers role="STUDENT" />;
       case "teachers":
-        return <AdminUsers />;
+        return <AdminUsers role="TEACHER" />;
       case "audio-lessons":
         return <AdminAudioLessons />;
       case "video-lessons":
@@ -242,7 +268,8 @@ function isValidView(v: string): v is View {
     "question-bank", "question-categories", "all-books", "all-courses", "audio-lessons", "video-lessons",
     "paid-exam-orders", "batch-orders", "course-orders", "qb-orders",
     "batch", "student-results", "package-results", "classroom-results",
-    "students", "teachers", "pdf-viewer", "settings", "home-cards", "content", "questions", "tests", "users"];
+    "students", "teachers", "pdf-viewer", "settings", "home-cards", "content", "questions", "tests", "users",
+    "notifications", "eye-vision", "books", "ai"];
   return all.includes(v);
 }
 

@@ -2,39 +2,42 @@ import { NextResponse, NextRequest } from "next/server";
 import { db } from "@/lib/db";
 
 /**
- * GET /api/student/tests?filter=practice|exam|ubt|free|batch|all
+ * GET /api/student/tests?filter=practice|exam|ubt|free|batch|all&category=exam|demo|batch|chapter|question_bank
  *
  * Returns published tests, optionally filtered.
- *  - practice : isExam = false (free practice tests)
- *  - exam     : isExam = true (formal exams)
- *  - ubt      : examType = "UBT"
- *  - free     : examType = "REGULAR" AND isExam = false
- *  - batch    : examType = "BATCH"
- *  - all      : no filter (default)
+ * - category: filters by testCategory field (exam, demo, batch, chapter, question_bank)
+ * - filter: legacy filter (practice, exam, ubt, free, batch, all)
  */
 export async function GET(req: NextRequest) {
   const filter = req.nextUrl.searchParams.get("filter") || "all";
+  const category = req.nextUrl.searchParams.get("category");
 
-  // Build the where clause based on the filter
+  // Build the where clause
   const where: any = { isPublished: true };
-  switch (filter) {
-    case "practice":
-      where.isExam = false;
-      break;
-    case "exam":
-      where.isExam = true;
-      break;
-    case "ubt":
-      where.examType = "UBT";
-      break;
-    case "free":
-      where.isExam = false;
-      where.examType = "REGULAR";
-      break;
-    case "batch":
-      where.examType = "BATCH";
-      break;
-    // "all" or anything else → no extra filter
+
+  // New category filter takes priority
+  if (category && ["exam", "demo", "batch", "chapter", "question_bank"].includes(category)) {
+    where.testCategory = category;
+  } else {
+    // Legacy filter
+    switch (filter) {
+      case "practice":
+        where.isExam = false;
+        break;
+      case "exam":
+        where.isExam = true;
+        break;
+      case "ubt":
+        where.examType = "UBT";
+        break;
+      case "free":
+        where.isExam = false;
+        where.examType = "REGULAR";
+        break;
+      case "batch":
+        where.testCategory = "batch";
+        break;
+    }
   }
 
   const tests = await db.test.findMany({

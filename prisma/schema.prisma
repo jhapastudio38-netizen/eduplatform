@@ -239,6 +239,9 @@ model Test {
   durationMin Int      @default(30)
   isExam      Boolean  @default(false)
   examType    String   @default("REGULAR") // UBT / CBT / CHAPTER / REGULAR
+  // testCategory: which tab this appears in on the app
+  // exam | demo | batch | chapter | question_bank
+  testCategory String  @default("exam")
   passScore   Int      @default(40)
   startAt     DateTime?
   endAt       DateTime?
@@ -258,7 +261,7 @@ model Test {
   // Audio settings — controls how exam audio plays
   audioPlayMode String? @default("single") // "single" | "double"
   audioGapSec  Int?     @default(2) // gap between audio plays in seconds
-  // Block configuration
+  // Block configuration (only for "exam" and "demo" categories)
   textBlockCount  Int? @default(20) // number of text questions (default 20)
   audioBlockCount Int? @default(20) // number of audio questions (default 20)
 
@@ -271,6 +274,7 @@ model Test {
   @@index([examType])
   @@index([isActive])
   @@index([category])
+  @@index([testCategory])
 }
 
 model TestItem {
@@ -409,7 +413,7 @@ model Book {
   id          String   @id @default(cuid())
   title       String
   slug        String   @unique
-  description String?
+  description String?  // about the book
   author      String?
   coverUrl    String?
   pdfUrl      String? // S3 URL to the PDF file
@@ -418,7 +422,8 @@ model Book {
   category    String? // e.g. "Beginner", "Intermediate", "Advanced", "TOPIK"
   level       String? // TOPIK 1-6
   tags        String? // JSON array
-  isPublished Boolean  @default(false)
+  publishedDate String? // publication date (admin-entered)
+  isPublished Boolean  @default(true)
   downloads   Int      @default(0)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
@@ -428,6 +433,26 @@ model Book {
 
   @@index([category, level])
   @@index([isPublished])
+}
+
+// ─── Eye Vision Tests ────────────────────────────────────────────────────────
+// Admin uploads an image with text/numbers. Student types what they see.
+// Answer is case-insensitive compared to what admin entered.
+model EyeVisionTest {
+  id          String   @id @default(cuid())
+  title       String
+  description String?
+  imageUrl    String   // the image to display
+  correctAnswer String // what admin typed — student must match (case-insensitive)
+  category    String?  // optional grouping (e.g. "Letters", "Numbers", "Symbols")
+  sortOrder   Int      @default(0)
+  isPublished Boolean  @default(true)
+  createdBy   String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([isPublished])
+  @@index([category])
 }
 
 model BookChapter {
