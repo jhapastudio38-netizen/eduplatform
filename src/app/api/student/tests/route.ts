@@ -55,6 +55,7 @@ export async function GET(req: NextRequest) {
     durationMin: t.durationMin,
     isExam: t.isExam,
     examType: t.examType,
+    testCategory: t.testCategory || "exam",
     passScore: t.passScore,
     startAt: t.startAt,
     endAt: t.endAt,
