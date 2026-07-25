@@ -616,21 +616,22 @@ fun AnswerInput(
     }
 }
 
-// ─── Async image (loads from URL) ─────────────────────────────────────────────
+// ─── Async image (loads from URL using Coil) ─────────────────────────────────
 @Composable
 fun AsyncImage(url: String, modifier: Modifier = Modifier) {
-    // Use Coil or just a placeholder box for now (no external dep)
-    // Real implementation would use coil-compose
-    Box(
-        modifier = modifier.background(Color(0xFFE0E0E0)),
-        contentAlignment = Alignment.Center
-    ) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+    val theme = rememberAppTheme()
+    if (url.isBlank()) {
+        Box(modifier = modifier.background(Color(0xFFE0E0E0)), contentAlignment = Alignment.Center) {
             Icon(Icons.Default.Image, null, tint = Color.Gray, modifier = Modifier.size(32.dp))
-            Spacer(Modifier.height(4.dp))
-            Text("Image: $url".take(40), color = Color.Gray, fontSize = 9.sp)
         }
+        return
     }
+    coil.compose.AsyncImage(
+        model = url,
+        contentDescription = null,
+        modifier = modifier,
+        contentScale = androidx.compose.ui.layout.ContentScale.Crop
+    )
 }
 
 // ─── Result screen ────────────────────────────────────────────────────────────

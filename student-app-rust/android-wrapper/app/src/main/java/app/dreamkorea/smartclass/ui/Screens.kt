@@ -71,9 +71,8 @@ fun MainScreen(userName: String, onLogout: () -> Unit) {
 
     Surface(modifier = Modifier.fillMaxSize(), color = theme.background) {
         Column(modifier = Modifier.fillMaxSize()) {
-            // ─── Top bar — hidden on Home and Exam for a cleaner, more open look ──
+            // ─── Top bar — hidden only on Exam and BookReader for immersive mode ──
             val showTopBar = when (screen) {
-                is Screen.Home -> false
                 is Screen.Exam -> false
                 is Screen.BookReader -> false
                 else -> true
@@ -122,7 +121,7 @@ fun MainScreen(userName: String, onLogout: () -> Unit) {
     }
 }
 
-// ─── Top bar — clean, minimal (no tagline) ────────────────────────────────────
+// ─── Top bar — clean, with DreamKorea logo ───────────────────────────────────
 @Composable
 fun TopBar(theme: AppTheme, userName: String, sound: SoundManager, onProfile: () -> Unit, onSettings: () -> Unit) {
     Surface(
@@ -131,9 +130,17 @@ fun TopBar(theme: AppTheme, userName: String, sound: SoundManager, onProfile: ()
         tonalElevation = 0.dp
     ) {
         Row(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
+            // DreamKorea logo
+            Image(
+                painter = painterResource(id = app.dreamkorea.smartclass.R.drawable.dreamkorea_logo),
+                contentDescription = "DreamKorea Logo",
+                modifier = Modifier.size(38.dp),
+                contentScale = ContentScale.Fit
+            )
+            Spacer(Modifier.width(10.dp))
             Text("DreamKorea", color = theme.darkText, fontSize = 18.sp, fontWeight = FontWeight.Bold)
             Spacer(Modifier.weight(1f))
             // Profile icon
@@ -161,7 +168,7 @@ fun TopBar(theme: AppTheme, userName: String, sound: SoundManager, onProfile: ()
     }
 }
 
-// Async image loader — loads admin-uploaded images. Falls back to DK placeholder.
+// Async image loader — uses Coil to load admin-uploaded images from URLs
 @Composable
 fun AsyncImageLoader(url: String, modifier: Modifier = Modifier) {
     val theme = rememberAppTheme()
@@ -170,17 +177,15 @@ fun AsyncImageLoader(url: String, modifier: Modifier = Modifier) {
             modifier = modifier.background(theme.primary.copy(alpha = 0.1f)),
             contentAlignment = Alignment.Center
         ) {
-            Text("DK", color = theme.primary, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+            Icon(Icons.Default.Image, null, tint = theme.primary.copy(alpha = 0.3f), modifier = Modifier.size(32.dp))
         }
         return
     }
-    // For now, show the logo as a placeholder. Image loading can be added later
-    // with Coil once the build environment has more memory headroom.
-    Image(
-        painter = painterResource(id = app.dreamkorea.smartclass.R.drawable.dreamkorea_logo),
+    coil.compose.AsyncImage(
+        model = url,
         contentDescription = null,
         modifier = modifier,
-        contentScale = ContentScale.Fit
+        contentScale = ContentScale.Crop
     )
 }
 
@@ -204,28 +209,19 @@ fun MiniStat(theme: AppTheme, icon: ImageVector, value: String, label: String) {
 // ─── Home — image cards like the original app ─────────────────────────────────
 @Composable
 fun HomeScreen(theme: AppTheme, sound: SoundManager, onNavigate: (Screen) -> Unit) {
-    var homeCards by remember { mutableStateOf<List<HomeCard>>(emptyList()) }
-    var loading by remember { mutableStateOf(true) }
-    var loadError by remember { mutableStateOf(false) }
-    var retryCount by remember { mutableStateOf(0) }
+    // Stale-while-revalidate: show cached data INSTANTLY, refresh in background
+    var homeCards by remember {
+        mutableStateOf<List<HomeCard>>(AppState.getCachedNow<List<HomeCard>>(AppState.KEY_HOME_CARDS) ?: emptyList())
+    }
+    var loading by remember { mutableStateOf(homeCards.isEmpty()) }
 
-    LaunchedEffect(retryCount) {
-        loading = true
-        loadError = false
+    LaunchedEffect(Unit) {
+        // If we already have cached data, don't show loading — just refresh silently
+        if (homeCards.isNotEmpty()) loading = false
         try {
-            if (retryCount > 0) AppState.invalidateCache("home_cards")
-            val result = kotlinx.coroutines.withTimeoutOrNull(15_000L) {
-                AppState.getCachedHomeCards()
-            }
-            if (result != null) {
-                homeCards = result
-            } else {
-                // Timeout — use fallback cards so home is never blank
-                homeCards = emptyList()
-            }
+            homeCards = AppState.getCachedHomeCards()
         } catch (_: Exception) {
-            // Silently fall back to default cards — home should never crash
-            homeCards = emptyList()
+            // Keep cached data if refresh fails
         } finally {
             loading = false
         }
@@ -263,16 +259,6 @@ fun HomeScreen(theme: AppTheme, sound: SoundManager, onNavigate: (Screen) -> Uni
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(bottom = 24.dp)
     ) {
-        // Clean minimal header — just "DreamKorea" text, no tagline, no logo image
-        item {
-            Row(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 16.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text("DreamKorea", color = theme.darkText, fontSize = 24.sp, fontWeight = FontWeight.Bold)
-            }
-        }
-
         sections.forEach { (sectionKey, cards) ->
             val sectionTitle = when (sectionKey) {
                 "test" -> "Tests"
@@ -512,8 +498,10 @@ fun LearnScreen(theme: AppTheme, sound: SoundManager, onBack: () -> Unit) {
 // ─── Books Screen ─────────────────────────────────────────────────────────────
 @Composable
 fun BooksScreen(theme: AppTheme, sound: SoundManager, onBack: () -> Unit, onBookClick: (Book) -> Unit = {}) {
-    var books by remember { mutableStateOf<List<Book>>(emptyList()) }
-    var loading by remember { mutableStateOf(true) }
+    var books by remember {
+        mutableStateOf<List<Book>>(AppState.getCachedNow<List<Book>>(AppState.KEY_BOOKS) ?: emptyList())
+    }
+    var loading by remember { mutableStateOf(books.isEmpty()) }
 
     LaunchedEffect(Unit) {
         try { books = AppState.getCachedBooks() } catch (_: Exception) {}
@@ -573,37 +561,43 @@ fun BooksScreen(theme: AppTheme, sound: SoundManager, onBack: () -> Unit, onBook
 // ─── Tests Screen ─────────────────────────────────────────────────────────────
 @Composable
 fun TestsScreen(theme: AppTheme, sound: SoundManager, filter: String = "all", title: String = "Tests & Exams", onBack: () -> Unit, onStartExam: (String) -> Unit) {
-    var tests by remember { mutableStateOf<List<TestItem>>(emptyList()) }
-    var loading by remember { mutableStateOf(true) }
+    // Stale-while-revalidate: show cached data instantly
+    var tests by remember {
+        mutableStateOf<List<TestItem>>(AppState.getCachedNow<List<TestItem>>(AppState.keyTests(filter)) ?: emptyList())
+    }
+    var loading by remember { mutableStateOf(tests.isEmpty()) }
     var error by remember { mutableStateOf("") }
     var retryCount by remember { mutableStateOf(0) }
 
     LaunchedEffect(filter, retryCount) {
-        loading = true
+        if (tests.isNotEmpty()) loading = false
+        else loading = true
         error = ""
         try {
-            if (retryCount > 0) AppState.invalidateCache("tests_$filter")
+            if (retryCount > 0) AppState.invalidateCache(AppState.keyTests(filter))
             val result = kotlinx.coroutines.withTimeoutOrNull(20_000L) {
                 AppState.getCachedTests(filter)
             }
             if (result != null) {
                 tests = result
-            } else {
+            } else if (tests.isEmpty()) {
                 error = "The request timed out. Check your internet and try again."
             }
         } catch (e: retrofit2.HttpException) {
-            error = when (e.code()) {
-                401 -> "Your session has expired. Please log out and sign in again."
-                else -> "Could not load tests (HTTP ${e.code()})."
+            if (tests.isEmpty()) {
+                error = when (e.code()) {
+                    401 -> "Your session has expired. Please log out and sign in again."
+                    else -> "Could not load tests (HTTP ${e.code()})."
+                }
             }
         } catch (e: java.net.UnknownHostException) {
-            error = "No internet connection. Please check your network."
+            if (tests.isEmpty()) error = "No internet connection. Please check your network."
         } catch (e: java.net.SocketTimeoutException) {
-            error = "The request timed out. Please try again."
+            if (tests.isEmpty()) error = "The request timed out. Please try again."
         } catch (e: java.io.IOException) {
-            error = "Network error: ${e.message ?: "Could not connect."}"
+            if (tests.isEmpty()) error = "Network error: ${e.message ?: "Could not connect."}"
         } catch (e: Exception) {
-            error = "Unexpected error: ${e.message ?: "Please try again."}"
+            if (tests.isEmpty()) error = "Unexpected error: ${e.message ?: "Please try again."}"
         } finally {
             loading = false
         }
@@ -745,8 +739,10 @@ fun TestCard(theme: AppTheme, sound: SoundManager, t: TestItem, onClick: () -> U
 // ─── Videos Screen ────────────────────────────────────────────────────────────
 @Composable
 fun VideosScreen(theme: AppTheme, sound: SoundManager, onBack: () -> Unit) {
-    var videos by remember { mutableStateOf<List<VideoLesson>>(emptyList()) }
-    var loading by remember { mutableStateOf(true) }
+    var videos by remember {
+        mutableStateOf<List<VideoLesson>>(AppState.getCachedNow<List<VideoLesson>>(AppState.KEY_VIDEOS) ?: emptyList())
+    }
+    var loading by remember { mutableStateOf(videos.isEmpty()) }
 
     LaunchedEffect(Unit) {
         try { videos = AppState.getCachedVideos() } catch (_: Exception) {}

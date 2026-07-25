@@ -248,7 +248,20 @@ interface DreamKoreaApi {
 
     @GET("api/student/question-bank")
     suspend fun getQuestionBank(): QuestionBankResponse
+
+    @GET("api/student/notifications")
+    suspend fun getNotifications(@Query("since") since: String? = null): NotificationsResponse
 }
+
+// ─── Notifications ────────────────────────────────────────────────────────────
+data class AppNotification(
+    val id: String,
+    val title: String,
+    val body: String,
+    val category: String = "general",
+    val createdAt: String
+)
+data class NotificationsResponse(val notifications: List<AppNotification> = emptyList())
 
 // ─── Question Bank ────────────────────────────────────────────────────────────
 data class QuestionBankQuestion(

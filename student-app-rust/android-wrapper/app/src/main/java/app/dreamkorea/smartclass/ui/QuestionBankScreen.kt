@@ -33,8 +33,10 @@ import kotlinx.coroutines.withTimeoutOrNull
  */
 @Composable
 fun QuestionBankScreen(theme: AppTheme, sound: SoundManager, onBack: () -> Unit) {
-    var questions by remember { mutableStateOf<List<QuestionBankQuestion>>(emptyList()) }
-    var loading by remember { mutableStateOf(true) }
+    var questions by remember {
+        mutableStateOf<List<QuestionBankQuestion>>(AppState.getCachedNow<List<QuestionBankQuestion>>(AppState.KEY_QUESTION_BANK) ?: emptyList())
+    }
+    var loading by remember { mutableStateOf(questions.isEmpty()) }
     var error by remember { mutableStateOf("") }
     var selectedCategory by remember { mutableStateOf<String?>(null) }
     var currentIdx by remember { mutableStateOf(0) }
@@ -44,33 +46,35 @@ fun QuestionBankScreen(theme: AppTheme, sound: SoundManager, onBack: () -> Unit)
     var retryCount by remember { mutableStateOf(0) }
 
     LaunchedEffect(retryCount) {
-        loading = true
+        if (questions.isNotEmpty()) loading = false
+        else loading = true
         error = ""
         try {
-            // Invalidate cache on retry so we get fresh data
-            if (retryCount > 0) AppState.invalidateCache("question_bank")
+            if (retryCount > 0) AppState.invalidateCache(AppState.KEY_QUESTION_BANK)
             val result = withTimeoutOrNull(20_000L) {
                 AppState.getCachedQuestionBank()
             }
             if (result != null) {
                 questions = result
-            } else {
+            } else if (questions.isEmpty()) {
                 error = "The request timed out. Check your internet and try again."
             }
         } catch (e: retrofit2.HttpException) {
-            val rawBody = try { e.response()?.errorBody()?.string() } catch (_: Exception) { null }
-            error = when (e.code()) {
-                401 -> "Your session has expired. Please log out and sign in again."
-                else -> "Could not load questions (HTTP ${e.code()}).${if (rawBody != null) " $rawBody" else ""}"
+            if (questions.isEmpty()) {
+                val rawBody = try { e.response()?.errorBody()?.string() } catch (_: Exception) { null }
+                error = when (e.code()) {
+                    401 -> "Your session has expired. Please log out and sign in again."
+                    else -> "Could not load questions (HTTP ${e.code()}).${if (rawBody != null) " $rawBody" else ""}"
+                }
             }
         } catch (e: java.net.UnknownHostException) {
-            error = "No internet connection. Please check your network."
+            if (questions.isEmpty()) error = "No internet connection. Please check your network."
         } catch (e: java.net.SocketTimeoutException) {
-            error = "The request timed out. Please try again."
+            if (questions.isEmpty()) error = "The request timed out. Please try again."
         } catch (e: java.io.IOException) {
-            error = "Network error: ${e.message ?: "Could not connect."}"
+            if (questions.isEmpty()) error = "Network error: ${e.message ?: "Could not connect."}"
         } catch (e: Exception) {
-            error = "Unexpected error: ${e.message ?: "Please try again."}"
+            if (questions.isEmpty()) error = "Unexpected error: ${e.message ?: "Please try again."}"
         } finally {
             loading = false
         }

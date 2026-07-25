@@ -693,3 +693,16 @@ enum ExamType {
   BATCH
   PLACEMENT
 }
+
+// ─── Notifications — admin broadcasts to all students ────────────────────────
+model Notification {
+  id          String   @id @default(cuid())
+  title       String
+  body        String
+  category    String   @default("general") // general | exam | update | alert
+  createdBy   String?
+  createdAt   DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([category])
+}
