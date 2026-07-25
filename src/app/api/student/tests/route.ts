@@ -57,6 +57,14 @@ export async function GET(req: NextRequest) {
     endAt: t.endAt,
     isPublished: t.isPublished,
     isActive: t.isActive,
+    // New fields for app display
+    featuredImage: t.featuredImage || null,
+    category: t.category || null,
+    price: t.price ?? null,
+    audioPlayMode: t.audioPlayMode || "single",
+    audioGapSec: t.audioGapSec ?? 2,
+    textBlockCount: t.textBlockCount ?? 20,
+    audioBlockCount: t.audioBlockCount ?? 20,
     items: [], // do not leak questions on the listing
     questionCount: t._count.items,
   }));
