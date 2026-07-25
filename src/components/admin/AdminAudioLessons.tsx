@@ -135,7 +135,39 @@ export function AdminAudioLessons() {
           <div className="space-y-3">
             <div><Label>Title</Label><Input value={form.title} onChange={e => setForm(f => ({ ...f, title: e.target.value }))} placeholder="Daily Korean Conversation — Episode 1" /></div>
             <div><Label>Description</Label><Textarea rows={2} value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} /></div>
-            <div><Label>Audio URL (MP3/M4A)</Label><Input value={form.audioUrl} onChange={e => setForm(f => ({ ...f, audioUrl: e.target.value }))} placeholder="https://s3.amazonaws.com/audio/lesson-1.mp3" /></div>
+            <div>
+              <Label>Audio File (MP3/M4A/WAV)</Label>
+              <div className="flex gap-2">
+                <Input value={form.audioUrl} onChange={e => setForm(f => ({ ...f, audioUrl: e.target.value }))} placeholder="Upload a file or paste URL…" className="flex-1" />
+                <label className="cursor-pointer">
+                  <input
+                    type="file"
+                    accept="audio/*"
+                    className="hidden"
+                    onChange={async (e) => {
+                      const f = e.target.files?.[0];
+                      if (!f) return;
+                      setBusy(true);
+                      try {
+                        const fd = new FormData();
+                        fd.append("file", f);
+                        fd.append("folder", "audio");
+                        const res = await fetch("/api/admin/upload", { method: "POST", body: fd });
+                        if (!res.ok) { const d = await res.json(); toast.error(d.error || "Upload failed"); return; }
+                        const d = await res.json();
+                        setForm(prev => ({ ...prev, audioUrl: d.url }));
+                        toast.success("Audio uploaded");
+                      } catch { toast.error("Upload failed"); }
+                      finally { setBusy(false); }
+                    }}
+                  />
+                  <span className="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium h-9 px-3 bg-primary text-primary-foreground cursor-pointer hover:bg-primary/90">
+                    📁 Upload
+                  </span>
+                </label>
+              </div>
+              {form.audioUrl && <p className="mt-1 text-xs text-green-600">✓ Audio file ready</p>}
+            </div>
             <div className="grid grid-cols-3 gap-3">
               <div><Label>Duration (sec)</Label><Input type="number" value={form.durationSec} onChange={e => setForm(f => ({ ...f, durationSec: Number(e.target.value) }))} /></div>
               <div><Label>Level</Label>

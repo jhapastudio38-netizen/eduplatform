@@ -32,8 +32,8 @@ export function AdminVideoLessons() {
   const [open, setOpen] = useState(false);
   const [preview, setPreview] = useState<VideoLesson | null>(null);
   const [busy, setBusy] = useState(false);
-  const [form, setForm] = useState({
-    title: "", description: "", youtubeUrl: "", durationMin: 10,
+  const [form, setForm] = useState<any>({
+    title: "", description: "", youtubeUrl: "", videoUrl: "", videoSource: "youtube", durationMin: 10,
     level: "Beginner", category: "Grammar", isPublished: true,
   });
 
@@ -43,18 +43,33 @@ export function AdminVideoLessons() {
   useEffect(load, []);
 
   async function save() {
-    if (!form.title.trim() || !form.youtubeUrl.trim()) { toast.error("Title and YouTube URL required"); return; }
+    if (!form.title.trim()) { toast.error("Title required"); return; }
+    const isUpload = form.youtubeUrl === "UPLOAD";
+    if (!isUpload && !form.youtubeUrl.trim()) { toast.error("YouTube URL or upload a video required"); return; }
+    if (isUpload && !form.videoUrl) { toast.error("Please upload a video file"); return; }
     setBusy(true);
     const slug = form.title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+    const payload = {
+      title: form.title,
+      slug,
+      description: form.description,
+      youtubeUrl: isUpload ? "" : form.youtubeUrl,
+      videoUrl: isUpload ? form.videoUrl : "",
+      videoSource: isUpload ? "upload" : "youtube",
+      durationMin: Number(form.durationMin),
+      level: form.level,
+      category: form.category,
+      isPublished: form.isPublished,
+    };
     const res = await fetch("/api/admin/video-lessons", {
       method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ...form, slug, durationMin: Number(form.durationMin) }),
+      body: JSON.stringify(payload),
     });
     setBusy(false);
     if (!res.ok) { const d = await res.json(); toast.error(d.error || "Failed"); return; }
     toast.success("Video lesson created");
     setOpen(false);
-    setForm({ title: "", description: "", youtubeUrl: "", durationMin: 10, level: "Beginner", category: "Grammar", isPublished: true });
+    setForm({ title: "", description: "", youtubeUrl: "", videoUrl: "", videoSource: "youtube", durationMin: 10, level: "Beginner", category: "Grammar", isPublished: true });
     load();
   }
 
@@ -118,7 +133,46 @@ export function AdminVideoLessons() {
           <DialogHeader><DialogTitle>Add Video Lesson</DialogTitle></DialogHeader>
           <div className="space-y-3">
             <div><Label>Title</Label><Input value={form.title} onChange={e => setForm(f => ({ ...f, title: e.target.value }))} placeholder="Korean Grammar — Present Tense" /></div>
-            <div><Label>YouTube URL</Label><Input value={form.youtubeUrl} onChange={e => setForm(f => ({ ...f, youtubeUrl: e.target.value }))} placeholder="https://youtube.com/watch?v=..." /></div>
+            <div>
+              <Label>Video Source</Label>
+              <div className="flex gap-2 mb-2">
+                <Button type="button" variant={form.youtubeUrl ? "default" : "outline"} size="sm" onClick={() => setForm(f => ({ ...f, youtubeUrl: "" }))}>YouTube URL</Button>
+                <Button type="button" variant={!form.youtubeUrl ? "default" : "outline"} size="sm" onClick={() => setForm(f => ({ ...f, youtubeUrl: "UPLOAD" }))}>Upload from Device</Button>
+              </div>
+              {form.youtubeUrl === "UPLOAD" ? (
+                <div>
+                  <label className="cursor-pointer">
+                    <input
+                      type="file"
+                      accept="video/*"
+                      className="hidden"
+                      onChange={async (e) => {
+                        const f = e.target.files?.[0];
+                        if (!f) return;
+                        setBusy(true);
+                        try {
+                          const fd = new FormData();
+                          fd.append("file", f);
+                          fd.append("folder", "videos");
+                          const res = await fetch("/api/admin/upload", { method: "POST", body: fd });
+                          if (!res.ok) { const d = await res.json(); toast.error(d.error || "Upload failed"); return; }
+                          const d = await res.json();
+                          setForm(prev => ({ ...prev, youtubeUrl: d.url, videoSource: "upload", videoUrl: d.url }));
+                          toast.success("Video uploaded");
+                        } catch { toast.error("Upload failed"); }
+                        finally { setBusy(false); }
+                      }}
+                    />
+                    <span className="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium h-9 px-3 bg-primary text-primary-foreground cursor-pointer hover:bg-primary/90">
+                      📁 Choose Video File
+                    </span>
+                  </label>
+                  {form.videoUrl && <p className="mt-1 text-xs text-green-600">✓ Video file ready</p>}
+                </div>
+              ) : (
+                <Input value={form.youtubeUrl} onChange={e => setForm(f => ({ ...f, youtubeUrl: e.target.value }))} placeholder="https://youtube.com/watch?v=..." />
+              )}
+            </div>
             <div><Label>Description</Label><Textarea rows={2} value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} /></div>
             <div className="grid grid-cols-3 gap-3">
               <div><Label>Duration (min)</Label><Input type="number" value={form.durationMin} onChange={e => setForm(f => ({ ...f, durationMin: Number(e.target.value) }))} /></div>

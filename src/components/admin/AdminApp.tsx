@@ -20,6 +20,7 @@ import { AdminContent } from "./AdminContent";
 import { AdminQuestions } from "./AdminQuestions";
 import { AdminTests } from "./AdminTests";
 import { AdminUsers } from "./AdminUsers";
+import { AdminNotifications } from "./AdminNotifications";
 import { AdminBooks } from "./AdminBooks";
 import { AdminHomeCards } from "./AdminHomeCards";
 import { AdminAudioLessons } from "./AdminAudioLessons";
@@ -40,7 +41,7 @@ type View =
   | "paid-exam-orders" | "batch-orders" | "course-orders" | "qb-orders"
   | "batch" | "student-results" | "package-results" | "classroom-results"
   | "students" | "teachers" | "pdf-viewer" | "settings" | "home-cards"
-  | "content" | "questions" | "tests" | "users";
+  | "content" | "questions" | "tests" | "users" | "notifications";
 
 interface NavItem {
   id: View;
@@ -78,6 +79,12 @@ const NAV_SECTIONS: NavSection[] = [
       { id: "students", label: "Students", icon: GraduationCap, hasAdd: true },
       { id: "teachers", label: "Teachers", icon: UserCog, hasAdd: true },
       { id: "student-results", label: "Student Results", icon: BarChart3 },
+    ],
+  },
+  {
+    title: "Communication",
+    items: [
+      { id: "notifications", label: "Push Notifications", icon: Bell, hasAdd: true },
     ],
   },
 ];
@@ -160,6 +167,8 @@ export function AdminApp() {
         return <AdminVideoLessons />;
       case "student-results":
         return <AdminStudentResults />;
+      case "notifications":
+        return <AdminNotifications />;
       case "batch":
         return <AdminBatch />;
       case "color-vision":
