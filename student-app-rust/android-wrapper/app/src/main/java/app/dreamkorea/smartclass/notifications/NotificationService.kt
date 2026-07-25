@@ -12,7 +12,6 @@ import androidx.core.app.ActivityCompat
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import app.dreamkorea.smartclass.MainActivity
-import app.dreamkorea.smartclass.R
 import app.dreamkorea.smartclass.api.AppNotification
 import app.dreamkorea.smartclass.data.AppState
 import kotlinx.coroutines.CoroutineScope
@@ -127,7 +126,7 @@ object NotificationService {
         )
 
         val builder = NotificationCompat.Builder(context, CHANNEL_ID)
-            .setSmallIcon(R.drawable.ic_launcher_foreground)
+            .setSmallIcon(android.R.drawable.ic_dialog_info)
             .setContentTitle(notif.title)
             .setContentText(notif.body)
             .setStyle(NotificationCompat.BigTextStyle().bigText(notif.body))
