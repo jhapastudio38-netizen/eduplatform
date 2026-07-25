@@ -47,7 +47,7 @@ object AppState {
 
     // ─── In-memory cache (fixes back/forth reload storms) ──────────────────────
     // Each entry stores (data, timestamp). Cache is valid for CACHE_TTL_MS.
-    private const val CACHE_TTL_MS = 60_000L // 1 minute
+    private const val CACHE_TTL_MS = 120_000L // 2 minutes
     private data class CacheEntry<T>(val data: T, val savedAt: Long)
     private val cache = ConcurrentHashMap<String, CacheEntry<*>>()
     private val cacheMutex = Mutex()
@@ -64,28 +64,48 @@ object AppState {
         return fresh
     }
 
+    /**
+     * Returns cached data IMMEDIATELY if available (even if stale), without
+     * making any API call. Returns null if no cache exists.
+     * Use this for instant screen loads — then call refreshXxx() in the
+     * background to update the data silently.
+     */
+    @Suppress("UNCHECKED_CAST")
+    fun <T> getCachedNow(key: String): T? {
+        val hit = cache[key] as? CacheEntry<T>
+        return hit?.data
+    }
+
     /** Force-invalidate a cache key (call after a mutation or pull-to-refresh). */
     fun invalidateCache(key: String? = null) {
         if (key == null) cache.clear() else cache.remove(key)
     }
 
+    // ─── Cache keys (public, so screens can use getCachedNow) ──────────────────
+    const val KEY_HOME_CARDS = "home_cards"
+    const val KEY_BOOKS = "books"
+    const val KEY_VIDEOS = "videos"
+    const val KEY_AUDIO = "audio"
+    const val KEY_QUESTION_BANK = "question_bank"
+    fun keyTests(filter: String) = "tests_$filter"
+
     // Cached API helpers — used by screens so navigating back doesn't refetch.
-    suspend fun getCachedHomeCards() = cached("home_cards") {
+    suspend fun getCachedHomeCards() = cached(KEY_HOME_CARDS) {
         AppState.api.getHomeCards().cards
     }
-    suspend fun getCachedTests(filter: String) = cached("tests_$filter") {
+    suspend fun getCachedTests(filter: String) = cached(keyTests(filter)) {
         AppState.api.getTests(filter).tests
     }
-    suspend fun getCachedBooks() = cached("books") {
+    suspend fun getCachedBooks() = cached(KEY_BOOKS) {
         AppState.api.getBooks().books
     }
-    suspend fun getCachedVideos() = cached("videos") {
+    suspend fun getCachedVideos() = cached(KEY_VIDEOS) {
         AppState.api.getVideoLessons().videos
     }
-    suspend fun getCachedAudio() = cached("audio") {
+    suspend fun getCachedAudio() = cached(KEY_AUDIO) {
         AppState.api.getAudioLessons().lessons
     }
-    suspend fun getCachedQuestionBank() = cached("question_bank") {
+    suspend fun getCachedQuestionBank() = cached(KEY_QUESTION_BANK) {
         AppState.api.getQuestionBank().questions
     }
 
@@ -132,8 +152,9 @@ object AppState {
         val client = OkHttpClient.Builder()
             .cookieJar(cookieJar)
             .addInterceptor(logging)
-            .connectTimeout(15, TimeUnit.SECONDS)
-            .readTimeout(15, TimeUnit.SECONDS)
+            .connectTimeout(10, TimeUnit.SECONDS)
+            .readTimeout(20, TimeUnit.SECONDS)
+            .writeTimeout(20, TimeUnit.SECONDS)
             .build()
 
         Retrofit.Builder()
