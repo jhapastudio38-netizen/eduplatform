@@ -71,17 +71,25 @@ fun MainScreen(userName: String, onLogout: () -> Unit) {
 
     Surface(modifier = Modifier.fillMaxSize(), color = theme.background) {
         Column(modifier = Modifier.fillMaxSize()) {
-            // ─── Top bar with DreamKorea logo ──────────────────────────────────
-            TopBar(theme, userName, sound, onProfile = { screen = Screen.Profile }, onSettings = { screen = Screen.Settings })
+            // ─── Top bar — hidden on Home and Exam for a cleaner, more open look ──
+            val showTopBar = when (screen) {
+                is Screen.Home -> false
+                is Screen.Exam -> false
+                is Screen.BookReader -> false
+                else -> true
+            }
+            if (showTopBar) {
+                TopBar(theme, userName, sound, onProfile = { screen = Screen.Profile }, onSettings = { screen = Screen.Settings })
+            }
 
-            // ─── Animated screen content — modern slide+fade transition ───────
+            // ─── Animated screen content — smooth fade transition ──────────────
             Box(modifier = Modifier.weight(1f)) {
                 AnimatedContent(
                     targetState = screen,
                     transitionSpec = {
-                        // Modern slide-in from right + fade, like native Android navigation
-                        (fadeIn(tween(300)) + slideInHorizontally(tween(300), initialOffsetX = { it / 6 })) togetherWith
-                        (fadeOut(tween(200)) + slideOutHorizontally(tween(200), targetOffsetX = { -it / 8 }))
+                        // Clean fade-only transition — minimal, no distracting slides
+                        fadeIn(tween(350, easing = FastOutSlowInEasing)) togetherWith
+                        fadeOut(tween(200, easing = FastOutSlowInEasing))
                     },
                     label = "screenTransition"
                 ) { s ->
@@ -96,7 +104,6 @@ fun MainScreen(userName: String, onLogout: () -> Unit) {
                         is Screen.Settings -> SettingsScreen(theme, sound, onBack = { screen = Screen.Home })
                         is Screen.Exam -> ExamScreen(theme, testId = s.testId, onExit = { screen = Screen.Home })
                         is Screen.BookReader -> BookReaderScreen(theme, sound, s.book, onBack = { screen = Screen.Books })
-                        // Specific card pages — each opens a DISTINCT filtered test list
                         is Screen.UbtTest -> TestsScreen(theme, sound, filter = "ubt", title = "UBT Tests", onBack = { screen = Screen.Home }, onStartExam = { screen = Screen.Exam(it) })
                         is Screen.FreeExam -> TestsScreen(theme, sound, filter = "free", title = "Free Practice Tests", onBack = { screen = Screen.Home }, onStartExam = { screen = Screen.Exam(it) })
                         is Screen.Batch -> TestsScreen(theme, sound, filter = "batch", title = "Batch Exams", onBack = { screen = Screen.Home }, onStartExam = { screen = Screen.Exam(it) })
@@ -115,52 +122,40 @@ fun MainScreen(userName: String, onLogout: () -> Unit) {
     }
 }
 
-// ─── Top bar with DreamKorea logo ─────────────────────────────────────────────
+// ─── Top bar — clean, minimal (no tagline) ────────────────────────────────────
 @Composable
 fun TopBar(theme: AppTheme, userName: String, sound: SoundManager, onProfile: () -> Unit, onSettings: () -> Unit) {
     Surface(
         color = theme.white,
-        shadowElevation = 2.dp,
+        shadowElevation = 0.dp,
         tonalElevation = 0.dp
     ) {
         Row(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp),
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // DreamKorea logo (bundled in APK, blends into background)
-            Image(
-                painter = painterResource(id = app.dreamkorea.smartclass.R.drawable.dreamkorea_logo),
-                contentDescription = "DreamKorea Logo",
-                modifier = Modifier.size(42.dp),
-                contentScale = ContentScale.Fit
-            )
-            Spacer(Modifier.width(10.dp))
-            Column(modifier = Modifier.weight(1f)) {
-                Text("DreamKorea", color = theme.darkText, fontSize = 17.sp, fontWeight = FontWeight.Bold)
-                Text("Realize your dream now", color = theme.subText, fontSize = 9.sp)
-            }
-            // Profile icon with subtle background
+            Text("DreamKorea", color = theme.darkText, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+            Spacer(Modifier.weight(1f))
+            // Profile icon
             Box(
                 modifier = Modifier
-                    .size(38.dp)
+                    .size(36.dp)
                     .clip(CircleShape)
-                    .background(theme.primary.copy(alpha = 0.08f))
                     .clickable { sound.click(); onProfile() },
                 contentAlignment = Alignment.Center
             ) {
-                Icon(Icons.Default.Person, "Profile", tint = theme.primary, modifier = Modifier.size(20.dp))
+                Icon(Icons.Default.Person, "Profile", tint = theme.darkText, modifier = Modifier.size(22.dp))
             }
-            Spacer(Modifier.width(6.dp))
-            // Settings icon with subtle background
+            Spacer(Modifier.width(4.dp))
+            // Settings icon
             Box(
                 modifier = Modifier
-                    .size(38.dp)
+                    .size(36.dp)
                     .clip(CircleShape)
-                    .background(theme.primary.copy(alpha = 0.08f))
                     .clickable { sound.click(); onSettings() },
                 contentAlignment = Alignment.Center
             ) {
-                Icon(Icons.Default.Settings, "Settings", tint = theme.primary, modifier = Modifier.size(20.dp))
+                Icon(Icons.Default.Settings, "Settings", tint = theme.darkText, modifier = Modifier.size(22.dp))
             }
         }
     }
@@ -266,33 +261,35 @@ fun HomeScreen(theme: AppTheme, sound: SoundManager, onNavigate: (Screen) -> Uni
 
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(bottom = 16.dp)
+        contentPadding = PaddingValues(bottom = 24.dp)
     ) {
+        // Clean minimal header — just "DreamKorea" text, no tagline, no logo image
+        item {
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 16.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text("DreamKorea", color = theme.darkText, fontSize = 24.sp, fontWeight = FontWeight.Bold)
+            }
+        }
+
         sections.forEach { (sectionKey, cards) ->
             val sectionTitle = when (sectionKey) {
-                "test" -> "UBT TEST"
-                "resources" -> "RESOURCES"
-                "premium" -> "PREMIUM"
-                else -> sectionKey.uppercase()
-            }
-            val sectionColor = when (sectionKey) {
-                "test" -> theme.primary.copy(alpha = 0.12f)
-                "resources" -> Color(0xFFE8F5E9)
-                "premium" -> Color(0xFFFFF3E0)
-                else -> theme.primary.copy(alpha = 0.08f)
+                "test" -> "Tests"
+                "resources" -> "Resources"
+                "premium" -> "Premium"
+                else -> sectionKey.replaceFirstChar { it.uppercase() }
             }
 
-            // Section header
+            // Section header — clean, no background color, just text
             item {
-                Surface(color = sectionColor, modifier = Modifier.fillMaxWidth()) {
-                    Text(
-                        sectionTitle,
-                        color = theme.darkText,
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.Bold,
-                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp)
-                    )
-                }
+                Text(
+                    sectionTitle,
+                    color = theme.subText,
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp)
+                )
             }
 
             // Cards in 2-column grid

@@ -110,8 +110,7 @@ fun LoginScreen(onLoginSuccess: () -> Unit) {
                 enter = fadeIn(tween(400)) + slideInVertically(tween(400)) { it / 2 }
             ) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text("DreamKorea", color = DarkText, fontSize = 24.sp, fontWeight = FontWeight.Bold)
-                    Text("Realize your dream now", color = SubText, fontSize = 12.sp)
+                    Text("DreamKorea", color = DarkText, fontSize = 26.sp, fontWeight = FontWeight.Bold)
                 }
             }
             Spacer(modifier = Modifier.height(28.dp))
