@@ -234,21 +234,33 @@ function CreateExamDialog({ open, testCategory, onOpenChange, onCreated }: {
     if (!form.title.trim()) { toast.error("Exam name required"); return; }
     setBusy(true);
     try {
+      const payload = {
+        title: form.title,
+        description: form.description,
+        durationMin: form.durationMin,
+        examType: form.examType,
+        testCategory,
+        category: form.category || undefined,
+        price: form.price ? parseFloat(form.price) : undefined,
+        featuredImage: form.featuredImage || undefined,
+        audioPlayMode: form.audioPlayMode,
+        audioGapSec: form.audioGapSec,
+        textBlockCount: form.textBlockCount,
+        audioBlockCount: form.audioBlockCount,
+        isExam: true,
+        isPublished: false, // Draft — admin pushes when ready
+      };
       const res = await fetch("/api/admin/tests", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          ...form,
-          testCategory,
-          price: form.price ? parseFloat(form.price) : undefined,
-          isExam: true,
-          isPublished: true,
-        }),
+        body: JSON.stringify(payload),
       });
-      if (!res.ok) { const d = await res.json(); toast.error(d.error || "Failed"); return; }
       const d = await res.json();
+      if (!res.ok) { toast.error(d.error || `Failed (HTTP ${res.status})`); return; }
       toast.success("Created — now add questions");
       onCreated(d.test);
+    } catch (e: any) {
+      toast.error("Create failed: " + (e.message || "network error"));
     } finally { setBusy(false); }
   }
 

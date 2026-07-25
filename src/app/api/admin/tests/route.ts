@@ -42,8 +42,8 @@ const testSchema = z.object({
   category: z.string().max(100).optional().or(z.literal("")),
   audioPlayMode: z.enum(["single", "double"]).default("single"),
   audioGapSec: z.number().int().min(0).max(60).default(2),
-  textBlockCount: z.number().int().min(1).max(100).default(20),
-  audioBlockCount: z.number().int().min(1).max(100).default(20),
+  textBlockCount: z.number().int().min(0).max(100).default(20),
+  audioBlockCount: z.number().int().min(0).max(100).default(20),
 });
 
 export async function POST(req: NextRequest) {
