@@ -295,7 +295,7 @@ function CardEditDialog({
                       const fd = new FormData();
                       fd.append("file", f);
                       fd.append("folder", "home-cards");
-                      const res = await fetch("/api/admin/upload", { method: "POST", body: fd });
+                      const res = await fetch("/api/admin/file-upload", { method: "POST", body: fd });
                       if (!res.ok) { const d = await res.json(); toast.error(d.error || "Upload failed"); return; }
                       const d = await res.json();
                       setImageUrl(d.url);

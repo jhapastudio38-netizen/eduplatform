@@ -251,7 +251,7 @@ function MultiStepExamCreator({ open, onOpenChange, onSaved }: {
     formData.append("folder", type === "image" ? "questions" : "audio");
     toast.info(`Uploading ${type}...`);
     try {
-      const res = await fetch("/api/admin/upload", { method: "POST", body: formData });
+      const res = await fetch("/api/admin/file-upload", { method: "POST", body: formData });
       const data = await res.json();
       if (data.ok) {
         const url = data.url.startsWith("http") ? data.url : `https://my-project-five-sepia.vercel.app${data.url}`;

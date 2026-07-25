@@ -140,7 +140,7 @@ function BookEditDialog({ open, onOpenChange, book, onSaved }: {
       const formData = new FormData();
       formData.append("file", file);
       formData.append("folder", folder);
-      const res = await fetch("/api/admin/upload", { method: "POST", body: formData });
+      const res = await fetch("/api/admin/file-upload", { method: "POST", body: formData });
       const data = await res.json();
       if (data.ok) {
         const url = data.url.startsWith("http") ? data.url : `https://my-project-five-sepia.vercel.app${data.url}`;
