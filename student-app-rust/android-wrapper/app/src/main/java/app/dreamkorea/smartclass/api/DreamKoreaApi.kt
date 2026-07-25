@@ -251,6 +251,9 @@ interface DreamKoreaApi {
 
     @GET("api/student/notifications")
     suspend fun getNotifications(@Query("since") since: String? = null): NotificationsResponse
+
+    @POST("api/student/live-sessions/join")
+    suspend fun joinLiveSession(@Body body: Map<String, String>): LiveSessionJoinResponse
 }
 
 // ─── Notifications ────────────────────────────────────────────────────────────
@@ -262,6 +265,21 @@ data class AppNotification(
     val createdAt: String
 )
 data class NotificationsResponse(val notifications: List<AppNotification> = emptyList())
+
+// ─── Live Session Join ───────────────────────────────────────────────────────
+data class LiveSessionData(
+    val id: String = "",
+    val title: String = "",
+    val description: String? = null,
+    val meetingUrl: String = "",
+    val credentials: String? = null,
+    val hostName: String? = null
+)
+data class LiveSessionJoinResponse(
+    val ok: Boolean = false,
+    val session: LiveSessionData? = null,
+    val error: String? = null
+)
 
 // ─── Question Bank ────────────────────────────────────────────────────────────
 data class QuestionBankQuestion(

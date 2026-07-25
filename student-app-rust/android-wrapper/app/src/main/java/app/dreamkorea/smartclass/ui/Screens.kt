@@ -57,6 +57,7 @@ sealed class Screen {
     object RecordedVideo : Screen()
     object ClassResult : Screen()
     object CourseVideo : Screen()
+    object Join : Screen()
     data class Exam(val testId: String) : Screen()
     data class BookReader(val book: Book) : Screen()
     /** Filtered test list. filter: "all" | "practice" | "exam" | "ubt" | "free" | "batch" */
@@ -114,6 +115,7 @@ fun MainScreen(userName: String, onLogout: () -> Unit) {
                         is Screen.ClassResult -> ProfileScreen(theme, sound, userName, onBack = { screen = Screen.Home }, onLogout = onLogout)
                         is Screen.CourseVideo -> VideosScreen(theme, sound, onBack = { screen = Screen.Home })
                         is Screen.TestList -> TestsScreen(theme, sound, filter = s.filter, title = s.title, onBack = { screen = Screen.Home }, onStartExam = { screen = Screen.Exam(it) })
+                        is Screen.Join -> JoinScreen(theme, sound, onBack = { screen = Screen.Home })
                     }
                 }
             }
@@ -298,8 +300,8 @@ fun HomeScreen(theme: AppTheme, sound: SoundManager, onNavigate: (Screen) -> Uni
                                     "question_bank" -> Screen.QuestionBank
                                     "course_video" -> Screen.CourseVideo
                                     "audio_lessons" -> Screen.AudioLessons
-                                    "classroom" -> Screen.Classroom
-                                    "live_class" -> Screen.LiveRoom
+                                    "classroom" -> Screen.Join
+                                    "live_class" -> Screen.Join
                                     "recorded_video" -> Screen.RecordedVideo
                                     "class_result" -> Screen.ClassResult
                                     else -> when (card.route) {
