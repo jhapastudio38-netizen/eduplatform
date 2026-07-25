@@ -21,6 +21,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { getCurrentUser } from "@/lib/session";
 import { z } from "zod";
+import { QuestionType as QType } from "@prisma/client";
 
 const questionSchema = z.object({
   blockType: z.enum(["text", "audio"]),
@@ -97,8 +98,7 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ testId: st
   const d = parsed.data;
 
   try {
-    // Map answerType to QuestionType enum
-    const questionType = "SINGLE_CHOICE";
+    const questionType = QType.SINGLE_CHOICE;
 
     // Build options array for storage
     let optionsJson: string | null = null;
@@ -134,7 +134,7 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ testId: st
       question = await db.question.update({
         where: { id: existingItem.questionId },
         data: {
-          type: questionType as any,
+          type: questionType,
           stem: d.stem,
           options: optionsJson,
           correctAnswer,
@@ -160,7 +160,7 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ testId: st
       // CREATE new question + link to test
       question = await db.question.create({
         data: {
-          type: questionType as any,
+          type: questionType,
           difficulty: "MEDIUM",
           stem: d.stem,
           options: optionsJson,

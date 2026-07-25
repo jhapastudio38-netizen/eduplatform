@@ -435,15 +435,39 @@ function ExamEditor({ test, testCategory, onClose }: { test: Test; testCategory:
     const q = currentQuestion;
     if (!q.stem.trim()) { toast.error("Question text required"); return; }
     try {
+      // Strip fields the API doesn't expect
+      const payload = {
+        blockType: q.blockType,
+        blockNumber: q.blockNumber,
+        stem: q.stem,
+        descType: q.descType,
+        descText: q.descText || "",
+        descImageUrl: q.descImageUrl || "",
+        descAudioUrl: q.descAudioUrl || "",
+        mediaType: q.mediaType,
+        mediaText: q.mediaText || "",
+        mediaImageUrl: q.mediaImageUrl || "",
+        mediaAudioUrl: q.mediaAudioUrl || "",
+        answerType: q.answerType,
+        options: q.options || [],
+        optionImages: q.optionImages || [],
+        optionAudios: q.optionAudios || [],
+        correctOption: q.correctOption,
+        explanation: q.explanation || "",
+      };
       const res = await fetch(`/api/admin/tests/${test.id}/questions`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(q),
+        body: JSON.stringify(payload),
       });
-      if (!res.ok) { const d = await res.json(); toast.error(d.error || "Save failed"); return; }
+      const d = await res.json();
+      if (!res.ok) {
+        toast.error(d.error || `Save failed (HTTP ${res.status})`);
+        return;
+      }
       toast.success(`Question ${q.blockNumber} saved`);
-    } catch {
-      toast.error("Save failed");
+    } catch (e: any) {
+      toast.error("Save failed: " + (e.message || "network error"));
     }
   }
 
