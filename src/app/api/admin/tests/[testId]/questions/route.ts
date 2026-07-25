@@ -98,11 +98,7 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ testId: st
 
   try {
     // Map answerType to QuestionType enum
-    const questionType =
-      d.answerType === "choose" ? "SINGLE_CHOICE" :
-      d.answerType === "text" ? "SINGLE_CHOICE" :
-      d.answerType === "image" ? "SINGLE_CHOICE" :
-      d.answerType === "audio" ? "SINGLE_CHOICE" : "SINGLE_CHOICE";
+    const questionType = "SINGLE_CHOICE";
 
     // Build options array for storage
     let optionsJson: string | null = null;
@@ -120,51 +116,91 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ testId: st
       correctAnswer = JSON.stringify(d.optionAudios[d.correctOption] || "");
     }
 
-    // Create the question
-    const question = await db.question.create({
-      data: {
-        type: questionType as any,
-        difficulty: "MEDIUM",
-        stem: d.stem,
-        options: optionsJson,
-        correctAnswer,
-        explanation: d.explanation || null,
-        // Legacy fields for app compat
-        imageUrl: d.mediaType === "image" ? d.mediaImageUrl : null,
-        audioUrl: d.mediaType === "audio" ? d.mediaAudioUrl : null,
-        audioLoop: d.blockType === "audio" ? 1 : 0,
-        audioLoopDelay: 0,
-        // New block-based fields
-        blockType: d.blockType,
-        blockNumber: d.blockNumber,
-        descType: d.descType,
-        descText: d.descText || null,
-        descImageUrl: d.descImageUrl || null,
-        descAudioUrl: d.descAudioUrl || null,
-        mediaType: d.mediaType,
-        mediaText: d.mediaText || null,
-        mediaImageUrl: d.mediaImageUrl || null,
-        mediaAudioUrl: d.mediaAudioUrl || null,
-        answerType: d.answerType,
-        optionImages: d.optionImages.length > 0 ? JSON.stringify(d.optionImages) : null,
-        optionAudios: d.optionAudios.length > 0 ? JSON.stringify(d.optionAudios) : null,
-        correctOption: d.correctOption,
-      },
-    });
-
-    // Link to test
-    const count = await db.testItem.count({ where: { testId } });
-    const item = await db.testItem.create({
-      data: {
+    // Check if a question already exists for this block (same testId + blockType + blockNumber)
+    const existingItem = await db.testItem.findFirst({
+      where: {
         testId,
-        questionId: question.id,
-        points: 1,
-        order: d.blockNumber, // use block number as order
+        question: {
+          blockType: d.blockType,
+          blockNumber: d.blockNumber,
+        },
       },
+      include: { question: true },
     });
 
-    return NextResponse.json({ ok: true, question, item });
+    let question;
+    if (existingItem) {
+      // UPDATE existing question
+      question = await db.question.update({
+        where: { id: existingItem.questionId },
+        data: {
+          type: questionType as any,
+          stem: d.stem,
+          options: optionsJson,
+          correctAnswer,
+          explanation: d.explanation || null,
+          imageUrl: d.mediaType === "image" ? d.mediaImageUrl : null,
+          audioUrl: d.mediaType === "audio" ? d.mediaAudioUrl : null,
+          audioLoop: d.blockType === "audio" ? 1 : 0,
+          descType: d.descType,
+          descText: d.descText || null,
+          descImageUrl: d.descImageUrl || null,
+          descAudioUrl: d.descAudioUrl || null,
+          mediaType: d.mediaType,
+          mediaText: d.mediaText || null,
+          mediaImageUrl: d.mediaImageUrl || null,
+          mediaAudioUrl: d.mediaAudioUrl || null,
+          answerType: d.answerType,
+          optionImages: d.optionImages.length > 0 ? JSON.stringify(d.optionImages) : null,
+          optionAudios: d.optionAudios.length > 0 ? JSON.stringify(d.optionAudios) : null,
+          correctOption: d.correctOption,
+        },
+      });
+    } else {
+      // CREATE new question + link to test
+      question = await db.question.create({
+        data: {
+          type: questionType as any,
+          difficulty: "MEDIUM",
+          stem: d.stem,
+          options: optionsJson,
+          correctAnswer,
+          explanation: d.explanation || null,
+          imageUrl: d.mediaType === "image" ? d.mediaImageUrl : null,
+          audioUrl: d.mediaType === "audio" ? d.mediaAudioUrl : null,
+          audioLoop: d.blockType === "audio" ? 1 : 0,
+          audioLoopDelay: 0,
+          blockType: d.blockType,
+          blockNumber: d.blockNumber,
+          descType: d.descType,
+          descText: d.descText || null,
+          descImageUrl: d.descImageUrl || null,
+          descAudioUrl: d.descAudioUrl || null,
+          mediaType: d.mediaType,
+          mediaText: d.mediaText || null,
+          mediaImageUrl: d.mediaImageUrl || null,
+          mediaAudioUrl: d.mediaAudioUrl || null,
+          answerType: d.answerType,
+          optionImages: d.optionImages.length > 0 ? JSON.stringify(d.optionImages) : null,
+          optionAudios: d.optionAudios.length > 0 ? JSON.stringify(d.optionAudios) : null,
+          correctOption: d.correctOption,
+        },
+      });
+
+      // Link to test
+      await db.testItem.create({
+        data: {
+          testId,
+          questionId: question.id,
+          points: 1,
+          order: d.blockNumber,
+        },
+      });
+    }
+
+    return NextResponse.json({ ok: true, question });
   } catch (e: any) {
-    return NextResponse.json({ error: e.message?.substring(0, 200) }, { status: 500 });
+    console.error("Question save error:", e);
+    return NextResponse.json({ error: e.message?.substring(0, 300) }, { status: 500 });
   }
 }
