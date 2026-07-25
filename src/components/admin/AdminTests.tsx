@@ -837,10 +837,30 @@ function QuestionEditor({ question, onChange, blockLabel, isAudioBlock }: {
     onClear: () => void;
     type: "image" | "audio";
   }) {
+    const [uploading, setUploading] = useState(false);
+
+    async function handleFile(file: File) {
+      setUploading(true);
+      try {
+        const u = await uploadFile(file);
+        onUpload(u);
+        toast.success("Uploaded");
+      } catch (err: any) {
+        toast.error(err.message || "Upload failed");
+      } finally {
+        setUploading(false);
+      }
+    }
+
     return (
       <div className="space-y-2">
-        <Label className="text-sm font-medium">{label}</Label>
-        {url ? (
+        {label && <Label className="text-sm font-medium">{label}</Label>}
+        {uploading ? (
+          <div className="flex flex-col items-center justify-center w-full h-28 border-2 border-primary border-dashed rounded-lg bg-primary/5">
+            <div className="w-8 h-8 border-3 border-primary border-t-transparent rounded-full animate-spin mb-2" />
+            <span className="text-xs text-primary font-medium">Uploading…</span>
+          </div>
+        ) : url ? (
           <div className="flex items-start gap-3">
             {type === "image" ? (
               <div className="relative">
@@ -864,10 +884,11 @@ function QuestionEditor({ question, onChange, blockLabel, isAudioBlock }: {
           </div>
         ) : (
           <label className="flex flex-col items-center justify-center w-full h-28 border-2 border-dashed border-slate-300 rounded-lg cursor-pointer hover:border-primary hover:bg-slate-50 transition-colors">
-            <input type="file" accept={accept} className="hidden" onChange={async (e) => {
+            <input type="file" accept={accept} className="hidden" onChange={(e) => {
               const f = e.target.files?.[0]; if (!f) return;
-              try { const u = await uploadFile(f); onUpload(u); toast.success("Uploaded"); }
-              catch (err: any) { toast.error(err.message); }
+              handleFile(f);
+              // Reset input so same file can be re-uploaded
+              e.target.value = "";
             }} />
             <Upload className="w-7 h-7 text-slate-400 mb-1" />
             <span className="text-xs text-slate-500">Click to upload {type}</span>
@@ -1053,8 +1074,8 @@ function QuestionEditor({ question, onChange, blockLabel, isAudioBlock }: {
               <Label className="text-sm font-semibold">4 Image Options — click circle to mark correct</Label>
               <div className="grid grid-cols-2 gap-3">
                 {[0, 1, 2, 3].map((i) => (
-                  <div key={i} className="space-y-2 p-2 border rounded bg-white">
-                    <div className="flex items-center gap-2">
+                  <div key={i} className="space-y-2 p-3 border rounded bg-white">
+                    <div className="flex items-center gap-2 mb-1">
                       <button
                         onClick={() => onChange({ ...question, correctOption: i })}
                         className={`w-7 h-7 rounded-full border-2 flex items-center justify-center text-xs font-bold flex-shrink-0 ${
@@ -1065,30 +1086,20 @@ function QuestionEditor({ question, onChange, blockLabel, isAudioBlock }: {
                       </button>
                       <span className="text-xs font-medium">Option {String.fromCharCode(65 + i)}</span>
                     </div>
-                    {question.optionImages[i] ? (
-                      <div className="relative">
-                        <img src={question.optionImages[i]} alt="" className="w-full h-20 rounded object-cover border" />
-                        <button
-                          onClick={() => {
-                            const imgs = [...question.optionImages]; imgs[i] = "";
-                            onChange({ ...question, optionImages: imgs });
-                          }}
-                          className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white rounded-full flex items-center justify-center text-xs"
-                        >✕</button>
-                      </div>
-                    ) : (
-                      <label className="flex flex-col items-center justify-center w-full h-20 border-2 border-dashed rounded cursor-pointer hover:border-primary hover:bg-slate-50">
-                        <input type="file" accept="image/*" className="hidden" onChange={async (e) => {
-                          const f = e.target.files?.[0]; if (!f) return;
-                          try { const u = await uploadFile(f);
-                            const imgs = [...question.optionImages]; imgs[i] = u;
-                            onChange({ ...question, optionImages: imgs }); toast.success("Uploaded");
-                          } catch (err: any) { toast.error(err.message); }
-                        }} />
-                        <Upload className="w-5 h-5 text-slate-400" />
-                        <span className="text-xs text-slate-400">Upload</span>
-                      </label>
-                    )}
+                    <MediaUpload
+                      label=""
+                      accept="image/*"
+                      url={question.optionImages[i] || ""}
+                      onUpload={(url) => {
+                        const imgs = [...question.optionImages]; imgs[i] = url;
+                        onChange({ ...question, optionImages: imgs });
+                      }}
+                      onClear={() => {
+                        const imgs = [...question.optionImages]; imgs[i] = "";
+                        onChange({ ...question, optionImages: imgs });
+                      }}
+                      type="image"
+                    />
                   </div>
                 ))}
               </div>
@@ -1100,8 +1111,8 @@ function QuestionEditor({ question, onChange, blockLabel, isAudioBlock }: {
               <Label className="text-sm font-semibold">4 Audio Options — click circle to mark correct</Label>
               <div className="space-y-3">
                 {[0, 1, 2, 3].map((i) => (
-                  <div key={i} className="p-2 border rounded bg-white space-y-2">
-                    <div className="flex items-center gap-2">
+                  <div key={i} className="p-3 border rounded bg-white">
+                    <div className="flex items-center gap-2 mb-2">
                       <button
                         onClick={() => onChange({ ...question, correctOption: i })}
                         className={`w-7 h-7 rounded-full border-2 flex items-center justify-center text-xs font-bold flex-shrink-0 ${
@@ -1112,30 +1123,20 @@ function QuestionEditor({ question, onChange, blockLabel, isAudioBlock }: {
                       </button>
                       <span className="text-xs font-medium">Audio {String.fromCharCode(65 + i)}</span>
                     </div>
-                    {question.optionAudios[i] ? (
-                      <div className="relative">
-                        <audio controls src={question.optionAudios[i]} className="w-full" />
-                        <button
-                          onClick={() => {
-                            const auds = [...question.optionAudios]; auds[i] = "";
-                            onChange({ ...question, optionAudios: auds });
-                          }}
-                          className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white rounded-full flex items-center justify-center text-xs"
-                        >✕</button>
-                      </div>
-                    ) : (
-                      <label className="flex items-center justify-center w-full h-10 border-2 border-dashed rounded cursor-pointer hover:border-primary hover:bg-slate-50">
-                        <input type="file" accept="audio/*" className="hidden" onChange={async (e) => {
-                          const f = e.target.files?.[0]; if (!f) return;
-                          try { const u = await uploadFile(f);
-                            const auds = [...question.optionAudios]; auds[i] = u;
-                            onChange({ ...question, optionAudios: auds }); toast.success("Uploaded");
-                          } catch (err: any) { toast.error(err.message); }
-                        }} />
-                        <Upload className="w-4 h-4 text-slate-400 mr-1" />
-                        <span className="text-xs text-slate-400">Upload audio</span>
-                      </label>
-                    )}
+                    <MediaUpload
+                      label=""
+                      accept="audio/*"
+                      url={question.optionAudios[i] || ""}
+                      onUpload={(url) => {
+                        const auds = [...question.optionAudios]; auds[i] = url;
+                        onChange({ ...question, optionAudios: auds });
+                      }}
+                      onClear={() => {
+                        const auds = [...question.optionAudios]; auds[i] = "";
+                        onChange({ ...question, optionAudios: auds });
+                      }}
+                      type="audio"
+                    />
                   </div>
                 ))}
               </div>

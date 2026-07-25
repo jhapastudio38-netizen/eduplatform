@@ -14,6 +14,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/session";
 import { uploadFile, generateFileKey } from "@/lib/r2";
 
+// Force Node.js runtime (needed for FormData parsing)
+export const runtime = "nodejs";
+export const maxDuration = 60;
+
 const MAX_SIZE = 100 * 1024 * 1024; // 100MB
 
 const ALLOWED_TYPES: Record<string, string[]> = {
