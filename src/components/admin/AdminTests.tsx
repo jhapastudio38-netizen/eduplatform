@@ -194,6 +194,106 @@ export function AdminTests({ testCategory = "exam" }: { testCategory?: string })
   );
 }
 
+// ─── Featured Image Upload (drag & drop + instant preview) ──────────────────
+function FeaturedImageUpload({ url, onUpload, onClear, uploadFn }: {
+  url: string;
+  onUpload: (url: string) => void;
+  onClear: () => void;
+  uploadFn: (file: File) => Promise<string>;
+}) {
+  const [uploading, setUploading] = useState(false);
+  const [dragOver, setDragOver] = useState(false);
+  const [localPreview, setLocalPreview] = useState("");
+
+  async function compressImage(file: File): Promise<File> {
+    if (file.size < 200_000) return file;
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const img = new Image();
+        img.onload = () => {
+          const canvas = document.createElement("canvas");
+          const maxDim = 800;
+          let { width, height } = img;
+          if (width > maxDim || height > maxDim) {
+            if (width > height) { height = (height / width) * maxDim; width = maxDim; }
+            else { width = (width / height) * maxDim; height = maxDim; }
+          }
+          canvas.width = width; canvas.height = height;
+          const ctx = canvas.getContext("2d")!;
+          ctx.drawImage(img, 0, 0, width, height);
+          canvas.toBlob((blob) => {
+            if (blob) resolve(new File([blob], "featured.jpg", { type: "image/jpeg" }));
+            else resolve(file);
+          }, "image/jpeg", 0.8);
+        };
+        img.src = e.target?.result as string;
+      };
+      reader.readAsDataURL(file);
+    });
+  }
+
+  async function handleFile(file: File) {
+    const localUrl = URL.createObjectURL(file);
+    setLocalPreview(localUrl);
+    setUploading(true);
+    try {
+      const compressed = await compressImage(file);
+      const u = await uploadFn(compressed);
+      onUpload(u);
+      toast.success("Image uploaded");
+    } catch (err: any) {
+      toast.error(err.message || "Upload failed");
+      setLocalPreview("");
+    } finally {
+      setUploading(false);
+      setTimeout(() => URL.revokeObjectURL(localUrl), 1000);
+    }
+  }
+
+  const displayUrl = uploading && localPreview ? localPreview : url;
+
+  return (
+    <div className="mt-1">
+      {displayUrl ? (
+        <div className="relative inline-block">
+          <img src={displayUrl} alt="Featured" className="w-24 h-24 rounded-lg object-cover border-2 border-slate-200" />
+          {uploading && (
+            <div className="absolute inset-0 bg-black/40 rounded-lg flex items-center justify-center">
+              <div className="w-6 h-6 border-2 border-white border-t-transparent rounded-full animate-spin" />
+            </div>
+          )}
+          {!uploading && (
+            <button
+              onClick={() => { onClear(); setLocalPreview(""); }}
+              className="absolute -top-2 -right-2 w-7 h-7 bg-red-500 text-white rounded-full flex items-center justify-center text-sm font-bold hover:bg-red-600 shadow"
+            >✕</button>
+          )}
+        </div>
+      ) : (
+        <div
+          onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+          onDragLeave={() => setDragOver(false)}
+          onDrop={(e) => {
+            e.preventDefault(); setDragOver(false);
+            const f = e.dataTransfer.files?.[0]; if (f) handleFile(f);
+          }}
+          className={`flex flex-col items-center justify-center w-24 h-24 border-2 border-dashed rounded-lg cursor-pointer transition-all ${
+            dragOver ? "border-primary bg-primary/10 scale-105" : "border-slate-300 hover:border-primary hover:bg-slate-50"
+          }`}
+        >
+          <input type="file" accept="image/*" className="hidden" onChange={(e) => {
+            const f = e.target.files?.[0]; if (!f) return;
+            handleFile(f); e.target.value = "";
+          }} />
+          <ImageIcon className="w-7 h-7 text-slate-400 mb-1" />
+          <span className="text-[10px] text-slate-500 text-center px-1">Drag & drop<br/>or click</span>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ═══════════════════════════════════════════════════════════════════════════
 // CREATE EXAM DIALOG — Step 1: exam details
 // ═══════════════════════════════════════════════════════════════════════════
@@ -326,34 +426,15 @@ function CreateExamDialog({ open, testCategory, onOpenChange, onCreated }: {
             </div>
           </div>
 
-          {/* Featured Image — upload only, no URL input */}
+          {/* Featured Image — drag & drop with instant preview */}
           <div>
             <Label className="text-sm font-semibold">Featured Image (optional)</Label>
-            <div className="flex items-center gap-3">
-              {form.featuredImage ? (
-                <div className="relative">
-                  <img src={form.featuredImage} alt="Featured" className="w-20 h-20 rounded-lg object-cover border" />
-                  <button
-                    onClick={() => setForm(f => ({ ...f, featuredImage: "" }))}
-                    className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center text-xs"
-                  >✕</button>
-                </div>
-              ) : (
-                <div className="w-20 h-20 rounded-lg border-2 border-dashed border-slate-300 flex items-center justify-center bg-slate-50">
-                  <ImageIcon className="w-6 h-6 text-slate-400" />
-                </div>
-              )}
-              <label className="cursor-pointer">
-                <input type="file" accept="image/*" className="hidden" onChange={async (e) => {
-                  const f = e.target.files?.[0]; if (!f) return;
-                  try { const url = await uploadFile(f, "exam-featured"); setForm(p => ({ ...p, featuredImage: url })); toast.success("Image uploaded"); }
-                  catch (err: any) { toast.error(err.message); }
-                }} />
-                <span className="inline-flex items-center h-10 px-4 rounded-md bg-primary text-primary-foreground text-sm font-medium cursor-pointer hover:bg-primary/90">
-                  <Upload className="w-4 h-4 mr-2" /> Upload Image
-                </span>
-              </label>
-            </div>
+            <FeaturedImageUpload
+              url={form.featuredImage}
+              onUpload={(url) => setForm(f => ({ ...f, featuredImage: url }))}
+              onClear={() => setForm(f => ({ ...f, featuredImage: "" }))}
+              uploadFn={(file) => uploadFile(file, "exam-featured")}
+            />
           </div>
 
           {/* Audio Settings — only for exam & demo (block-based) */}
@@ -826,7 +907,7 @@ function QuestionEditor({ question, onChange, blockLabel, isAudioBlock }: {
     return d.url;
   }
 
-  // ─── Reusable upload field with preview ──────────────────────────────────
+  // ─── Reusable upload field with drag-drop + instant preview ───────────────
   function MediaUpload({
     label, accept, url, onUpload, onClear, type,
   }: {
@@ -838,61 +919,132 @@ function QuestionEditor({ question, onChange, blockLabel, isAudioBlock }: {
     type: "image" | "audio";
   }) {
     const [uploading, setUploading] = useState(false);
+    const [dragOver, setDragOver] = useState(false);
+    const [localPreview, setLocalPreview] = useState<string>(""); // instant blob URL
+
+    // Compress images before upload (max 800px, 80% quality) — much faster
+    async function compressImage(file: File): Promise<File> {
+      if (file.size < 200_000) return file; // skip small images
+      return new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          const img = new Image();
+          img.onload = () => {
+            const canvas = document.createElement("canvas");
+            const maxDim = 800;
+            let { width, height } = img;
+            if (width > maxDim || height > maxDim) {
+              if (width > height) { height = (height / width) * maxDim; width = maxDim; }
+              else { width = (width / height) * maxDim; height = maxDim; }
+            }
+            canvas.width = width; canvas.height = height;
+            const ctx = canvas.getContext("2d")!;
+            ctx.drawImage(img, 0, 0, width, height);
+            canvas.toBlob((blob) => {
+              if (blob) resolve(new File([blob], file.name.replace(/\.\w+$/, ".jpg"), { type: "image/jpeg" }));
+              else resolve(file);
+            }, "image/jpeg", 0.8);
+          };
+          img.src = e.target?.result as string;
+        };
+        reader.readAsDataURL(file);
+      });
+    }
 
     async function handleFile(file: File) {
+      // Instant local preview (no waiting for upload)
+      const localUrl = URL.createObjectURL(file);
+      setLocalPreview(localUrl);
+
       setUploading(true);
       try {
-        const u = await uploadFile(file);
+        // Compress images for faster upload
+        const fileToUpload = type === "image" ? await compressImage(file) : file;
+        const u = await uploadFile(fileToUpload);
         onUpload(u);
         toast.success("Uploaded");
       } catch (err: any) {
         toast.error(err.message || "Upload failed");
+        setLocalPreview(""); // clear preview on error
       } finally {
         setUploading(false);
+        // Clean up the blob URL after a delay (let React render the real URL)
+        setTimeout(() => URL.revokeObjectURL(localUrl), 1000);
       }
     }
+
+    // The display URL: local preview during upload, real URL after
+    const displayUrl = uploading && localPreview ? localPreview : url;
 
     return (
       <div className="space-y-2">
         {label && <Label className="text-sm font-medium">{label}</Label>}
-        {uploading ? (
-          <div className="flex flex-col items-center justify-center w-full h-28 border-2 border-primary border-dashed rounded-lg bg-primary/5">
-            <div className="w-8 h-8 border-3 border-primary border-t-transparent rounded-full animate-spin mb-2" />
-            <span className="text-xs text-primary font-medium">Uploading…</span>
-          </div>
-        ) : url ? (
+
+        {displayUrl ? (
+          /* ─── Preview shown (either local or uploaded) ─── */
           <div className="flex items-start gap-3">
             {type === "image" ? (
               <div className="relative">
-                <img src={url} alt={label} className="w-28 h-28 rounded-lg object-cover border-2 border-slate-200" />
-                <button
-                  onClick={onClear}
-                  className="absolute -top-2 -right-2 w-7 h-7 bg-red-500 text-white rounded-full flex items-center justify-center text-sm font-bold hover:bg-red-600 shadow"
-                  title="Remove"
-                >✕</button>
+                <img src={displayUrl} alt={label} className="w-28 h-28 rounded-lg object-cover border-2 border-slate-200" />
+                {uploading && (
+                  <div className="absolute inset-0 bg-black/40 rounded-lg flex items-center justify-center">
+                    <div className="w-6 h-6 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  </div>
+                )}
+                {!uploading && (
+                  <button
+                    onClick={() => { onClear(); setLocalPreview(""); }}
+                    className="absolute -top-2 -right-2 w-7 h-7 bg-red-500 text-white rounded-full flex items-center justify-center text-sm font-bold hover:bg-red-600 shadow"
+                    title="Remove"
+                  >✕</button>
+                )}
               </div>
             ) : (
               <div className="relative flex-1">
-                <audio controls src={url} className="w-full" />
-                <button
-                  onClick={onClear}
-                  className="absolute -top-2 -right-2 w-7 h-7 bg-red-500 text-white rounded-full flex items-center justify-center text-sm font-bold hover:bg-red-600 shadow"
-                  title="Remove"
-                >✕</button>
+                <audio controls src={displayUrl} className="w-full" />
+                {uploading && (
+                  <div className="absolute inset-0 bg-black/20 rounded flex items-center justify-center">
+                    <div className="bg-white px-3 py-1 rounded-full text-xs font-medium flex items-center gap-2">
+                      <div className="w-3 h-3 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+                      Uploading…
+                    </div>
+                  </div>
+                )}
+                {!uploading && (
+                  <button
+                    onClick={() => { onClear(); setLocalPreview(""); }}
+                    className="absolute -top-2 -right-2 w-7 h-7 bg-red-500 text-white rounded-full flex items-center justify-center text-sm font-bold hover:bg-red-600 shadow"
+                    title="Remove"
+                  >✕</button>
+                )}
               </div>
             )}
           </div>
         ) : (
-          <label className="flex flex-col items-center justify-center w-full h-28 border-2 border-dashed border-slate-300 rounded-lg cursor-pointer hover:border-primary hover:bg-slate-50 transition-colors">
+          /* ─── Upload zone (drag-drop + click) ─── */
+          <div
+            onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+            onDragLeave={() => setDragOver(false)}
+            onDrop={(e) => {
+              e.preventDefault();
+              setDragOver(false);
+              const f = e.dataTransfer.files?.[0];
+              if (f) handleFile(f);
+            }}
+            className={`flex flex-col items-center justify-center w-full h-28 border-2 border-dashed rounded-lg cursor-pointer transition-all ${
+              dragOver ? "border-primary bg-primary/10 scale-[1.02]" : "border-slate-300 hover:border-primary hover:bg-slate-50"
+            }`}
+          >
             <input type="file" accept={accept} className="hidden" onChange={(e) => {
               const f = e.target.files?.[0]; if (!f) return;
               handleFile(f);
-              // Reset input so same file can be re-uploaded
               e.target.value = "";
             }} />
             <Upload className="w-7 h-7 text-slate-400 mb-1" />
-            <span className="text-xs text-slate-500">Click to upload {type}</span>
-          </label>
+            <span className="text-xs text-slate-500 font-medium">
+              {dragOver ? "Drop here!" : `Drag & drop or click to upload ${type}`}
+            </span>
+          </div>
         )}
       </div>
     );
