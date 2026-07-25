@@ -434,7 +434,7 @@ function QuestionDialog({ chapters, onSaved }: { chapters: Chapter[]; onSaved: (
                       const fd = new FormData();
                       fd.append("file", f);
                       fd.append("folder", "questions");
-                      const res = await fetch("/api/admin/upload", { method: "POST", body: fd });
+                      const res = await fetch("/api/admin/file-upload", { method: "POST", body: fd });
                       if (!res.ok) { const d = await res.json(); toast.error(d.error || "Upload failed"); return; }
                       const d = await res.json();
                       setImageUrl(d.url);
@@ -467,7 +467,7 @@ function QuestionDialog({ chapters, onSaved }: { chapters: Chapter[]; onSaved: (
                       const fd = new FormData();
                       fd.append("file", f);
                       fd.append("folder", "audio");
-                      const res = await fetch("/api/admin/upload", { method: "POST", body: fd });
+                      const res = await fetch("/api/admin/file-upload", { method: "POST", body: fd });
                       if (!res.ok) { const d = await res.json(); toast.error(d.error || "Upload failed"); return; }
                       const d = await res.json();
                       setAudioUrl(d.url);
