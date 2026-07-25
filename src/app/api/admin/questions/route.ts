@@ -15,7 +15,7 @@ const extendedQuestionSchema = createQuestionSchema.extend({
 
 export async function GET(req: NextRequest) {
   const user = await getCurrentUser(req);
-  if (!user || user.role !== "ADMIN") return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  if (!user || (user.role !== "ADMIN" && user.role !== "TEACHER")) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   const questions = await db.question.findMany({
     orderBy: { createdAt: "desc" },
     take: 200,
