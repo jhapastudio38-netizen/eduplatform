@@ -197,6 +197,27 @@ model Question {
   // Question Bank: standalone practice questions (not tied to a test)
   inQuestionBank Boolean @default(false)
   category    String?  // e.g. "Vocabulary", "Grammar", "Listening", "Reading"
+  // ─── New block-based exam fields ────────────────────────────────────────
+  blockType   String?  // "text" | "audio" — which block this question belongs to
+  blockNumber Int?     // 1-40 (1-20 text block, 21-40 audio block)
+  // Description type: "none" | "text" | "image" | "audio"
+  descType    String?  @default("none")
+  descText    String?  // text description (if descType = "text")
+  descImageUrl String? // image description (if descType = "image")
+  descAudioUrl String? // audio description (if descType = "audio")
+  // Question media type: "none" | "text" | "image" | "audio"
+  mediaType   String?  @default("none")
+  mediaText   String?  // text media (if mediaType = "text")
+  mediaImageUrl String? // image media (if mediaType = "image")
+  mediaAudioUrl String? // audio media (if mediaType = "audio")
+  // Answer type: "text" | "image" | "audio" | "choose"
+  answerType  String?  @default("text")
+  // For image answers: JSON array of 4 image URLs
+  optionImages String? // JSON: ["url1", "url2", "url3", "url4"]
+  // For audio answers: JSON array of 4 audio URLs
+  optionAudios String? // JSON: ["url1", "url2", "url3", "url4"]
+  // Which option is correct (0-3 index)
+  correctOption Int?   @default(0)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
@@ -207,6 +228,7 @@ model Question {
   @@index([type, difficulty])
   @@index([inQuestionBank])
   @@index([category])
+  @@index([blockType, blockNumber])
 }
 
 model Test {
@@ -216,19 +238,29 @@ model Test {
   description String?
   durationMin Int      @default(30)
   isExam      Boolean  @default(false)
-  examType    String   @default("REGULAR") // UBT / TOPIK_I / TOPIK_II / DEMO / CHAPTER / BATCH / PLACEMENT / REGULAR
+  examType    String   @default("REGULAR") // UBT / CBT / CHAPTER / REGULAR
   passScore   Int      @default(40)
   startAt     DateTime?
   endAt       DateTime?
-  isActive    Boolean  @default(true) // admin/teacher can deactivate
+  isActive    Boolean  @default(true)
   isPublished Boolean  @default(false)
-  negativeMarking Float @default(0) // points deducted per wrong answer
+  negativeMarking Float @default(0)
   shuffleQuestions Boolean @default(false)
   showResultImmediately Boolean @default(true)
-  maxAttempts Int      @default(1) // 0 = unlimited
-  createdBy   String? // teacher/admin who created
+  maxAttempts Int      @default(1)
+  createdBy   String?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+  // ─── New exam fields ────────────────────────────────────────────────────
+  price       Float?   // optional exam price
+  featuredImage String? // featured image URL
+  category    String?  // admin-defined category (shows in app)
+  // Audio settings — controls how exam audio plays
+  audioPlayMode String? @default("single") // "single" | "double"
+  audioGapSec  Int?     @default(2) // gap between audio plays in seconds
+  // Block configuration
+  textBlockCount  Int? @default(20) // number of text questions (default 20)
+  audioBlockCount Int? @default(20) // number of audio questions (default 20)
 
   chapter     Chapter? @relation(fields: [chapterId], references: [id], onDelete: SetNull)
   items       TestItem[]
@@ -238,6 +270,7 @@ model Test {
   @@index([isPublished, startAt])
   @@index([examType])
   @@index([isActive])
+  @@index([category])
 }
 
 model TestItem {
