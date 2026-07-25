@@ -419,15 +419,67 @@ function QuestionDialog({ chapters, onSaved }: { chapters: Chapter[]; onSaved: (
 
           {/* Image URL */}
           <div>
-            <Label>Image URL (optional — for visual questions)</Label>
-            <Input value={imageUrl} onChange={(e) => setImageUrl(e.target.value)} placeholder="https://..." />
+            <Label>Image (optional — for visual questions)</Label>
+            <div className="flex gap-2">
+              <Input value={imageUrl} onChange={(e) => setImageUrl(e.target.value)} placeholder="Upload a file or paste URL…" className="flex-1" />
+              <label className="cursor-pointer">
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={async (e) => {
+                    const f = e.target.files?.[0];
+                    if (!f) return;
+                    try {
+                      const fd = new FormData();
+                      fd.append("file", f);
+                      fd.append("folder", "questions");
+                      const res = await fetch("/api/admin/upload", { method: "POST", body: fd });
+                      if (!res.ok) { const d = await res.json(); toast.error(d.error || "Upload failed"); return; }
+                      const d = await res.json();
+                      setImageUrl(d.url);
+                      toast.success("Image uploaded");
+                    } catch { toast.error("Upload failed"); }
+                  }}
+                />
+                <span className="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium h-9 px-3 bg-primary text-primary-foreground cursor-pointer hover:bg-primary/90">
+                  📁 Upload
+                </span>
+              </label>
+            </div>
             {imageUrl && <img src={imageUrl} alt="Preview" className="mt-2 max-h-40 rounded border" />}
           </div>
 
           {/* Audio URL with loop settings */}
           <div className="space-y-2 p-3 border rounded-lg bg-slate-50">
             <Label>Audio (optional — for listening exams)</Label>
-            <Input value={audioUrl} onChange={(e) => setAudioUrl(e.target.value)} placeholder="https://...mp3" />
+            <div className="flex gap-2">
+              <Input value={audioUrl} onChange={(e) => setAudioUrl(e.target.value)} placeholder="Upload a file or paste URL…" className="flex-1" />
+              <label className="cursor-pointer">
+                <input
+                  type="file"
+                  accept="audio/*"
+                  className="hidden"
+                  onChange={async (e) => {
+                    const f = e.target.files?.[0];
+                    if (!f) return;
+                    try {
+                      const fd = new FormData();
+                      fd.append("file", f);
+                      fd.append("folder", "audio");
+                      const res = await fetch("/api/admin/upload", { method: "POST", body: fd });
+                      if (!res.ok) { const d = await res.json(); toast.error(d.error || "Upload failed"); return; }
+                      const d = await res.json();
+                      setAudioUrl(d.url);
+                      toast.success("Audio uploaded");
+                    } catch { toast.error("Upload failed"); }
+                  }}
+                />
+                <span className="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium h-9 px-3 bg-primary text-primary-foreground cursor-pointer hover:bg-primary/90">
+                  📁 Upload
+                </span>
+              </label>
+            </div>
             {audioUrl && (
               <div className="space-y-2">
                 <audio controls src={audioUrl} className="w-full h-8" />
