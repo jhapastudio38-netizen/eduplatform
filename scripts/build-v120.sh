@@ -8,7 +8,7 @@ export PATH="/usr/lib/jvm/java-21-openjdk-amd64/bin:/usr/bin:/bin:$PATH"
 
 LOG=/tmp/gradle-v120.log
 RESULT=/tmp/build_v120_result.txt
-APK_OUT=/home/z/my-project/download/DreamKorea-SmartClass-v1.3.0.apk
+APK_OUT=/home/z/my-project/download/DreamKorea-SmartClass-v1.3.1.apk
 PROJECT_DIR=/home/z/my-project/student-app-rust/android-wrapper
 
 echo "=== Build started at $(date) ===" > $LOG

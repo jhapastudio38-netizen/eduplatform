@@ -209,16 +209,29 @@ fun MiniStat(theme: AppTheme, icon: ImageVector, value: String, label: String) {
 // ─── Home — image cards like the original app ─────────────────────────────────
 @Composable
 fun HomeScreen(theme: AppTheme, sound: SoundManager, onNavigate: (Screen) -> Unit) {
-    val scope = rememberCoroutineScope()
     var homeCards by remember { mutableStateOf<List<HomeCard>>(emptyList()) }
     var loading by remember { mutableStateOf(true) }
+    var loadError by remember { mutableStateOf(false) }
+    var retryCount by remember { mutableStateOf(0) }
 
-    LaunchedEffect(Unit) {
-        scope.launch {
-            try {
-                // Use cached API — avoids reload storm on back/forth navigation
-                homeCards = AppState.getCachedHomeCards()
-            } catch (_: Exception) {}
+    LaunchedEffect(retryCount) {
+        loading = true
+        loadError = false
+        try {
+            if (retryCount > 0) AppState.invalidateCache("home_cards")
+            val result = kotlinx.coroutines.withTimeoutOrNull(15_000L) {
+                AppState.getCachedHomeCards()
+            }
+            if (result != null) {
+                homeCards = result
+            } else {
+                // Timeout — use fallback cards so home is never blank
+                homeCards = emptyList()
+            }
+        } catch (_: Exception) {
+            // Silently fall back to default cards — home should never crash
+            homeCards = emptyList()
+        } finally {
             loading = false
         }
     }
@@ -447,12 +460,14 @@ fun ScreenHeader(theme: AppTheme, sound: SoundManager, title: String, subtitle: 
 // ─── Learn Screen ─────────────────────────────────────────────────────────────
 @Composable
 fun LearnScreen(theme: AppTheme, sound: SoundManager, onBack: () -> Unit) {
-    val scope = rememberCoroutineScope()
     var subjects by remember { mutableStateOf<List<Subject>>(emptyList()) }
     var loading by remember { mutableStateOf(true) }
 
     LaunchedEffect(Unit) {
-        scope.launch { try { subjects = AppState.api.getSubjects().subjects } catch (_: Exception) {} ; loading = false }
+        try {
+            subjects = AppState.api.getSubjects().subjects
+        } catch (_: Exception) {}
+        finally { loading = false }
     }
 
     if (loading) {
@@ -500,12 +515,12 @@ fun LearnScreen(theme: AppTheme, sound: SoundManager, onBack: () -> Unit) {
 // ─── Books Screen ─────────────────────────────────────────────────────────────
 @Composable
 fun BooksScreen(theme: AppTheme, sound: SoundManager, onBack: () -> Unit, onBookClick: (Book) -> Unit = {}) {
-    val scope = rememberCoroutineScope()
     var books by remember { mutableStateOf<List<Book>>(emptyList()) }
     var loading by remember { mutableStateOf(true) }
 
     LaunchedEffect(Unit) {
-        scope.launch { try { books = AppState.getCachedBooks() } catch (_: Exception) {} ; loading = false }
+        try { books = AppState.getCachedBooks() } catch (_: Exception) {}
+        finally { loading = false }
     }
 
     if (loading) {
@@ -733,12 +748,12 @@ fun TestCard(theme: AppTheme, sound: SoundManager, t: TestItem, onClick: () -> U
 // ─── Videos Screen ────────────────────────────────────────────────────────────
 @Composable
 fun VideosScreen(theme: AppTheme, sound: SoundManager, onBack: () -> Unit) {
-    val scope = rememberCoroutineScope()
     var videos by remember { mutableStateOf<List<VideoLesson>>(emptyList()) }
     var loading by remember { mutableStateOf(true) }
 
     LaunchedEffect(Unit) {
-        scope.launch { try { videos = AppState.getCachedVideos() } catch (_: Exception) {} ; loading = false }
+        try { videos = AppState.getCachedVideos() } catch (_: Exception) {}
+        finally { loading = false }
     }
 
     if (loading) {
@@ -798,10 +813,8 @@ fun ProfileScreen(theme: AppTheme, sound: SoundManager, userName: String, onBack
     var loading by remember { mutableStateOf(true) }
 
     LaunchedEffect(Unit) {
-        scope.launch {
-            try { stats = AppState.api.getStats().stats } catch (_: Exception) {}
-            loading = false
-        }
+        try { stats = AppState.api.getStats().stats } catch (_: Exception) {}
+        finally { loading = false }
     }
 
     LazyColumn(
