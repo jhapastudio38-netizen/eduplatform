@@ -24,7 +24,7 @@ const testSchema = z.object({
   isExam: z.boolean().default(true),
   examType: z.string().default("UBT"), // UBT / CBT / CHAPTER / REGULAR
   passScore: z.number().int().min(0).max(100).default(40),
-  isPublished: z.boolean().default(true),
+  isPublished: z.boolean().default(false), // Draft by default — admin pushes when ready
   // New fields
   price: z.number().min(0).optional(),
   featuredImage: z.string().optional().or(z.literal("")),

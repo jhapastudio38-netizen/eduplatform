@@ -143,9 +143,11 @@ export function AdminTests() {
                   </p>
                 </div>
                 <div className="flex items-center gap-2">
-                  <Badge variant={t.isActive ? "default" : "secondary"}>
-                    {t.isActive ? "Active" : "Inactive"}
-                  </Badge>
+                  {t.isPublished ? (
+                    <Badge className="bg-green-500">🚀 Live</Badge>
+                  ) : (
+                    <Badge variant="secondary">📝 Draft</Badge>
+                  )}
                   <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); deleteTest(t); }}>
                     <Trash2 className="w-4 h-4 text-red-500" />
                   </Button>
@@ -350,6 +352,8 @@ function ExamEditor({ test, onClose }: { test: Test; onClose: () => void }) {
   const [clipboard, setClipboard] = useState<string>("");
   const [showPasteDialog, setShowPasteDialog] = useState(false);
   const [pasteCode, setPasteCode] = useState("");
+  const [pushing, setPushing] = useState(false);
+  const [isPublished, setIsPublished] = useState(test.isPublished);
 
   const textCount = test.textBlockCount || 20;
   const audioCount = test.audioBlockCount || 20;
@@ -413,6 +417,29 @@ function ExamEditor({ test, onClose }: { test: Test; onClose: () => void }) {
 
   function pasteQuestion() {
     setShowPasteDialog(true);
+  }
+
+  async function pushToApp() {
+    const filledCount = Object.values(questions).filter(q => q.stem.trim()).length;
+    if (filledCount === 0) {
+      toast.error("Cannot push: add at least one question first");
+      return;
+    }
+    if (!confirm(`Push this exam to all student apps?\n\n${filledCount} question(s) will be live.\n\nStudents will see it in their Exams page immediately.`)) {
+      return;
+    }
+    setPushing(true);
+    try {
+      const res = await fetch(`/api/admin/tests/${test.id}/publish`, { method: "POST" });
+      const d = await res.json();
+      if (!res.ok) { toast.error(d.error || "Push failed"); return; }
+      setIsPublished(true);
+      toast.success(d.message || "Pushed to app — students can now see this exam");
+    } catch {
+      toast.error("Push failed — check your connection");
+    } finally {
+      setPushing(false);
+    }
   }
 
   function doPaste() {
@@ -502,20 +529,41 @@ function ExamEditor({ test, onClose }: { test: Test; onClose: () => void }) {
           )}
         </div>
 
-        {/* Action buttons — Done, Copy, Paste */}
+        {/* Action buttons — Done, Copy, Paste, Push to App */}
         <div className="flex items-center justify-between border-t pt-3">
-          <div className="flex gap-2">
+          <div className="flex gap-2 flex-wrap">
             <Button onClick={saveQuestion} variant="default">
               <Save className="w-4 h-4 mr-1" /> Done
             </Button>
             <Button onClick={copyQuestion} variant="outline">
-              <Copy className="w-4 h-4 mr-1" /> Copy Question
+              <Copy className="w-4 h-4 mr-1" /> Copy
             </Button>
             <Button onClick={pasteQuestion} variant="outline">
-              <ClipboardPaste className="w-4 h-4 mr-1" /> Paste Question
+              <ClipboardPaste className="w-4 h-4 mr-1" /> Paste
             </Button>
           </div>
-          <Button variant="ghost" onClick={onClose}>Close</Button>
+          <div className="flex items-center gap-2">
+            {isPublished && (
+              <Badge className="bg-green-500">
+                <CheckCircle2 className="w-3 h-3 mr-1" /> Live in App
+              </Badge>
+            )}
+            <Button
+              onClick={pushToApp}
+              disabled={pushing || isPublished}
+              variant={isPublished ? "outline" : "default"}
+              className={isPublished ? "" : "bg-green-600 hover:bg-green-700"}
+            >
+              {pushing ? (
+                <><span className="animate-spin mr-1">⏳</span> Pushing…</>
+              ) : isPublished ? (
+                <><CheckCircle2 className="w-4 h-4 mr-1" /> Pushed</>
+              ) : (
+                <><span className="mr-1">🚀</span> Push to App</>
+              )}
+            </Button>
+            <Button variant="ghost" onClick={onClose}>Close</Button>
+          </div>
         </div>
       </DialogContent>
 
