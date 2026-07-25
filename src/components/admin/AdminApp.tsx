@@ -59,26 +59,7 @@ const NAV_SECTIONS: NavSection[] = [
   {
     title: "Exam Management",
     items: [
-      { id: "exams", label: "Exams & Tests", icon: FileText, hasAdd: true },
-      { id: "question-bank", label: "Question Bank", icon: FileQuestion, hasAdd: true },
-      { id: "live-rooms", label: "Live Rooms", icon: Radio, hasAdd: true },
-    ],
-  },
-  {
-    title: "Content & Resources",
-    items: [
-      { id: "home-cards", label: "Home Cards", icon: LayoutGrid, hasAdd: true },
-      { id: "all-books", label: "Books", icon: BookMarked, hasAdd: true },
-      { id: "audio-lessons", label: "Audio Lessons", icon: Headphones, hasAdd: true },
-      { id: "video-lessons", label: "Video Lessons", icon: Video, hasAdd: true },
-    ],
-  },
-  {
-    title: "User Management",
-    items: [
-      { id: "students", label: "Students", icon: GraduationCap, hasAdd: true },
-      { id: "teachers", label: "Teachers", icon: UserCog, hasAdd: true },
-      { id: "student-results", label: "Student Results", icon: BarChart3 },
+      { id: "exams", label: "Exams", icon: FileText, hasAdd: true },
     ],
   },
   {
