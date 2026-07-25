@@ -504,23 +504,55 @@ function ExamEditor({ test, testCategory, onClose }: { test: Test; testCategory:
   }
 
   async function pushToApp() {
-    const filledCount = Object.values(questions).filter(q => q.stem.trim()).length;
-    if (filledCount === 0) {
+    // Count questions that have been filled in
+    const filledQuestions = Object.values(questions).filter(q => q.stem.trim());
+    if (filledQuestions.length === 0) {
       toast.error("Cannot push: add at least one question first");
       return;
     }
-    if (!confirm(`Push this exam to all student apps?\n\n${filledCount} question(s) will be live.\n\nStudents will see it in their Exams page immediately.`)) {
-      return;
-    }
+
+    // Auto-save any unsaved questions before pushing
     setPushing(true);
     try {
+      // Save all filled questions that haven't been saved yet
+      for (const q of filledQuestions) {
+        const payload = {
+          blockType: q.blockType,
+          blockNumber: q.blockNumber,
+          stem: q.stem,
+          descType: q.descType,
+          descText: q.descText || "",
+          descImageUrl: q.descImageUrl || "",
+          descAudioUrl: q.descAudioUrl || "",
+          mediaType: q.mediaType,
+          mediaText: q.mediaText || "",
+          mediaImageUrl: q.mediaImageUrl || "",
+          mediaAudioUrl: q.mediaAudioUrl || "",
+          answerType: q.answerType,
+          options: q.options || [],
+          optionImages: q.optionImages || [],
+          optionAudios: q.optionAudios || [],
+          correctOption: q.correctOption,
+          explanation: q.explanation || "",
+        };
+        await fetch(`/api/admin/tests/${test.id}/questions`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+      }
+
+      // Now publish
       const res = await fetch(`/api/admin/tests/${test.id}/publish`, { method: "POST" });
       const d = await res.json();
-      if (!res.ok) { toast.error(d.error || "Push failed"); return; }
+      if (!res.ok) {
+        toast.error(d.error || `Push failed (HTTP ${res.status})`);
+        return;
+      }
       setIsPublished(true);
       toast.success(d.message || "Pushed to app — students can now see this exam");
-    } catch {
-      toast.error("Push failed — check your connection");
+    } catch (e: any) {
+      toast.error("Push failed: " + (e.message || "network error"));
     } finally {
       setPushing(false);
     }
