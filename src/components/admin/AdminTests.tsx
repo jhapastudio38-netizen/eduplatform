@@ -270,7 +270,7 @@ function CreateExamDialog({ open, testCategory, onOpenChange, onCreated }: {
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="sm:max-w-4xl max-h-[90vh] overflow-y-auto">
         <DialogHeader><DialogTitle className="text-xl">{dialogTitle}</DialogTitle></DialogHeader>
         <div className="space-y-4">
           {/* Exam Name */}
@@ -636,7 +636,7 @@ function ExamEditor({ test, testCategory, onClose }: { test: Test; testCategory:
 
   return (
     <Dialog open={true} onOpenChange={(v) => { if (!v) onClose(); }}>
-      <DialogContent className="max-w-5xl max-h-[95vh] overflow-hidden flex flex-col">
+      <DialogContent className="sm:max-w-5xl max-h-[95vh] overflow-hidden flex flex-col">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <span>{test.title}</span>
