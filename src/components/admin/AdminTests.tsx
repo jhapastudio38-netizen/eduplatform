@@ -326,21 +326,34 @@ function CreateExamDialog({ open, testCategory, onOpenChange, onCreated }: {
             </div>
           </div>
 
-          {/* Featured Image */}
+          {/* Featured Image — upload only, no URL input */}
           <div>
-            <Label className="text-sm font-semibold">Featured Image</Label>
-            <div className="flex gap-2">
-              <Input value={form.featuredImage} onChange={(e) => setForm(f => ({ ...f, featuredImage: e.target.value }))} placeholder="Upload or paste URL…" className="flex-1" />
+            <Label className="text-sm font-semibold">Featured Image (optional)</Label>
+            <div className="flex items-center gap-3">
+              {form.featuredImage ? (
+                <div className="relative">
+                  <img src={form.featuredImage} alt="Featured" className="w-20 h-20 rounded-lg object-cover border" />
+                  <button
+                    onClick={() => setForm(f => ({ ...f, featuredImage: "" }))}
+                    className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center text-xs"
+                  >✕</button>
+                </div>
+              ) : (
+                <div className="w-20 h-20 rounded-lg border-2 border-dashed border-slate-300 flex items-center justify-center bg-slate-50">
+                  <ImageIcon className="w-6 h-6 text-slate-400" />
+                </div>
+              )}
               <label className="cursor-pointer">
                 <input type="file" accept="image/*" className="hidden" onChange={async (e) => {
                   const f = e.target.files?.[0]; if (!f) return;
                   try { const url = await uploadFile(f, "exam-featured"); setForm(p => ({ ...p, featuredImage: url })); toast.success("Image uploaded"); }
                   catch (err: any) { toast.error(err.message); }
                 }} />
-                <span className="inline-flex items-center h-10 px-4 rounded-md bg-primary text-primary-foreground text-sm cursor-pointer hover:bg-primary/90">📁 Upload</span>
+                <span className="inline-flex items-center h-10 px-4 rounded-md bg-primary text-primary-foreground text-sm font-medium cursor-pointer hover:bg-primary/90">
+                  <Upload className="w-4 h-4 mr-2" /> Upload Image
+                </span>
               </label>
             </div>
-            {form.featuredImage && <img src={form.featuredImage} alt="Featured" className="mt-2 max-h-32 rounded border" />}
           </div>
 
           {/* Audio Settings — only for exam & demo (block-based) */}
@@ -812,7 +825,30 @@ function QuestionEditor({ question, onChange, blockLabel, isAudioBlock }: {
     return d.url;
   }
 
-  function UploadButton({ onUpload, accept }: { onUpload: (url: string) => void; accept: string }) {
+  function UploadButton({ onUpload, accept, hasPreview, previewUrl, onClear, isImage, isAudio, small }: {
+    onUpload: (url: string) => void;
+    accept: string;
+    hasPreview?: boolean;
+    previewUrl?: string;
+    onClear?: () => void;
+    isImage?: boolean;
+    isAudio?: boolean;
+    small?: boolean;
+  }) {
+    if (hasPreview && previewUrl) {
+      return (
+        <div className={`relative ${small ? "w-full" : "w-24"}`}>
+          {isImage && <img src={previewUrl} alt="" className={`${small ? "h-20" : "h-24"} w-full rounded-lg object-cover border`} />}
+          {isAudio && <audio controls src={previewUrl} className="w-full h-8" />}
+          {onClear && (
+            <button
+              onClick={onClear}
+              className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center text-xs hover:bg-red-600"
+            >✕</button>
+          )}
+        </div>
+      );
+    }
     return (
       <label className="cursor-pointer">
         <input type="file" accept={accept} className="hidden" onChange={async (e) => {
@@ -820,7 +856,9 @@ function QuestionEditor({ question, onChange, blockLabel, isAudioBlock }: {
           try { const url = await uploadFile(f, "questions"); onUpload(url); toast.success("File uploaded"); }
           catch (err: any) { toast.error(err.message); }
         }} />
-        <span className="inline-flex items-center h-8 px-2 rounded-md bg-primary text-primary-foreground text-xs cursor-pointer hover:bg-primary/90">📁 Upload</span>
+        <span className={`inline-flex items-center ${small ? "h-8 px-2 text-xs" : "h-10 px-4 text-sm"} rounded-md bg-primary text-primary-foreground cursor-pointer hover:bg-primary/90 font-medium`}>
+          <Upload className={`${small ? "w-3 h-3" : "w-4 h-4"} mr-1`} /> Upload {isImage ? "Image" : isAudio ? "Audio" : "File"}
+        </span>
       </label>
     );
   }
@@ -858,19 +896,13 @@ function QuestionEditor({ question, onChange, blockLabel, isAudioBlock }: {
           <Textarea rows={2} value={question.descText} onChange={(e) => onChange({ ...question, descText: e.target.value })} placeholder="Description text…" />
         )}
         {question.descType === "image" && (
-          <div className="flex gap-2">
-            <Input value={question.descImageUrl} onChange={(e) => onChange({ ...question, descImageUrl: e.target.value })} placeholder="Image URL…" className="flex-1" />
-            <UploadButton accept="image/*" onUpload={(url) => onChange({ ...question, descImageUrl: url })} />
-          </div>
+          <UploadButton accept="image/*" onUpload={(url) => onChange({ ...question, descImageUrl: url })} hasPreview={!!question.descImageUrl} previewUrl={question.descImageUrl} onClear={() => onChange({ ...question, descImageUrl: "" })} isImage />
         )}
         {question.descType === "image" && question.descImageUrl && (
           <img src={question.descImageUrl} alt="Desc" className="max-h-32 rounded border" />
         )}
         {question.descType === "audio" && (
-          <div className="flex gap-2">
-            <Input value={question.descAudioUrl} onChange={(e) => onChange({ ...question, descAudioUrl: e.target.value })} placeholder="Audio URL…" className="flex-1" />
-            <UploadButton accept="audio/*" onUpload={(url) => onChange({ ...question, descAudioUrl: url })} />
-          </div>
+          <UploadButton accept="audio/*" onUpload={(url) => onChange({ ...question, descAudioUrl: url })} hasPreview={!!question.descAudioUrl} previewUrl={question.descAudioUrl} onClear={() => onChange({ ...question, descAudioUrl: "" })} isAudio />
         )}
         {question.descType === "audio" && question.descAudioUrl && (
           <audio controls src={question.descAudioUrl} className="w-full h-8" />
@@ -907,19 +939,13 @@ function QuestionEditor({ question, onChange, blockLabel, isAudioBlock }: {
         )}
         {question.mediaType === "image" && (
           <>
-            <div className="flex gap-2">
-              <Input value={question.mediaImageUrl} onChange={(e) => onChange({ ...question, mediaImageUrl: e.target.value })} placeholder="Image URL…" className="flex-1" />
-              <UploadButton accept="image/*" onUpload={(url) => onChange({ ...question, mediaImageUrl: url })} />
-            </div>
+            <UploadButton accept="image/*" onUpload={(url) => onChange({ ...question, mediaImageUrl: url })} hasPreview={!!question.mediaImageUrl} previewUrl={question.mediaImageUrl} onClear={() => onChange({ ...question, mediaImageUrl: "" })} isImage />
             {question.mediaImageUrl && <img src={question.mediaImageUrl} alt="Media" className="max-h-40 rounded border" />}
           </>
         )}
         {question.mediaType === "audio" && (
           <>
-            <div className="flex gap-2">
-              <Input value={question.mediaAudioUrl} onChange={(e) => onChange({ ...question, mediaAudioUrl: e.target.value })} placeholder="Audio URL…" className="flex-1" />
-              <UploadButton accept="audio/*" onUpload={(url) => onChange({ ...question, mediaAudioUrl: url })} />
-            </div>
+            <UploadButton accept="audio/*" onUpload={(url) => onChange({ ...question, mediaAudioUrl: url })} hasPreview={!!question.mediaAudioUrl} previewUrl={question.mediaAudioUrl} onClear={() => onChange({ ...question, mediaAudioUrl: "" })} isAudio />
             {question.mediaAudioUrl && <audio controls src={question.mediaAudioUrl} className="w-full h-8" />}
           </>
         )}
@@ -998,15 +1024,15 @@ function QuestionEditor({ question, onChange, blockLabel, isAudioBlock }: {
                     onChange({ ...question, optionImages: imgs });
                   }} />
                 </div>
-                <Input
-                  value={question.optionImages[i] || ""}
-                  onChange={(e) => {
+                <UploadButton accept="image/*" onUpload={(url) => {
                     const imgs = [...question.optionImages];
-                    imgs[i] = e.target.value;
+                    imgs[i] = url;
                     onChange({ ...question, optionImages: imgs });
-                  }}
-                  placeholder="Image URL…"
-                />
+                  }} hasPreview={!!question.optionImages[i]} previewUrl={question.optionImages[i] || ""} onClear={() => {
+                    const imgs = [...question.optionImages];
+                    imgs[i] = "";
+                    onChange({ ...question, optionImages: imgs });
+                  }} isImage small />
                 {question.optionImages[i] && <img src={question.optionImages[i]} alt="" className="h-20 rounded border" />}
               </div>
             ))}
@@ -1036,15 +1062,15 @@ function QuestionEditor({ question, onChange, blockLabel, isAudioBlock }: {
                     onChange({ ...question, optionAudios: auds });
                   }} />
                 </div>
-                <Input
-                  value={question.optionAudios[i] || ""}
-                  onChange={(e) => {
+                <UploadButton accept="audio/*" onUpload={(url) => {
                     const auds = [...question.optionAudios];
-                    auds[i] = e.target.value;
+                    auds[i] = url;
                     onChange({ ...question, optionAudios: auds });
-                  }}
-                  placeholder="Audio URL…"
-                />
+                  }} hasPreview={!!question.optionAudios[i]} previewUrl={question.optionAudios[i] || ""} onClear={() => {
+                    const auds = [...question.optionAudios];
+                    auds[i] = "";
+                    onChange({ ...question, optionAudios: auds });
+                  }} isAudio small />
                 {question.optionAudios[i] && <audio controls src={question.optionAudios[i]} className="w-full h-8" />}
               </div>
             ))}

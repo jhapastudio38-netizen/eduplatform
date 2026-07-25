@@ -6,7 +6,7 @@ import { audit } from "@/lib/audit";
 
 export async function GET() {
   const user = await getCurrentUser();
-  if (!user || user.role !== "ADMIN") return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  if (!user || (user.role !== "ADMIN" && user.role !== "TEACHER")) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   const lessons = await db.lesson.findMany({
     orderBy: { createdAt: "desc" },
     take: 100,
@@ -17,7 +17,7 @@ export async function GET() {
 
 export async function POST(req: NextRequest) {
   const user = await getCurrentUser();
-  if (!user || user.role !== "ADMIN") return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  if (!user || (user.role !== "ADMIN" && user.role !== "TEACHER")) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   const body = await req.json().catch(() => null);
   const parsed = createLessonSchema.safeParse(body);
   if (!parsed.success) return NextResponse.json({ error: parsed.error.issues[0]?.message }, { status: 400 });
