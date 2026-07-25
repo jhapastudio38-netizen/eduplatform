@@ -806,7 +806,8 @@ function ExamEditor({ test, testCategory, onClose }: { test: Test; testCategory:
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// QUESTION EDITOR — individual question form
+// ═══════════════════════════════════════════════════════════════════════════
+// QUESTION EDITOR — clean, PC-optimized, two-column layout
 // ═══════════════════════════════════════════════════════════════════════════
 
 function QuestionEditor({ question, onChange, blockLabel, isAudioBlock }: {
@@ -815,273 +816,338 @@ function QuestionEditor({ question, onChange, blockLabel, isAudioBlock }: {
   blockLabel: string;
   isAudioBlock: boolean;
 }) {
-  async function uploadFile(file: File, folder: string): Promise<string> {
+  async function uploadFile(file: File): Promise<string> {
     const fd = new FormData();
     fd.append("file", file);
-    fd.append("folder", folder);
+    fd.append("folder", "questions");
     const res = await fetch("/api/admin/file-upload", { method: "POST", body: fd });
     if (!res.ok) { const d = await res.json(); throw new Error(d.error || "Upload failed"); }
     const d = await res.json();
     return d.url;
   }
 
-  function UploadButton({ onUpload, accept, hasPreview, previewUrl, onClear, isImage, isAudio, small }: {
-    onUpload: (url: string) => void;
+  // ─── Reusable upload field with preview ──────────────────────────────────
+  function MediaUpload({
+    label, accept, url, onUpload, onClear, type,
+  }: {
+    label: string;
     accept: string;
-    hasPreview?: boolean;
-    previewUrl?: string;
-    onClear?: () => void;
-    isImage?: boolean;
-    isAudio?: boolean;
-    small?: boolean;
+    url: string;
+    onUpload: (url: string) => void;
+    onClear: () => void;
+    type: "image" | "audio";
   }) {
-    if (hasPreview && previewUrl) {
-      return (
-        <div className={`relative ${small ? "w-full" : "w-24"}`}>
-          {isImage && <img src={previewUrl} alt="" className={`${small ? "h-20" : "h-24"} w-full rounded-lg object-cover border`} />}
-          {isAudio && <audio controls src={previewUrl} className="w-full h-8" />}
-          {onClear && (
-            <button
-              onClick={onClear}
-              className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center text-xs hover:bg-red-600"
-            >✕</button>
-          )}
-        </div>
-      );
-    }
     return (
-      <label className="cursor-pointer">
-        <input type="file" accept={accept} className="hidden" onChange={async (e) => {
-          const f = e.target.files?.[0]; if (!f) return;
-          try { const url = await uploadFile(f, "questions"); onUpload(url); toast.success("File uploaded"); }
-          catch (err: any) { toast.error(err.message); }
-        }} />
-        <span className={`inline-flex items-center ${small ? "h-8 px-2 text-xs" : "h-10 px-4 text-sm"} rounded-md bg-primary text-primary-foreground cursor-pointer hover:bg-primary/90 font-medium`}>
-          <Upload className={`${small ? "w-3 h-3" : "w-4 h-4"} mr-1`} /> Upload {isImage ? "Image" : isAudio ? "Audio" : "File"}
-        </span>
-      </label>
+      <div className="space-y-2">
+        <Label className="text-sm font-medium">{label}</Label>
+        {url ? (
+          <div className="flex items-start gap-3">
+            {type === "image" ? (
+              <div className="relative">
+                <img src={url} alt={label} className="w-28 h-28 rounded-lg object-cover border-2 border-slate-200" />
+                <button
+                  onClick={onClear}
+                  className="absolute -top-2 -right-2 w-7 h-7 bg-red-500 text-white rounded-full flex items-center justify-center text-sm font-bold hover:bg-red-600 shadow"
+                  title="Remove"
+                >✕</button>
+              </div>
+            ) : (
+              <div className="relative flex-1">
+                <audio controls src={url} className="w-full" />
+                <button
+                  onClick={onClear}
+                  className="absolute -top-2 -right-2 w-7 h-7 bg-red-500 text-white rounded-full flex items-center justify-center text-sm font-bold hover:bg-red-600 shadow"
+                  title="Remove"
+                >✕</button>
+              </div>
+            )}
+          </div>
+        ) : (
+          <label className="flex flex-col items-center justify-center w-full h-28 border-2 border-dashed border-slate-300 rounded-lg cursor-pointer hover:border-primary hover:bg-slate-50 transition-colors">
+            <input type="file" accept={accept} className="hidden" onChange={async (e) => {
+              const f = e.target.files?.[0]; if (!f) return;
+              try { const u = await uploadFile(f); onUpload(u); toast.success("Uploaded"); }
+              catch (err: any) { toast.error(err.message); }
+            }} />
+            <Upload className="w-7 h-7 text-slate-400 mb-1" />
+            <span className="text-xs text-slate-500">Click to upload {type}</span>
+          </label>
+        )}
+      </div>
     );
   }
 
   return (
-    <div className="space-y-4">
-      {/* Question number badge */}
-      <div className="flex items-center gap-2">
-        <div className="w-10 h-10 rounded-full bg-primary text-primary-foreground flex items-center justify-center font-bold">
+    <div className="space-y-5 p-1">
+      {/* ─── Question number + label ──────────────────────────────────────── */}
+      <div className="flex items-center gap-3 pb-3 border-b">
+        <div className="w-12 h-12 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-lg font-bold">
           {question.blockNumber}
         </div>
         <div>
-          <p className="font-semibold">{blockLabel}</p>
+          <p className="font-bold text-base">{blockLabel}</p>
           <p className="text-xs text-muted-foreground">{isAudioBlock ? "Audio question" : "Text question"}</p>
         </div>
       </div>
 
-      {/* Question Description type */}
-      <div className="space-y-2">
-        <Label className="text-sm font-semibold">Question Description Type</Label>
-        <div className="flex gap-2 flex-wrap">
-          {(["none", "text", "image", "audio"] as const).map((t) => (
-            <Button
-              key={t}
-              variant={question.descType === t ? "default" : "outline"}
-              size="sm"
-              onClick={() => onChange({ ...question, descType: t })}
-            >
-              {t === "none" ? "None" : t === "text" ? "Text" : t === "image" ? "Image" : "Audio"}
-            </Button>
-          ))}
-        </div>
-        {/* Description content based on type */}
-        {question.descType === "text" && (
-          <Textarea rows={2} value={question.descText} onChange={(e) => onChange({ ...question, descText: e.target.value })} placeholder="Description text…" />
-        )}
-        {question.descType === "image" && (
-          <UploadButton accept="image/*" onUpload={(url) => onChange({ ...question, descImageUrl: url })} hasPreview={!!question.descImageUrl} previewUrl={question.descImageUrl} onClear={() => onChange({ ...question, descImageUrl: "" })} isImage />
-        )}
-        {question.descType === "image" && question.descImageUrl && (
-          <img src={question.descImageUrl} alt="Desc" className="max-h-32 rounded border" />
-        )}
-        {question.descType === "audio" && (
-          <UploadButton accept="audio/*" onUpload={(url) => onChange({ ...question, descAudioUrl: url })} hasPreview={!!question.descAudioUrl} previewUrl={question.descAudioUrl} onClear={() => onChange({ ...question, descAudioUrl: "" })} isAudio />
-        )}
-        {question.descType === "audio" && question.descAudioUrl && (
-          <audio controls src={question.descAudioUrl} className="w-full h-8" />
-        )}
-      </div>
+      {/* ─── Two-column layout for PC ─────────────────────────────────────── */}
+      <div className="grid grid-cols-2 gap-6">
 
-      {/* Question text */}
-      <div className="space-y-2">
-        <Label className="text-sm font-semibold">Question *</Label>
-        <Textarea rows={2} value={question.stem} onChange={(e) => onChange({ ...question, stem: e.target.value })} placeholder="What is the question?" />
-      </div>
+        {/* ─── LEFT COLUMN: Description + Question ─────────────────────────── */}
+        <div className="space-y-5">
 
-      {/* Question Media type */}
-      <div className="space-y-2">
-        <Label className="text-sm font-semibold">Question Media (shows in exam)</Label>
-        <div className="flex gap-2 flex-wrap">
-          {(["none", "text", "image", "audio"] as const).map((t) => (
-            <Button
-              key={t}
-              variant={question.mediaType === t ? "default" : "outline"}
-              size="sm"
-              onClick={() => onChange({ ...question, mediaType: t })}
-              disabled={isAudioBlock && t === "none"} // audio block must have audio media
-            >
-              {t === "none" ? "None" : t === "text" ? "Text" : t === "image" ? "Image" : "Audio"}
-            </Button>
-          ))}
-        </div>
-        {isAudioBlock && (
-          <p className="text-xs text-amber-600">Audio block: media type is set to Audio automatically</p>
-        )}
-        {question.mediaType === "text" && (
-          <Textarea rows={2} value={question.mediaText} onChange={(e) => onChange({ ...question, mediaText: e.target.value })} placeholder="Media text…" />
-        )}
-        {question.mediaType === "image" && (
-          <>
-            <UploadButton accept="image/*" onUpload={(url) => onChange({ ...question, mediaImageUrl: url })} hasPreview={!!question.mediaImageUrl} previewUrl={question.mediaImageUrl} onClear={() => onChange({ ...question, mediaImageUrl: "" })} isImage />
-            {question.mediaImageUrl && <img src={question.mediaImageUrl} alt="Media" className="max-h-40 rounded border" />}
-          </>
-        )}
-        {question.mediaType === "audio" && (
-          <>
-            <UploadButton accept="audio/*" onUpload={(url) => onChange({ ...question, mediaAudioUrl: url })} hasPreview={!!question.mediaAudioUrl} previewUrl={question.mediaAudioUrl} onClear={() => onChange({ ...question, mediaAudioUrl: "" })} isAudio />
-            {question.mediaAudioUrl && <audio controls src={question.mediaAudioUrl} className="w-full h-8" />}
-          </>
-        )}
-      </div>
-
-      {/* Answer type */}
-      <div className="space-y-2">
-        <Label className="text-sm font-semibold">Answer Type</Label>
-        <div className="flex gap-2 flex-wrap">
-          {(["text", "image", "audio", "choose"] as const).map((t) => (
-            <Button
-              key={t}
-              variant={question.answerType === t ? "default" : "outline"}
-              size="sm"
-              onClick={() => onChange({ ...question, answerType: t })}
-            >
-              {t === "text" ? "Text" : t === "image" ? "Image" : t === "audio" ? "Audio" : "Choose Correct"}
-            </Button>
-          ))}
-        </div>
-      </div>
-
-      {/* Options based on answer type */}
-      {(question.answerType === "text" || question.answerType === "choose") && (
-        <div className="space-y-2 p-3 border rounded-lg bg-slate-50">
-          <Label className="text-sm font-semibold">Options (4)</Label>
-          <div className="grid grid-cols-2 gap-2">
-            {[0, 1, 2, 3].map((i) => (
-              <div key={i} className="flex items-center gap-2">
-                <button
-                  onClick={() => onChange({ ...question, correctOption: i })}
-                  className={`w-6 h-6 rounded-full border-2 flex items-center justify-center text-xs font-bold ${
-                    question.correctOption === i ? "bg-green-500 text-white border-green-500" : "border-slate-300"
-                  }`}
-                >
-                  {question.correctOption === i ? "✓" : String.fromCharCode(65 + i)}
-                </button>
-                <Input
-                  value={question.options[i] || ""}
-                  onChange={(e) => {
-                    const opts = [...question.options];
-                    opts[i] = e.target.value;
-                    onChange({ ...question, options: opts });
-                  }}
-                  placeholder={`Option ${String.fromCharCode(65 + i)}`}
+          {/* Description Type */}
+          <div className="space-y-2">
+            <Label className="text-sm font-semibold">Description Type</Label>
+            <div className="flex gap-1">
+              {(["none", "text", "image", "audio"] as const).map((t) => (
+                <Button
+                  key={t}
+                  variant={question.descType === t ? "default" : "outline"}
+                  size="sm"
                   className="flex-1"
-                />
-              </div>
-            ))}
+                  onClick={() => onChange({ ...question, descType: t })}
+                >
+                  {t === "none" ? "None" : t.charAt(0).toUpperCase() + t.slice(1)}
+                </Button>
+              ))}
+            </div>
           </div>
-          {question.answerType === "choose" && (
-            <p className="text-xs text-muted-foreground">Underline style: correct option has ✓ green circle</p>
+
+          {/* Description content */}
+          {question.descType === "text" && (
+            <div className="space-y-1">
+              <Label className="text-xs text-muted-foreground">Description Text</Label>
+              <Textarea rows={2} value={question.descText} onChange={(e) => onChange({ ...question, descText: e.target.value })} placeholder="Enter description…" />
+            </div>
+          )}
+          {question.descType === "image" && (
+            <MediaUpload
+              label="Description Image"
+              accept="image/*"
+              url={question.descImageUrl}
+              onUpload={(url) => onChange({ ...question, descImageUrl: url })}
+              onClear={() => onChange({ ...question, descImageUrl: "" })}
+              type="image"
+            />
+          )}
+          {question.descType === "audio" && (
+            <MediaUpload
+              label="Description Audio"
+              accept="audio/*"
+              url={question.descAudioUrl}
+              onUpload={(url) => onChange({ ...question, descAudioUrl: url })}
+              onClear={() => onChange({ ...question, descAudioUrl: "" })}
+              type="audio"
+            />
+          )}
+
+          {/* Question text */}
+          <div className="space-y-1">
+            <Label className="text-sm font-semibold">Question <span className="text-red-500">*</span></Label>
+            <Textarea rows={3} value={question.stem} onChange={(e) => onChange({ ...question, stem: e.target.value })} placeholder="What is the question?" className="text-base" />
+          </div>
+
+          {/* Question Media Type */}
+          <div className="space-y-2">
+            <Label className="text-sm font-semibold">Question Media (shows in exam)</Label>
+            <div className="flex gap-1">
+              {(["none", "text", "image", "audio"] as const).map((t) => (
+                <Button
+                  key={t}
+                  variant={question.mediaType === t ? "default" : "outline"}
+                  size="sm"
+                  className="flex-1"
+                  onClick={() => onChange({ ...question, mediaType: t })}
+                  disabled={isAudioBlock && t === "none"}
+                >
+                  {t === "none" ? "None" : t.charAt(0).toUpperCase() + t.slice(1)}
+                </Button>
+              ))}
+            </div>
+          </div>
+
+          {/* Media content */}
+          {question.mediaType === "text" && (
+            <div className="space-y-1">
+              <Label className="text-xs text-muted-foreground">Media Text</Label>
+              <Textarea rows={2} value={question.mediaText} onChange={(e) => onChange({ ...question, mediaText: e.target.value })} placeholder="Media text…" />
+            </div>
+          )}
+          {question.mediaType === "image" && (
+            <MediaUpload
+              label="Question Image"
+              accept="image/*"
+              url={question.mediaImageUrl}
+              onUpload={(url) => onChange({ ...question, mediaImageUrl: url })}
+              onClear={() => onChange({ ...question, mediaImageUrl: "" })}
+              type="image"
+            />
+          )}
+          {question.mediaType === "audio" && (
+            <MediaUpload
+              label="Question Audio"
+              accept="audio/*"
+              url={question.mediaAudioUrl}
+              onUpload={(url) => onChange({ ...question, mediaAudioUrl: url })}
+              onClear={() => onChange({ ...question, mediaAudioUrl: "" })}
+              type="audio"
+            />
           )}
         </div>
-      )}
 
-      {question.answerType === "image" && (
-        <div className="space-y-2 p-3 border rounded-lg bg-slate-50">
-          <Label className="text-sm font-semibold">Image Options (4)</Label>
-          <div className="grid grid-cols-2 gap-2">
-            {[0, 1, 2, 3].map((i) => (
-              <div key={i} className="space-y-1">
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => onChange({ ...question, correctOption: i })}
-                    className={`w-6 h-6 rounded-full border-2 flex items-center justify-center text-xs font-bold ${
-                      question.correctOption === i ? "bg-green-500 text-white border-green-500" : "border-slate-300"
-                    }`}
-                  >
-                    {question.correctOption === i ? "✓" : String.fromCharCode(65 + i)}
-                  </button>
-                  <span className="text-xs">Option {String.fromCharCode(65 + i)}</span>
-                  <UploadButton accept="image/*" onUpload={(url) => {
-                    const imgs = [...question.optionImages];
-                    imgs[i] = url;
-                    onChange({ ...question, optionImages: imgs });
-                  }} />
-                </div>
-                <UploadButton accept="image/*" onUpload={(url) => {
-                    const imgs = [...question.optionImages];
-                    imgs[i] = url;
-                    onChange({ ...question, optionImages: imgs });
-                  }} hasPreview={!!question.optionImages[i]} previewUrl={question.optionImages[i] || ""} onClear={() => {
-                    const imgs = [...question.optionImages];
-                    imgs[i] = "";
-                    onChange({ ...question, optionImages: imgs });
-                  }} isImage small />
-                {question.optionImages[i] && <img src={question.optionImages[i]} alt="" className="h-20 rounded border" />}
+        {/* ─── RIGHT COLUMN: Answer type + options ────────────────────────── */}
+        <div className="space-y-5">
+
+          {/* Answer Type */}
+          <div className="space-y-2">
+            <Label className="text-sm font-semibold">Answer Type</Label>
+            <div className="grid grid-cols-2 gap-1">
+              {(["text", "image", "audio", "choose"] as const).map((t) => (
+                <Button
+                  key={t}
+                  variant={question.answerType === t ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => onChange({ ...question, answerType: t })}
+                >
+                  {t === "text" ? "Text Options" : t === "image" ? "Image Options" : t === "audio" ? "Audio Options" : "Choose Correct"}
+                </Button>
+              ))}
+            </div>
+          </div>
+
+          {/* Options based on answer type */}
+          {(question.answerType === "text" || question.answerType === "choose") && (
+            <div className="space-y-3 p-4 border rounded-lg bg-slate-50">
+              <Label className="text-sm font-semibold">4 Options — click circle to mark correct</Label>
+              <div className="space-y-2">
+                {[0, 1, 2, 3].map((i) => (
+                  <div key={i} className="flex items-center gap-3">
+                    <button
+                      onClick={() => onChange({ ...question, correctOption: i })}
+                      className={`w-8 h-8 rounded-full border-2 flex items-center justify-center text-sm font-bold flex-shrink-0 ${
+                        question.correctOption === i ? "bg-green-500 text-white border-green-500" : "border-slate-300 text-slate-400"
+                      }`}
+                      title="Mark as correct"
+                    >
+                      {question.correctOption === i ? "✓" : String.fromCharCode(65 + i)}
+                    </button>
+                    <Input
+                      value={question.options[i] || ""}
+                      onChange={(e) => {
+                        const opts = [...question.options];
+                        opts[i] = e.target.value;
+                        onChange({ ...question, options: opts });
+                      }}
+                      placeholder={`Option ${String.fromCharCode(65 + i)}`}
+                      className="flex-1"
+                    />
+                  </div>
+                ))}
               </div>
-            ))}
+            </div>
+          )}
+
+          {question.answerType === "image" && (
+            <div className="space-y-3 p-4 border rounded-lg bg-slate-50">
+              <Label className="text-sm font-semibold">4 Image Options — click circle to mark correct</Label>
+              <div className="grid grid-cols-2 gap-3">
+                {[0, 1, 2, 3].map((i) => (
+                  <div key={i} className="space-y-2 p-2 border rounded bg-white">
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => onChange({ ...question, correctOption: i })}
+                        className={`w-7 h-7 rounded-full border-2 flex items-center justify-center text-xs font-bold flex-shrink-0 ${
+                          question.correctOption === i ? "bg-green-500 text-white border-green-500" : "border-slate-300 text-slate-400"
+                        }`}
+                      >
+                        {question.correctOption === i ? "✓" : String.fromCharCode(65 + i)}
+                      </button>
+                      <span className="text-xs font-medium">Option {String.fromCharCode(65 + i)}</span>
+                    </div>
+                    {question.optionImages[i] ? (
+                      <div className="relative">
+                        <img src={question.optionImages[i]} alt="" className="w-full h-20 rounded object-cover border" />
+                        <button
+                          onClick={() => {
+                            const imgs = [...question.optionImages]; imgs[i] = "";
+                            onChange({ ...question, optionImages: imgs });
+                          }}
+                          className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white rounded-full flex items-center justify-center text-xs"
+                        >✕</button>
+                      </div>
+                    ) : (
+                      <label className="flex flex-col items-center justify-center w-full h-20 border-2 border-dashed rounded cursor-pointer hover:border-primary hover:bg-slate-50">
+                        <input type="file" accept="image/*" className="hidden" onChange={async (e) => {
+                          const f = e.target.files?.[0]; if (!f) return;
+                          try { const u = await uploadFile(f);
+                            const imgs = [...question.optionImages]; imgs[i] = u;
+                            onChange({ ...question, optionImages: imgs }); toast.success("Uploaded");
+                          } catch (err: any) { toast.error(err.message); }
+                        }} />
+                        <Upload className="w-5 h-5 text-slate-400" />
+                        <span className="text-xs text-slate-400">Upload</span>
+                      </label>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {question.answerType === "audio" && (
+            <div className="space-y-3 p-4 border rounded-lg bg-slate-50">
+              <Label className="text-sm font-semibold">4 Audio Options — click circle to mark correct</Label>
+              <div className="space-y-3">
+                {[0, 1, 2, 3].map((i) => (
+                  <div key={i} className="p-2 border rounded bg-white space-y-2">
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => onChange({ ...question, correctOption: i })}
+                        className={`w-7 h-7 rounded-full border-2 flex items-center justify-center text-xs font-bold flex-shrink-0 ${
+                          question.correctOption === i ? "bg-green-500 text-white border-green-500" : "border-slate-300 text-slate-400"
+                        }`}
+                      >
+                        {question.correctOption === i ? "✓" : String.fromCharCode(65 + i)}
+                      </button>
+                      <span className="text-xs font-medium">Audio {String.fromCharCode(65 + i)}</span>
+                    </div>
+                    {question.optionAudios[i] ? (
+                      <div className="relative">
+                        <audio controls src={question.optionAudios[i]} className="w-full" />
+                        <button
+                          onClick={() => {
+                            const auds = [...question.optionAudios]; auds[i] = "";
+                            onChange({ ...question, optionAudios: auds });
+                          }}
+                          className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white rounded-full flex items-center justify-center text-xs"
+                        >✕</button>
+                      </div>
+                    ) : (
+                      <label className="flex items-center justify-center w-full h-10 border-2 border-dashed rounded cursor-pointer hover:border-primary hover:bg-slate-50">
+                        <input type="file" accept="audio/*" className="hidden" onChange={async (e) => {
+                          const f = e.target.files?.[0]; if (!f) return;
+                          try { const u = await uploadFile(f);
+                            const auds = [...question.optionAudios]; auds[i] = u;
+                            onChange({ ...question, optionAudios: auds }); toast.success("Uploaded");
+                          } catch (err: any) { toast.error(err.message); }
+                        }} />
+                        <Upload className="w-4 h-4 text-slate-400 mr-1" />
+                        <span className="text-xs text-slate-400">Upload audio</span>
+                      </label>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Answer Description */}
+          <div className="space-y-1">
+            <Label className="text-sm font-semibold">Answer Description (optional)</Label>
+            <Textarea rows={2} value={question.explanation} onChange={(e) => onChange({ ...question, explanation: e.target.value })} placeholder="Explanation shown after answering…" />
           </div>
         </div>
-      )}
-
-      {question.answerType === "audio" && (
-        <div className="space-y-2 p-3 border rounded-lg bg-slate-50">
-          <Label className="text-sm font-semibold">Audio Options (4) — click to play</Label>
-          <div className="grid grid-cols-2 gap-2">
-            {[0, 1, 2, 3].map((i) => (
-              <div key={i} className="space-y-1">
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => onChange({ ...question, correctOption: i })}
-                    className={`w-6 h-6 rounded-full border-2 flex items-center justify-center text-xs font-bold ${
-                      question.correctOption === i ? "bg-green-500 text-white border-green-500" : "border-slate-300"
-                    }`}
-                  >
-                    {question.correctOption === i ? "✓" : String.fromCharCode(65 + i)}
-                  </button>
-                  <span className="text-xs">Audio {String.fromCharCode(65 + i)}</span>
-                  <UploadButton accept="audio/*" onUpload={(url) => {
-                    const auds = [...question.optionAudios];
-                    auds[i] = url;
-                    onChange({ ...question, optionAudios: auds });
-                  }} />
-                </div>
-                <UploadButton accept="audio/*" onUpload={(url) => {
-                    const auds = [...question.optionAudios];
-                    auds[i] = url;
-                    onChange({ ...question, optionAudios: auds });
-                  }} hasPreview={!!question.optionAudios[i]} previewUrl={question.optionAudios[i] || ""} onClear={() => {
-                    const auds = [...question.optionAudios];
-                    auds[i] = "";
-                    onChange({ ...question, optionAudios: auds });
-                  }} isAudio small />
-                {question.optionAudios[i] && <audio controls src={question.optionAudios[i]} className="w-full h-8" />}
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Answer description */}
-      <div className="space-y-2">
-        <Label className="text-sm font-semibold">Answer Description (optional)</Label>
-        <Textarea rows={2} value={question.explanation} onChange={(e) => onChange({ ...question, explanation: e.target.value })} placeholder="Explanation shown after answering…" />
       </div>
     </div>
   );
