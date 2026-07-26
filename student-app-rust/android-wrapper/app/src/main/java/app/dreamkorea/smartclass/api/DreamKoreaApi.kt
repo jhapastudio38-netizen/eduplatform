@@ -91,10 +91,27 @@ data class QuestionDetail(
     val difficulty: String,
     val stem: String,
     val options: List<String>?,
+    // Legacy fields
     val imageUrl: String?,
     val audioUrl: String?,
     val audioLoop: Int = 0,
-    val audioLoopDelay: Int = 0
+    val audioLoopDelay: Int = 0,
+    // New block-based fields
+    val blockType: String = "text",
+    val blockNumber: Int = 0,
+    val descType: String = "none",
+    val descText: String? = null,
+    val descImageUrl: String? = null,
+    val descAudioUrl: String? = null,
+    val mediaType: String = "none",
+    val mediaText: String? = null,
+    val mediaImageUrl: String? = null,
+    val mediaAudioUrl: String? = null,
+    val answerType: String = "text",
+    val optionImages: List<String> = emptyList(),
+    val optionAudios: List<String> = emptyList(),
+    val correctOption: Int = 0,
+    val explanation: String? = null
 )
 data class TestItemDetail(
     val id: String,
@@ -223,7 +240,7 @@ interface DreamKoreaApi {
     suspend fun getLessons(@Path("id") id: String): LessonsResponse
 
     @GET("api/student/tests")
-    suspend fun getTests(@Query("filter") filter: String = "all"): TestsResponse
+    suspend fun getTests(@Query("category") category: String = "all", @Query("filter") filter: String? = null): TestsResponse
 
     @GET("api/student/tests/{id}")
     suspend fun getTestDetail(@Path("id") id: String): TestDetailResponse
@@ -254,6 +271,9 @@ interface DreamKoreaApi {
 
     @POST("api/student/live-sessions/join")
     suspend fun joinLiveSession(@Body body: Map<String, String>): LiveSessionJoinResponse
+
+    @GET("api/student/eye-vision")
+    suspend fun getEyeVisionTests(): EyeVisionResponse
 }
 
 // ─── Notifications ────────────────────────────────────────────────────────────
@@ -280,6 +300,16 @@ data class LiveSessionJoinResponse(
     val session: LiveSessionData? = null,
     val error: String? = null
 )
+
+// ─── Eye Vision ──────────────────────────────────────────────────────────────
+data class EyeVisionTestItem(
+    val id: String,
+    val title: String,
+    val description: String? = null,
+    val imageUrl: String,
+    val category: String? = null
+)
+data class EyeVisionResponse(val tests: List<EyeVisionTestItem> = emptyList())
 
 // ─── Question Bank ────────────────────────────────────────────────────────────
 data class QuestionBankQuestion(

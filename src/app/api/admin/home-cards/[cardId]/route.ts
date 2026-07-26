@@ -9,9 +9,9 @@ import { audit } from "@/lib/audit";
 import { z } from "zod";
 
 const updateSchema = z.object({
-  title: z.string().trim().min(2).max(100).optional(),
-  section: z.enum(["test", "resources", "premium"]).optional(),
-  imageUrl: z.string().url().optional().or(z.literal("")).or(z.null()),
+  title: z.string().trim().min(1).max(100).optional(),
+  section: z.string().max(50).optional(),
+  imageUrl: z.string().optional().or(z.literal("")).or(z.null()),
   sortOrder: z.number().int().min(0).max(100).optional(),
   isActive: z.boolean().optional(),
   route: z.string().trim().max(50).optional().or(z.literal("")),
@@ -19,7 +19,7 @@ const updateSchema = z.object({
 
 export async function PUT(req: NextRequest, ctx: { params: Promise<{ cardId: string }> }) {
   const { cardId } = await ctx.params;
-  const user = await getCurrentUser();
+  const user = await getCurrentUser(req);
   if (!user || (user.role !== "ADMIN" && user.role !== "TEACHER")) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
@@ -30,14 +30,18 @@ export async function PUT(req: NextRequest, ctx: { params: Promise<{ cardId: str
   }
   const data: Record<string, unknown> = { ...parsed.data };
   if (data.imageUrl === "" || data.imageUrl === null) data.imageUrl = null;
-  const card = await db.homeCard.update({ where: { id: cardId }, data });
-  await audit({ actorId: user.id, action: "update_home_card", entity: "HomeCard", entityId: cardId });
-  return NextResponse.json({ card });
+  try {
+    const card = await db.homeCard.update({ where: { id: cardId }, data });
+    await audit({ actorId: user.id, action: "update_home_card", entity: "HomeCard", entityId: cardId });
+    return NextResponse.json({ card });
+  } catch (e: any) {
+    return NextResponse.json({ error: e.message?.substring(0, 200) }, { status: 500 });
+  }
 }
 
-export async function DELETE(_req: NextRequest, ctx: { params: Promise<{ cardId: string }> }) {
+export async function DELETE(req: NextRequest, ctx: { params: Promise<{ cardId: string }> }) {
   const { cardId } = await ctx.params;
-  const user = await getCurrentUser();
+  const user = await getCurrentUser(req);
   if (!user || (user.role !== "ADMIN" && user.role !== "TEACHER")) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }

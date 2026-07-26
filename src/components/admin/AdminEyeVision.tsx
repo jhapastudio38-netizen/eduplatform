@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
+import { FastImageUpload } from "./FastImageUpload";
 import {
   Dialog,
   DialogContent,
@@ -240,64 +241,19 @@ function CreateEyeVisionDialog({ open, onOpenChange, onCreated }: {
             />
           </div>
 
-          {/* Image upload */}
+          {/* Image upload — drag & drop with instant preview */}
           <div className="space-y-2">
             <Label className="text-sm font-semibold">Image *</Label>
             <p className="text-xs text-muted-foreground">
               Upload the image students should look at. The correct answer below is matched case-insensitively against what the student types.
             </p>
-            {form.imageUrl ? (
-              <div className="relative w-full max-w-md rounded-lg overflow-hidden border">
-                <img src={form.imageUrl} alt="Eye vision" className="w-full max-h-72 object-contain bg-slate-50" />
-                <Button
-                  size="icon"
-                  variant="destructive"
-                  className="absolute top-2 right-2 h-8 w-8"
-                  onClick={() => setForm((f) => ({ ...f, imageUrl: "" }))}
-                >
-                  <X className="h-4 w-4" />
-                </Button>
-              </div>
-            ) : (
-              <button
-                type="button"
-                onClick={() => fileRef.current?.click()}
-                disabled={uploading}
-                className="w-full max-w-md h-48 rounded-lg border-2 border-dashed border-slate-300 hover:border-primary hover:bg-slate-50 transition-colors grid place-items-center text-slate-500"
-              >
-                {uploading ? (
-                  <div className="flex flex-col items-center gap-2">
-                    <Loader2 className="h-6 w-6 animate-spin" />
-                    <span className="text-sm">Uploading…</span>
-                  </div>
-                ) : (
-                  <div className="flex flex-col items-center gap-2">
-                    <Upload className="h-8 w-8" />
-                    <span className="text-sm font-medium">Click to upload image</span>
-                    <span className="text-xs">PNG, JPG, WebP</span>
-                  </div>
-                )}
-              </button>
-            )}
-            <input
-              ref={fileRef}
-              type="file"
-              accept="image/*"
-              className="hidden"
-              onChange={onPickFile}
+            <FastImageUpload
+              url={form.imageUrl}
+              onUpload={(url) => setForm((p) => ({ ...p, imageUrl: url }))}
+              onClear={() => setForm((f) => ({ ...f, imageUrl: "" }))}
+              folder="eye-vision"
+              previewClassName="w-full max-w-md h-48"
             />
-            {form.imageUrl && (
-              <div className="flex gap-2 items-center">
-                <Input
-                  value={form.imageUrl}
-                  onChange={(e) => setForm((f) => ({ ...f, imageUrl: e.target.value }))}
-                  placeholder="Or paste image URL…"
-                />
-                <Button variant="outline" size="lg" onClick={() => fileRef.current?.click()} disabled={uploading}>
-                  <Upload className="w-4 h-4 mr-1" /> Replace
-                </Button>
-              </div>
-            )}
           </div>
 
           {/* Correct answer */}
