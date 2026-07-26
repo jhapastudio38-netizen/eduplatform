@@ -48,7 +48,10 @@ object AppState {
 
     // ─── In-memory cache (fixes back/forth reload storms) ──────────────────────
     // Each entry stores (data, timestamp). Cache is valid for CACHE_TTL_MS.
-    private const val CACHE_TTL_MS = 120_000L // 2 minutes
+    // Reduced from 2 min to 30 sec so the app picks up admin changes faster.
+    // For screens that need real-time data, use invalidateCache() before
+    // loading, or use cachedFresh() which always fetches.
+    private const val CACHE_TTL_MS = 30_000L // 30 seconds
     private data class CacheEntry<T>(val data: T, val savedAt: Long)
     private val cache = ConcurrentHashMap<String, CacheEntry<*>>()
     private val cacheMutex = Mutex()
@@ -60,6 +63,18 @@ object AppState {
         if (hit != null && now - hit.savedAt < CACHE_TTL_MS) {
             return hit.data
         }
+        val fresh = loader()
+        cache[key] = CacheEntry(fresh, System.currentTimeMillis())
+        return fresh
+    }
+
+    /**
+     * Always fetches fresh data from the network — bypasses the cache entirely.
+     * Use this on screens where real-time data matters (Books, Exams, QBank,
+     * Packages). Updates the cache as a side-effect so subsequent calls to
+     * getCachedNow() return the fresh data.
+     */
+    suspend fun <T> cachedFresh(key: String, loader: suspend () -> T): T {
         val fresh = loader()
         cache[key] = CacheEntry(fresh, System.currentTimeMillis())
         return fresh

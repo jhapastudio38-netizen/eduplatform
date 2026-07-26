@@ -674,9 +674,17 @@ fun BooksScreen(theme: AppTheme, sound: SoundManager, onBack: () -> Unit, onBook
         mutableStateOf<List<Book>>(AppState.getCachedNow<List<Book>>(AppState.KEY_BOOKS) ?: emptyList())
     }
     var loading by remember { mutableStateOf(books.isEmpty()) }
+    var retryCount by remember { mutableStateOf(0) }
 
-    LaunchedEffect(Unit) {
-        try { books = AppState.getCachedBooks() } catch (_: Exception) {}
+    // Use cachedFresh so we ALWAYS hit the network when this screen mounts —
+    // the user expects to see new books the admin just published, not stale
+    // cache. Cache is still updated so getCachedNow() returns fresh data
+    // after a screen rotation.
+    LaunchedEffect(retryCount) {
+        if (books.isNotEmpty()) loading = false else loading = true
+        try {
+            books = AppState.cachedFresh(AppState.KEY_BOOKS) { AppState.api.getBooks().books }
+        } catch (_: Exception) {}
         finally { loading = false }
     }
 
@@ -734,7 +742,8 @@ fun TestsScreen(theme: AppTheme, sound: SoundManager, filter: String = "all", ti
         if (tests.isNotEmpty()) loading = false else loading = true
         error = ""
         try {
-            if (retryCount > 0) AppState.invalidateCache(AppState.keyTests(activeFilter))
+            // Always fetch fresh — admin may have just published a new exam
+            AppState.invalidateCache(AppState.keyTests(activeFilter))
             val result = kotlinx.coroutines.withTimeoutOrNull(20_000L) { AppState.getCachedTests(activeFilter) }
             if (result != null) tests = result
             else if (tests.isEmpty()) error = "The request timed out. Check your internet and try again."
