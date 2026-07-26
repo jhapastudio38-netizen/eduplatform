@@ -71,6 +71,7 @@ const NAV_SECTIONS: NavSection[] = [
   {
     title: "Content",
     items: [
+      { id: "home-cards", label: "Home Cards", icon: LayoutGrid, hasAdd: true },
       { id: "eye-vision", label: "Eye Vision", icon: Eye, hasAdd: true },
       { id: "books", label: "Books", icon: BookMarked, hasAdd: true },
     ],

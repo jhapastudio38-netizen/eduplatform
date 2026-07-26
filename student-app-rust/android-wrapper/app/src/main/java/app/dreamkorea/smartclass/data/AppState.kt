@@ -94,7 +94,7 @@ object AppState {
         AppState.api.getHomeCards().cards
     }
     suspend fun getCachedTests(filter: String) = cached(keyTests(filter)) {
-        AppState.api.getTests(filter).tests
+        AppState.api.getTests(category = filter).tests
     }
     suspend fun getCachedBooks() = cached(KEY_BOOKS) {
         AppState.api.getBooks().books

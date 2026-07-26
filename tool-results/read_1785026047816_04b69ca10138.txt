@@ -1,0 +1,652 @@
+   440→        Column {
+   441→            Text(title, color = theme.darkText, fontSize = 20.sp, fontWeight = FontWeight.ExtraBold)
+   442→            if (subtitle != null) {
+   443→                Text(subtitle, color = theme.subText, fontSize = 12.sp, fontWeight = FontWeight.Medium)
+   444→            }
+   445→        }
+   446→    }
+   447→}
+   448→
+   449→// ─── Learn Screen ─────────────────────────────────────────────────────────────
+   450→@Composable
+   451→fun LearnScreen(theme: AppTheme, sound: SoundManager, onBack: () -> Unit) {
+   452→    var subjects by remember { mutableStateOf<List<Subject>>(emptyList()) }
+   453→    var loading by remember { mutableStateOf(true) }
+   454→
+   455→    LaunchedEffect(Unit) {
+   456→        try {
+   457→            subjects = AppState.api.getSubjects().subjects
+   458→        } catch (_: Exception) {}
+   459→        finally { loading = false }
+   460→    }
+   461→
+   462→    if (loading) {
+   463→        SkeletonListScreen(theme, itemCount = 5)
+   464→        return
+   465→    }
+   466→
+   467→    LazyColumn(
+   468→        modifier = Modifier.fillMaxSize(),
+   469→        contentPadding = PaddingValues(16.dp),
+   470→        verticalArrangement = Arrangement.spacedBy(10.dp)
+   471→    ) {
+   472→        item { ScreenHeader(theme, sound, "Subjects", "Choose a subject to start learning", onBack) }
+   473→        if (subjects.isEmpty()) {
+   474→            item { EmptyState(theme, "No subjects yet", "Check back soon.", Icons.Default.School) }
+   475→        } else {
+   476→            itemsIndexed(subjects) { i, s ->
+   477→                AnimatedListItem(index = i, theme = theme) {
+   478→                    Surface(
+   479→                        color = theme.cardBg,
+   480→                        shape = RoundedCornerShape(14.dp),
+   481→                        modifier = Modifier.fillMaxWidth(),
+   482→                        shadowElevation = 2.dp
+   483→                    ) {
+   484→                        Row(modifier = Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
+   485→                            Surface(color = theme.primary.copy(alpha = 0.1f), shape = RoundedCornerShape(10.dp), modifier = Modifier.size(44.dp)) {
+   486→                                Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
+   487→                                    Icon(Icons.Default.School, null, tint = theme.primary, modifier = Modifier.size(22.dp))
+   488→                                }
+   489→                            }
+   490→                            Spacer(Modifier.width(12.dp))
+   491→                            Column(modifier = Modifier.weight(1f)) {
+   492→                                Text(s.name, color = theme.darkText, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+   493→                                Text(s.description ?: "", color = theme.subText, fontSize = 11.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
+   494→                            }
+   495→                            Icon(Icons.Default.ChevronRight, null, tint = theme.subText, modifier = Modifier.size(20.dp))
+   496→                        }
+   497→                    }
+   498→                }
+   499→            }
+   500→        }
+   501→    }
+   502→}
+   503→
+   504→// ─── Books Screen ─────────────────────────────────────────────────────────────
+   505→@Composable
+   506→fun BooksScreen(theme: AppTheme, sound: SoundManager, onBack: () -> Unit, onBookClick: (Book) -> Unit = {}) {
+   507→    var books by remember {
+   508→        mutableStateOf<List<Book>>(AppState.getCachedNow<List<Book>>(AppState.KEY_BOOKS) ?: emptyList())
+   509→    }
+   510→    var loading by remember { mutableStateOf(books.isEmpty()) }
+   511→
+   512→    LaunchedEffect(Unit) {
+   513→        try { books = AppState.getCachedBooks() } catch (_: Exception) {}
+   514→        finally { loading = false }
+   515→    }
+   516→
+   517→    if (loading) {
+   518→        SkeletonListScreen(theme, itemCount = 5)
+   519→        return
+   520→    }
+   521→
+   522→    LazyColumn(
+   523→        modifier = Modifier.fillMaxSize(),
+   524→        contentPadding = PaddingValues(16.dp),
+   525→        verticalArrangement = Arrangement.spacedBy(10.dp)
+   526→    ) {
+   527→        item { ScreenHeader(theme, sound, "Books", "Digital library for Korean learning", onBack) }
+   528→        if (books.isEmpty()) {
+   529→            item { EmptyState(theme, "No books yet", "Your teacher will add books here soon.", Icons.Default.Book) }
+   530→        } else {
+   531→            itemsIndexed(books) { i, b ->
+   532→                AnimatedListItem(index = i, theme = theme) {
+   533→                    Surface(color = theme.cardBg, shape = RoundedCornerShape(14.dp), modifier = Modifier.fillMaxWidth(), shadowElevation = 2.dp) {
+   534→                        Row(modifier = Modifier.padding(12.dp)) {
+   535→                            Surface(color = theme.primary, shape = RoundedCornerShape(8.dp), modifier = Modifier.size(54.dp, 72.dp)) {
+   536→                                Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
+   537→                                    Icon(Icons.Default.Book, null, tint = Color.White, modifier = Modifier.size(24.dp))
+   538→                                }
+   539→                            }
+   540→                            Spacer(Modifier.width(12.dp))
+   541→                            Column(modifier = Modifier.weight(1f)) {
+   542→                                Text(b.title, color = theme.darkText, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, maxLines = 2, overflow = TextOverflow.Ellipsis)
+   543→                                if (!b.author.isNullOrBlank()) Text("by ${b.author}", color = theme.subText, fontSize = 11.sp)
+   544→                                Spacer(Modifier.height(6.dp))
+   545→                                Row(verticalAlignment = Alignment.CenterVertically) {
+   546→                                    if (!b.category.isNullOrBlank()) {
+   547→                                        InfoChip(theme, b.category, theme.primary)
+   548→                                        Spacer(Modifier.width(6.dp))
+   549→                                    }
+   550→                                    if (!b.level.isNullOrBlank()) {
+   551→                                        InfoChip(theme, b.level, theme.accent)
+   552→                                        Spacer(Modifier.width(6.dp))
+   553→                                    }
+   554→                                    if (b.pageCount != null) {
+   555→                                        InfoChip(theme, "${b.pageCount}p", theme.subText)
+   556→                                    }
+   557→                                }
+   558→                            }
+   559→                        }
+   560→                    }
+   561→                }
+   562→            }
+   563→        }
+   564→    }
+   565→}
+   566→
+   567→// ─── Tests Screen ─────────────────────────────────────────────────────────────
+   568→@Composable
+   569→fun TestsScreen(theme: AppTheme, sound: SoundManager, filter: String = "all", title: String = "Tests & Exams", onBack: () -> Unit, onStartExam: (String) -> Unit) {
+   570→    // Stale-while-revalidate: show cached data instantly
+   571→    var tests by remember {
+   572→        mutableStateOf<List<TestItem>>(AppState.getCachedNow<List<TestItem>>(AppState.keyTests(filter)) ?: emptyList())
+   573→    }
+   574→    var loading by remember { mutableStateOf(tests.isEmpty()) }
+   575→    var error by remember { mutableStateOf("") }
+   576→    var retryCount by remember { mutableStateOf(0) }
+   577→
+   578→    LaunchedEffect(filter, retryCount) {
+   579→        if (tests.isNotEmpty()) loading = false
+   580→        else loading = true
+   581→        error = ""
+   582→        try {
+   583→            if (retryCount > 0) AppState.invalidateCache(AppState.keyTests(filter))
+   584→            val result = kotlinx.coroutines.withTimeoutOrNull(20_000L) {
+   585→                AppState.getCachedTests(filter)
+   586→            }
+   587→            if (result != null) {
+   588→                tests = result
+   589→            } else if (tests.isEmpty()) {
+   590→                error = "The request timed out. Check your internet and try again."
+   591→            }
+   592→        } catch (e: retrofit2.HttpException) {
+   593→            if (tests.isEmpty()) {
+   594→                error = when (e.code()) {
+   595→                    401 -> "Your session has expired. Please log out and sign in again."
+   596→                    else -> "Could not load tests (HTTP ${e.code()})."
+   597→                }
+   598→            }
+   599→        } catch (e: java.net.UnknownHostException) {
+   600→            if (tests.isEmpty()) error = "No internet connection. Please check your network."
+   601→        } catch (e: java.net.SocketTimeoutException) {
+   602→            if (tests.isEmpty()) error = "The request timed out. Please try again."
+   603→        } catch (e: java.io.IOException) {
+   604→            if (tests.isEmpty()) error = "Network error: ${e.message ?: "Could not connect."}"
+   605→        } catch (e: Exception) {
+   606→            if (tests.isEmpty()) error = "Unexpected error: ${e.message ?: "Please try again."}"
+   607→        } finally {
+   608→            loading = false
+   609→        }
+   610→    }
+   611→
+   612→    if (loading) {
+   613→        Column(Modifier.fillMaxSize()) {
+   614→            LinearProgressIndicator(
+   615→                modifier = Modifier.fillMaxWidth(),
+   616→                color = theme.primary,
+   617→                trackColor = theme.primary.copy(alpha = 0.1f),
+   618→            )
+   619→            ScreenHeader(theme, sound, title, "Tap a test to start.", onBack)
+   620→            SkeletonListScreen(theme, itemCount = 5)
+   621→        }
+   622→        return
+   623→    }
+   624→
+   625→    if (error.isNotEmpty()) {
+   626→        Column(
+   627→            Modifier.fillMaxSize().padding(24.dp),
+   628→            horizontalAlignment = Alignment.CenterHorizontally,
+   629→            verticalArrangement = Arrangement.Center
+   630→        ) {
+   631→            Icon(Icons.Default.CloudOff, null, tint = theme.errorRed.copy(alpha = 0.7f), modifier = Modifier.size(56.dp))
+   632→            Spacer(Modifier.height(16.dp))
+   633→            Text("Couldn't load tests", color = theme.darkText, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+   634→            Spacer(Modifier.height(8.dp))
+   635→            Text(error, color = theme.subText, fontSize = 13.sp, textAlign = TextAlign.Center, modifier = Modifier.padding(horizontal = 16.dp))
+   636→            Spacer(Modifier.height(24.dp))
+   637→            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+   638→                OutlinedButton(onClick = onBack, shape = RoundedCornerShape(10.dp)) { Text("Go back") }
+   639→                Button(
+   640→                    onClick = { sound.click(); retryCount++ },
+   641→                    colors = ButtonDefaults.buttonColors(containerColor = theme.primary),
+   642→                    shape = RoundedCornerShape(10.dp)
+   643→                ) {
+   644→                    Icon(Icons.Default.Refresh, null, modifier = Modifier.size(18.dp))
+   645→                    Spacer(Modifier.width(6.dp))
+   646→                    Text("Retry")
+   647→                }
+   648→            }
+   649→        }
+   650→        return
+   651→    }
+   652→
+   653→    LazyColumn(
+   654→        modifier = Modifier.fillMaxSize(),
+   655→        contentPadding = PaddingValues(16.dp),
+   656→        verticalArrangement = Arrangement.spacedBy(10.dp)
+   657→    ) {
+   658→        item { ScreenHeader(theme, sound, title, if (tests.isEmpty()) "No tests in this category yet." else "Tap a test to start. Stats update automatically.", onBack) }
+   659→        if (tests.isEmpty()) {
+   660→            item { EmptyState(theme, "Nothing here yet", "Your teacher will add content to this section soon.", Icons.Default.Quiz) }
+   661→        } else {
+   662→            itemsIndexed(tests) { i, t ->
+   663→                AnimatedListItem(index = i, theme = theme) {
+   664→                    TestCard(theme, sound, t, onClick = { onStartExam(t.id) })
+   665→                }
+   666→            }
+   667→        }
+   668→    }
+   669→}
+   670→
+   671→// ─── Test Card with rich info + gradient accent ──────────────────────────────
+   672→@Composable
+   673→fun TestCard(theme: AppTheme, sound: SoundManager, t: TestItem, onClick: () -> Unit) {
+   674→    var pressed by remember { mutableStateOf(false) }
+   675→    val scale by animateFloatAsState(
+   676→        targetValue = if (pressed) 0.97f else 1f,
+   677→        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy),
+   678→        label = "testScale"
+   679→    )
+   680→    val accentColor = if (t.isExam) theme.accent else theme.primary
+   681→    Surface(
+   682→        color = theme.cardBg,
+   683→        shape = RoundedCornerShape(16.dp),
+   684→        modifier = Modifier
+   685→            .fillMaxWidth()
+   686→            .scale(scale)
+   687→            .clickable { sound.click(); pressed = true; onClick() },
+   688→        shadowElevation = 3.dp
+   689→    ) {
+   690→        Row(modifier = Modifier.fillMaxWidth()) {
+   691→            // Left gradient accent bar — color-coded by exam/practice
+   692→            Box(
+   693→                modifier = Modifier
+   694→                    .width(6.dp)
+   695→                    .height(100.dp)
+   696→                    .background(
+   697→                        Brush.verticalGradient(
+   698→                            listOf(accentColor, accentColor.copy(alpha = 0.4f))
+   699→                        )
+   700→                    )
+   701→            )
+   702→            Column(modifier = Modifier.padding(16.dp).weight(1f)) {
+   703→                Row(Modifier.fillMaxWidth(), Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+   704→                    Text(
+   705→                        t.title,
+   706→                        color = theme.darkText,
+   707→                        fontSize = 17.sp,
+   708→                        fontWeight = FontWeight.ExtraBold,
+   709→                        modifier = Modifier.weight(1f)
+   710→                    )
+   711→                    Surface(
+   712→                        color = accentColor.copy(alpha = 0.15f),
+   713→                        shape = RoundedCornerShape(6.dp)
+   714→                    ) {
+   715→                        Text(
+   716→                            if (t.isExam) "EXAM" else "PRACTICE",
+   717→                            color = accentColor,
+   718→                            fontSize = 9.sp, fontWeight = FontWeight.Bold,
+   719→                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+   720→                        )
+   721→                    }
+   722→                }
+   723→                if (!t.description.isNullOrBlank()) {
+   724→                    Spacer(Modifier.height(4.dp))
+   725→                    Text(t.description, color = theme.subText, fontSize = 12.sp, fontWeight = FontWeight.Medium, maxLines = 2, overflow = TextOverflow.Ellipsis)
+   726→                }
+   727→                Spacer(Modifier.height(10.dp))
+   728→                // Info chips row
+   729→                Row(verticalAlignment = Alignment.CenterVertically) {
+   730→                    InfoChipWithIcon(theme, Icons.Default.Timer, "${t.durationMin} min", theme.primary)
+   731→                    Spacer(Modifier.width(6.dp))
+   732→                    InfoChipWithIcon(theme, Icons.Default.CheckCircle, "Pass ${t.passScore}%", SuccessGreen)
+   733→                    if (t.questionCount > 0) {
+   734→                        Spacer(Modifier.width(6.dp))
+   735→                        InfoChipWithIcon(theme, Icons.Default.Quiz, "${t.questionCount} Q", theme.accent)
+   736→                    }
+   737→                    Spacer(Modifier.weight(1f))
+   738→                    Text("Start →", color = accentColor, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+   739→                }
+   740→            }
+   741→        }
+   742→    }
+   743→}
+   744→
+   745→// ─── Videos Screen ────────────────────────────────────────────────────────────
+   746→@Composable
+   747→fun VideosScreen(theme: AppTheme, sound: SoundManager, onBack: () -> Unit) {
+   748→    var videos by remember {
+   749→        mutableStateOf<List<VideoLesson>>(AppState.getCachedNow<List<VideoLesson>>(AppState.KEY_VIDEOS) ?: emptyList())
+   750→    }
+   751→    var loading by remember { mutableStateOf(videos.isEmpty()) }
+   752→
+   753→    LaunchedEffect(Unit) {
+   754→        try { videos = AppState.getCachedVideos() } catch (_: Exception) {}
+   755→        finally { loading = false }
+   756→    }
+   757→
+   758→    if (loading) {
+   759→        SkeletonGridScreen(theme, rows = 3)
+   760→        return
+   761→    }
+   762→
+   763→    LazyColumn(
+   764→        modifier = Modifier.fillMaxSize(),
+   765→        contentPadding = PaddingValues(16.dp),
+   766→        verticalArrangement = Arrangement.spacedBy(10.dp)
+   767→    ) {
+   768→        item { ScreenHeader(theme, sound, "Video Lessons", "Watch and learn Korean", onBack) }
+   769→        if (videos.isEmpty()) {
+   770→            item { EmptyState(theme, "No videos yet", "Your teacher will add videos here soon.", Icons.Default.VideoLibrary) }
+   771→        } else {
+   772→            itemsIndexed(videos) { i, v ->
+   773→                AnimatedListItem(index = i, theme = theme) {
+   774→                    Surface(color = theme.cardBg, shape = RoundedCornerShape(14.dp), modifier = Modifier.fillMaxWidth(), shadowElevation = 2.dp) {
+   775→                        Column(modifier = Modifier.padding(12.dp)) {
+   776→                            // Thumbnail placeholder with play button
+   777→                            Surface(color = theme.errorRed, shape = RoundedCornerShape(10.dp), modifier = Modifier.fillMaxWidth().height(120.dp)) {
+   778→                                Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
+   779→                                    Icon(Icons.Default.PlayCircle, null, tint = Color.White, modifier = Modifier.size(40.dp))
+   780→                                }
+   781→                            }
+   782→                            Spacer(Modifier.height(8.dp))
+   783→                            Text(v.title, color = theme.darkText, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, maxLines = 2, overflow = TextOverflow.Ellipsis)
+   784→                            Spacer(Modifier.height(6.dp))
+   785→                            Row(verticalAlignment = Alignment.CenterVertically) {
+   786→                                InfoChipWithIcon(theme, Icons.Default.Timer, "${v.durationMin} min", theme.primary)
+   787→                                Spacer(Modifier.width(6.dp))
+   788→                                if (!v.level.isNullOrBlank()) {
+   789→                                    InfoChip(theme, v.level, theme.accent)
+   790→                                    Spacer(Modifier.width(6.dp))
+   791→                                }
+   792→                                if (!v.category.isNullOrBlank()) {
+   793→                                    InfoChip(theme, v.category, theme.subText)
+   794→                                    Spacer(Modifier.width(6.dp))
+   795→                                }
+   796→                                Spacer(Modifier.weight(1f))
+   797→                                Text("${v.views} views", color = theme.subText, fontSize = 9.sp)
+   798→                            }
+   799→                        }
+   800→                    }
+   801→                }
+   802→            }
+   803→        }
+   804→    }
+   805→}
+   806→
+   807→// ─── Profile Screen ───────────────────────────────────────────────────────────
+   808→@Composable
+   809→fun ProfileScreen(theme: AppTheme, sound: SoundManager, userName: String, onBack: () -> Unit, onLogout: () -> Unit) {
+   810→    val scope = rememberCoroutineScope()
+   811→    var stats by remember { mutableStateOf<UserStats?>(null) }
+   812→    var loading by remember { mutableStateOf(true) }
+   813→
+   814→    LaunchedEffect(Unit) {
+   815→        try { stats = AppState.api.getStats().stats } catch (_: Exception) {}
+   816→        finally { loading = false }
+   817→    }
+   818→
+   819→    LazyColumn(
+   820→        modifier = Modifier.fillMaxSize(),
+   821→        contentPadding = PaddingValues(16.dp),
+   822→        verticalArrangement = Arrangement.spacedBy(14.dp)
+   823→    ) {
+   824→        item { ScreenHeader(theme, sound, "Profile", "Your account and progress", onBack) }
+   825→
+   826→        // Profile header card
+   827→        item {
+   828→            Surface(color = theme.cardBg, shape = RoundedCornerShape(16.dp), modifier = Modifier.fillMaxWidth(), shadowElevation = 2.dp) {
+   829→                Column(modifier = Modifier.padding(20.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+   830→                    Surface(color = theme.primary, shape = CircleShape, modifier = Modifier.size(72.dp)) {
+   831→                        Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
+   832→                            Text(userName.take(2).uppercase(), color = Color.White, fontSize = 24.sp, fontWeight = FontWeight.Bold)
+   833→                        }
+   834→                    }
+   835→                    Spacer(Modifier.height(10.dp))
+   836→                    Text(userName, color = theme.darkText, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+   837→                    Text("Student", color = theme.subText, fontSize = 12.sp)
+   838→                }
+   839→            }
+   840→        }
+   841→
+   842→        // Stats grid
+   843→        item {
+   844→            Surface(color = theme.cardBg, shape = RoundedCornerShape(14.dp), modifier = Modifier.fillMaxWidth(), shadowElevation = 1.dp) {
+   845→                Column(modifier = Modifier.padding(16.dp)) {
+   846→                    Text("Your Progress", color = theme.darkText, fontSize = 14.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(bottom = 12.dp))
+   847→                    if (loading) {
+   848→                        SkeletonStatsRow(theme)
+   849→                    } else {
+   850→                        Row(Modifier.fillMaxWidth(), Arrangement.SpaceEvenly) {
+   851→                            ProfileStat(theme, "${stats?.totalExamsTaken ?: 0}", "Exams")
+   852→                            ProfileStat(theme, "${String.format("%.0f", stats?.averageScore ?: 0.0)}%", "Avg")
+   853→                            ProfileStat(theme, "${stats?.studyStreakDays ?: 0}", "Streak")
+   854→                            ProfileStat(theme, "${stats?.badgesEarned ?: 0}", "Badges")
+   855→                        }
+   856→                    }
+   857→                }
+   858→            }
+   859→        }
+   860→
+   861→        // Detailed stats list
+   862→        item {
+   863→            Surface(color = theme.cardBg, shape = RoundedCornerShape(14.dp), modifier = Modifier.fillMaxWidth(), shadowElevation = 1.dp) {
+   864→                Column(modifier = Modifier.padding(14.dp)) {
+   865→                    StatRow(theme, "Books Read", "${stats?.booksRead ?: 0}", Icons.Default.Book)
+   866→                    Divider(color = theme.divider, thickness = 0.5.dp, modifier = Modifier.padding(vertical = 8.dp))
+   867→                    StatRow(theme, "Audio Lessons", "${stats?.audioLessonsCompleted ?: 0}", Icons.Default.Headphones)
+   868→                    Divider(color = theme.divider, thickness = 0.5.dp, modifier = Modifier.padding(vertical = 8.dp))
+   869→                    StatRow(theme, "Total Time", "${stats?.totalTimeSpentMin ?: 0} min", Icons.Default.Schedule)
+   870→                    Divider(color = theme.divider, thickness = 0.5.dp, modifier = Modifier.padding(vertical = 8.dp))
+   871→                    StatRow(theme, "Correct Answers", "${stats?.totalCorrectAnswers ?: 0}", Icons.Default.CheckCircle)
+   872→                }
+   873→            }
+   874→        }
+   875→
+   876→        // Account info
+   877→        item {
+   878→            val userEmail = AppState.user?.email ?: ""
+   879→            val userPhone = AppState.user?.phone ?: ""
+   880→            Surface(color = theme.cardBg, shape = RoundedCornerShape(14.dp), modifier = Modifier.fillMaxWidth(), shadowElevation = 1.dp) {
+   881→                Column(modifier = Modifier.padding(14.dp)) {
+   882→                    Text("Account", color = theme.darkText, fontSize = 14.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(bottom = 8.dp))
+   883→                    if (userEmail.isNotEmpty()) {
+   884→                        StatRow(theme, "Email", userEmail, Icons.Default.Email)
+   885→                        Spacer(Modifier.height(6.dp))
+   886→                    }
+   887→                    if (userPhone.isNotEmpty()) {
+   888→                        StatRow(theme, "Phone", userPhone, Icons.Default.Phone)
+   889→                    }
+   890→                }
+   891→            }
+   892→        }
+   893→
+   894→        // Contact info — institute details
+   895→        item {
+   896→            Surface(color = theme.cardBg, shape = RoundedCornerShape(14.dp), modifier = Modifier.fillMaxWidth(), shadowElevation = 1.dp) {
+   897→                Column(modifier = Modifier.padding(14.dp)) {
+   898→                    Text("Contact DreamKorea", color = theme.darkText, fontSize = 14.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(bottom = 10.dp))
+   899→
+   900→                    // Phone numbers (tappable)
+   901→                    ContactRow(theme, Icons.Default.Phone, "023-591658", "tel:023591658")
+   902→                    Spacer(Modifier.height(8.dp))
+   903→                    ContactRow(theme, Icons.Default.Phone, "9852677658", "tel:9852677658")
+   904→                    Spacer(Modifier.height(8.dp))
+   905→                    ContactRow(theme, Icons.Default.Phone, "9765308000", "tel:9765308000")
+   906→                    Spacer(Modifier.height(10.dp))
+   907→                    Divider(color = theme.divider, thickness = 0.5.dp)
+   908→                    Spacer(Modifier.height(10.dp))
+   909→
+   910→                    // Location (tappable — opens maps)
+   911→                    ContactRow(theme, Icons.Default.LocationOn, "Krishithok Road, Birtamod, Jhapa", "geo:26.67,87.99?q=Krishithok+Road+Birtamod+Jhapa+Nepal")
+   912→                    Spacer(Modifier.height(10.dp))
+   913→                    Divider(color = theme.divider, thickness = 0.5.dp)
+   914→                    Spacer(Modifier.height(10.dp))
+   915→
+   916→                    // Website (tappable — opens browser)
+   917→                    ContactRow(theme, Icons.Default.Language, "DreamKorea SmartClass", "https://my-project-five-sepia.vercel.app")
+   918→                }
+   919→            }
+   920→        }
+   921→
+   922→        // Logout
+   923→        item {
+   924→            Button(
+   925→                onClick = {
+   926→                    sound.click()
+   927→                    scope.launch {
+   928→                        try { AppState.api.logout() } catch (_: Exception) {}
+   929→                        AppState.clearSession()
+   930→                        onLogout()
+   931→                    }
+   932→                },
+   933→                modifier = Modifier.fillMaxWidth().height(48.dp),
+   934→                colors = ButtonDefaults.buttonColors(containerColor = theme.errorRed),
+   935→                shape = RoundedCornerShape(12.dp)
+   936→            ) {
+   937→                Icon(Icons.Default.Logout, null, modifier = Modifier.size(18.dp))
+   938→                Spacer(Modifier.width(8.dp))
+   939→                Text("Sign out", fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+   940→            }
+   941→        }
+   942→
+   943→        item {
+   944→            Text("DreamKorea SmartClass v1.0.0", color = theme.subText, fontSize = 10.sp, modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center)
+   945→        }
+   946→    }
+   947→}
+   948→
+   949→// ─── Reusable components ──────────────────────────────────────────────────────
+   950→@Composable
+   951→fun InfoChip(theme: AppTheme, text: String, color: Color) {
+   952→    Surface(color = color.copy(alpha = 0.1f), shape = RoundedCornerShape(4.dp)) {
+   953→        Text(text, color = color, fontSize = 9.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp))
+   954→    }
+   955→}
+   956→
+   957→@Composable
+   958→fun InfoChipWithIcon(theme: AppTheme, icon: ImageVector, text: String, color: Color) {
+   959→    Surface(color = color.copy(alpha = 0.1f), shape = RoundedCornerShape(4.dp)) {
+   960→        Row(modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp), verticalAlignment = Alignment.CenterVertically) {
+   961→            Icon(icon, null, tint = color, modifier = Modifier.size(10.dp))
+   962→            Spacer(Modifier.width(2.dp))
+   963→            Text(text, color = color, fontSize = 9.sp, fontWeight = FontWeight.SemiBold)
+   964→        }
+   965→    }
+   966→}
+   967→
+   968→@Composable
+   969→fun StatRow(theme: AppTheme, label: String, value: String, icon: ImageVector) {
+   970→    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+   971→        Row(verticalAlignment = Alignment.CenterVertically) {
+   972→            Icon(icon, null, tint = theme.primary, modifier = Modifier.size(16.dp))
+   973→            Spacer(Modifier.width(8.dp))
+   974→            Text(label, color = theme.subText, fontSize = 12.sp)
+   975→        }
+   976→        Text(value, color = theme.darkText, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+   977→    }
+   978→}
+   979→
+   980→@Composable
+   981→fun ContactRow(theme: AppTheme, icon: ImageVector, text: String, link: String) {
+   982→    val context = androidx.compose.ui.platform.LocalContext.current
+   983→    Row(
+   984→        modifier = Modifier.fillMaxWidth().clickable {
+   985→            // Open the link (tel:, geo:, https:)
+   986→            val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(link))
+   987→            context.startActivity(intent)
+   988→        }.padding(vertical = 4.dp),
+   989→        verticalAlignment = Alignment.CenterVertically
+   990→    ) {
+   991→        Icon(icon, null, tint = theme.primary, modifier = Modifier.size(18.dp))
+   992→        Spacer(Modifier.width(10.dp))
+   993→        Text(text, color = theme.darkText, fontSize = 13.sp, fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f))
+   994→        Icon(Icons.Default.ChevronRight, null, tint = theme.subText, modifier = Modifier.size(16.dp))
+   995→    }
+   996→}
+   997→
+   998→@Composable
+   999→fun ProfileStat(theme: AppTheme, value: String, label: String) {
+  1000→    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+  1001→        Text(value, color = theme.primary, fontSize = 20.sp, fontWeight = FontWeight.Bold)
+  1002→        Text(label, color = theme.subText, fontSize = 10.sp)
+  1003→    }
+  1004→}
+  1005→
+  1006→@Composable
+  1007→fun EmptyState(theme: AppTheme, title: String, body: String, icon: ImageVector) {
+  1008→    Surface(color = theme.cardBg, shape = RoundedCornerShape(14.dp), modifier = Modifier.fillMaxWidth(), shadowElevation = 1.dp) {
+  1009→        Column(modifier = Modifier.padding(32.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+  1010→            Icon(icon, null, tint = theme.subText.copy(alpha = 0.5f), modifier = Modifier.size(48.dp))
+  1011→            Spacer(Modifier.height(12.dp))
+  1012→            Text(title, color = theme.darkText, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+  1013→            Spacer(Modifier.height(4.dp))
+  1014→            Text(body, color = theme.subText, fontSize = 12.sp, textAlign = TextAlign.Center)
+  1015→        }
+  1016→    }
+  1017→}
+  1018→
+  1019→@Composable
+  1020→fun AnimatedListItem(index: Int, theme: AppTheme, content: @Composable () -> Unit) {
+  1021→    var visible by remember { mutableStateOf(false) }
+  1022→    LaunchedEffect(Unit) {
+  1023→        kotlinx.coroutines.delay(index * 40L)
+  1024→        visible = true
+  1025→    }
+  1026→    AnimatedVisibility(
+  1027→        visible = visible,
+  1028→        enter = fadeIn(tween(300)) + slideInVertically(initialOffsetY = { it / 4 }, animationSpec = tween(300))
+  1029→    ) {
+  1030→        content()
+  1031→    }
+  1032→}
+  1033→
+  1034→// ─── Book Reader Screen — opens PDF in browser ────────────────────────────────
+  1035→@Composable
+  1036→fun BookReaderScreen(theme: AppTheme, sound: SoundManager, book: Book, onBack: () -> Unit) {
+  1037→    Column(modifier = Modifier.fillMaxSize().background(theme.background)) {
+  1038→        // Header
+  1039→        ScreenHeader(theme, sound, book.title, "Tap 'Open PDF' to read", onBack)
+  1040→        
+  1041→        Column(
+  1042→            modifier = Modifier.fillMaxSize().padding(20.dp),
+  1043→            horizontalAlignment = Alignment.CenterHorizontally,
+  1044→            verticalArrangement = Arrangement.Center
+  1045→        ) {
+  1046→            // Book cover
+  1047→            Surface(
+  1048→                color = theme.primary,
+  1049→                shape = RoundedCornerShape(8.dp),
+  1050→                modifier = Modifier.size(120.dp, 160.dp),
+  1051→                shadowElevation = 4.dp
+  1052→            ) {
+  1053→                Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
+  1054→                    Icon(Icons.Default.Book, null, tint = Color.White, modifier = Modifier.size(48.dp))
+  1055→                }
+  1056→            }
+  1057→            Spacer(Modifier.height(16.dp))
+  1058→            Text(book.title, color = theme.darkText, fontSize = 18.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
+  1059→            if (!book.author.isNullOrBlank()) {
+  1060→                Text("by ${book.author}", color = theme.subText, fontSize = 13.sp)
+  1061→            }
+  1062→            Spacer(Modifier.height(8.dp))
+  1063→            if (!book.description.isNullOrBlank()) {
+  1064→                Text(book.description ?: "", color = theme.subText, fontSize = 12.sp, textAlign = TextAlign.Center, maxLines = 3)
+  1065→            }
+  1066→            Spacer(Modifier.height(24.dp))
+  1067→            
+  1068→            // Open PDF button
+  1069→            if (!book.pdfUrl.isNullOrBlank()) {
+  1070→                val context = androidx.compose.ui.platform.LocalContext.current
+  1071→                Button(
+  1072→                    onClick = {
+  1073→                        sound.click()
+  1074→                        val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(book.pdfUrl))
+  1075→                        context.startActivity(intent)
+  1076→                    },
+  1077→                    modifier = Modifier.fillMaxWidth().height(48.dp),
+  1078→                    colors = ButtonDefaults.buttonColors(containerColor = theme.primary),
+  1079→                    shape = RoundedCornerShape(10.dp)
+  1080→                ) {
+  1081→                    Icon(Icons.Default.Book, null, modifier = Modifier.size(18.dp))
+  1082→                    Spacer(Modifier.width(8.dp))
+  1083→                    Text("Open PDF", fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+  1084→                }
+  1085→            } else {
+  1086→                Text("No PDF available", color = theme.subText, fontSize = 13.sp)
+  1087→            }
+  1088→        }
+  1089→    }
+  1090→}
+  1091→
