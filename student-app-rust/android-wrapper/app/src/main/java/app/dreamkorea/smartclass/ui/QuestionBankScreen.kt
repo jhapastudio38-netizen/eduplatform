@@ -54,7 +54,8 @@ fun QuestionBankScreen(theme: AppTheme, sound: SoundManager, onBack: () -> Unit,
         loading = true
         error = ""
         try {
-            // Fetch question_bank tests via the existing tests endpoint
+            // Always fetch fresh — admin may have just published a new QBank test
+            AppState.invalidateCache(AppState.keyTests("question_bank"))
             val result = withTimeoutOrNull(20_000L) { AppState.getCachedTests("question_bank") }
             if (result != null) tests = result
             else error = "The request timed out. Check your internet and try again."

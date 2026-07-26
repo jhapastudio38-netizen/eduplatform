@@ -173,32 +173,40 @@ export function AdminTests({ testCategory = "exam" }: { testCategory?: string })
   // ─── Make a Copy / Duplicate ──────────────────────────────────────────────
   // Two modes:
   //   • "Duplicate" — clone the whole test (all questions) into a target
-  //     category. New test starts as a draft.
+  //     category. New test starts as a draft. Optionally add to a package.
   //   • "Copy Set" — only for question_bank tests. Copies one Set's questions
   //     into another existing test.
-  async function duplicateTest(test: Test) {
-    const targetCategory = prompt(
-      `Duplicate "${test.title}" into which category?\n\nType one of: exam, demo, batch, chapter, question_bank\n(Leave empty to keep as ${test.testCategory})`,
-      test.testCategory || "exam",
-    );
-    if (targetCategory === null) return;
-    const validCats = ["exam", "demo", "batch", "chapter", "question_bank"];
-    const target = validCats.includes(targetCategory.trim()) ? targetCategory.trim() : test.testCategory;
-    const newTitle = prompt("New title (leave empty to add ' (Copy)'):", `${test.title} (Copy)`);
-    if (newTitle === null) return;
+  const [duplicateTarget, setDuplicateTarget] = useState<Test | null>(null);
+
+  async function doDuplicate(test: Test, newTitle: string, targetCategory: string, bundleId?: string) {
     try {
       const res = await fetch(`/api/admin/tests/${test.id}/copy`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           mode: "duplicate",
-          targetCategory: target,
+          targetCategory,
           newTitle: newTitle.trim() || `${test.title} (Copy)`,
         }),
       });
       const d = await res.json();
       if (!res.ok) { toast.error(d.error || "Duplicate failed"); return; }
-      toast.success(`Duplicated to ${target} as "${d.test.title}"`);
+      // Optionally add the new test to a package
+      if (bundleId && d.test?.id) {
+        try {
+          await fetch(`/api/admin/bundles/${bundleId}/items`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ testId: d.test.id }),
+          });
+          toast.success(`Duplicated as "${d.test.title}" and added to package`);
+        } catch {
+          toast.success(`Duplicated as "${d.test.title}" (package add failed — try manually)`);
+        }
+      } else {
+        toast.success(`Duplicated as "${d.test.title}"`);
+      }
+      setDuplicateTarget(null);
       load();
     } catch (e: any) {
       toast.error("Duplicate failed: " + (e?.message || "network error"));
@@ -343,9 +351,9 @@ export function AdminTests({ testCategory = "exam" }: { testCategory?: string })
                     size="sm"
                     className="text-blue-600 hover:text-blue-700"
                     title="Duplicate this test into another category"
-                    onClick={(e) => { e.stopPropagation(); duplicateTest(t); }}
+                    onClick={(e) => { e.stopPropagation(); setDuplicateTarget(t); }}
                   >
-                    <Copy className="w-4 h-4 mr-1" /> Copy
+                    <Copy className="w-4 h-4 mr-1" /> Duplicate
                   </Button>
                   {/* Copy Set — only for question_bank tests */}
                   {t.testCategory === "question_bank" && (
@@ -386,7 +394,107 @@ export function AdminTests({ testCategory = "exam" }: { testCategory?: string })
           onClose={() => { setEditingTest(null); load(); }}
         />
       )}
+
+      {duplicateTarget && (
+        <DuplicateDialog
+          test={duplicateTarget}
+          onClose={() => setDuplicateTarget(null)}
+          onDuplicate={(title, cat, bundleId) => doDuplicate(duplicateTarget, title, cat, bundleId)}
+        />
+      )}
     </div>
+  );
+}
+
+// ─── Duplicate Dialog ────────────────────────────────────────────────────────
+// Shows when admin clicks "Duplicate" on a test card. Lets the admin:
+//   • Edit the new title (default: "{Original} (Copy)")
+//   • Pick the target category (exam / demo / batch / chapter / question_bank)
+//   • Optionally pick a package to add the duplicated test to
+// Questions, blocks, and all other settings stay the same.
+function DuplicateDialog({ test, onClose, onDuplicate }: {
+  test: Test;
+  onClose: () => void;
+  onDuplicate: (newTitle: string, targetCategory: string, bundleId?: string) => void;
+}) {
+  const [newTitle, setNewTitle] = useState(`${test.title} (Copy)`);
+  const [targetCategory, setTargetCategory] = useState(test.testCategory || "exam");
+  const [bundles, setBundles] = useState<{ id: string; title: string; kind: string }[]>([]);
+  const [selectedBundle, setSelectedBundle] = useState<string>("");
+  const [busy, setBusy] = useState(false);
+
+  // Load bundles so the admin can pick one to add the duplicate to
+  useEffect(() => {
+    fetch("/api/admin/bundles")
+      .then((r) => r.json())
+      .then((d) => setBundles(d.bundles || []))
+      .catch(() => {});
+  }, []);
+
+  async function handleDuplicate() {
+    setBusy(true);
+    onDuplicate(newTitle, targetCategory, selectedBundle || undefined);
+    setBusy(false);
+  }
+
+  return (
+    <Dialog open={true} onOpenChange={(v) => { if (!v) onClose(); }}>
+      <DialogContent className="max-w-lg">
+        <DialogHeader>
+          <DialogTitle>Duplicate Test</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-4">
+          <div>
+            <Label className="text-sm font-semibold">New Title</Label>
+            <Input
+              value={newTitle}
+              onChange={(e) => setNewTitle(e.target.value)}
+              className="h-12 text-base"
+              autoFocus
+            />
+            <p className="text-xs text-muted-foreground mt-1">
+              Questions, blocks, audio settings, and all other content stay the same. Only the title changes.
+            </p>
+          </div>
+          <div>
+            <Label className="text-sm font-semibold">Target Category</Label>
+            <Select value={targetCategory} onValueChange={setTargetCategory}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="exam">Exam</SelectItem>
+                <SelectItem value="demo">Demo Exam</SelectItem>
+                <SelectItem value="batch">Batch Exam</SelectItem>
+                <SelectItem value="chapter">Chapter Exam</SelectItem>
+                <SelectItem value="question_bank">Question Bank</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div>
+            <Label className="text-sm font-semibold">Add to Package (optional)</Label>
+            <Select value={selectedBundle} onValueChange={setSelectedBundle}>
+              <SelectTrigger><SelectValue placeholder="— None —" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="">— None —</SelectItem>
+                {bundles.map((b) => (
+                  <SelectItem key={b.id} value={b.id}>
+                    {b.title} ({b.kind})
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground mt-1">
+              If you pick a package, the duplicated test is automatically added to it.
+            </p>
+          </div>
+        </div>
+        <div className="flex justify-end gap-2 pt-2 border-t">
+          <Button variant="outline" onClick={onClose}>Cancel</Button>
+          <Button onClick={handleDuplicate} disabled={busy || !newTitle.trim()}>
+            {busy ? "Duplicating…" : <><Copy className="w-4 h-4 mr-1" /> Duplicate</>}
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -856,8 +964,59 @@ function ExamEditor({ test, testCategory, onClose }: { test: Test; testCategory:
     toast.success(`Copied! Code: ${code}`);
   }
 
+  // ─── Copy ALL questions in this test ──────────────────────────────────────
+  // Generates a single code that bundles every filled question. The admin
+  // can paste the code into another test to bulk-import all questions at once.
+  function copyAll() {
+    const filled = Object.values(questions).filter(q => q.stem.trim());
+    if (filled.length === 0) { toast.error("No questions to copy — add some first"); return; }
+    const code = `DK-ALL-${test.id.slice(-4).toUpperCase()}-${Date.now().toString(36).toUpperCase()}`;
+    const data = JSON.stringify({ code, allQuestions: filled, sourceTestId: test.id, sourceTitle: test.title });
+    const allCopies = JSON.parse(localStorage.getItem("dk_copies") || "{}");
+    allCopies[code] = data;
+    localStorage.setItem("dk_copies", JSON.stringify(allCopies));
+    navigator.clipboard.writeText(code);
+    toast.success(`Copied ${filled.length} questions! Code: ${code}`);
+  }
+
   function pasteQuestion() {
     setShowPasteDialog(true);
+  }
+
+  // ─── Paste All questions from a Copy-All code ─────────────────────────────
+  // Reads the code from localStorage, parses the bundled questions, and
+  // imports them into the current test with new block numbers (so they don't
+  // overwrite existing questions). The setNumber is preserved from source.
+  function doPasteAll(code: string) {
+    const allCopies = JSON.parse(localStorage.getItem("dk_copies") || "{}");
+    const data = allCopies[code.trim()];
+    if (!data) { toast.error("Invalid code"); return; }
+    const parsed = JSON.parse(data);
+    if (!parsed.allQuestions || !Array.isArray(parsed.allQuestions)) {
+      toast.error("This code is for a single question, not a bulk copy. Use Paste instead.");
+      return;
+    }
+    const incoming: QuestionData[] = parsed.allQuestions;
+    // Find the max block number currently in use so we append rather than overwrite
+    const used = new Set(Object.values(questions).map(q => q.blockNumber));
+    let nextNum = 1;
+    while (used.has(nextNum)) nextNum++;
+    const newQuestions = { ...questions };
+    for (const q of incoming) {
+      const k = key(q.blockType, nextNum);
+      newQuestions[k] = {
+        ...q,
+        blockNumber: nextNum,
+        // Preserve setNumber from source, default to current activeSet
+        setNumber: q.setNumber ?? activeSet,
+      };
+      nextNum++;
+    }
+    setQuestions(newQuestions);
+    scheduleDraftSave(newQuestions);
+    toast.success(`Pasted ${incoming.length} questions — click Save on each to persist`);
+    setShowPasteDialog(false);
+    setPasteCode("");
   }
 
   async function pushToApp() {
@@ -968,6 +1127,12 @@ function ExamEditor({ test, testCategory, onClose }: { test: Test; testCategory:
     const data = allCopies[pasteCode.trim()];
     if (!data) { toast.error("Invalid paste code"); return; }
     const parsed = JSON.parse(data);
+    // If this is a bulk-copy code (allQuestions array), paste all into this test
+    if (parsed.allQuestions && Array.isArray(parsed.allQuestions)) {
+      doPasteAll(pasteCode.trim());
+      return;
+    }
+    // Single-question paste
     const q = parsed.question as QuestionData;
     // Paste into current slot — keep current block number/type
     const pasted: QuestionData = {
@@ -1191,6 +1356,9 @@ function ExamEditor({ test, testCategory, onClose }: { test: Test; testCategory:
             </Button>
             <Button onClick={pasteQuestion} variant="outline" size="lg">
               <ClipboardPaste className="w-4 h-4 mr-1" /> Paste
+            </Button>
+            <Button onClick={copyAll} variant="outline" size="lg" className="text-purple-600 hover:text-purple-700">
+              <Copy className="w-4 h-4 mr-1" /> Copy All
             </Button>
             {isSimple && (
               <Button onClick={deleteActiveQuestion} variant="outline" size="lg" className="text-rose-600 hover:text-rose-700">

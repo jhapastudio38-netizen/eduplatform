@@ -57,7 +57,10 @@ fun BundlesScreen(theme: AppTheme, sound: SoundManager, onBack: () -> Unit, onOp
         loading = true
         error = ""
         try {
-            val result = withTimeoutOrNull(20_000L) { AppState.api.getStudentBundles().bundles }
+            // Always fetch fresh — admin may have just published a new package
+            val result = withTimeoutOrNull(20_000L) {
+                AppState.cachedFresh("bundles") { AppState.api.getStudentBundles().bundles }
+            }
             if (result != null) bundles = result
             else error = "The request timed out. Check your internet and try again."
         } catch (e: retrofit2.HttpException) {
