@@ -120,6 +120,14 @@ fun MainScreen(userName: String, onLogout: () -> Unit) {
 
             // ─── Screen content with slide animation ─────────────────────────
             Box(modifier = Modifier.weight(1f)) {
+                // Subtle background image — low opacity, barely noticeable
+                Image(
+                    painter = painterResource(id = app.dreamkorea.smartclass.R.drawable.app_bg),
+                    contentDescription = null,
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.Crop
+                )
+                Box(modifier = Modifier.fillMaxSize().background(BgGray.copy(alpha = 0.92f)))
                 AnimatedContent(
                     targetState = screen,
                     transitionSpec = {
@@ -336,39 +344,54 @@ fun HomeScreen(theme: AppTheme, sound: SoundManager, userName: String, onNavigat
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(bottom = 100.dp)
     ) {
-        // ─── Hero card — navy blue with greeting + progress ─────────────
+        // ─── Hero card — with tree image background + greeting + progress ─────
         item {
             Surface(
-                color = NavyBlue,
                 shape = RoundedCornerShape(20.dp),
                 modifier = Modifier.fillMaxWidth().padding(16.dp),
-                shadowElevation = 4.dp,
+                shadowElevation = 6.dp,
             ) {
-                Column(modifier = Modifier.padding(20.dp)) {
-                    Text("Hello, $userName", color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.Bold)
-                    Text("Let's learn Korean together", color = Color.White.copy(alpha = 0.7f), fontSize = 13.sp)
-                    Spacer(Modifier.height(16.dp))
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text("Level ${if ((stats?.totalExamsTaken ?: 0) > 5) 2 else 1}", color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
-                        Spacer(Modifier.width(8.dp))
-                        Surface(color = Color.White.copy(alpha = 0.2f), shape = RoundedCornerShape(8.dp)) {
-                            Text("${stats?.totalExamsTaken ?: 0} exams", color = Color.White, fontSize = 11.sp, modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp))
-                        }
-                        Spacer(Modifier.width(6.dp))
-                        Surface(color = Color.White.copy(alpha = 0.2f), shape = RoundedCornerShape(8.dp)) {
-                            Text("${stats?.studyStreakDays ?: 0} day streak", color = Color.White, fontSize = 11.sp, modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp))
-                        }
-                    }
-                    Spacer(Modifier.height(10.dp))
-                    val progress = ((stats?.averageScore ?: 0.0).toFloat() / 100f).coerceIn(0f, 1f)
-                    LinearProgressIndicator(
-                        progress = { progress },
-                        color = Color.White,
-                        trackColor = Color.White.copy(alpha = 0.2f),
-                        modifier = Modifier.fillMaxWidth().height(6.dp).clip(RoundedCornerShape(3.dp)),
+                Box(modifier = Modifier.fillMaxWidth().height(160.dp)) {
+                    // Tree image as background
+                    Image(
+                        painter = painterResource(id = app.dreamkorea.smartclass.R.drawable.hero_bg),
+                        contentDescription = null,
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Crop
                     )
-                    Spacer(Modifier.height(4.dp))
-                    Text("${String.format("%.0f", stats?.averageScore ?: 0.0)}% average score", color = Color.White.copy(alpha = 0.7f), fontSize = 11.sp)
+                    // Gradient overlay — pink/magenta to match the tree image
+                    Box(
+                        modifier = Modifier.fillMaxSize().background(
+                            Brush.verticalGradient(
+                                listOf(Color(0xFF8B2252).copy(alpha = 0.75f), Color(0xFF1E3A8A).copy(alpha = 0.85f))
+                            )
+                        )
+                    )
+                    // Content on top
+                    Column(modifier = Modifier.padding(20.dp)) {
+                        Text("Hello, $userName", color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.Bold)
+                        Text("Let's learn Korean together", color = Color.White.copy(alpha = 0.8f), fontSize = 13.sp)
+                        Spacer(Modifier.height(12.dp))
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Surface(color = Color.White.copy(alpha = 0.2f), shape = RoundedCornerShape(8.dp)) {
+                                Text("${stats?.totalExamsTaken ?: 0} exams", color = Color.White, fontSize = 11.sp, modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp))
+                            }
+                            Spacer(Modifier.width(6.dp))
+                            Surface(color = Color.White.copy(alpha = 0.2f), shape = RoundedCornerShape(8.dp)) {
+                                Text("${stats?.studyStreakDays ?: 0} day streak", color = Color.White, fontSize = 11.sp, modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp))
+                            }
+                        }
+                        Spacer(Modifier.height(10.dp))
+                        val progress = ((stats?.averageScore ?: 0.0).toFloat() / 100f).coerceIn(0f, 1f)
+                        LinearProgressIndicator(
+                            progress = { progress },
+                            color = Color(0xFFF472B6),
+                            trackColor = Color.White.copy(alpha = 0.2f),
+                            modifier = Modifier.fillMaxWidth().height(6.dp).clip(RoundedCornerShape(3.dp)),
+                        )
+                        Spacer(Modifier.height(4.dp))
+                        Text("${String.format("%.0f", stats?.averageScore ?: 0.0)}% average score", color = Color.White.copy(alpha = 0.7f), fontSize = 11.sp)
+                    }
                 }
             }
         }
