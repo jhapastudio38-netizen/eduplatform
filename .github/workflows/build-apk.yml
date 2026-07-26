@@ -37,31 +37,51 @@ jobs:
       - name: Rename APK with version
         run: |
           mv student-app-rust/android-wrapper/app/build/outputs/apk/debug/app-debug.apk \
-             student-app-rust/android-wrapper/app/build/outputs/apk/debug/dreamkorea-v3.2.1-debug.apk
+             student-app-rust/android-wrapper/app/build/outputs/apk/debug/dreamkorea-v3.3.0-debug.apk
       # Upload as a GitHub Release asset — Releases storage is UNLIMITED for
       # public repos and doesn't count against the Actions artifact quota
       # (which we've already hit).
       - name: Create or update release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v3.2.1-${{ github.run_number }}
-          name: DreamKorea v3.2.1 (Build ${{ github.run_number }})
+          tag_name: v3.3.0-${{ github.run_number }}
+          name: DreamKorea v3.3.0 (Build ${{ github.run_number }})
           body: |
-            ## What's new in v3.2.1
+            ## What's new in v3.3.0
 
-            - **Fixed: Next button now clickable in horizontal mode.** The
-              inner LazyColumns no longer use fillMaxHeight() which was
-              pushing the bottom button bar off-screen.
-            - **QBank in app now matches admin.** The student Question Bank
-              screen now lists QBank TESTS (created in admin under
-              "Question Bank"), not standalone practice questions that were
-              never created. Tapping a QBank test opens the same
-              auto-landscape + block-grid flow as a regular exam.
-            - All exams, QBank tests, and packages flow through the same
-              ExamEntryScreen (briefing card → auto-landscape → block grid).
+            ### Login screen
+            - **Three tabs: Sign In / Sign Up / Forgot Password** (default: Sign In)
+            - Sign Up: name + email + phone + password (no OTP needed)
+            - Forgot Password: enter email → get 6-digit code → reset password
+
+            ### QBank Sets
+            - Admin can group questions into Set 1, 2, 3, 4, 5 within a single QBank test
+            - Set selector (purple pills) at the top of the QBank editor
+
+            ### Make a Copy
+            - Every test card has a "Copy" button — duplicates the whole test
+              + all questions into another category (exam/demo/batch/chapter/qbank)
+            - QBank tests also have "Copy Set" — copies one set's questions
+              into another existing test
+
+            ### Eye Vision auto-trigger
+            - After exam submission, if the student scored below 70%
+              (mistakes > 30%), an orange "Eye Vision Check Recommended"
+              card appears on the result screen with a "Take N Tests" button
+            - More mistakes → more tests (3-5); fewer mistakes → fewer (0-2)
+
+            ### Block toggle (admin)
+            - Each exam/demo card has inline Text/Audio pills to enable/disable
+              a block per exam — disabled blocks hide from students entirely
+
+            ### Bug fixes
+            - Next button is now clickable in horizontal mode (was being pushed
+              off-screen by fillMaxHeight() LazyColumns)
+            - QBank in app now matches admin (both list question_bank TESTS)
+            - Drafts auto-save — questions don't vanish on misclick
 
             SHA: ${{ github.sha }}
           files: |
-            student-app-rust/android-wrapper/app/build/outputs/apk/debug/dreamkorea-v3.2.1-debug.apk
+            student-app-rust/android-wrapper/app/build/outputs/apk/debug/dreamkorea-v3.3.0-debug.apk
           draft: false
           prerelease: false

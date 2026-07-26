@@ -200,6 +200,9 @@ model Question {
   // ─── New block-based exam fields ────────────────────────────────────────
   blockType   String?  // "text" | "audio" — which block this question belongs to
   blockNumber Int?     // 1-40 (1-20 text block, 21-40 audio block)
+  // Set number within a QBank test — admin groups questions into Set 1, Set 2,
+  // Set 3 etc. so the student can pick a set to practice. Default 1.
+  setNumber   Int?     @default(1)
   // Description type: "none" | "text" | "image" | "audio"
   descType    String?  @default("none")
   descText    String?  // text description (if descType = "text")
