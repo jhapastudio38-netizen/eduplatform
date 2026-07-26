@@ -216,6 +216,10 @@ model Question {
   optionImages String? // JSON: ["url1", "url2", "url3", "url4"]
   // For audio answers: JSON array of 4 audio URLs
   optionAudios String? // JSON: ["url1", "url2", "url3", "url4"]
+  // Per-option blank/underline word — admin types a word for each option,
+  // it gets underlined in the actual option text shown to students.
+  // JSON: ["word1", "", "word3", ""] — empty string = no underline
+  optionBlanks String?
   // Which option is correct (0-3 index)
   correctOption Int?   @default(0)
   createdAt   DateTime @default(now())

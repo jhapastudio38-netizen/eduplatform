@@ -55,6 +55,7 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ testId: str
           id: i.question.id, type: i.question.type, difficulty: i.question.difficulty,
           stem: i.question.stem,
           options: i.question.options ? JSON.parse(i.question.options) : null,
+          optionBlanks: i.question.optionBlanks ? JSON.parse(i.question.optionBlanks) : [],
           imageUrl: i.question.imageUrl || null,
           audioUrl: i.question.audioUrl || null,
           audioLoop: i.question.audioLoop || 0,
