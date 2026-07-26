@@ -271,7 +271,9 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
         }
 
         val q = currentQuestion.question
-        val isHorizontalMode = AppState.getTextSizeMultiplier() > 1.0f
+        // Horizontal mode is now a dedicated toggle in Settings, decoupled
+        // from text size. Default is vertical (phone-friendly).
+        val isHorizontalMode = AppState.isExamHorizontalMode()
 
         if (isHorizontalMode) {
             // HORIZONTAL MODE: question on left, options on right

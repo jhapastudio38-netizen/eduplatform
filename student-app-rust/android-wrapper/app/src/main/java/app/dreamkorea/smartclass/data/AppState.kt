@@ -37,6 +37,7 @@ object AppState {
     private const val KEY_THEME_COLOR = "theme_color"
     private const val KEY_DARK_MODE = "dark_mode"
     private const val KEY_TEXT_SIZE = "text_size"
+    private const val KEY_EXAM_HORIZONTAL = "exam_horizontal_mode"
     private const val KEY_ANIMATIONS = "animations_enabled"
     private const val KEY_NOTIFICATIONS = "notifications_enabled"
 
@@ -247,6 +248,17 @@ object AppState {
     fun getTextSizeMultiplier(): Float = settingsPrefs.getFloat(KEY_TEXT_SIZE, 1.0f)
     fun setTextSizeMultiplier(value: Float) {
         settingsPrefs.edit().putFloat(KEY_TEXT_SIZE, value).apply()
+    }
+
+    /**
+     * Exam layout mode — independent of text size.
+     *  • false (default) = Vertical (question on top, options below) — best for phones
+     *  • true            = Horizontal (question on left, options on right) — best for tablets
+     *                      and landscape phones where you want to see both at once
+     */
+    fun isExamHorizontalMode(): Boolean = settingsPrefs.getBoolean(KEY_EXAM_HORIZONTAL, false)
+    fun setExamHorizontalMode(value: Boolean) {
+        settingsPrefs.edit().putBoolean(KEY_EXAM_HORIZONTAL, value).apply()
     }
 
     fun areAnimationsEnabled(): Boolean = settingsPrefs.getBoolean(KEY_ANIMATIONS, true)
