@@ -107,7 +107,7 @@ fun SettingsScreen(theme: AppTheme, sound: SoundManager, onBack: () -> Unit) {
                     theme = theme,
                     title = "Horizontal Exam Layout",
                     subtitle = "Question on left, options on right (great for tablets / landscape)",
-                    checked = examHorizontal
+                    value = examHorizontal
                 ) {
                     examHorizontal = it
                     AppState.setExamHorizontalMode(it)
