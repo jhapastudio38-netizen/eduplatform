@@ -93,6 +93,7 @@ interface QuestionData {
   testItemId?: string;
   blockType: "text" | "audio";
   blockNumber: number;
+  setNumber?: number;
   stem: string;
   descType: "none" | "text" | "image" | "audio";
   descText: string;
@@ -114,6 +115,7 @@ function emptyQuestion(blockType: "text" | "audio", blockNumber: number): Questi
   return {
     blockType,
     blockNumber,
+    setNumber: 1,
     stem: "",
     descType: "none",
     descText: "",
@@ -166,6 +168,70 @@ export function AdminTests({ testCategory = "exam" }: { testCategory?: string })
     await fetch(`/api/admin/tests/${test.id}`, { method: "DELETE" });
     toast.success("Exam deleted");
     load();
+  }
+
+  // ─── Make a Copy / Duplicate ──────────────────────────────────────────────
+  // Two modes:
+  //   • "Duplicate" — clone the whole test (all questions) into a target
+  //     category. New test starts as a draft.
+  //   • "Copy Set" — only for question_bank tests. Copies one Set's questions
+  //     into another existing test.
+  async function duplicateTest(test: Test) {
+    const targetCategory = prompt(
+      `Duplicate "${test.title}" into which category?\n\nType one of: exam, demo, batch, chapter, question_bank\n(Leave empty to keep as ${test.testCategory})`,
+      test.testCategory || "exam",
+    );
+    if (targetCategory === null) return;
+    const validCats = ["exam", "demo", "batch", "chapter", "question_bank"];
+    const target = validCats.includes(targetCategory.trim()) ? targetCategory.trim() : test.testCategory;
+    const newTitle = prompt("New title (leave empty to add ' (Copy)'):", `${test.title} (Copy)`);
+    if (newTitle === null) return;
+    try {
+      const res = await fetch(`/api/admin/tests/${test.id}/copy`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          mode: "duplicate",
+          targetCategory: target,
+          newTitle: newTitle.trim() || `${test.title} (Copy)`,
+        }),
+      });
+      const d = await res.json();
+      if (!res.ok) { toast.error(d.error || "Duplicate failed"); return; }
+      toast.success(`Duplicated to ${target} as "${d.test.title}"`);
+      load();
+    } catch (e: any) {
+      toast.error("Duplicate failed: " + (e?.message || "network error"));
+    }
+  }
+
+  // Copy a single Set (only for question_bank tests) into another existing test
+  async function copySet(test: Test) {
+    const setNumberStr = prompt(`Which Set to copy? (1-10)`, "1");
+    if (!setNumberStr) return;
+    const setNumber = parseInt(setNumberStr, 10);
+    if (isNaN(setNumber) || setNumber < 1) { toast.error("Invalid set number"); return; }
+    const targetTestId = prompt(
+      `Paste the destination test ID (you can copy it from the URL of any test you open in the admin panel):`,
+      "",
+    );
+    if (!targetTestId?.trim()) { toast.error("Target test ID is required"); return; }
+    try {
+      const res = await fetch(`/api/admin/tests/${test.id}/copy`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          mode: "copySet",
+          setNumber,
+          targetTestId: targetTestId.trim(),
+        }),
+      });
+      const d = await res.json();
+      if (!res.ok) { toast.error(d.error || "Copy set failed"); return; }
+      toast.success(`Copied ${d.copiedCount} questions from Set ${setNumber}`);
+    } catch (e: any) {
+      toast.error("Copy set failed: " + (e?.message || "network error"));
+    }
   }
 
   return (
@@ -270,6 +336,28 @@ export function AdminTests({ testCategory = "exam" }: { testCategory?: string })
                     <Badge className="bg-green-500">🚀 Live</Badge>
                   ) : (
                     <Badge variant="secondary">📝 Draft</Badge>
+                  )}
+                  {/* Make a Copy — duplicate whole test into another category */}
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="text-blue-600 hover:text-blue-700"
+                    title="Duplicate this test into another category"
+                    onClick={(e) => { e.stopPropagation(); duplicateTest(t); }}
+                  >
+                    <Copy className="w-4 h-4 mr-1" /> Copy
+                  </Button>
+                  {/* Copy Set — only for question_bank tests */}
+                  {t.testCategory === "question_bank" && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="text-purple-600 hover:text-purple-700"
+                      title="Copy one Set's questions into another test"
+                      onClick={(e) => { e.stopPropagation(); copySet(t); }}
+                    >
+                      Copy Set
+                    </Button>
                   )}
                   <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); deleteTest(t); }}>
                     <Trash2 className="w-4 h-4 text-red-500" />
@@ -607,8 +695,11 @@ function CreateExamDialog({ open, testCategory, onOpenChange, onCreated }: {
 
 function ExamEditor({ test, testCategory, onClose }: { test: Test; testCategory: string; onClose: () => void }) {
   const isSimple = SIMPLE_CATEGORIES.includes(testCategory);
+  const isQBank = testCategory === "question_bank";
   const [activeBlock, setActiveBlock] = useState<"text" | "audio">("text");
   const [activeNumber, setActiveNumber] = useState(1);
+  // Set selector — only used for question_bank tests. Default Set 1.
+  const [activeSet, setActiveSet] = useState(1);
   const [questions, setQuestions] = useState<Record<string, QuestionData>>({});
   const [loading, setLoading] = useState(true);
   const [clipboard, setClipboard] = useState<string>("");
@@ -709,6 +800,7 @@ function ExamEditor({ test, testCategory, onClose }: { test: Test; testCategory:
       const payload = {
         blockType: q.blockType,
         blockNumber: q.blockNumber,
+        setNumber: q.setNumber ?? activeSet,
         stem: q.stem,
         descType: q.descType,
         descText: q.descText || "",
@@ -783,6 +875,7 @@ function ExamEditor({ test, testCategory, onClose }: { test: Test; testCategory:
         const payload = {
           blockType: q.blockType,
           blockNumber: q.blockNumber,
+          setNumber: q.setNumber ?? activeSet,
           stem: q.stem,
           descType: q.descType,
           descText: q.descText || "",
@@ -967,6 +1060,30 @@ function ExamEditor({ test, testCategory, onClose }: { test: Test; testCategory:
             )}
           </DialogTitle>
         </DialogHeader>
+
+        {/* Set selector — only for question_bank tests. Lets admin organize
+            questions into Set 1, 2, 3, 4, 5 within a single QBank test. */}
+        {isQBank && (
+          <div className="flex items-center gap-2 p-3 bg-purple-50 border border-purple-200 rounded-lg">
+            <span className="text-sm font-semibold text-purple-800">Set:</span>
+            {[1, 2, 3, 4, 5].map((s) => (
+              <button
+                key={s}
+                onClick={() => setActiveSet(s)}
+                className={`px-3 py-1 rounded-md text-sm font-medium transition-colors ${
+                  activeSet === s
+                    ? "bg-purple-600 text-white"
+                    : "bg-white text-purple-700 border border-purple-300 hover:bg-purple-100"
+                }`}
+              >
+                Set {s}
+              </button>
+            ))}
+            <span className="text-xs text-purple-600 ml-2">
+              Questions you add now go into Set {activeSet}. Use "Copy Set" on the test card to copy this set into another test.
+            </span>
+          </div>
+        )}
 
         {/* Block tabs — only for exam & demo */}
         {!isSimple && (

@@ -152,12 +152,21 @@ data class ReviewItem(
     val explanation: String?,
     val isCorrect: Boolean
 )
+data class EyeVisionRecommendation(
+    val show: Boolean = false,
+    val count: Int = 0,
+    val reason: String = ""
+)
+
 data class SubmitResponse(
     val score: Int,
     val maxScore: Int,
     val graded: Boolean,
     val submissionId: String,
-    val review: List<ReviewItem> = emptyList()
+    val review: List<ReviewItem> = emptyList(),
+    // Eye vision auto-trigger — server recommends eye vision tests based
+    // on the student's mistake rate. The app reads this after submit.
+    val eyeVision: EyeVisionRecommendation = EyeVisionRecommendation()
 )
 
 data class Book(
@@ -220,6 +229,18 @@ interface DreamKoreaApi {
 
     @POST("api/auth/credentials")
     suspend fun loginCredentials(@Body body: Map<String, String>): CredentialsResponse
+
+    // Student signup with email + password (no OTP needed)
+    @POST("api/auth/signup")
+    suspend fun signup(@Body body: Map<String, String>): CredentialsResponse
+
+    // Forgot password — request a 6-digit reset code via email
+    @POST("api/auth/request-reset")
+    suspend fun requestReset(@Body body: Map<String, String>): SimpleResponse
+
+    // Forgot password — verify the reset code + set a new password
+    @POST("api/auth/reset-password")
+    suspend fun resetPassword(@Body body: Map<String, String>): SimpleResponse
 
     @POST("api/auth/set-password")
     suspend fun setPassword(@Body body: Map<String, String>): SimpleResponse
