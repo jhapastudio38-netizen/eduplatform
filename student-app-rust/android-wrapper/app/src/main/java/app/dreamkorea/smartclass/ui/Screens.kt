@@ -239,18 +239,12 @@ fun TopBar(theme: AppTheme, userName: String, sound: SoundManager, onProfile: ()
             Spacer(Modifier.width(10.dp))
             Text("DreamKorea", color = TextDark, fontSize = 18.sp, fontWeight = FontWeight.Bold)
             Spacer(Modifier.weight(1f))
+            // Profile icon only (settings removed)
             Box(
                 modifier = Modifier.size(36.dp).clip(CircleShape).clickable { sound.click(); onProfile() },
                 contentAlignment = Alignment.Center
             ) {
                 Icon(Icons.Default.Person, "Profile", tint = TextDark, modifier = Modifier.size(22.dp))
-            }
-            Spacer(Modifier.width(4.dp))
-            Box(
-                modifier = Modifier.size(36.dp).clip(CircleShape).clickable { sound.click(); onSettings() },
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(Icons.Default.Settings, "Settings", tint = TextDark, modifier = Modifier.size(22.dp))
             }
         }
     }

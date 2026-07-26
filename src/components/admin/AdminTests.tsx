@@ -598,17 +598,16 @@ function ExamEditor({ test, testCategory, onClose }: { test: Test; testCategory:
   }
 
   async function pushToApp() {
-    // Count questions that have been filled in
     const filledQuestions = Object.values(questions).filter(q => q.stem.trim());
     if (filledQuestions.length === 0) {
       toast.error("Cannot push: add at least one question first");
       return;
     }
 
-    // Auto-save any unsaved questions before pushing
     setPushing(true);
     try {
-      // Save all filled questions that haven't been saved yet
+      // Auto-save ALL filled questions — check each response
+      let saveErrors = 0;
       for (const q of filledQuestions) {
         const payload = {
           blockType: q.blockType,
@@ -629,11 +628,22 @@ function ExamEditor({ test, testCategory, onClose }: { test: Test; testCategory:
           correctOption: q.correctOption,
           explanation: q.explanation || "",
         };
-        await fetch(`/api/admin/tests/${test.id}/questions`, {
+        const saveRes = await fetch(`/api/admin/tests/${test.id}/questions`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload),
         });
+        if (!saveRes.ok) {
+          const errData = await saveRes.json().catch(() => ({}));
+          console.error(`Question ${q.blockNumber} save failed:`, errData);
+          saveErrors++;
+        }
+      }
+
+      if (saveErrors > 0) {
+        toast.error(`${saveErrors} question(s) failed to save. Check console for details.`);
+        setPushing(false);
+        return;
       }
 
       // Now publish

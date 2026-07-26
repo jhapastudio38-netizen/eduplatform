@@ -128,17 +128,7 @@ fun LoginScreen(onLoginSuccess: () -> Unit) {
 
             Spacer(modifier = Modifier.height(14.dp))
 
-            // Title — white text on blue background
-            AnimatedVisibility(
-                visible = logoVisible,
-                enter = fadeIn(tween(500)) + slideInVertically(tween(500)) { it / 3 }
-            ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text("DreamKorea", color = Color.White, fontSize = 26.sp, fontWeight = FontWeight.Bold)
-                    Text("SmartClass", color = Color.White.copy(alpha = 0.6f), fontSize = 13.sp, fontWeight = FontWeight.Medium)
-                }
-            }
-
+            // No text — just the logo speaks for itself
             Spacer(modifier = Modifier.height(28.dp))
 
             // Form card — clean white card floating on blue
