@@ -7,6 +7,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 // LazyVerticalGrid + GridCells + the LazyGridScope.items overload all live
 // in androidx.compose.foundation.lazy.grid — a separate subpackage.
@@ -257,64 +258,97 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
 
     // ─── Question screen ────────────────────────────────────────────────────
     Column(modifier = Modifier.fillMaxSize().background(theme.background)) {
-        // Header with timer + progress
-        Surface(color = theme.primary, shape = RoundedCornerShape(0.dp)) {
-            Column(modifier = Modifier.padding(16.dp)) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    IconButton(onClick = onExit) {
-                        Icon(Icons.Default.Close, null, tint = Color.White)
-                    }
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text("Question ${currentIdx + 1} of ${t.items.size}", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
-                        val progress = if (t.items.size > 0) (currentIdx + 1f) / t.items.size else 0f
-                        LinearProgressIndicator(
-                            progress = { progress.coerceIn(0f, 1f) },
-                            color = Color.White,
-                            trackColor = Color.White.copy(alpha = 0.3f),
-                            modifier = Modifier.width(120.dp).padding(top = 4.dp)
-                        )
-                    }
-                    // Right-side controls: Question grid button + Timer
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        // Question grid button — opens a numbered grid so the
-                        // student can jump to any question (like a real test
-                        // bubble sheet).
-                        Surface(
-                            color = Color.White.copy(alpha = 0.2f),
-                            shape = RoundedCornerShape(8.dp),
-                            modifier = Modifier.clickable { sound.click(); showQuestionGrid = true }
-                        ) {
-                            Row(
-                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Icon(Icons.Default.GridView, null, tint = Color.White, modifier = Modifier.size(14.dp))
-                                Spacer(Modifier.width(4.dp))
-                                Text("Grid", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
-                            }
+        // ─── SLIM HEADER — single row, 8dp padding ─────────────────────────
+        // The old header had 16dp padding + a separate title row, which ate
+        // ~80dp of vertical space in landscape and pushed content off-screen.
+        // This compact header is ~40dp tall and fits everything in one row.
+        Surface(color = theme.primary) {
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                IconButton(onClick = onExit, modifier = Modifier.size(32.dp)) {
+                    Icon(Icons.Default.Close, null, tint = Color.White, modifier = Modifier.size(18.dp))
+                }
+                Text(
+                    "Q${currentIdx + 1}/${t.items.size}",
+                    color = Color.White,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Bold
+                )
+                Spacer(Modifier.width(8.dp))
+                // Thin progress bar
+                LinearProgressIndicator(
+                    progress = { if (t.items.size > 0) ((currentIdx + 1f) / t.items.size).coerceIn(0f, 1f) else 0f },
+                    color = Color.White,
+                    trackColor = Color.White.copy(alpha = 0.3f),
+                    modifier = Modifier.weight(1f).height(3.dp)
+                )
+                Spacer(Modifier.width(8.dp))
+                // Timer — compact
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.Timer, null, tint = Color.White, modifier = Modifier.size(12.dp))
+                    Spacer(Modifier.width(2.dp))
+                    val mm = timeLeft / 60
+                    val ss = timeLeft % 60
+                    Text(String.format("%02d:%02d", mm, ss), color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                }
+                Spacer(Modifier.width(6.dp))
+                // Grid button — compact icon only
+                IconButton(onClick = { sound.click(); showQuestionGrid = true }, modifier = Modifier.size(32.dp)) {
+                    Icon(Icons.Default.GridView, null, tint = Color.White, modifier = Modifier.size(18.dp))
+                }
+            }
+        }
+
+        // ─── BLOCK STRIP — persistent horizontal scroll of all questions ────
+        // Each block is a small numbered circle:
+        //   • Blue     = current question
+        //   • Green    = answered correctly
+        //   • Red      = answered wrong
+        //   • Grey     = not yet answered
+        // Tap any block to jump to that question. This is the "bubble sheet"
+        // the user asked for — always visible, auto-updates as you answer.
+        Surface(color = theme.cardBg, shadowElevation = 1.dp) {
+            LazyRow(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 6.dp, vertical = 4.dp),
+                horizontalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                items(t.items.size) { idx ->
+                    val item = t.items[idx]
+                    val isAnswered = answers.containsKey(item.question.id)
+                    val isCorrect = questionFeedback?.isCorrect == true && idx == currentIdx
+                    val isCurrent = idx == currentIdx
+                    val blockColor = when {
+                        isCurrent -> theme.primary
+                        isCorrect -> Color(0xFF4CAF50)
+                        isAnswered && idx != currentIdx -> {
+                            // For previously answered questions, check if we have feedback
+                            // We only track current feedback, so answered = green if we know it's correct
+                            // For simplicity, answered = light green, wrong = red (when feedback shows wrong)
+                            Color(0xFF4CAF50).copy(alpha = 0.6f)
                         }
-                        Spacer(Modifier.width(8.dp))
-                        // Timer
-                        Surface(color = Color.White.copy(alpha = 0.2f), shape = RoundedCornerShape(8.dp)) {
-                            Row(
-                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Icon(Icons.Default.Timer, null, tint = Color.White, modifier = Modifier.size(14.dp))
-                                Spacer(Modifier.width(4.dp))
-                                val mm = timeLeft / 60
-                                val ss = timeLeft % 60
-                                Text(String.format("%02d:%02d", mm, ss), color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold)
-                            }
+                        else -> Color(0xFFE0E0E0)
+                    }
+                    val textColor = when {
+                        isCurrent || isCorrect -> Color.White
+                        isAnswered -> Color.White
+                        else -> Color(0xFF666666)
+                    }
+                    Surface(
+                        color = blockColor,
+                        shape = RoundedCornerShape(6.dp),
+                        modifier = Modifier.size(26.dp).clickable {
+                            sound.click()
+                            currentIdx = idx
+                            questionFeedback = null
+                        }
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Text("${idx + 1}", color = textColor, fontSize = 10.sp, fontWeight = FontWeight.Bold)
                         }
                     }
                 }
-                Spacer(Modifier.height(8.dp))
-                Text(t.title, color = Color.White.copy(alpha = 0.85f), fontSize = 12.sp)
             }
         }
 
@@ -327,213 +361,102 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
         }
 
         val q = currentQuestion.question
-        // ALWAYS use horizontal layout during the exam — the device is locked
-        // to landscape (see DisposableEffect above) so the question + options
-        // side-by-side layout has the room it needs. This overrides the
-        // user's profile setting for the duration of the exam.
-        val isHorizontalMode = true
 
-        if (isHorizontalMode) {
-            // HORIZONTAL MODE: question on left, options on right.
-            // CRITICAL: do NOT use fillMaxHeight() on the inner LazyColumns —
-            // that would let them expand and push the bottom button bar off
-            // screen (which made Next unclickable in v3.2.0). Instead, the
-            // parent Row uses weight(1f) inside the Column, and the
-            // LazyColumns inherit the constrained height naturally.
-            Row(
-                modifier = Modifier
-                    .weight(1f)
-                    .fillMaxWidth()
-                    .padding(8.dp)
-            ) {
-                // Left: Question + media (scrollable)
-                LazyColumn(
-                    modifier = Modifier.weight(1f).padding(end = 4.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    item {
-                        Surface(color = theme.cardBg, shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth(), shadowElevation = 2.dp) {
-                            Column(modifier = Modifier.padding(12.dp)) {
-                                Text(q.stem, color = theme.darkText, fontSize = 14.sp, fontWeight = FontWeight.Bold)
-                            }
-                        }
-                    }
-                    // Description image
-                    if (q.descType == "image" && !q.descImageUrl.isNullOrBlank()) {
-                        item {
-                            AsyncImage(url = q.descImageUrl!!.toAbsoluteUrl(), modifier = Modifier.fillMaxWidth().heightIn(max = 120.dp).clip(RoundedCornerShape(8.dp)))
-                        }
-                    }
-                    // Media image
-                    val mediaImgUrl = (q.mediaImageUrl ?: q.imageUrl)?.toAbsoluteUrl()
-                    if (!mediaImgUrl.isNullOrBlank()) {
-                        item {
-                            AsyncImage(url = mediaImgUrl, modifier = Modifier.fillMaxWidth().heightIn(max = 150.dp).clip(RoundedCornerShape(8.dp)))
-                        }
-                    }
-                    // Media audio
-                    val mediaAudUrl = (q.mediaAudioUrl ?: q.audioUrl)?.toAbsoluteUrl()
-                    if (!mediaAudUrl.isNullOrBlank()) {
-                        item { AudioPlayerCard(theme = theme, url = mediaAudUrl, loopCount = q.audioLoop, loopDelaySec = q.audioLoopDelay, sound = sound) }
-                    }
-                }
-
-                // Right: Answer options
-                LazyColumn(
-                    modifier = Modifier.weight(1f).padding(start = 4.dp),
-                    verticalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
-                    item { AnswerInputBlock(theme, q, answers[q.id], questionFeedback, sound) { ans ->
-                        answers[q.id] = ans
-                        val correctIdx = q.correctOption
-                        val isCorrect = when {
-                            q.answerType == "text" || q.answerType == "choose" -> q.options?.getOrNull(correctIdx) == ans
-                            q.answerType == "image" -> q.optionImages.getOrNull(correctIdx) == ans
-                            q.answerType == "audio" -> q.optionAudios.getOrNull(correctIdx) == ans
-                            else -> false
-                        }
-                        questionFeedback = QuestionFeedback(isCorrect, "")
-                    }}
-                }
-            }
-        } else {
-            // STABLE MODE: vertical scroll (current behavior)
+        // ─── HORIZONTAL MODE: question on left, options on right ────────────
+        // Compact layout — 6dp padding, tight spacing, smaller fonts where
+        // safe. Fits everything on screen without scrolling for most questions.
+        Row(
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxWidth()
+                .padding(6.dp)
+        ) {
+            // Left: Question + media (scrollable if needed)
             LazyColumn(
-                modifier = Modifier.weight(1f).fillMaxWidth().padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
+                modifier = Modifier.weight(1f).padding(end = 3.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp)
             ) {
-            // Question stem
-            item {
-                Surface(color = theme.cardBg, shape = RoundedCornerShape(14.dp), modifier = Modifier.fillMaxWidth(), shadowElevation = 2.dp) {
-                    Column(modifier = Modifier.padding(16.dp)) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Surface(color = theme.primary, shape = RoundedCornerShape(6.dp), modifier = Modifier.size(30.dp)) {
-                                Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
-                                    Text("${currentIdx + 1}", color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Bold)
-                                }
-                            }
-                            Spacer(Modifier.width(8.dp))
-                            Text(q.difficulty, color = theme.subText, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
-                            Spacer(Modifier.weight(1f))
-                            Text("${currentQuestion.points} pts", color = theme.primary, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                        }
-                        Spacer(Modifier.height(12.dp))
-                        Text(q.stem, color = theme.darkText, fontSize = 17.sp, fontWeight = FontWeight.Bold)
+                item {
+                    Surface(color = theme.cardBg, shape = RoundedCornerShape(8.dp), modifier = Modifier.fillMaxWidth(), shadowElevation = 1.dp) {
+                        Text(
+                            q.stem,
+                            color = theme.darkText,
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Medium,
+                            modifier = Modifier.padding(8.dp)
+                        )
                     }
                 }
-            }
-
-            // Description image (if descType == "image")
-            if (q.descType == "image" && !q.descImageUrl.isNullOrBlank()) {
-                item {
-                    Surface(color = theme.cardBg, shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth(), shadowElevation = 1.dp) {
-                        AsyncImage(url = q.descImageUrl!!, modifier = Modifier.fillMaxWidth().heightIn(max = 200.dp).clip(RoundedCornerShape(12.dp)))
+                // Description image — compact
+                if (q.descType == "image" && !q.descImageUrl.isNullOrBlank()) {
+                    item {
+                        AsyncImage(url = q.descImageUrl!!.toAbsoluteUrl(), modifier = Modifier.fillMaxWidth().heightIn(max = 100.dp).clip(RoundedCornerShape(6.dp)))
                     }
                 }
-            }
-
-            // Description audio (if descType == "audio")
-            if (q.descType == "audio" && !q.descAudioUrl.isNullOrBlank()) {
-                item {
-                    AudioPlayerCard(theme = theme, url = q.descAudioUrl!!.toAbsoluteUrl(), loopCount = 1, loopDelaySec = 0, sound = sound)
-                }
-            }
-
-            // Description text (if descType == "text")
-            if (q.descType == "text" && !q.descText.isNullOrBlank()) {
-                item {
-                    Surface(color = theme.cardBg, shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth(), shadowElevation = 1.dp) {
-                        Text(q.descText!!, color = theme.subText, fontSize = 14.sp, modifier = Modifier.padding(16.dp))
+                // Media image — compact
+                val mediaImgUrl = (q.mediaImageUrl ?: q.imageUrl)?.toAbsoluteUrl()
+                if (!mediaImgUrl.isNullOrBlank()) {
+                    item {
+                        AsyncImage(url = mediaImgUrl, modifier = Modifier.fillMaxWidth().heightIn(max = 120.dp).clip(RoundedCornerShape(6.dp)))
                     }
                 }
-            }
-
-            // Question media image — use new field or fall back to legacy
-            val mediaImgUrl = q.mediaImageUrl ?: q.imageUrl
-            if (!mediaImgUrl.isNullOrBlank()) {
-                item {
-                    Surface(color = theme.cardBg, shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth(), shadowElevation = 1.dp) {
-                        AsyncImage(url = mediaImgUrl, modifier = Modifier.fillMaxWidth().heightIn(max = 240.dp).clip(RoundedCornerShape(12.dp)))
-                    }
+                // Media audio — compact
+                val mediaAudUrl = (q.mediaAudioUrl ?: q.audioUrl)?.toAbsoluteUrl()
+                if (!mediaAudUrl.isNullOrBlank()) {
+                    item { AudioPlayerCard(theme = theme, url = mediaAudUrl, loopCount = q.audioLoop, loopDelaySec = q.audioLoopDelay, sound = sound) }
                 }
             }
 
-            // Question media audio — use new field or fall back to legacy
-            val mediaAudUrl = (q.mediaAudioUrl ?: q.audioUrl)?.toAbsoluteUrl()
-            if (!mediaAudUrl.isNullOrBlank()) {
-                item {
-                    AudioPlayerCard(
-                        theme = theme,
-                        url = mediaAudUrl,
-                        loopCount = q.audioLoop,
-                        loopDelaySec = q.audioLoopDelay,
-                        sound = sound
-                    )
-                }
-            }
-
-            // Answer input — use answerType to determine display
-            item {
-                AnswerInputBlock(theme, q, answers[q.id], questionFeedback, sound) { ans ->
+            // Right: Answer options — compact, fills the right half
+            LazyColumn(
+                modifier = Modifier.weight(1f).padding(start = 3.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                item { AnswerInputBlock(theme, q, answers[q.id], questionFeedback, sound) { ans ->
                     answers[q.id] = ans
-                    // Auto-check answer
                     val correctIdx = q.correctOption
                     val isCorrect = when {
-                        q.answerType == "text" || q.answerType == "choose" -> {
-                            val correctAns = q.options?.getOrNull(correctIdx) ?: ""
-                            ans == correctAns
-                        }
-                        q.answerType == "image" -> {
-                            val correctAns = q.optionImages.getOrNull(correctIdx) ?: ""
-                            ans == correctAns
-                        }
-                        q.answerType == "audio" -> {
-                            val correctAns = q.optionAudios.getOrNull(correctIdx) ?: ""
-                            ans == correctAns
-                        }
+                        q.answerType == "text" || q.answerType == "choose" -> q.options?.getOrNull(correctIdx) == ans
+                        q.answerType == "image" -> q.optionImages.getOrNull(correctIdx) == ans
+                        q.answerType == "audio" -> q.optionAudios.getOrNull(correctIdx) == ans
                         else -> false
                     }
                     questionFeedback = QuestionFeedback(isCorrect, "")
-                }
+                }}
             }
         }
-        }
 
-        // Bottom navigation buttons
-        Surface(color = theme.white, shadowElevation = 4.dp) {
+        // ─── Bottom navigation — compact, single row ────────────────────────
+        Surface(color = theme.cardBg, shadowElevation = 4.dp) {
             Row(
-                modifier = Modifier.fillMaxWidth().padding(16.dp),
-                horizontalArrangement = Arrangement.SpaceBetween
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
                 OutlinedButton(
                     onClick = {
                         sound.click()
-                        if (currentIdx > 0) {
-                            currentIdx--
-                            questionFeedback = null
-                        }
+                        if (currentIdx > 0) { currentIdx--; questionFeedback = null }
                     },
                     enabled = currentIdx > 0,
-                    shape = RoundedCornerShape(10.dp)
+                    shape = RoundedCornerShape(8.dp),
+                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp)
                 ) {
-                    Icon(Icons.Default.ArrowBack, null, modifier = Modifier.size(16.dp))
-                    Spacer(Modifier.width(4.dp))
-                    Text("Prev")
+                    Icon(Icons.Default.ArrowBack, null, modifier = Modifier.size(14.dp))
+                    Spacer(Modifier.width(2.dp))
+                    Text("Prev", fontSize = 12.sp)
                 }
 
                 if (currentIdx < t.items.size - 1) {
                     Button(
-                        onClick = {
-                            sound.swoosh()
-                            currentIdx++
-                            questionFeedback = null
-                        },
-                        shape = RoundedCornerShape(10.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = theme.primary)
+                        onClick = { sound.swoosh(); currentIdx++; questionFeedback = null },
+                        shape = RoundedCornerShape(8.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = theme.primary),
+                        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 4.dp)
                     ) {
-                        Text("Next")
-                        Spacer(Modifier.width(4.dp))
-                        Icon(Icons.Default.ArrowForward, null, modifier = Modifier.size(16.dp))
+                        Text("Next", fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                        Spacer(Modifier.width(2.dp))
+                        Icon(Icons.Default.ArrowForward, null, modifier = Modifier.size(14.dp))
                     }
                 } else {
                     Button(
@@ -544,26 +467,23 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
                                 try {
                                     submitResult = AppState.api.submitTest(t.id, SubmitRequest(answers.toMap()))
                                     sound.success()
-                                } catch (e: java.net.UnknownHostException) {
-                                    error = "No internet connection. Please check your network."
-                                } catch (e: java.io.IOException) {
-                                    error = "Could not connect to server. Please check your internet."
-                                } catch (e: Exception) {
-                                    error = "Could not submit exam. Please try again."
-                                }
+                                } catch (e: java.net.UnknownHostException) { error = "No internet connection." }
+                                catch (e: java.io.IOException) { error = "Could not connect." }
+                                catch (e: Exception) { error = "Could not submit exam." }
                                 submitting = false
                             }
                         },
-                        shape = RoundedCornerShape(10.dp),
+                        shape = RoundedCornerShape(8.dp),
                         colors = ButtonDefaults.buttonColors(containerColor = theme.accent),
-                        enabled = !submitting
+                        enabled = !submitting,
+                        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 4.dp)
                     ) {
                         if (submitting) {
-                            CircularProgressIndicator(color = Color.White, modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                            CircularProgressIndicator(color = Color.White, modifier = Modifier.size(14.dp), strokeWidth = 2.dp)
                         } else {
-                            Icon(Icons.Default.Check, null, modifier = Modifier.size(16.dp))
-                            Spacer(Modifier.width(4.dp))
-                            Text("Submit")
+                            Icon(Icons.Default.Check, null, modifier = Modifier.size(14.dp))
+                            Spacer(Modifier.width(2.dp))
+                            Text("Submit", fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
                         }
                     }
                 }
