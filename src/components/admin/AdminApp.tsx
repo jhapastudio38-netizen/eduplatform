@@ -7,7 +7,7 @@ import {
   GraduationCap, School, Image, Layers, Package, UserCog, BookMarked,
   ClipboardList, BarChart3, Settings, LogOut, ChevronDown, ChevronRight,
   FolderTree, Library, Award, Bell, Search, Menu, X, Headphones, Radio, Video,
-  LayoutGrid, Eye
+  LayoutGrid, Eye, Ticket
 } from "lucide-react";
 import { useAuthStore } from "@/stores/auth";
 import { Button } from "@/components/ui/button";
@@ -30,6 +30,8 @@ import { AdminVideoLessons } from "./AdminVideoLessons";
 import { AdminLiveRooms } from "./AdminLiveRooms";
 import { AdminStudentResults } from "./AdminStudentResults";
 import { AdminPlaceholder } from "./AdminPlaceholder";
+import { AdminBundles } from "./AdminBundles";
+import { AdminTeacherInvites } from "./AdminTeacherInvites";
 import {
   AdminQuestionCategories, AdminAllCourses, AdminBatch,
   AdminPDFViewer, AdminColorVision, AdminPackageResults,
@@ -43,7 +45,9 @@ type View =
   | "batch" | "student-results" | "package-results" | "classroom-results"
   | "students" | "teachers" | "pdf-viewer" | "settings" | "home-cards"
   | "content" | "questions" | "tests" | "users" | "notifications" | "ai"
-  | "eye-vision" | "books" | "live-sessions";
+  | "eye-vision" | "books" | "live-sessions"
+  | "bundles-qbank" | "bundles-batch" | "bundles-exam" | "bundles-chapter"
+  | "teacher-invites";
 
 interface NavItem {
   id: View;
@@ -69,6 +73,15 @@ const NAV_SECTIONS: NavSection[] = [
     ],
   },
   {
+    title: "Packages",
+    items: [
+      { id: "bundles-qbank", label: "QBank Packages", icon: Package, hasAdd: true },
+      { id: "bundles-batch", label: "Batch Packages", icon: Package, hasAdd: true },
+      { id: "bundles-exam", label: "Exam Packages", icon: Package, hasAdd: true },
+      { id: "bundles-chapter", label: "Chapter Packages", icon: Package, hasAdd: true },
+    ],
+  },
+  {
     title: "Content",
     items: [
       { id: "home-cards", label: "Home Cards", icon: LayoutGrid, hasAdd: true },
@@ -83,6 +96,7 @@ const NAV_SECTIONS: NavSection[] = [
       { id: "student-results", label: "Student Results", icon: BarChart3 },
       { id: "students", label: "Students", icon: GraduationCap },
       { id: "teachers", label: "Teachers", icon: UserCog, hasAdd: true },
+      { id: "teacher-invites", label: "Teacher Invites", icon: Ticket, hasAdd: true },
     ],
   },
   {
@@ -199,6 +213,16 @@ export function AdminApp() {
         return <AdminOrders type="Course Orders" />;
       case "qb-orders":
         return <AdminOrders type="Question Bank Orders" />;
+      case "bundles-qbank":
+        return <AdminBundles initialKind="qbank" />;
+      case "bundles-batch":
+        return <AdminBundles initialKind="batch" />;
+      case "bundles-exam":
+        return <AdminBundles initialKind="exam" />;
+      case "bundles-chapter":
+        return <AdminBundles initialKind="chapter" />;
+      case "teacher-invites":
+        return <AdminTeacherInvites />;
       default:
         return <AdminOverview onNavigate={navigate} />;
     }
@@ -274,7 +298,8 @@ function isValidView(v: string): v is View {
     "paid-exam-orders", "batch-orders", "course-orders", "qb-orders",
     "batch", "student-results", "package-results", "classroom-results",
     "students", "teachers", "pdf-viewer", "settings", "home-cards", "content", "questions", "tests", "users",
-    "notifications", "eye-vision", "books", "ai"];
+    "notifications", "eye-vision", "books", "ai",
+    "bundles-qbank", "bundles-batch", "bundles-exam", "bundles-chapter", "teacher-invites"];
   return all.includes(v);
 }
 
