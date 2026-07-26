@@ -239,8 +239,6 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
         return
     }
 
-    val t = test ?: return
-    // Guard: if the test has no questions, show a friendly message instead of crashing
     if (t.items.isEmpty()) {
         Column(
             Modifier.fillMaxSize().padding(20.dp),
@@ -306,6 +304,7 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
             }
         },
         onExit = onExit,
+        onClearFeedback = { questionFeedback = null },
         scope = scope,
     )
 }
@@ -329,6 +328,7 @@ private fun ExamDashboard(
     onNext: () -> Unit,
     onSubmit: () -> Unit,
     onExit: () -> Unit,
+    onClearFeedback: () -> Unit,
     scope: kotlinx.coroutines.CoroutineScope,
 ) {
     // Separate items into text (Reading) and audio (Listening) blocks
@@ -475,7 +475,7 @@ private fun ExamDashboard(
         val item = test.items.getOrNull(idx) ?: return@let
         val q = item.question
         androidx.compose.ui.window.Dialog(
-            onDismissRequest = { selectedIdx = null; questionFeedback = null }
+            onDismissRequest = { selectedIdx = null; onClearFeedback() }
         ) {
             Surface(
                 color = theme.background,
@@ -489,7 +489,7 @@ private fun ExamDashboard(
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        IconButton(onClick = { selectedIdx = null; questionFeedback = null }, modifier = Modifier.size(32.dp)) {
+                        IconButton(onClick = { selectedIdx = null; onClearFeedback() }, modifier = Modifier.size(32.dp)) {
                             Icon(Icons.Default.Close, null, tint = theme.darkText, modifier = Modifier.size(18.dp))
                         }
                         Text("Question ${idx + 1} of ${test.items.size}", color = theme.darkText, fontSize = 12.sp, fontWeight = FontWeight.Bold)
