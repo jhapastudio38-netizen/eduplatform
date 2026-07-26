@@ -80,8 +80,8 @@ sealed class Screen {
 enum class BottomTab(val label: String, val icon: ImageVector) {
     Home("Home", Icons.Default.Home),
     Exams("Exams", Icons.Default.Quiz),
-    Progress("Progress", Icons.Default.BarChart),
-    Profile("Profile", Icons.Default.Person),
+    Tools("Tools", Icons.Default.Build),
+    Books("Books", Icons.Default.Book),
 }
 
 @Composable
