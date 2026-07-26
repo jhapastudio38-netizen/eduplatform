@@ -126,6 +126,12 @@ data class TestDetail(
     val durationMin: Int,
     val isExam: Boolean,
     val passScore: Int,
+    // Block flags + counts — exposed so the pre-exam info screen can show
+    // "X text + Y audio questions" and the app can lay out the block grid.
+    val textBlockCount: Int = 0,
+    val audioBlockCount: Int = 0,
+    val textBlockEnabled: Boolean = true,
+    val audioBlockEnabled: Boolean = true,
     val items: List<TestItemDetail>
 )
 data class TestDetailResponse(val test: TestDetail)
@@ -281,6 +287,9 @@ interface DreamKoreaApi {
         @Path("testId") testId: String,
         @Body body: Map<String, String>
     ): EyeVisionCheckResponse
+
+    @GET("api/student/bundles")
+    suspend fun getStudentBundles(@Query("kind") kind: String? = null): BundlesResponse
 }
 
 // ─── Notifications ────────────────────────────────────────────────────────────
@@ -381,3 +390,33 @@ data class LiveRoomJoinResponse(
     val attendeeCount: Int = 0,
     val error: String? = null
 )
+
+// ─── Question Bank / Batch / Exam / Chapter packages ─────────────────────────
+// A bundle is a curated collection of tests the student can browse as a
+// single package. Each bundle has a kind (qbank, batch, exam, chapter) and
+// a list of tests inside it.
+data class BundleTestSummary(
+    val id: String,
+    val title: String,
+    val testCategory: String? = null,
+    val examType: String = "REGULAR",
+    val durationMin: Int = 0,
+    val passScore: Int = 40,
+    val featuredImage: String? = null
+)
+data class BundleItem(
+    val sortOrder: Int = 0,
+    val test: BundleTestSummary
+)
+data class BundleSummary(
+    val id: String,
+    val title: String,
+    val slug: String,
+    val description: String? = null,
+    val kind: String = "qbank",
+    val coverUrl: String? = null,
+    val price: Int = 0,
+    val createdAt: String = "",
+    val items: List<BundleItem> = emptyList()
+)
+data class BundlesResponse(val bundles: List<BundleSummary> = emptyList())

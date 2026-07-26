@@ -1,5 +1,7 @@
 package app.dreamkorea.smartclass.ui
 
+import android.app.Activity
+import android.content.pm.ActivityInfo
 import androidx.compose.animation.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -40,11 +42,16 @@ import kotlinx.coroutines.withTimeoutOrNull
  * 6. Auto-advances to next question
  * 7. Final score + review screen
  * 8. Stats auto-update via /api/student/tests/[id]/submit
+ *
+ * The screen locks the device to landscape for the duration of the exam so
+ * the question + options layout has room to breathe. The orientation is
+ * restored to the device default when the student exits.
  */
 @Composable
 fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
     val sound = rememberSoundManager()
     val scope = rememberCoroutineScope()
+    val context = LocalContext.current
     var test by remember { mutableStateOf<TestDetail?>(null) }
     var loading by remember { mutableStateOf(true) }
     var error by remember { mutableStateOf("") }
@@ -58,6 +65,20 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
     var timeLeft by remember { mutableStateOf(0) }
     // Retry trigger — increment to force reload
     var retryCount by remember { mutableStateOf(0) }
+    // Question grid open/closed — students can tap a number to jump
+    var showQuestionGrid by remember { mutableStateOf(false) }
+
+    // ─── Force landscape for the entire exam ──────────────────────────────────
+    // The pre-exam info screen already locked to landscape, but we re-lock
+    // here in case the student rotated back during the briefing. The lock
+    // is released when they exit the exam (either via Close or auto-submit).
+    DisposableEffect(Unit) {
+        val activity = context as? Activity
+        activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
+        onDispose {
+            activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+        }
+    }
 
     // Load test detail — uses LaunchedEffect's own scope, finally block guarantees loading cleanup
     LaunchedEffect(testId, retryCount) {
@@ -243,17 +264,38 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
                             modifier = Modifier.width(120.dp).padding(top = 4.dp)
                         )
                     }
-                    // Timer
-                    Surface(color = Color.White.copy(alpha = 0.2f), shape = RoundedCornerShape(8.dp)) {
-                        Row(
-                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
-                            verticalAlignment = Alignment.CenterVertically
+                    // Right-side controls: Question grid button + Timer
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        // Question grid button — opens a numbered grid so the
+                        // student can jump to any question (like a real test
+                        // bubble sheet).
+                        Surface(
+                            color = Color.White.copy(alpha = 0.2f),
+                            shape = RoundedCornerShape(8.dp),
+                            modifier = Modifier.clickable { sound.click(); showQuestionGrid = true }
                         ) {
-                            Icon(Icons.Default.Timer, null, tint = Color.White, modifier = Modifier.size(14.dp))
-                            Spacer(Modifier.width(4.dp))
-                            val mm = timeLeft / 60
-                            val ss = timeLeft % 60
-                            Text(String.format("%02d:%02d", mm, ss), color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                            Row(
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(Icons.Default.GridView, null, tint = Color.White, modifier = Modifier.size(14.dp))
+                                Spacer(Modifier.width(4.dp))
+                                Text("Grid", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                            }
+                        }
+                        Spacer(Modifier.width(8.dp))
+                        // Timer
+                        Surface(color = Color.White.copy(alpha = 0.2f), shape = RoundedCornerShape(8.dp)) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(Icons.Default.Timer, null, tint = Color.White, modifier = Modifier.size(14.dp))
+                                Spacer(Modifier.width(4.dp))
+                                val mm = timeLeft / 60
+                                val ss = timeLeft % 60
+                                Text(String.format("%02d:%02d", mm, ss), color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                            }
                         }
                     }
                 }
@@ -271,9 +313,11 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
         }
 
         val q = currentQuestion.question
-        // Horizontal mode is now a dedicated toggle in Settings, decoupled
-        // from text size. Default is vertical (phone-friendly).
-        val isHorizontalMode = AppState.isExamHorizontalMode()
+        // ALWAYS use horizontal layout during the exam — the device is locked
+        // to landscape (see DisposableEffect above) so the question + options
+        // side-by-side layout has the room it needs. This overrides the
+        // user's profile setting for the duration of the exam.
+        val isHorizontalMode = true
 
         if (isHorizontalMode) {
             // HORIZONTAL MODE: question on left, options on right
@@ -496,6 +540,115 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
                             Icon(Icons.Default.Check, null, modifier = Modifier.size(16.dp))
                             Spacer(Modifier.width(4.dp))
                             Text("Submit")
+                        }
+                    }
+                }
+            }
+        }
+
+        // ─── Question grid overlay (bubble-sheet style) ────────────────────────
+        // Tap any number to jump straight to that question. Already-answered
+        // questions are filled green, current is highlighted with the primary
+        // color, unanswered are grey.
+        if (showQuestionGrid) {
+            androidx.compose.ui.window.Dialog(onDismissRequest = { showQuestionGrid = false }) {
+                Surface(
+                    color = theme.cardBg,
+                    shape = RoundedCornerShape(16.dp),
+                    modifier = Modifier.fillMaxWidth().fillMaxHeight(0.85f)
+                ) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text("Questions", color = theme.darkText, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                            IconButton(onClick = { sound.click(); showQuestionGrid = false }) {
+                                Icon(Icons.Default.Close, "Close", tint = theme.darkText)
+                            }
+                        }
+                        Spacer(Modifier.height(8.dp))
+                        // Summary: answered / total
+                        val answeredCount = answers.size
+                        Text(
+                            "$answeredCount of ${t.items.size} answered",
+                            color = theme.subText,
+                            fontSize = 12.sp,
+                            modifier = Modifier.padding(bottom = 12.dp)
+                        )
+                        // Grid — 6 columns of numbered buttons
+                        // Use LazyVerticalGrid for performance on big tests
+                        androidx.compose.foundation.lazy.LazyVerticalGrid(
+                            columns = androidx.compose.foundation.lazy.GridCells.Fixed(6),
+                            modifier = Modifier.weight(1f),
+                            verticalArrangement = Arrangement.spacedBy(6.dp),
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            items(t.items.size) { idx ->
+                                val item = t.items[idx]
+                                val isAnswered = answers.containsKey(item.question.id)
+                                val isCurrent = idx == currentIdx
+                                Surface(
+                                    color = when {
+                                        isCurrent -> theme.primary
+                                        isAnswered -> Color(0xFF34C759)
+                                        else -> theme.background
+                                    },
+                                    shape = RoundedCornerShape(8.dp),
+                                    modifier = Modifier
+                                        .aspectRatio(1f)
+                                        .clickable {
+                                            sound.click()
+                                            currentIdx = idx
+                                            questionFeedback = null
+                                            showQuestionGrid = false
+                                        }
+                                ) {
+                                    Box(contentAlignment = Alignment.Center) {
+                                        Text(
+                                            "${idx + 1}",
+                                            color = when {
+                                                isCurrent -> Color.White
+                                                isAnswered -> Color.White
+                                                else -> theme.darkText
+                                            },
+                                            fontSize = 14.sp,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                        Spacer(Modifier.height(12.dp))
+                        // Submit button at the bottom of the grid
+                        Button(
+                            onClick = {
+                                sound.swoosh()
+                                showQuestionGrid = false
+                                submitting = true
+                                scope.launch {
+                                    try {
+                                        submitResult = AppState.api.submitTest(t.id, SubmitRequest(answers.toMap()))
+                                        sound.success()
+                                    } catch (e: Exception) {
+                                        error = "Could not submit exam: ${e.message ?: "Please try again."}"
+                                    }
+                                    submitting = false
+                                }
+                            },
+                            modifier = Modifier.fillMaxWidth().height(48.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = theme.accent),
+                            shape = RoundedCornerShape(12.dp),
+                            enabled = !submitting
+                        ) {
+                            if (submitting) {
+                                CircularProgressIndicator(color = Color.White, modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+                            } else {
+                                Icon(Icons.Default.Check, null, modifier = Modifier.size(18.dp))
+                                Spacer(Modifier.width(6.dp))
+                                Text("Submit Exam", fontSize = 15.sp, fontWeight = FontWeight.Bold)
+                            }
                         }
                     }
                 }
