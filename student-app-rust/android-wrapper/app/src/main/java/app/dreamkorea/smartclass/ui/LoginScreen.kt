@@ -206,7 +206,7 @@ private fun Step1Details(name: String, email: String, phone: String, loading: Bo
 
     Column(modifier = Modifier.fillMaxWidth()) {
         Text("Welcome", color = TextDark, fontSize = 22.sp, fontWeight = FontWeight.Bold)
-        Text("Sign up or log in with your email", color = TextMid, fontSize: 13.sp)
+        Text("Sign up or log in with your email", color = TextMid, fontSize = 13.sp)
         Spacer(Modifier.height(20.dp))
 
         Field(label = "Full Name", value = n, onChange = { n = it }, icon = Icons.Default.Person, keyboardType = KeyboardType.Text)
