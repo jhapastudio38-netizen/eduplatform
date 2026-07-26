@@ -29,6 +29,11 @@ android {
         }
         debug {
             isDebuggable = true
+            // Speed up dexing for debug builds — disables the slow
+            // mergeDebugGlobalSynthetics step that took 25+ min on the
+            // GitHub Action runner. This is fine for debug builds.
+            isMinifyEnabled = false
+            isShrinkResources = false
         }
     }
 
@@ -39,6 +44,18 @@ android {
 
     kotlinOptions {
         jvmTarget = "17"
+    }
+
+    // Speed up packaging — don't split ABI for debug, use the universal APK.
+    splits {
+        abi {
+            isEnable = false
+        }
+    }
+
+    // Disable build variants we don't need
+    variantFilter {
+        setIgnore(name != "debug" && name != "release")
     }
 }
 
