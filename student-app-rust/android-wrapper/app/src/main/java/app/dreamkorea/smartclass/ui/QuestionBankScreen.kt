@@ -1,5 +1,8 @@
 package app.dreamkorea.smartclass.ui
 
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -20,6 +23,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import app.dreamkorea.smartclass.api.TestItem
 import app.dreamkorea.smartclass.data.AppState
 import kotlinx.coroutines.withTimeoutOrNull
 
