@@ -52,11 +52,6 @@ android {
             isEnable = false
         }
     }
-
-    // Disable build variants we don't need
-    variantFilter {
-        setIgnore(name != "debug" && name != "release")
-    }
 }
 
 dependencies {
