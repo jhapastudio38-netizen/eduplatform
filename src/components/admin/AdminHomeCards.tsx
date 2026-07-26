@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { FastImageUpload } from "./FastImageUpload";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
@@ -280,36 +281,13 @@ function CardEditDialog({
           </div>
           <div>
             <Label>Card Image</Label>
-            <div className="flex gap-2">
-              <Input value={imageUrl} onChange={(e) => setImageUrl(e.target.value)} placeholder="Upload a file or paste URL…" className="flex-1" />
-              <label className="cursor-pointer">
-                <input
-                  type="file"
-                  accept="image/*"
-                  className="hidden"
-                  onChange={async (e) => {
-                    const f = e.target.files?.[0];
-                    if (!f) return;
-                    setBusy(true);
-                    try {
-                      const fd = new FormData();
-                      fd.append("file", f);
-                      fd.append("folder", "home-cards");
-                      const res = await fetch("/api/admin/file-upload", { method: "POST", body: fd });
-                      if (!res.ok) { const d = await res.json(); toast.error(d.error || "Upload failed"); return; }
-                      const d = await res.json();
-                      setImageUrl(d.url);
-                      toast.success("Image uploaded");
-                    } catch { toast.error("Upload failed"); }
-                    finally { setBusy(false); }
-                  }}
-                />
-                <span className="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium h-9 px-3 bg-primary text-primary-foreground cursor-pointer hover:bg-primary/90">
-                  📁 Upload
-                </span>
-              </label>
-            </div>
-            {imageUrl && <img src={imageUrl} alt="Preview" className="mt-2 max-h-32 rounded border" />}
+            <FastImageUpload
+              url={imageUrl}
+              onUpload={(url) => setImageUrl(url)}
+              onClear={() => setImageUrl("")}
+              folder="home-cards"
+              previewClassName="w-28 h-36"
+            />
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>

@@ -183,39 +183,69 @@ fun MainScreen(userName: String, onLogout: () -> Unit) {
     }
 }
 
-// ─── Bottom Navigation Bar ────────────────────────────────────────────────────
+// ─── Floating Pill Bottom Navigation Bar ──────────────────────────────────────
 @Composable
 fun BottomNavBar(activeTab: BottomTab, onTabClick: (BottomTab) -> Unit) {
-    Surface(
-        color = CardWhite,
-        shadowElevation = 8.dp,
-        tonalElevation = 0.dp,
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 8.dp),
+        contentAlignment = Alignment.BottomCenter,
     ) {
-        Row(
-            modifier = Modifier.fillMaxWidth().navigationBarsPadding().padding(vertical = 6.dp),
-            horizontalArrangement = Arrangement.SpaceEvenly,
-            verticalAlignment = Alignment.CenterVertically,
+        Surface(
+            color = CardWhite,
+            shape = RoundedCornerShape(28.dp),
+            shadowElevation = 12.dp,
+            tonalElevation = 0.dp,
         ) {
-            BottomTab.values().forEach { tab ->
-                val isActive = tab == activeTab
-                val color = if (isActive) NavyBlue else TextLight
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    modifier = Modifier.clickable { onTabClick(tab) }.padding(horizontal = 12.dp, vertical = 4.dp),
-                ) {
-                    Icon(
-                        tab.icon,
-                        tab.label,
-                        tint = color,
-                        modifier = Modifier.size(24.dp),
-                    )
-                    Spacer(Modifier.height(2.dp))
-                    Text(
-                        tab.label,
-                        color = color,
-                        fontSize = 10.sp,
-                        fontWeight = if (isActive) FontWeight.Bold else FontWeight.Normal,
-                    )
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .navigationBarsPadding()
+                    .padding(horizontal = 8.dp, vertical = 8.dp),
+                horizontalArrangement = Arrangement.SpaceEvenly,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                BottomTab.values().forEach { tab ->
+                    val isActive = tab == activeTab
+                    val iconColor = if (isActive) NavyBlue else Color(0xFF64748B)
+                    val textColor = if (isActive) NavyBlue else Color(0xFF94A3B8)
+                    val bgColor = if (isActive) NavyBlue.copy(alpha = 0.1f) else Color.Transparent
+
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(20.dp))
+                            .background(bgColor)
+                            .clickable { onTabClick(tab) }
+                            .padding(horizontal = 16.dp, vertical = 8.dp),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Box(contentAlignment = Alignment.TopEnd) {
+                                Icon(
+                                    tab.icon,
+                                    tab.label,
+                                    tint = iconColor,
+                                    modifier = Modifier.size(24.dp),
+                                )
+                                // Notification badge on active tab
+                                if (isActive) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(7.dp)
+                                            .background(NavyBlue, CircleShape)
+                                    )
+                                }
+                            }
+                            Spacer(Modifier.height(4.dp))
+                            Text(
+                                tab.label,
+                                color = textColor,
+                                fontSize = 10.sp,
+                                fontWeight = if (isActive) FontWeight.SemiBold else FontWeight.Normal,
+                            )
+                        }
+                    }
                 }
             }
         }
