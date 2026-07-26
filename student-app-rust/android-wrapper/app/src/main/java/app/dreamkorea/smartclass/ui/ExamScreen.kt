@@ -8,6 +8,11 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+// LazyVerticalGrid + GridCells + the LazyGridScope.items overload all live
+// in androidx.compose.foundation.lazy.grid — a separate subpackage.
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.items as gridItems
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -579,13 +584,13 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
                         )
                         // Grid — 6 columns of numbered buttons
                         // Use LazyVerticalGrid for performance on big tests
-                        androidx.compose.foundation.lazy.LazyVerticalGrid(
-                            columns = androidx.compose.foundation.lazy.GridCells.Fixed(6),
+                        LazyVerticalGrid(
+                            columns = GridCells.Fixed(6),
                             modifier = Modifier.weight(1f),
                             verticalArrangement = Arrangement.spacedBy(6.dp),
                             horizontalArrangement = Arrangement.spacedBy(6.dp)
                         ) {
-                            items(t.items.size) { idx ->
+                            gridItems(t.items.size) { idx ->
                                 val item = t.items[idx]
                                 val isAnswered = answers.containsKey(item.question.id)
                                 val isCurrent = idx == currentIdx

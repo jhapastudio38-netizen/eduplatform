@@ -193,9 +193,12 @@ fun EyeVisionScreen(theme: AppTheme, sound: SoundManager, onBack: () -> Unit) {
                         statsAttempts = attempts
                         statsStreak = streak
                         // If the level changed, reload tests at the new level
+                        // after a short delay so the user sees the banner first
                         if (leveledUp || leveledDown) {
-                            kotlinx.coroutines.delay(1800)
-                            loadTests(adaptive = true)
+                            scope.launch {
+                                kotlinx.coroutines.delay(1800)
+                                loadTests(adaptive = true)
+                            }
                         }
                     }
                 )

@@ -109,7 +109,7 @@ fun BundlesScreen(theme: AppTheme, sound: SoundManager, onBack: () -> Unit, onOp
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Center
             ) {
-                Icon(Icons.Default.Package, null, tint = theme.subText, modifier = Modifier.size(48.dp))
+                Icon(Icons.Default.Inventory2, null, tint = theme.subText, modifier = Modifier.size(48.dp))
                 Spacer(Modifier.height(12.dp))
                 Text("No packages yet", color = theme.darkText, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
                 Text("Your teacher will publish packages here soon.", color = theme.subText, fontSize = 12.sp, textAlign = TextAlign.Center)
@@ -152,7 +152,7 @@ private fun BundleCard(theme: AppTheme, sound: SoundManager, bundle: BundleSumma
                         contentScale = ContentScale.Crop
                     )
                 } else {
-                    Icon(Icons.Default.Package, null, tint = theme.primary, modifier = Modifier.size(36.dp))
+                    Icon(Icons.Default.Inventory2, null, tint = theme.primary, modifier = Modifier.size(36.dp))
                 }
             }
             // Content
