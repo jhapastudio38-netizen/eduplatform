@@ -58,6 +58,7 @@ sealed class Screen {
     object ClassResult : Screen()
     object CourseVideo : Screen()
     object Join : Screen()
+    object EyeVision : Screen()
     data class Exam(val testId: String) : Screen()
     data class BookReader(val book: Book) : Screen()
     /** Filtered test list. filter: "all" | "practice" | "exam" | "ubt" | "free" | "batch" */
@@ -104,18 +105,19 @@ fun MainScreen(userName: String, onLogout: () -> Unit) {
                         is Screen.Settings -> SettingsScreen(theme, sound, onBack = { screen = Screen.Home })
                         is Screen.Exam -> ExamScreen(theme, testId = s.testId, onExit = { screen = Screen.Home })
                         is Screen.BookReader -> BookReaderScreen(theme, sound, s.book, onBack = { screen = Screen.Books })
-                        is Screen.UbtTest -> TestsScreen(theme, sound, filter = "ubt", title = "UBT Tests", onBack = { screen = Screen.Home }, onStartExam = { screen = Screen.Exam(it) })
-                        is Screen.FreeExam -> TestsScreen(theme, sound, filter = "free", title = "Free Practice Tests", onBack = { screen = Screen.Home }, onStartExam = { screen = Screen.Exam(it) })
+                        is Screen.UbtTest -> TestsScreen(theme, sound, filter = "exam", title = "UBT Exams", onBack = { screen = Screen.Home }, onStartExam = { screen = Screen.Exam(it) })
+                        is Screen.FreeExam -> TestsScreen(theme, sound, filter = "demo", title = "Demo Exams", onBack = { screen = Screen.Home }, onStartExam = { screen = Screen.Exam(it) })
                         is Screen.Batch -> TestsScreen(theme, sound, filter = "batch", title = "Batch Exams", onBack = { screen = Screen.Home }, onStartExam = { screen = Screen.Exam(it) })
-                        is Screen.Results -> ProfileScreen(theme, sound, userName, onBack = { screen = Screen.Home }, onLogout = onLogout)
+                        is Screen.Results -> ResultsScreen(theme, sound, onBack = { screen = Screen.Home })
                         is Screen.QuestionBank -> QuestionBankScreen(theme, sound, onBack = { screen = Screen.Home })
                         is Screen.AudioLessons -> LearnScreen(theme, sound, onBack = { screen = Screen.Home })
                         is Screen.Classroom -> LiveRoomScreen(theme, onBack = { screen = Screen.Home })
                         is Screen.RecordedVideo -> VideosScreen(theme, sound, onBack = { screen = Screen.Home })
-                        is Screen.ClassResult -> ProfileScreen(theme, sound, userName, onBack = { screen = Screen.Home }, onLogout = onLogout)
+                        is Screen.ClassResult -> ResultsScreen(theme, sound, onBack = { screen = Screen.Home })
                         is Screen.CourseVideo -> VideosScreen(theme, sound, onBack = { screen = Screen.Home })
                         is Screen.TestList -> TestsScreen(theme, sound, filter = s.filter, title = s.title, onBack = { screen = Screen.Home }, onStartExam = { screen = Screen.Exam(it) })
                         is Screen.Join -> JoinScreen(theme, sound, onBack = { screen = Screen.Home })
+                        is Screen.EyeVision -> EyeVisionScreen(theme, sound, onBack = { screen = Screen.Home })
                     }
                 }
             }
@@ -230,22 +232,20 @@ fun HomeScreen(theme: AppTheme, sound: SoundManager, onNavigate: (Screen) -> Uni
     }
 
     // Fallback cards if API fails or returns empty — ensures home is never blank
+    // Only sections the user asked for: Tests + Resources (no Premium)
     val effectiveCards = remember(homeCards, loading) {
         if (loading) emptyList()
         else if (homeCards.isNotEmpty()) homeCards
         else listOf(
-            HomeCard(key = "ubt_test", title = "UBT TEST", section = "test", sortOrder = 0, route = "tests", imageUrl = ""),
-            HomeCard(key = "free_exam", title = "Free Exam", section = "test", sortOrder = 1, route = "tests", imageUrl = ""),
-            HomeCard(key = "batch", title = "Batch", section = "test", sortOrder = 2, route = "tests", imageUrl = ""),
-            HomeCard(key = "results", title = "Results", section = "test", sortOrder = 3, route = "profile", imageUrl = ""),
-            HomeCard(key = "all_books", title = "ALL BOOKS", section = "resources", sortOrder = 0, route = "books", imageUrl = ""),
-            HomeCard(key = "question_bank", title = "QUESTION BANK", section = "resources", sortOrder = 1, route = "learn", imageUrl = ""),
-            HomeCard(key = "course_video", title = "COURSE VIDEO", section = "resources", sortOrder = 2, route = "videos", imageUrl = ""),
-            HomeCard(key = "audio_lessons", title = "AUDIO LESSONS", section = "resources", sortOrder = 3, route = "learn", imageUrl = ""),
-            HomeCard(key = "classroom", title = "CLASSROOM", section = "premium", sortOrder = 0, route = "live", imageUrl = ""),
-            HomeCard(key = "live_class", title = "LIVE CLASS", section = "premium", sortOrder = 1, route = "live", imageUrl = ""),
-            HomeCard(key = "recorded_video", title = "RECORDED VIDEO", section = "premium", sortOrder = 2, route = "videos", imageUrl = ""),
-            HomeCard(key = "class_result", title = "CLASS RESULT", section = "premium", sortOrder = 3, route = "profile", imageUrl = "")
+            HomeCard(key = "ubt_test", title = "UBT Test", section = "test", sortOrder = 0, route = "tests", imageUrl = ""),
+            HomeCard(key = "demo_exam", title = "Demo Exam", section = "test", sortOrder = 1, route = "tests", imageUrl = ""),
+            HomeCard(key = "batch", title = "Batch Exam", section = "test", sortOrder = 2, route = "tests", imageUrl = ""),
+            HomeCard(key = "chapter_exam", title = "Chapter Exam", section = "test", sortOrder = 3, route = "tests", imageUrl = ""),
+            HomeCard(key = "results", title = "Results", section = "test", sortOrder = 4, route = "results", imageUrl = ""),
+            HomeCard(key = "all_books", title = "Books", section = "resources", sortOrder = 0, route = "books", imageUrl = ""),
+            HomeCard(key = "question_bank", title = "Question Bank", section = "resources", sortOrder = 1, route = "questionbank", imageUrl = ""),
+            HomeCard(key = "eye_vision", title = "Eye Vision", section = "resources", sortOrder = 2, route = "eyevision", imageUrl = ""),
+            HomeCard(key = "join", title = "Join Live", section = "resources", sortOrder = 3, route = "join", imageUrl = "")
         )
     }
 
@@ -290,26 +290,30 @@ fun HomeScreen(theme: AppTheme, sound: SoundManager, onNavigate: (Screen) -> Uni
                     ) {
                         rowCards.forEach { card ->
                             ImageCard(theme, sound, card, modifier = Modifier.weight(1f)) {
-                                // Navigate to distinct page based on card key
+                                // Navigate based on card key — maps to correct exam category
                                 val dest = when (card.key) {
                                     "ubt_test" -> Screen.UbtTest
-                                    "free_exam" -> Screen.FreeExam
+                                    "demo_exam" -> Screen.FreeExam
                                     "batch" -> Screen.Batch
+                                    "chapter_exam" -> Screen.TestList("chapter", "Chapter Exams")
                                     "results" -> Screen.Results
                                     "all_books" -> Screen.Books
                                     "question_bank" -> Screen.QuestionBank
+                                    "eye_vision" -> Screen.EyeVision
+                                    "join" -> Screen.Join
                                     "course_video" -> Screen.CourseVideo
                                     "audio_lessons" -> Screen.AudioLessons
-                                    "classroom" -> Screen.Join
-                                    "live_class" -> Screen.Join
                                     "recorded_video" -> Screen.RecordedVideo
-                                    "class_result" -> Screen.ClassResult
                                     else -> when (card.route) {
                                         "tests" -> Screen.Tests
                                         "books" -> Screen.Books
                                         "videos" -> Screen.Videos
                                         "learn" -> Screen.Learn
-                                        "live" -> Screen.LiveRoom
+                                        "live" -> Screen.Join
+                                        "results" -> Screen.Results
+                                        "eyevision" -> Screen.EyeVision
+                                        "questionbank" -> Screen.QuestionBank
+                                        "join" -> Screen.Join
                                         "profile" -> Screen.Profile
                                         else -> Screen.Tests
                                     }

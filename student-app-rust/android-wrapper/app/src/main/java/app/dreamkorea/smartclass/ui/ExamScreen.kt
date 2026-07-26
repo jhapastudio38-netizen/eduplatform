@@ -57,10 +57,12 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
     var timeLeft by remember { mutableStateOf(0) }
     // Retry trigger — increment to force reload
     var retryCount by remember { mutableStateOf(0) }
+    var preloadingMedia by remember { mutableStateOf(false) }
 
     // Load test detail — uses LaunchedEffect's own scope, finally block guarantees loading cleanup
     LaunchedEffect(testId, retryCount) {
         loading = true
+        preloadingMedia = false
         error = ""
         try {
             // 20-second timeout — if the API hangs, show a timeout error
@@ -70,6 +72,26 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
             if (result != null) {
                 test = result
                 timeLeft = (result.durationMin.coerceAtLeast(1)) * 60
+
+                // Preload all images and audio before starting the exam
+                // This prevents lag during the exam when switching questions
+                preloadingMedia = true
+                val mediaUrls = mutableListOf<String>()
+                for (item in result.items) {
+                    item.question.imageUrl?.let { if (it.isNotBlank()) mediaUrls.add(it) }
+                    item.question.audioUrl?.let { if (it.isNotBlank()) mediaUrls.add(it) }
+                }
+                // Preload images using Coil's image loader
+                for (url in mediaUrls) {
+                    try {
+                        val loader = coil.imageLoader(LocalContext.current)
+                        val request = coil.request.ImageRequest.Builder(LocalContext.current)
+                            .data(url)
+                            .build()
+                        loader.execute(request)
+                    } catch (_: Exception) {}
+                }
+                preloadingMedia = false
             } else {
                 error = "The request timed out. Check your internet connection and try again."
             }
@@ -94,6 +116,7 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
         } finally {
             // GUARANTEED: loading is always reset, even if the coroutine is cancelled
             loading = false
+            preloadingMedia = false
         }
     }
 
@@ -125,14 +148,17 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
     }
 
     if (loading) {
-        // Loading skeleton with a subtle "Loading..." label so users know it's working
-        Column(Modifier.fillMaxSize()) {
+        Column(Modifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
             LinearProgressIndicator(
                 modifier = Modifier.fillMaxWidth(),
                 color = theme.primary,
                 trackColor = theme.primary.copy(alpha = 0.1f),
             )
-            SkeletonListScreen(theme, itemCount = 4)
+            Spacer(Modifier.height(16.dp))
+            Text(
+                if (preloadingMedia) "Preparing exam content..." else "Loading exam...",
+                color = theme.subText, fontSize = 14.sp
+            )
         }
         return
     }
