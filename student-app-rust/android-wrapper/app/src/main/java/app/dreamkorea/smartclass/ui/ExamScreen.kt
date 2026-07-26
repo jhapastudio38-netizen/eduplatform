@@ -220,108 +220,132 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
         return
     }
 
-    // ─── EXAM DASHBOARD (landscape) ────────────────────────────────────────
-    // Full-screen grid dashboard matching the reference app:
-    // LEFT: Reading grid (1-20) + Listening grid (21-40)
-    // RIGHT: When no question selected → sidebar (logo, timer, filters, Submit)
-    //        When a question is selected → question + options inline (NOT a popup)
-    //        with Next/Prev buttons visible at the bottom
-    ExamLandscapeDashboard(
-        theme = theme,
-        sound = sound,
-        test = t,
-        answers = answers,
-        timeLeft = timeLeft,
-        currentIdx = currentIdx,
-        questionFeedback = questionFeedback,
-        submitting = submitting,
-        onAnswer = { qid, ans ->
-            answers[qid] = ans
-            val q = t.items.find { it.question.id == qid }?.question
-            if (q != null) {
-                val correctIdx = q.correctOption
-                val isCorrect = when {
-                    q.answerType == "text" || q.answerType == "choose" -> q.options?.getOrNull(correctIdx) == ans
-                    q.answerType == "image" -> q.optionImages.getOrNull(correctIdx) == ans
-                    q.answerType == "audio" -> q.optionAudios.getOrNull(correctIdx) == ans
-                    else -> false
+    // ─── EXAM VIEW (landscape) ─────────────────────────────────────────────
+    // Two views:
+    // 1. GRID OVERVIEW: Reading (1-20) + Listening (21-40) grids, sidebar with
+    //    timer/filters/Submit. Student taps a block to start answering.
+    // 2. FULL-SCREEN QUESTION: NO grid, NO numbers, NO Reading/Listening labels.
+    //    Just: exam title (small), timer (small, top-right), question text,
+    //    answer options, Next button. Clean, focused, full screen.
+    var examView by remember { mutableStateOf("grid") } // "grid" | "question"
+
+    if (examView == "grid") {
+        ExamGridOverview(
+            theme = theme,
+            sound = sound,
+            test = t,
+            answers = answers,
+            timeLeft = timeLeft,
+            submitting = submitting,
+            onBlockTap = { idx ->
+                currentIdx = idx
+                questionFeedback = null
+                examView = "question"
+            },
+            onSubmit = {
+                sound.swoosh()
+                submitting = true
+                scope.launch {
+                    try {
+                        submitResult = AppState.api.submitTest(t.id, SubmitRequest(answers.toMap()))
+                        sound.success()
+                    } catch (e: Exception) { error = "Could not submit exam." }
+                    submitting = false
                 }
-                questionFeedback = QuestionFeedback(isCorrect, "")
-            }
-        },
-        onNavigate = { idx -> currentIdx = idx; questionFeedback = null },
-        onSubmit = {
-            sound.swoosh()
-            submitting = true
-            scope.launch {
-                try {
-                    submitResult = AppState.api.submitTest(t.id, SubmitRequest(answers.toMap()))
-                    sound.success()
-                } catch (e: Exception) { error = "Could not submit exam." }
-                submitting = false
-            }
-        },
-        onExit = onExit,
-    )
+            },
+            onExit = onExit,
+        )
+    } else {
+        ExamFullScreenQuestion(
+            theme = theme,
+            sound = sound,
+            test = t,
+            answers = answers,
+            currentIdx = currentIdx,
+            questionFeedback = questionFeedback,
+            timeLeft = timeLeft,
+            submitting = submitting,
+            onAnswer = { qid, ans ->
+                answers[qid] = ans
+                val q = t.items.find { it.question.id == qid }?.question
+                if (q != null) {
+                    val correctIdx = q.correctOption
+                    val isCorrect = when {
+                        q.answerType == "text" || q.answerType == "choose" -> q.options?.getOrNull(correctIdx) == ans
+                        q.answerType == "image" -> q.optionImages.getOrNull(correctIdx) == ans
+                        q.answerType == "audio" -> q.optionAudios.getOrNull(correctIdx) == ans
+                        else -> false
+                    }
+                    questionFeedback = QuestionFeedback(isCorrect, "")
+                }
+            },
+            onNext = {
+                if (currentIdx < t.items.size - 1) {
+                    currentIdx++
+                    questionFeedback = null
+                }
+            },
+            onPrev = {
+                if (currentIdx > 0) {
+                    currentIdx--
+                    questionFeedback = null
+                }
+            },
+            onBackToGrid = {
+                examView = "grid"
+            },
+            onSubmit = {
+                sound.swoosh()
+                submitting = true
+                scope.launch {
+                    try {
+                        submitResult = AppState.api.submitTest(t.id, SubmitRequest(answers.toMap()))
+                        sound.success()
+                    } catch (e: Exception) { error = "Could not submit exam." }
+                    submitting = false
+                }
+            },
+        )
+    }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// EXAM LANDSCAPE DASHBOARD — grid on left, question/sidebar on right
+// GRID OVERVIEW — Reading + Listening grids + sidebar with timer/Submit
 // ═══════════════════════════════════════════════════════════════════════════
 @Composable
-private fun ExamLandscapeDashboard(
+private fun ExamGridOverview(
     theme: AppTheme,
     sound: SoundManager,
     test: TestDetail,
     answers: androidx.compose.runtime.snapshots.SnapshotStateMap<String, Any>,
     timeLeft: Int,
-    currentIdx: Int,
-    questionFeedback: QuestionFeedback?,
     submitting: Boolean,
-    onAnswer: (String, Any) -> Unit,
-    onNavigate: (Int) -> Unit,
+    onBlockTap: (Int) -> Unit,
     onSubmit: () -> Unit,
     onExit: () -> Unit,
 ) {
-    // Separate items into Reading (text) and Listening (audio) blocks
     val textItems = test.items.filter { it.question.blockType == "text" }
     val audioItems = test.items.filter { it.question.blockType == "audio" }
     val readingItems = if (textItems.isNotEmpty()) textItems else test.items
     val listeningItems = if (textItems.isNotEmpty()) audioItems else emptyList()
-
-    // null = grid view (sidebar visible), non-null = question view (question visible)
-    var selectedIdx by remember { mutableStateOf<Int?>(null) }
     var filter by remember { mutableStateOf("all") }
 
     Row(modifier = Modifier.fillMaxSize().background(theme.background)) {
-        // ─── LEFT: Question grids (always visible) ──────────────────────────
+        // LEFT: Grids
         Column(
-            modifier = Modifier.weight(1f).fillMaxHeight().padding(6.dp).verticalScroll(rememberScrollState()),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+            modifier = Modifier.weight(1f).fillMaxHeight().padding(8.dp).verticalScroll(rememberScrollState()),
+            verticalArrangement = Arrangement.spacedBy(6.dp)
         ) {
-            // Reading section
             if (readingItems.isNotEmpty()) {
                 Text("Reading", color = theme.darkText, fontSize = 13.sp, fontWeight = FontWeight.Bold)
-                QuestionGridSection(
-                    theme = theme, sound = sound,
-                    items = readingItems, startIndex = 0,
-                    answers = answers, selectedIdx = selectedIdx, filter = filter,
-                    onBlockTap = { idx -> selectedIdx = idx; onNavigate(idx) }
-                )
+                GridSection(theme, sound, readingItems, 0, answers, filter, onBlockTap)
             }
-            // Listening section
             if (listeningItems.isNotEmpty()) {
-                Spacer(Modifier.height(8.dp))
+                Spacer(Modifier.height(6.dp))
                 Text("Listening", color = theme.darkText, fontSize = 13.sp, fontWeight = FontWeight.Bold)
-                QuestionGridSection(
-                    theme = theme, sound = sound,
-                    items = listeningItems, startIndex = readingItems.size,
-                    answers = answers, selectedIdx = selectedIdx, filter = filter,
-                    onBlockTap = { idx -> selectedIdx = idx; onNavigate(idx) }
-                )
+                GridSection(theme, sound, listeningItems, readingItems.size, answers, filter, onBlockTap)
             }
-            // Submit button at the bottom of the grid (like the reference app)
-            Spacer(Modifier.height(12.dp))
+            Spacer(Modifier.height(8.dp))
             Button(
                 onClick = onSubmit,
                 modifier = Modifier.fillMaxWidth().height(40.dp),
@@ -337,250 +361,218 @@ private fun ExamLandscapeDashboard(
             }
         }
 
-        // ─── RIGHT: Either sidebar (grid view) or question (question view) ─
-        Surface(
-            color = theme.cardBg,
-            modifier = Modifier.weight(1f).fillMaxHeight(),
-            shadowElevation = 4.dp
-        ) {
-            if (selectedIdx == null) {
-                // ── SIDEBAR VIEW (no question selected) ──
-                Column(
-                    modifier = Modifier.fillMaxSize().padding(12.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.SpaceBetween
-                ) {
-                    // Top: DK logo + title
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Box(
-                            modifier = Modifier.size(48.dp).clip(RoundedCornerShape(10.dp)).background(theme.primary),
-                            contentAlignment = Alignment.Center
+        // RIGHT: Sidebar
+        Surface(color = theme.cardBg, modifier = Modifier.width(130.dp).fillMaxHeight(), shadowElevation = 4.dp) {
+            Column(
+                modifier = Modifier.fillMaxSize().padding(8.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.SpaceBetween
+            ) {
+                // DK logo + title
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Box(modifier = Modifier.size(40.dp).clip(RoundedCornerShape(8.dp)).background(theme.primary), contentAlignment = Alignment.Center) {
+                        Text("DK", color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                    }
+                    Spacer(Modifier.height(4.dp))
+                    Text(test.title.take(18), color = theme.subText, fontSize = 8.sp, maxLines = 2, textAlign = TextAlign.Center)
+                }
+                // Timer + progress
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    val mm = timeLeft / 60; val ss = timeLeft % 60
+                    Text(String.format("%02d:%02d", mm, ss), color = theme.primary, fontSize = 22.sp, fontWeight = FontWeight.Bold)
+                    Text("time left", color = theme.subText, fontSize = 8.sp)
+                    Spacer(Modifier.height(6.dp))
+                    Text("${answers.size}/${test.items.size}", color = theme.darkText, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                    Text("answered", color = theme.subText, fontSize = 8.sp)
+                }
+                // Filters
+                Column(verticalArrangement = Arrangement.spacedBy(3.dp), modifier = Modifier.fillMaxWidth()) {
+                    listOf("all" to "All", "solved" to "Solved", "unsolved" to "Unsolved").forEach { (k, label) ->
+                        Surface(
+                            color = if (filter == k) theme.primary else theme.background,
+                            shape = RoundedCornerShape(5.dp),
+                            modifier = Modifier.fillMaxWidth().clickable { sound.click(); filter = k }
                         ) {
-                            Text("DK", color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                            Text(label, color = if (filter == k) Color.White else theme.subText, fontSize = 9.sp, fontWeight = if (filter == k) FontWeight.Bold else FontWeight.Normal, modifier = Modifier.padding(vertical = 4.dp, horizontal = 6.dp), textAlign = TextAlign.Center)
                         }
-                        Spacer(Modifier.height(8.dp))
-                        Text(test.title, color = theme.darkText, fontSize = 13.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center, maxLines = 2)
-                        if (!test.description.isNullOrBlank()) {
-                            Spacer(Modifier.height(4.dp))
-                            Text(test.description!!, color = theme.subText, fontSize = 10.sp, textAlign = TextAlign.Center, maxLines = 3)
-                        }
-                    }
-
-                    // Middle: Timer + progress
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Surface(color = theme.primary.copy(alpha = 0.1f), shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp)) {
-                            Column(modifier = Modifier.padding(12.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                                val mm = timeLeft / 60
-                                val ss = timeLeft % 60
-                                Text(String.format("%02d:%02d", mm, ss), color = theme.primary, fontSize = 28.sp, fontWeight = FontWeight.Bold)
-                                Text("Time Left", color = theme.subText, fontSize = 10.sp)
-                                Spacer(Modifier.height(8.dp))
-                                val answered = answers.size
-                                val total = test.items.size
-                                Text("$answered / $total", color = theme.darkText, fontSize = 18.sp, fontWeight = FontWeight.Bold)
-                                Text("Answered", color = theme.subText, fontSize = 10.sp)
-                            }
-                        }
-                    }
-
-                    // Filter tabs
-                    Column(verticalArrangement = Arrangement.spacedBy(4.dp), modifier = Modifier.fillMaxWidth()) {
-                        Text("Filter", color = theme.subText, fontSize = 10.sp, fontWeight = FontWeight.SemiBold)
-                        listOf("all" to "All", "solved" to "Solved", "unsolved" to "Unsolved").forEach { (key, label) ->
-                            Surface(
-                                color = if (filter == key) theme.primary else theme.background,
-                                shape = RoundedCornerShape(6.dp),
-                                modifier = Modifier.fillMaxWidth().clickable { sound.click(); filter = key }
-                            ) {
-                                Text(
-                                    label,
-                                    color = if (filter == key) Color.White else theme.subText,
-                                    fontSize = 11.sp,
-                                    fontWeight = if (filter == key) FontWeight.Bold else FontWeight.Normal,
-                                    modifier = Modifier.padding(vertical = 6.dp, horizontal = 12.dp),
-                                    textAlign = TextAlign.Center
-                                )
-                            }
-                        }
-                    }
-
-                    // Exit button
-                    OutlinedButton(
-                        onClick = onExit,
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(8.dp)
-                    ) {
-                        Icon(Icons.Default.Close, null, modifier = Modifier.size(14.dp))
-                        Spacer(Modifier.width(4.dp))
-                        Text("Exit Exam", fontSize = 11.sp)
                     }
                 }
-            } else {
-                // ── QUESTION VIEW (a block is selected) ──
-                val idx = selectedIdx!!
-                val item = test.items.getOrNull(idx)
-                if (item != null) {
-                    val q = item.question
-                    Column(modifier = Modifier.fillMaxSize().padding(8.dp)) {
-                        // Header row: back to grid | question number | nav arrows
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            // Back to grid
-                            TextButton(onClick = { selectedIdx = null; onNavigate(idx) }) {
-                                Icon(Icons.Default.GridView, null, tint = theme.primary, modifier = Modifier.size(16.dp))
-                                Spacer(Modifier.width(4.dp))
-                                Text("Grid", color = theme.primary, fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                            }
-                            Text("Q${idx + 1} of ${test.items.size}", color = theme.darkText, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                            // Nav arrows
-                            Row {
-                                IconButton(
-                                    onClick = { if (idx > 0) { selectedIdx = idx - 1; onNavigate(idx - 1) } },
-                                    modifier = Modifier.size(28.dp),
-                                    enabled = idx > 0
-                                ) {
-                                    Icon(Icons.Default.ArrowBack, null, tint = if (idx > 0) theme.darkText else theme.subText, modifier = Modifier.size(16.dp))
-                                }
-                                IconButton(
-                                    onClick = { if (idx < test.items.size - 1) { selectedIdx = idx + 1; onNavigate(idx + 1) } },
-                                    modifier = Modifier.size(28.dp),
-                                    enabled = idx < test.items.size - 1
-                                ) {
-                                    Icon(Icons.Default.ArrowForward, null, tint = if (idx < test.items.size - 1) theme.darkText else theme.subText, modifier = Modifier.size(16.dp))
-                                }
-                            }
-                        }
-
-                        // Timer (compact, top-right corner of question view)
-                        Row(modifier = Modifier.fillMaxWidth().padding(bottom = 4.dp), horizontalArrangement = Arrangement.End) {
-                            val mm = timeLeft / 60
-                            val ss = timeLeft % 60
-                            Icon(Icons.Default.Timer, null, tint = theme.subText, modifier = Modifier.size(12.dp))
-                            Spacer(Modifier.width(2.dp))
-                            Text(String.format("%02d:%02d", mm, ss), color = theme.subText, fontSize = 10.sp, fontWeight = FontWeight.Bold)
-                        }
-
-                        // Question + media (scrollable, top portion)
-                        LazyColumn(
-                            modifier = Modifier.weight(1f).fillMaxWidth(),
-                            verticalArrangement = Arrangement.spacedBy(4.dp)
-                        ) {
-                            item {
-                                Surface(color = theme.background, shape = RoundedCornerShape(8.dp), modifier = Modifier.fillMaxWidth(), border = androidx.compose.foundation.BorderStroke(1.dp, theme.divider)) {
-                                    Text(q.stem, color = theme.darkText, fontSize = 13.sp, fontWeight = FontWeight.Medium, modifier = Modifier.padding(10.dp))
-                                }
-                            }
-                            // Media
-                            if (q.descType == "image" && !q.descImageUrl.isNullOrBlank()) {
-                                item { AsyncImage(url = q.descImageUrl!!.toAbsoluteUrl(), modifier = Modifier.fillMaxWidth().heightIn(max = 100.dp).clip(RoundedCornerShape(6.dp))) }
-                            }
-                            val mediaImgUrl = (q.mediaImageUrl ?: q.imageUrl)?.toAbsoluteUrl()
-                            if (!mediaImgUrl.isNullOrBlank()) {
-                                item { AsyncImage(url = mediaImgUrl, modifier = Modifier.fillMaxWidth().heightIn(max = 120.dp).clip(RoundedCornerShape(6.dp))) }
-                            }
-                            val mediaAudUrl = (q.mediaAudioUrl ?: q.audioUrl)?.toAbsoluteUrl()
-                            if (!mediaAudUrl.isNullOrBlank()) {
-                                item { AudioPlayerCard(theme = theme, url = mediaAudUrl, loopCount = q.audioLoop, loopDelaySec = q.audioLoopDelay, sound = sound) }
-                            }
-                            // Answer options
-                            item {
-                                AnswerInputBlock(theme, q, answers[q.id], questionFeedback, sound) { ans ->
-                                    onAnswer(q.id, ans)
-                                }
-                            }
-                        }
-
-                        // Bottom: Next button (always visible, NOT a popup)
-                        Row(
-                            modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            OutlinedButton(
-                                onClick = { if (idx > 0) { selectedIdx = idx - 1; onNavigate(idx - 1) } },
-                                enabled = idx > 0,
-                                shape = RoundedCornerShape(8.dp),
-                                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 6.dp)
-                            ) {
-                                Icon(Icons.Default.ArrowBack, null, modifier = Modifier.size(14.dp))
-                                Spacer(Modifier.width(4.dp))
-                                Text("Prev", fontSize = 12.sp)
-                            }
-                            if (idx < test.items.size - 1) {
-                                Button(
-                                    onClick = { selectedIdx = idx + 1; onNavigate(idx + 1) },
-                                    shape = RoundedCornerShape(8.dp),
-                                    colors = ButtonDefaults.buttonColors(containerColor = theme.primary),
-                                    contentPadding = PaddingValues(horizontal = 24.dp, vertical = 6.dp)
-                                ) {
-                                    Text("Next", fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                                    Spacer(Modifier.width(4.dp))
-                                    Icon(Icons.Default.ArrowForward, null, modifier = Modifier.size(14.dp))
-                                }
-                            } else {
-                                Button(
-                                    onClick = onSubmit,
-                                    shape = RoundedCornerShape(8.dp),
-                                    colors = ButtonDefaults.buttonColors(containerColor = theme.accent),
-                                    enabled = !submitting,
-                                    contentPadding = PaddingValues(horizontal = 24.dp, vertical = 6.dp)
-                                ) {
-                                    Icon(Icons.Default.Check, null, modifier = Modifier.size(14.dp))
-                                    Spacer(Modifier.width(4.dp))
-                                    Text("Submit", fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                                }
-                            }
-                        }
-                    }
+                OutlinedButton(onClick = onExit, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(6.dp), contentPadding = PaddingValues(vertical = 4.dp)) {
+                    Text("Exit", fontSize = 10.sp)
                 }
             }
         }
     }
 }
 
-// ─── Question Grid Section — 5 columns of numbered blocks ────────────────────
 @Composable
-private fun QuestionGridSection(
-    theme: AppTheme,
-    sound: SoundManager,
-    items: List<TestItemDetail>,
-    startIndex: Int,
+private fun GridSection(
+    theme: AppTheme, sound: SoundManager,
+    items: List<TestItemDetail>, startIndex: Int,
     answers: androidx.compose.runtime.snapshots.SnapshotStateMap<String, Any>,
-    selectedIdx: Int?,
-    filter: String,
-    onBlockTap: (Int) -> Unit,
+    filter: String, onBlockTap: (Int) -> Unit,
 ) {
-    val displayItems = items.mapIndexed { i, item ->
-        Triple(startIndex + i, item, answers.containsKey(item.question.id))
-    }.filter { (_, _, isAnswered) ->
-        when (filter) { "solved" -> isAnswered; "unsolved" -> !isAnswered; else -> true }
-    }
-
-    val rows = displayItems.chunked(5)
-    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+    val display = items.mapIndexed { i, item -> Triple(startIndex + i, item, answers.containsKey(item.question.id)) }
+        .filter { (_, _, answered) -> when (filter) { "solved" -> answered; "unsolved" -> !answered; else -> true } }
+    val rows = display.chunked(5)
+    Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
         rows.forEach { row ->
-            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                row.forEach { (globalIdx, _, isAnswered) ->
-                    val isSelected = selectedIdx == globalIdx
-                    val blockColor = when {
-                        isSelected -> theme.primary
-                        isAnswered -> Color(0xFF4CAF50)
-                        else -> Color(0xFFE0E0E0)
-                    }
-                    val textColor = if (isSelected || isAnswered) Color.White else Color(0xFF666666)
+            Row(horizontalArrangement = Arrangement.spacedBy(3.dp)) {
+                row.forEach { (idx, _, answered) ->
                     Surface(
-                        color = blockColor,
-                        shape = RoundedCornerShape(6.dp),
-                        modifier = Modifier.size(32.dp).clickable { sound.click(); onBlockTap(globalIdx) }
+                        color = if (answered) Color(0xFF4CAF50) else Color(0xFFE0E0E0),
+                        shape = RoundedCornerShape(5.dp),
+                        modifier = Modifier.size(30.dp).clickable { sound.click(); onBlockTap(idx) }
                     ) {
                         Box(contentAlignment = Alignment.Center) {
-                            Text("${globalIdx + 1}", color = textColor, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                            Text("${idx + 1}", color = if (answered) Color.White else Color(0xFF666666), fontSize = 10.sp, fontWeight = FontWeight.Bold)
                         }
                     }
                 }
-                repeat(5 - row.size) { Spacer(Modifier.size(32.dp)) }
+                repeat(5 - row.size) { Spacer(Modifier.size(30.dp)) }
+            }
+        }
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// FULL-SCREEN QUESTION — clean, focused, no grid, no numbers
+// Just: title (small), timer (small top-right), question, options, Next
+// ═══════════════════════════════════════════════════════════════════════════
+@Composable
+private fun ExamFullScreenQuestion(
+    theme: AppTheme,
+    sound: SoundManager,
+    test: TestDetail,
+    answers: androidx.compose.runtime.snapshots.SnapshotStateMap<String, Any>,
+    currentIdx: Int,
+    questionFeedback: QuestionFeedback?,
+    timeLeft: Int,
+    submitting: Boolean,
+    onAnswer: (String, Any) -> Unit,
+    onNext: () -> Unit,
+    onPrev: () -> Unit,
+    onBackToGrid: () -> Unit,
+    onSubmit: () -> Unit,
+) {
+    val item = test.items.getOrNull(currentIdx) ?: return
+    val q = item.question
+
+    Column(modifier = Modifier.fillMaxSize().background(theme.background)) {
+        // ─── Header: title (left) + timer (right) + grid button ────────────
+        // Small, doesn't affect the main content. Just a thin strip.
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            // Left: Grid button + title
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                IconButton(onClick = onBackToGrid, modifier = Modifier.size(28.dp)) {
+                    Icon(Icons.Default.GridView, null, tint = theme.primary, modifier = Modifier.size(16.dp))
+                }
+                Text(test.title.take(30), color = theme.subText, fontSize = 11.sp, fontWeight = FontWeight.Medium, maxLines = 1)
+            }
+            // Right: Timer (small, doesn't affect main content)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Default.Timer, null, tint = theme.subText, modifier = Modifier.size(12.dp))
+                Spacer(Modifier.width(2.dp))
+                val mm = timeLeft / 60; val ss = timeLeft % 60
+                Text(String.format("%02d:%02d", mm, ss), color = theme.subText, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+            }
+        }
+
+        // ─── Main content: question on left, options on right ──────────────
+        Row(modifier = Modifier.weight(1f).fillMaxWidth().padding(8.dp)) {
+            // LEFT: Question text + media
+            LazyColumn(
+                modifier = Modifier.weight(1f).padding(end = 6.dp),
+                verticalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                item {
+                    Surface(color = theme.cardBg, shape = RoundedCornerShape(10.dp), modifier = Modifier.fillMaxWidth(), shadowElevation = 2.dp) {
+                        Column(modifier = Modifier.padding(12.dp)) {
+                            Text("Q${currentIdx + 1}", color = theme.primary, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                            Spacer(Modifier.height(4.dp))
+                            Text(q.stem, color = theme.darkText, fontSize = 14.sp, fontWeight = FontWeight.Medium)
+                        }
+                    }
+                }
+                // Media
+                if (q.descType == "image" && !q.descImageUrl.isNullOrBlank()) {
+                    item { AsyncImage(url = q.descImageUrl!!.toAbsoluteUrl(), modifier = Modifier.fillMaxWidth().heightIn(max = 120.dp).clip(RoundedCornerShape(8.dp))) }
+                }
+                val mediaImgUrl = (q.mediaImageUrl ?: q.imageUrl)?.toAbsoluteUrl()
+                if (!mediaImgUrl.isNullOrBlank()) {
+                    item { AsyncImage(url = mediaImgUrl, modifier = Modifier.fillMaxWidth().heightIn(max = 140.dp).clip(RoundedCornerShape(8.dp))) }
+                }
+                val mediaAudUrl = (q.mediaAudioUrl ?: q.audioUrl)?.toAbsoluteUrl()
+                if (!mediaAudUrl.isNullOrBlank()) {
+                    item { AudioPlayerCard(theme = theme, url = mediaAudUrl, loopCount = q.audioLoop, loopDelaySec = q.audioLoopDelay, sound = sound) }
+                }
+            }
+
+            // RIGHT: Answer options
+            LazyColumn(
+                modifier = Modifier.weight(1f).padding(start = 6.dp),
+                verticalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                item {
+                    AnswerInputBlock(theme, q, answers[q.id], questionFeedback, sound) { ans ->
+                        onAnswer(q.id, ans)
+                    }
+                }
+            }
+        }
+
+        // ─── Bottom: Prev / Next (or Submit) — always visible ──────────────
+        Surface(color = theme.cardBg, shadowElevation = 4.dp) {
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 6.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                OutlinedButton(
+                    onClick = onPrev,
+                    enabled = currentIdx > 0,
+                    shape = RoundedCornerShape(8.dp),
+                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp)
+                ) {
+                    Icon(Icons.Default.ArrowBack, null, modifier = Modifier.size(16.dp))
+                    Spacer(Modifier.width(4.dp))
+                    Text("Prev", fontSize = 13.sp)
+                }
+
+                Text("${currentIdx + 1} / ${test.items.size}", color = theme.subText, fontSize = 12.sp, fontWeight = FontWeight.Medium)
+
+                if (currentIdx < test.items.size - 1) {
+                    Button(
+                        onClick = onNext,
+                        shape = RoundedCornerShape(8.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = theme.primary),
+                        contentPadding = PaddingValues(horizontal = 24.dp, vertical = 8.dp)
+                    ) {
+                        Text("Next", fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                        Spacer(Modifier.width(4.dp))
+                        Icon(Icons.Default.ArrowForward, null, modifier = Modifier.size(16.dp))
+                    }
+                } else {
+                    Button(
+                        onClick = onSubmit,
+                        shape = RoundedCornerShape(8.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = theme.accent),
+                        enabled = !submitting,
+                        contentPadding = PaddingValues(horizontal = 24.dp, vertical = 8.dp)
+                    ) {
+                        if (submitting) {
+                            CircularProgressIndicator(color = Color.White, modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                        } else {
+                            Icon(Icons.Default.Check, null, modifier = Modifier.size(16.dp))
+                            Spacer(Modifier.width(4.dp))
+                            Text("Submit", fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                        }
+                    }
+                }
             }
         }
     }
