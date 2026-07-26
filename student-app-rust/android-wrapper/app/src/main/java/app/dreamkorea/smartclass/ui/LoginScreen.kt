@@ -54,7 +54,6 @@ fun LoginScreen(onLoginSuccess: () -> Unit) {
     var error by remember { mutableStateOf("") }
     var info by remember { mutableStateOf("") }
 
-    // Entrance animations
     var logoVisible by remember { mutableStateOf(false) }
     var formVisible by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) {
@@ -67,13 +66,26 @@ fun LoginScreen(onLoginSuccess: () -> Unit) {
         animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessLow),
         label = "logoScale"
     )
+    val logoOffset by animateFloatAsState(
+        targetValue = if (logoVisible) 0f else -30f,
+        animationSpec = tween(800, easing = FastOutSlowInEasing),
+        label = "logoOffset"
+    )
     val formAlpha by animateFloatAsState(
         targetValue = if (formVisible) 1f else 0f,
         animationSpec = tween(600, easing = FastOutSlowInEasing),
         label = "formAlpha"
     )
 
-    Box(modifier = Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(NavyBlue, Color(0xFF1E40AF), Color(0xFFF8FAFC)))) ) {
+    // Inverted gradient: white/light at top, navy blue at bottom
+    // Logo sits in the blue area and blends naturally
+    Box(
+        modifier = Modifier.fillMaxSize().background(
+            Brush.verticalGradient(
+                listOf(Color(0xFFF8FAFC), Color(0xFFEFF6FF), NavyBlue.copy(alpha = 0.3f), NavyBlue)
+            )
+        )
+    ) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -82,48 +94,61 @@ fun LoginScreen(onLoginSuccess: () -> Unit) {
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
-            Spacer(modifier = Modifier.height(60.dp))
+            Spacer(modifier = Modifier.height(40.dp))
 
-            // Logo in a clean white circle — blends naturally
-            Surface(
-                color = Color.White,
-                shape = androidx.compose.foundation.shape.CircleShape,
-                modifier = Modifier.size(110.dp).scale(logoScale),
-                shadowElevation = 8.dp,
-            ) {
-                Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
-                    Image(
-                        painter = painterResource(id = app.dreamkorea.smartclass.R.drawable.dreamkorea_logo),
-                        contentDescription = "DreamKorea Logo",
-                        modifier = Modifier.size(70.dp),
-                        contentScale = ContentScale.Fit
-                    )
+            // Logo — sits on the blue part, white circle with subtle glow
+            Box(contentAlignment = Alignment.Center) {
+                // Soft blue glow
+                Box(
+                    modifier = Modifier
+                        .size(130.dp)
+                        .clip(RoundedCornerShape(32.dp))
+                        .background(
+                            Brush.radialGradient(
+                                listOf(Color.White.copy(alpha = 0.3f), Color.Transparent),
+                            )
+                        )
+                )
+                Surface(
+                    color = Color.White,
+                    shape = androidx.compose.foundation.shape.CircleShape,
+                    modifier = Modifier.size(100.dp).scale(logoScale),
+                    shadowElevation = 12.dp,
+                ) {
+                    Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
+                        Image(
+                            painter = painterResource(id = app.dreamkorea.smartclass.R.drawable.dreamkorea_logo),
+                            contentDescription = "DreamKorea Logo",
+                            modifier = Modifier.size(64.dp),
+                            contentScale = ContentScale.Fit
+                        )
+                    }
                 }
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(14.dp))
 
-            // Title
+            // Title — white text on blue background
             AnimatedVisibility(
                 visible = logoVisible,
                 enter = fadeIn(tween(500)) + slideInVertically(tween(500)) { it / 3 }
             ) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Text("DreamKorea", color = Color.White, fontSize = 26.sp, fontWeight = FontWeight.Bold)
-                    Text("SmartClass", color = Color.White.copy(alpha = 0.7f), fontSize = 14.sp, fontWeight = FontWeight.Medium)
+                    Text("SmartClass", color = Color.White.copy(alpha = 0.6f), fontSize = 13.sp, fontWeight = FontWeight.Medium)
                 }
             }
-            Spacer(modifier = Modifier.height(32.dp))
 
-            // Form card — clean white card on the gradient background
+            Spacer(modifier = Modifier.height(28.dp))
+
+            // Form card — clean white card floating on blue
             Surface(
                 color = Color.White,
                 shape = RoundedCornerShape(20.dp),
                 modifier = Modifier.fillMaxWidth().alpha(formAlpha),
-                shadowElevation = 6.dp,
+                shadowElevation = 8.dp,
             ) {
                 Column(modifier = Modifier.padding(24.dp)) {
-                    // Info message
                     AnimatedVisibility(visible = info.isNotEmpty(), enter = fadeIn() + slideInVertically(), exit = fadeOut()) {
                         Surface(color = Color(0xFFE8F5E9), shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)) {
                             Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -134,7 +159,6 @@ fun LoginScreen(onLoginSuccess: () -> Unit) {
                         }
                     }
 
-                    // Error message
                     AnimatedVisibility(visible = error.isNotEmpty(), enter = fadeIn() + slideInVertically(), exit = fadeOut()) {
                         Surface(color = Color(0xFFFEE2E2), shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)) {
                             Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -145,7 +169,6 @@ fun LoginScreen(onLoginSuccess: () -> Unit) {
                         }
                     }
 
-                    // Step content with animated transition
                     AnimatedContent(
                         targetState = step,
                         transitionSpec = {
@@ -208,7 +231,6 @@ private fun Step1Details(name: String, email: String, phone: String, loading: Bo
         Text("Welcome", color = TextDark, fontSize = 22.sp, fontWeight = FontWeight.Bold)
         Text("Sign up or log in with your email", color = TextMid, fontSize = 13.sp)
         Spacer(Modifier.height(20.dp))
-
         Field(label = "Full Name", value = n, onChange = { n = it }, icon = Icons.Default.Person, keyboardType = KeyboardType.Text)
         Spacer(Modifier.height(10.dp))
         Field(label = "Email", value = e, onChange = { e = it }, icon = Icons.Default.Email, keyboardType = KeyboardType.Email)
@@ -217,7 +239,6 @@ private fun Step1Details(name: String, email: String, phone: String, loading: Bo
         Spacer(Modifier.height(6.dp))
         Text("Returning user? Use the same email to log in.", color = TextLight, fontSize = 11.sp)
         Spacer(Modifier.height(16.dp))
-
         Button(
             onClick = {
                 if (n.isBlank()) return@Button
@@ -232,11 +253,8 @@ private fun Step1Details(name: String, email: String, phone: String, loading: Bo
             shape = RoundedCornerShape(12.dp),
             enabled = !loading && n.isNotBlank() && e.isNotBlank() && p.isNotBlank()
         ) {
-            if (loading) {
-                CircularProgressIndicator(color = Color.White, modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
-            } else {
-                Text("Send Verification Code", fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
-            }
+            if (loading) { CircularProgressIndicator(color = Color.White, modifier = Modifier.size(20.dp), strokeWidth = 2.dp) }
+            else { Text("Send Verification Code", fontSize = 15.sp, fontWeight = FontWeight.SemiBold) }
         }
     }
 }
@@ -244,29 +262,20 @@ private fun Step1Details(name: String, email: String, phone: String, loading: Bo
 @Composable
 private fun Step2Verify(code: String, email: String, loading: Boolean, onSubmit: (String) -> Unit) {
     var c by remember { mutableStateOf(code) }
-
     Column(modifier = Modifier.fillMaxWidth()) {
         Text("Verify", color = TextDark, fontSize = 22.sp, fontWeight = FontWeight.Bold)
         Text("Enter the 6-digit code sent to $email", color = TextMid, fontSize = 13.sp)
         Spacer(Modifier.height(20.dp))
-
         OutlinedTextField(
-            value = c,
-            onValueChange = { c = it.filter { ch -> ch.isDigit() }.take(6) },
-            modifier = Modifier.fillMaxWidth(),
-            label = { Text("6-digit code") },
-            singleLine = true,
-            colors = OutlinedTextFieldDefaults.colors(
-                focusedTextColor = TextDark, unfocusedTextColor = TextDark,
-                focusedBorderColor = NavyBlue, unfocusedBorderColor = DividerColor, cursorColor = NavyBlue,
-            ),
+            value = c, onValueChange = { c = it.filter { ch -> ch.isDigit() }.take(6) },
+            modifier = Modifier.fillMaxWidth(), label = { Text("6-digit code") }, singleLine = true,
+            colors = OutlinedTextFieldDefaults.colors(focusedTextColor = TextDark, unfocusedTextColor = TextDark, focusedBorderColor = NavyBlue, unfocusedBorderColor = DividerColor, cursorColor = NavyBlue),
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
             shape = RoundedCornerShape(12.dp),
             leadingIcon = { Icon(Icons.Default.Password, null, tint = TextMid, modifier = Modifier.size(20.dp)) },
             textStyle = androidx.compose.ui.text.TextStyle(fontSize = 20.sp, fontWeight = FontWeight.Bold, letterSpacing = 8.sp)
         )
         Spacer(Modifier.height(16.dp))
-
         Button(
             onClick = { if (c.length >= 6) onSubmit(c) },
             modifier = Modifier.fillMaxWidth().height(50.dp),
@@ -274,37 +283,23 @@ private fun Step2Verify(code: String, email: String, loading: Boolean, onSubmit:
             shape = RoundedCornerShape(12.dp),
             enabled = !loading && c.length >= 6
         ) {
-            if (loading) {
-                CircularProgressIndicator(color = Color.White, modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
-            } else {
-                Text("Verify & Continue", fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
-            }
+            if (loading) { CircularProgressIndicator(color = Color.White, modifier = Modifier.size(20.dp), strokeWidth = 2.dp) }
+            else { Text("Verify & Continue", fontSize = 15.sp, fontWeight = FontWeight.SemiBold) }
         }
         Spacer(Modifier.height(8.dp))
-        TextButton(onClick = { }, modifier = Modifier.fillMaxWidth()) {
-            Text("Resend code", color = NavyBlue, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
-        }
+        TextButton(onClick = { }, modifier = Modifier.fillMaxWidth()) { Text("Resend code", color = NavyBlue, fontSize = 13.sp, fontWeight = FontWeight.SemiBold) }
         Spacer(Modifier.height(4.dp))
-        TextButton(onClick = { /* back to step 1 */ }, modifier = Modifier.fillMaxWidth()) {
-            Text("Change details", color = TextMid, fontSize = 13.sp)
-        }
+        TextButton(onClick = { }, modifier = Modifier.fillMaxWidth()) { Text("Change details", color = TextMid, fontSize = 13.sp) }
     }
 }
 
 @Composable
 private fun Field(label: String, value: String, onChange: (String) -> Unit, icon: androidx.compose.ui.graphics.vector.ImageVector, keyboardType: KeyboardType, placeholder: String? = null) {
     OutlinedTextField(
-        value = value,
-        onValueChange = onChange,
-        label = { Text(label) },
+        value = value, onValueChange = onChange, label = { Text(label) },
         placeholder = placeholder?.let { { Text(it) } },
-        modifier = Modifier.fillMaxWidth(),
-        singleLine = true,
-        colors = OutlinedTextFieldDefaults.colors(
-            focusedTextColor = TextDark, unfocusedTextColor = TextDark,
-            focusedBorderColor = NavyBlue, unfocusedBorderColor = DividerColor, cursorColor = NavyBlue,
-            focusedLabelColor = NavyBlue, unfocusedLabelColor = TextMid,
-        ),
+        modifier = Modifier.fillMaxWidth(), singleLine = true,
+        colors = OutlinedTextFieldDefaults.colors(focusedTextColor = TextDark, unfocusedTextColor = TextDark, focusedBorderColor = NavyBlue, unfocusedBorderColor = DividerColor, cursorColor = NavyBlue, focusedLabelColor = NavyBlue, unfocusedLabelColor = TextMid),
         keyboardOptions = KeyboardOptions(keyboardType = keyboardType),
         shape = RoundedCornerShape(12.dp),
         leadingIcon = { Icon(icon, null, tint = TextMid, modifier = Modifier.size(20.dp)) }
