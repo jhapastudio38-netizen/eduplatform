@@ -630,7 +630,7 @@ struct ProfileView: View {
 
                 // Logout
                 Button(role: .destructive) {
-                    Task { APIClient.shared.logout() }
+                    Task { await APIClient.shared.logout() }
                     session.clearSession()
                 } label: {
                     HStack {
