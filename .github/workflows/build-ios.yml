@@ -1,0 +1,65 @@
+name: Build iOS IPA
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'ios-app/**'
+      - '.github/workflows/build-ios.yml'
+  workflow_dispatch:
+
+jobs:
+  build-ios:
+    runs-on: macos-14
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Select latest Xcode
+        run: |
+          LATEST_XCODE=$(ls -d /Applications/Xcode*.app | sort -V | tail -1)
+          echo "Using: $LATEST_XCODE"
+          sudo xcode-select -s "$LATEST_XCODE/Contents/Developer"
+          xcodebuild -version
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Generate Xcode Project
+        working-directory: ios-app
+        run: xcodegen generate
+
+      - name: Build Archive (unsigned)
+        working-directory: ios-app
+        run: |
+          xcodebuild archive \
+            -project DreamKorea.xcodeproj \
+            -scheme DreamKorea \
+            -configuration Release \
+            -destination 'generic/platform=iOS' \
+            -archivePath build/DreamKorea.xcarchive \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            COMPILER_INDEX_STORE_ENABLE=NO \
+            AD_HOC_CODE_SIGNING_ALLOWED=YES
+
+      - name: Create IPA from Archive
+        working-directory: ios-app
+        run: |
+          mkdir -p build/ipa/Payload
+          cp -r build/DreamKorea.xcarchive/Products/Applications/DreamKorea.app build/ipa/Payload/
+          cd build/ipa
+          zip -r DreamKorea.ipa Payload
+          ls -lh DreamKorea.ipa
+
+      - name: Upload IPA as Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ios-v3.0.0
+          name: DreamKorea iOS v3.0.0
+          files: ios-app/build/ipa/DreamKorea.ipa
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

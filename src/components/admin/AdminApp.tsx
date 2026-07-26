@@ -7,7 +7,7 @@ import {
   GraduationCap, School, Image, Layers, Package, UserCog, BookMarked,
   ClipboardList, BarChart3, Settings, LogOut, ChevronDown, ChevronRight,
   FolderTree, Library, Award, Bell, Search, Menu, X, Headphones, Radio, Video,
-  LayoutGrid, Eye
+  LayoutGrid, Eye, Ticket
 } from "lucide-react";
 import { useAuthStore } from "@/stores/auth";
 import { Button } from "@/components/ui/button";
@@ -30,6 +30,8 @@ import { AdminVideoLessons } from "./AdminVideoLessons";
 import { AdminLiveRooms } from "./AdminLiveRooms";
 import { AdminStudentResults } from "./AdminStudentResults";
 import { AdminPlaceholder } from "./AdminPlaceholder";
+import { AdminBundles } from "./AdminBundles";
+import { AdminTeacherInvites } from "./AdminTeacherInvites";
 import {
   AdminQuestionCategories, AdminAllCourses, AdminBatch,
   AdminPDFViewer, AdminColorVision, AdminPackageResults,
@@ -43,7 +45,9 @@ type View =
   | "batch" | "student-results" | "package-results" | "classroom-results"
   | "students" | "teachers" | "pdf-viewer" | "settings" | "home-cards"
   | "content" | "questions" | "tests" | "users" | "notifications" | "ai"
-  | "eye-vision" | "books" | "live-sessions";
+  | "eye-vision" | "books" | "live-sessions"
+  | "bundles-qbank" | "bundles-batch" | "bundles-exam" | "bundles-chapter"
+  | "teacher-invites";
 
 interface NavItem {
   id: View;
@@ -69,8 +73,18 @@ const NAV_SECTIONS: NavSection[] = [
     ],
   },
   {
+    title: "Packages",
+    items: [
+      { id: "bundles-qbank", label: "QBank Packages", icon: Package, hasAdd: true },
+      { id: "bundles-batch", label: "Batch Packages", icon: Package, hasAdd: true },
+      { id: "bundles-exam", label: "Exam Packages", icon: Package, hasAdd: true },
+      { id: "bundles-chapter", label: "Chapter Packages", icon: Package, hasAdd: true },
+    ],
+  },
+  {
     title: "Content",
     items: [
+      { id: "home-cards", label: "Home Cards", icon: LayoutGrid, hasAdd: true },
       { id: "eye-vision", label: "Eye Vision", icon: Eye, hasAdd: true },
       { id: "books", label: "Books", icon: BookMarked, hasAdd: true },
     ],
@@ -82,6 +96,7 @@ const NAV_SECTIONS: NavSection[] = [
       { id: "student-results", label: "Student Results", icon: BarChart3 },
       { id: "students", label: "Students", icon: GraduationCap },
       { id: "teachers", label: "Teachers", icon: UserCog, hasAdd: true },
+      { id: "teacher-invites", label: "Teacher Invites", icon: Ticket, hasAdd: true },
     ],
   },
   {
@@ -106,6 +121,37 @@ export function AdminApp() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set(["Exam Management"]));
   const { user, logout } = useAuthStore();
+  const isAdmin = user?.role === "ADMIN";
+
+  // ─── Role-based nav filtering ────────────────────────────────────────────────
+  // Teachers only see:
+  //   • Exam Management  (all 5 items)
+  //   • Packages         (all 4 items)
+  //   • Management       (only Live Sessions, Student Results, Students — NO
+  //                       Teachers list, NO Teacher Invites, NO ability to
+  //                       create other teachers)
+  // Admins see everything.
+  const visibleSections: NavSection[] = isAdmin
+    ? NAV_SECTIONS
+    : NAV_SECTIONS
+        .filter((s) => s.title !== "Communication") // no Push Notifications for teachers
+        .filter((s) => s.title !== "Content")        // no Home Cards / Eye Vision / Books for teachers
+        .map((s) => {
+          if (s.title === "Management") {
+            // Teachers see only Live Sessions, Student Results, Students
+            // (no Teachers, no Teacher Invites — those are admin-only)
+            return {
+              ...s,
+              items: s.items.filter(
+                (it) =>
+                  it.id === "live-sessions" ||
+                  it.id === "student-results" ||
+                  it.id === "students",
+              ),
+            };
+          }
+          return s;
+        });
 
   useEffect(() => {
     const onHash = () => {
@@ -132,6 +178,19 @@ export function AdminApp() {
     setMobileOpen(false);
     history.replaceState(null, "", `#/${v}`);
   }
+
+  // Guard: if a teacher somehow lands on a view they're not allowed to see
+  // (e.g. via direct URL), redirect them to overview.
+  const TEACHER_FORBIDDEN: View[] = [
+    "home-cards", "eye-vision", "books",
+    "teachers", "teacher-invites", "notifications",
+    "all-books", "question-categories", "all-courses", "content",
+  ];
+  useEffect(() => {
+    if (!isAdmin && TEACHER_FORBIDDEN.includes(view)) {
+      setView("overview");
+    }
+  }, [isAdmin, view]);
 
   function renderView() {
     switch (view) {
@@ -198,6 +257,16 @@ export function AdminApp() {
         return <AdminOrders type="Course Orders" />;
       case "qb-orders":
         return <AdminOrders type="Question Bank Orders" />;
+      case "bundles-qbank":
+        return <AdminBundles initialKind="qbank" />;
+      case "bundles-batch":
+        return <AdminBundles initialKind="batch" />;
+      case "bundles-exam":
+        return <AdminBundles initialKind="exam" />;
+      case "bundles-chapter":
+        return <AdminBundles initialKind="chapter" />;
+      case "teacher-invites":
+        return <AdminTeacherInvites />;
       default:
         return <AdminOverview onNavigate={navigate} />;
     }
@@ -207,9 +276,9 @@ export function AdminApp() {
     <div className="min-h-[100dvh] flex bg-slate-50">
       {/* Desktop sidebar */}
       <aside className="hidden md:flex flex-col w-72 border-r bg-white">
-        <SidebarHeader />
+        <SidebarHeader isAdmin={isAdmin} />
         <nav className="flex-1 overflow-y-auto px-2 pb-4">
-          {NAV_SECTIONS.map((section) => (
+          {visibleSections.map((section) => (
             <NavSectionView
               key={section.title}
               section={section}
@@ -228,9 +297,9 @@ export function AdminApp() {
         <div className="fixed inset-0 z-50 md:hidden">
           <div className="absolute inset-0 bg-black/30" onClick={() => setMobileOpen(false)} />
           <div className="absolute left-0 top-0 bottom-0 w-72 bg-white flex flex-col">
-            <SidebarHeader onClose={() => setMobileOpen(false)} />
+            <SidebarHeader onClose={() => setMobileOpen(false)} isAdmin={isAdmin} />
             <nav className="flex-1 overflow-y-auto px-2 pb-4">
-              {NAV_SECTIONS.map((section) => (
+              {visibleSections.map((section) => (
                 <NavSectionView
                   key={section.title}
                   section={section}
@@ -273,19 +342,26 @@ function isValidView(v: string): v is View {
     "paid-exam-orders", "batch-orders", "course-orders", "qb-orders",
     "batch", "student-results", "package-results", "classroom-results",
     "students", "teachers", "pdf-viewer", "settings", "home-cards", "content", "questions", "tests", "users",
-    "notifications", "eye-vision", "books", "ai"];
+    "notifications", "eye-vision", "books", "ai",
+    "bundles-qbank", "bundles-batch", "bundles-exam", "bundles-chapter", "teacher-invites"];
   return all.includes(v);
 }
 
-function SidebarHeader({ onClose }: { onClose?: () => void }) {
+function SidebarHeader({ onClose, isAdmin = true }: { onClose?: () => void; isAdmin?: boolean }) {
   return (
     <div className="h-16 flex items-center gap-3 px-5 border-b shrink-0">
-      <div className="h-9 w-9 rounded-full bg-gradient-to-br from-emerald-500 to-teal-600 grid place-items-center text-white shadow-sm">
-        <span className="font-bold text-lg">A</span>
+      <div className={`h-9 w-9 rounded-full grid place-items-center text-white shadow-sm ${
+        isAdmin
+          ? "bg-gradient-to-br from-emerald-500 to-teal-600"
+          : "bg-gradient-to-br from-amber-500 to-orange-600"
+      }`}>
+        <span className="font-bold text-lg">{isAdmin ? "A" : "T"}</span>
       </div>
       <div>
         <div className="font-bold text-sm tracking-tight">DREAMKOREA</div>
-        <div className="text-[10px] text-slate-500 -mt-0.5">SmartClass Admin</div>
+        <div className="text-[10px] text-slate-500 -mt-0.5">
+          SmartClass {isAdmin ? "Admin" : "Teacher"}
+        </div>
       </div>
       {onClose && (
         <Button variant="ghost" size="icon" className="ml-auto md:hidden" onClick={onClose}>
@@ -296,17 +372,22 @@ function SidebarHeader({ onClose }: { onClose?: () => void }) {
   );
 }
 
-function SidebarFooter({ user, onLogout }: { user: { name?: string | null; email: string } | null; onLogout: () => void }) {
+function SidebarFooter({ user, onLogout }: { user: { name?: string | null; email: string; role?: string } | null; onLogout: () => void }) {
+  const isAdmin = user?.role === "ADMIN";
   return (
     <div className="p-3 border-t shrink-0">
       <div className="flex items-center gap-3 mb-3 px-2">
         <Avatar className="h-9 w-9">
-          <AvatarFallback className="bg-emerald-100 text-emerald-700 text-xs font-semibold">
+          <AvatarFallback className={`text-xs font-semibold ${
+            isAdmin
+              ? "bg-emerald-100 text-emerald-700"
+              : "bg-amber-100 text-amber-700"
+          }`}>
             {(user?.name || user?.email || "A").slice(0, 2).toUpperCase()}
           </AvatarFallback>
         </Avatar>
         <div className="min-w-0 flex-1">
-          <div className="text-sm font-medium truncate">{user?.name || "Admin"}</div>
+          <div className="text-sm font-medium truncate">{user?.name || (isAdmin ? "Admin" : "Teacher")}</div>
           <div className="text-xs text-slate-500 truncate">{user?.email}</div>
         </div>
       </div>
@@ -368,7 +449,8 @@ function NavSectionView({
   );
 }
 
-function HeaderBar({ onMenuClick, user }: { onMenuClick: () => void; user: { name?: string | null } | null }) {
+function HeaderBar({ onMenuClick, user }: { onMenuClick: () => void; user: { name?: string | null; role?: string } | null }) {
+  const isAdmin = user?.role === "ADMIN";
   return (
     <header className="h-16 border-b bg-white px-4 md:px-8 flex items-center gap-4 shrink-0">
       <Button variant="ghost" size="icon" className="md:hidden" onClick={onMenuClick}>
@@ -388,9 +470,15 @@ function HeaderBar({ onMenuClick, user }: { onMenuClick: () => void; user: { nam
         <span className="absolute top-2 right-2 h-2 w-2 rounded-full bg-rose-500" />
       </Button>
       <div className="hidden sm:flex items-center gap-2">
-        <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-200">
-          <Award className="h-3 w-3 mr-1" /> Admin
-        </Badge>
+        {isAdmin ? (
+          <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-200">
+            <Award className="h-3 w-3 mr-1" /> Admin
+          </Badge>
+        ) : (
+          <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200">
+            <School className="h-3 w-3 mr-1" /> Teacher
+          </Badge>
+        )}
       </div>
     </header>
   );

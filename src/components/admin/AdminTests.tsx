@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -9,8 +9,60 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { FileText, Plus, Trash2, Clock, Upload, X, ChevronRight, ChevronLeft, Image as ImageIcon, Headphones, CheckCircle2, Copy, ClipboardPaste, Save } from "lucide-react";
+import { FileText, Plus, Trash2, Clock, Upload, X, ChevronRight, ChevronLeft, Image as ImageIcon, Headphones, CheckCircle2, Copy, ClipboardPaste, Save, CloudOff, Cloud, RotateCcw } from "lucide-react";
 import { toast } from "sonner";
+
+// ─── Draft persistence (localStorage) ────────────────────────────────────────
+// Auto-saves in-progress question drafts keyed by testId so a misclick,
+// accidental close, or page refresh doesn't lose work. Drafts are cleared
+// after a successful "Push to App".
+
+const DRAFT_PREFIX = "dk_draft_test_";
+
+function loadDraft(testId: string): Record<string, QuestionData> | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = localStorage.getItem(DRAFT_PREFIX + testId);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== "object") return null;
+    // Sanity-check: only keep entries that look like questions
+    const out: Record<string, QuestionData> = {};
+    for (const [k, v] of Object.entries(parsed)) {
+      if (v && typeof v === "object" && "blockType" in (v as any)) {
+        out[k] = v as QuestionData;
+      }
+    }
+    return out;
+  } catch {
+    return null;
+  }
+}
+
+function saveDraft(testId: string, questions: Record<string, QuestionData>) {
+  if (typeof window === "undefined") return;
+  try {
+    // Only persist entries that have a stem (skip pure-empty placeholders)
+    const filtered: Record<string, QuestionData> = {};
+    for (const [k, q] of Object.entries(questions)) {
+      if (q && (q.stem?.trim() || q.descText?.trim() || q.mediaImageUrl || q.mediaAudioUrl || q.descImageUrl || (q.options && q.options.some((o) => o?.trim())))) {
+        filtered[k] = q;
+      }
+    }
+    localStorage.setItem(DRAFT_PREFIX + testId, JSON.stringify(filtered));
+  } catch {
+    // localStorage might be full or disabled — fail silently
+  }
+}
+
+function clearDraft(testId: string) {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.removeItem(DRAFT_PREFIX + testId);
+  } catch {
+    // ignore
+  }
+}
 
 interface Test {
   id: string;
@@ -30,6 +82,9 @@ interface Test {
   audioGapSec?: number | null;
   textBlockCount?: number | null;
   audioBlockCount?: number | null;
+  // Per-block enable flags — admin can hide the audio or text section
+  textBlockEnabled?: boolean | null;
+  audioBlockEnabled?: boolean | null;
   _count?: { items: number };
 }
 
@@ -38,6 +93,7 @@ interface QuestionData {
   testItemId?: string;
   blockType: "text" | "audio";
   blockNumber: number;
+  setNumber?: number;
   stem: string;
   descType: "none" | "text" | "image" | "audio";
   descText: string;
@@ -60,6 +116,7 @@ function emptyQuestion(blockType: "text" | "audio", blockNumber: number): Questi
   return {
     blockType,
     blockNumber,
+    setNumber: 1,
     stem: "",
     descType: "none",
     descText: "",
@@ -115,6 +172,78 @@ export function AdminTests({ testCategory = "exam" }: { testCategory?: string })
     load();
   }
 
+  // ─── Make a Copy / Duplicate ──────────────────────────────────────────────
+  // Two modes:
+  //   • "Duplicate" — clone the whole test (all questions) into a target
+  //     category. New test starts as a draft. Optionally add to a package.
+  //   • "Copy Set" — only for question_bank tests. Copies one Set's questions
+  //     into another existing test.
+  const [duplicateTarget, setDuplicateTarget] = useState<Test | null>(null);
+
+  async function doDuplicate(test: Test, newTitle: string, targetCategory: string, bundleId?: string) {
+    try {
+      const res = await fetch(`/api/admin/tests/${test.id}/copy`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          mode: "duplicate",
+          targetCategory,
+          newTitle: newTitle.trim() || `${test.title} (Copy)`,
+        }),
+      });
+      const d = await res.json();
+      if (!res.ok) { toast.error(d.error || "Duplicate failed"); return; }
+      // Optionally add the new test to a package
+      if (bundleId && d.test?.id) {
+        try {
+          await fetch(`/api/admin/bundles/${bundleId}/items`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ testId: d.test.id }),
+          });
+          toast.success(`Duplicated as "${d.test.title}" and added to package`);
+        } catch {
+          toast.success(`Duplicated as "${d.test.title}" (package add failed — try manually)`);
+        }
+      } else {
+        toast.success(`Duplicated as "${d.test.title}"`);
+      }
+      setDuplicateTarget(null);
+      load();
+    } catch (e: any) {
+      toast.error("Duplicate failed: " + (e?.message || "network error"));
+    }
+  }
+
+  // Copy a single Set (only for question_bank tests) into another existing test
+  async function copySet(test: Test) {
+    const setNumberStr = prompt(`Which Set to copy? (1-10)`, "1");
+    if (!setNumberStr) return;
+    const setNumber = parseInt(setNumberStr, 10);
+    if (isNaN(setNumber) || setNumber < 1) { toast.error("Invalid set number"); return; }
+    const targetTestId = prompt(
+      `Paste the destination test ID (you can copy it from the URL of any test you open in the admin panel):`,
+      "",
+    );
+    if (!targetTestId?.trim()) { toast.error("Target test ID is required"); return; }
+    try {
+      const res = await fetch(`/api/admin/tests/${test.id}/copy`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          mode: "copySet",
+          setNumber,
+          targetTestId: targetTestId.trim(),
+        }),
+      });
+      const d = await res.json();
+      if (!res.ok) { toast.error(d.error || "Copy set failed"); return; }
+      toast.success(`Copied ${d.copiedCount} questions from Set ${setNumber}`);
+    } catch (e: any) {
+      toast.error("Copy set failed: " + (e?.message || "network error"));
+    }
+  }
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
@@ -158,12 +287,87 @@ export function AdminTests({ testCategory = "exam" }: { testCategory?: string })
                   <p className="text-sm text-muted-foreground mt-1">
                     {t.durationMin} min • {t._count?.items || 0} questions • Pass {t.passScore}%
                   </p>
+                  {/* Block enable/disable toggles — only for exam & demo categories */}
+                  {(testCategory === "exam" || testCategory === "demo") && (
+                    <div className="flex items-center gap-1 mt-2" onClick={(e) => e.stopPropagation()}>
+                      <button
+                        onClick={async () => {
+                          const next = !(t.textBlockEnabled !== false);
+                          try {
+                            await fetch(`/api/admin/tests/${t.id}/toggle-block`, {
+                              method: "POST",
+                              headers: { "Content-Type": "application/json" },
+                              body: JSON.stringify({ block: "text", enabled: next }),
+                            });
+                            toast.success(next ? "Text block enabled" : "Text block disabled — students won't see text questions");
+                            load();
+                          } catch {
+                            toast.error("Failed to toggle");
+                          }
+                        }}
+                        className={`text-[10px] px-2 py-0.5 rounded-full border transition-colors ${
+                          t.textBlockEnabled !== false
+                            ? "bg-emerald-50 text-emerald-700 border-emerald-300"
+                            : "bg-slate-100 text-slate-500 border-slate-300 line-through"
+                        }`}
+                        title="Toggle text block visibility for students"
+                      >
+                        Text
+                      </button>
+                      <button
+                        onClick={async () => {
+                          const next = !(t.audioBlockEnabled !== false);
+                          try {
+                            await fetch(`/api/admin/tests/${t.id}/toggle-block`, {
+                              method: "POST",
+                              headers: { "Content-Type": "application/json" },
+                              body: JSON.stringify({ block: "audio", enabled: next }),
+                            });
+                            toast.success(next ? "Audio block enabled" : "Audio block disabled — students won't see audio questions");
+                            load();
+                          } catch {
+                            toast.error("Failed to toggle");
+                          }
+                        }}
+                        className={`text-[10px] px-2 py-0.5 rounded-full border transition-colors ${
+                          t.audioBlockEnabled !== false
+                            ? "bg-amber-50 text-amber-700 border-amber-300"
+                            : "bg-slate-100 text-slate-500 border-slate-300 line-through"
+                        }`}
+                        title="Toggle audio block visibility for students"
+                      >
+                        Audio
+                      </button>
+                    </div>
+                  )}
                 </div>
                 <div className="flex items-center gap-2">
                   {t.isPublished ? (
                     <Badge className="bg-green-500">🚀 Live</Badge>
                   ) : (
                     <Badge variant="secondary">📝 Draft</Badge>
+                  )}
+                  {/* Make a Copy — duplicate whole test into another category */}
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="text-blue-600 hover:text-blue-700"
+                    title="Duplicate this test into another category"
+                    onClick={(e) => { e.stopPropagation(); setDuplicateTarget(t); }}
+                  >
+                    <Copy className="w-4 h-4 mr-1" /> Duplicate
+                  </Button>
+                  {/* Copy Set — only for question_bank tests */}
+                  {t.testCategory === "question_bank" && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="text-purple-600 hover:text-purple-700"
+                      title="Copy one Set's questions into another test"
+                      onClick={(e) => { e.stopPropagation(); copySet(t); }}
+                    >
+                      Copy Set
+                    </Button>
                   )}
                   <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); deleteTest(t); }}>
                     <Trash2 className="w-4 h-4 text-red-500" />
@@ -192,7 +396,107 @@ export function AdminTests({ testCategory = "exam" }: { testCategory?: string })
           onClose={() => { setEditingTest(null); load(); }}
         />
       )}
+
+      {duplicateTarget && (
+        <DuplicateDialog
+          test={duplicateTarget}
+          onClose={() => setDuplicateTarget(null)}
+          onDuplicate={(title, cat, bundleId) => doDuplicate(duplicateTarget, title, cat, bundleId)}
+        />
+      )}
     </div>
+  );
+}
+
+// ─── Duplicate Dialog ────────────────────────────────────────────────────────
+// Shows when admin clicks "Duplicate" on a test card. Lets the admin:
+//   • Edit the new title (default: "{Original} (Copy)")
+//   • Pick the target category (exam / demo / batch / chapter / question_bank)
+//   • Optionally pick a package to add the duplicated test to
+// Questions, blocks, and all other settings stay the same.
+function DuplicateDialog({ test, onClose, onDuplicate }: {
+  test: Test;
+  onClose: () => void;
+  onDuplicate: (newTitle: string, targetCategory: string, bundleId?: string) => void;
+}) {
+  const [newTitle, setNewTitle] = useState(`${test.title} (Copy)`);
+  const [targetCategory, setTargetCategory] = useState(test.testCategory || "exam");
+  const [bundles, setBundles] = useState<{ id: string; title: string; kind: string }[]>([]);
+  const [selectedBundle, setSelectedBundle] = useState<string>("");
+  const [busy, setBusy] = useState(false);
+
+  // Load bundles so the admin can pick one to add the duplicate to
+  useEffect(() => {
+    fetch("/api/admin/bundles")
+      .then((r) => r.json())
+      .then((d) => setBundles(d.bundles || []))
+      .catch(() => {});
+  }, []);
+
+  async function handleDuplicate() {
+    setBusy(true);
+    onDuplicate(newTitle, targetCategory, selectedBundle || undefined);
+    setBusy(false);
+  }
+
+  return (
+    <Dialog open={true} onOpenChange={(v) => { if (!v) onClose(); }}>
+      <DialogContent className="max-w-lg">
+        <DialogHeader>
+          <DialogTitle>Duplicate Test</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-4">
+          <div>
+            <Label className="text-sm font-semibold">New Title</Label>
+            <Input
+              value={newTitle}
+              onChange={(e) => setNewTitle(e.target.value)}
+              className="h-12 text-base"
+              autoFocus
+            />
+            <p className="text-xs text-muted-foreground mt-1">
+              Questions, blocks, audio settings, and all other content stay the same. Only the title changes.
+            </p>
+          </div>
+          <div>
+            <Label className="text-sm font-semibold">Target Category</Label>
+            <Select value={targetCategory} onValueChange={setTargetCategory}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="exam">Exam</SelectItem>
+                <SelectItem value="demo">Demo Exam</SelectItem>
+                <SelectItem value="batch">Batch Exam</SelectItem>
+                <SelectItem value="chapter">Chapter Exam</SelectItem>
+                <SelectItem value="question_bank">Question Bank</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div>
+            <Label className="text-sm font-semibold">Add to Package (optional)</Label>
+            <Select value={selectedBundle} onValueChange={setSelectedBundle}>
+              <SelectTrigger><SelectValue placeholder="— None —" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="">— None —</SelectItem>
+                {bundles.map((b) => (
+                  <SelectItem key={b.id} value={b.id}>
+                    {b.title} ({b.kind})
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground mt-1">
+              If you pick a package, the duplicated test is automatically added to it.
+            </p>
+          </div>
+        </div>
+        <div className="flex justify-end gap-2 pt-2 border-t">
+          <Button variant="outline" onClick={onClose}>Cancel</Button>
+          <Button onClick={handleDuplicate} disabled={busy || !newTitle.trim()}>
+            {busy ? "Duplicating…" : <><Copy className="w-4 h-4 mr-1" /> Duplicate</>}
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -501,8 +805,11 @@ function CreateExamDialog({ open, testCategory, onOpenChange, onCreated }: {
 
 function ExamEditor({ test, testCategory, onClose }: { test: Test; testCategory: string; onClose: () => void }) {
   const isSimple = SIMPLE_CATEGORIES.includes(testCategory);
+  const isQBank = testCategory === "question_bank";
   const [activeBlock, setActiveBlock] = useState<"text" | "audio">("text");
   const [activeNumber, setActiveNumber] = useState(1);
+  // Set selector — only used for question_bank tests. Default Set 1.
+  const [activeSet, setActiveSet] = useState(1);
   const [questions, setQuestions] = useState<Record<string, QuestionData>>({});
   const [loading, setLoading] = useState(true);
   const [clipboard, setClipboard] = useState<string>("");
@@ -510,6 +817,12 @@ function ExamEditor({ test, testCategory, onClose }: { test: Test; testCategory:
   const [pasteCode, setPasteCode] = useState("");
   const [pushing, setPushing] = useState(false);
   const [isPublished, setIsPublished] = useState(test.isPublished);
+  // Draft auto-save state
+  const [draftSavedAt, setDraftSavedAt] = useState<number | null>(null);
+  const [hasDraft, setHasDraft] = useState(false);
+  const draftTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Track unsaved server-side question IDs so we can show "unsaved changes"
+  const [dirty, setDirty] = useState(false);
 
   const textCount = test.textBlockCount || (isSimple ? 0 : 20);
   const audioCount = test.audioBlockCount || (isSimple ? 0 : 20);
@@ -518,25 +831,75 @@ function ExamEditor({ test, testCategory, onClose }: { test: Test; testCategory:
     return `${blockType}-${blockNumber}`;
   }
 
+  // Merge fetched server questions with any locally-saved draft.
+  // Draft wins when present (it represents the most recent edit), but we
+  // keep the server's `id` / `testItemId` so saving updates the same row
+  // instead of creating a duplicate.
   useEffect(() => {
-    // Load existing questions
-    fetch(`/api/admin/tests/${test.id}/questions`)
-      .then((r) => r.json())
-      .then((d) => {
-        const map: Record<string, QuestionData> = {};
+    let cancelled = false;
+    (async () => {
+      const serverMap: Record<string, QuestionData> = {};
+      try {
+        const r = await fetch(`/api/admin/tests/${test.id}/questions`);
+        const d = await r.json();
         for (const q of d.questions || []) {
-          map[key(q.blockType, q.blockNumber)] = q;
+          serverMap[key(q.blockType, q.blockNumber)] = q;
         }
-        setQuestions(map);
-      })
-      .finally(() => setLoading(false));
+      } catch {
+        // network error — fall through to draft-only
+      }
+      if (cancelled) return;
+
+      const draft = loadDraft(test.id);
+      if (draft) {
+        const merged: Record<string, QuestionData> = { ...serverMap };
+        for (const [k, dq] of Object.entries(draft)) {
+          const sq = serverMap[k];
+          merged[k] = sq
+            ? { ...sq, ...dq, id: sq.id, testItemId: sq.testItemId }
+            : dq;
+        }
+        setQuestions(merged);
+        setHasDraft(true);
+        toast.info("Restored unsaved draft from this browser.", { duration: 3500 });
+      } else {
+        setQuestions(serverMap);
+      }
+      setLoading(false);
+    })();
+    return () => { cancelled = true; };
   }, [test.id]);
 
+  // Debounced auto-save to localStorage whenever questions change.
+  // We also set a "dirty" flag so the editor can warn on close.
   const currentKey = key(activeBlock, activeNumber);
   const currentQuestion = questions[currentKey] || emptyQuestion(activeBlock, activeNumber);
 
+  const scheduleDraftSave = useCallback((next: Record<string, QuestionData>) => {
+    if (draftTimer.current) clearTimeout(draftTimer.current);
+    draftTimer.current = setTimeout(() => {
+      saveDraft(test.id, next);
+      setDraftSavedAt(Date.now());
+      setDirty(true);
+    }, 600); // 600ms debounce — feels instant but avoids thrashing on every keystroke
+  }, [test.id]);
+
   function updateQuestion(q: QuestionData) {
-    setQuestions((prev) => ({ ...prev, [currentKey]: q }));
+    setQuestions((prev) => {
+      const next = { ...prev, [currentKey]: q };
+      scheduleDraftSave(next);
+      return next;
+    });
+  }
+
+  // Force an immediate save (used after successful server-saves)
+  function flushDraft() {
+    if (draftTimer.current) clearTimeout(draftTimer.current);
+    // Save whatever's in state right now
+    setQuestions((prev) => {
+      saveDraft(test.id, prev);
+      return prev;
+    });
   }
 
   async function saveQuestion() {
@@ -547,6 +910,7 @@ function ExamEditor({ test, testCategory, onClose }: { test: Test; testCategory:
       const payload = {
         blockType: q.blockType,
         blockNumber: q.blockNumber,
+        setNumber: q.setNumber ?? activeSet,
         stem: q.stem,
         descType: q.descType,
         descText: q.descText || "",
@@ -574,6 +938,13 @@ function ExamEditor({ test, testCategory, onClose }: { test: Test; testCategory:
         toast.error(d.error || `Save failed (HTTP ${res.status})`);
         return;
       }
+      // Update local state with the saved question (preserves id/testItemId)
+      setQuestions((prev) => ({
+        ...prev,
+        [currentKey]: { ...q, id: d.question?.id, testItemId: d.question?.testItemId ?? q.testItemId },
+      }));
+      // Persist the updated state to the draft so a refresh still works
+      setTimeout(() => flushDraft(), 50);
       toast.success(`Question ${q.blockNumber} saved`);
     } catch (e: any) {
       toast.error("Save failed: " + (e.message || "network error"));
@@ -596,26 +967,77 @@ function ExamEditor({ test, testCategory, onClose }: { test: Test; testCategory:
     toast.success(`Copied! Code: ${code}`);
   }
 
+  // ─── Copy ALL questions in this test ──────────────────────────────────────
+  // Generates a single code that bundles every filled question. The admin
+  // can paste the code into another test to bulk-import all questions at once.
+  function copyAll() {
+    const filled = Object.values(questions).filter(q => q.stem.trim());
+    if (filled.length === 0) { toast.error("No questions to copy — add some first"); return; }
+    const code = `DK-ALL-${test.id.slice(-4).toUpperCase()}-${Date.now().toString(36).toUpperCase()}`;
+    const data = JSON.stringify({ code, allQuestions: filled, sourceTestId: test.id, sourceTitle: test.title });
+    const allCopies = JSON.parse(localStorage.getItem("dk_copies") || "{}");
+    allCopies[code] = data;
+    localStorage.setItem("dk_copies", JSON.stringify(allCopies));
+    navigator.clipboard.writeText(code);
+    toast.success(`Copied ${filled.length} questions! Code: ${code}`);
+  }
+
   function pasteQuestion() {
     setShowPasteDialog(true);
   }
 
+  // ─── Paste All questions from a Copy-All code ─────────────────────────────
+  // Reads the code from localStorage, parses the bundled questions, and
+  // imports them into the current test with new block numbers (so they don't
+  // overwrite existing questions). The setNumber is preserved from source.
+  function doPasteAll(code: string) {
+    const allCopies = JSON.parse(localStorage.getItem("dk_copies") || "{}");
+    const data = allCopies[code.trim()];
+    if (!data) { toast.error("Invalid code"); return; }
+    const parsed = JSON.parse(data);
+    if (!parsed.allQuestions || !Array.isArray(parsed.allQuestions)) {
+      toast.error("This code is for a single question, not a bulk copy. Use Paste instead.");
+      return;
+    }
+    const incoming: QuestionData[] = parsed.allQuestions;
+    // Find the max block number currently in use so we append rather than overwrite
+    const used = new Set(Object.values(questions).map(q => q.blockNumber));
+    let nextNum = 1;
+    while (used.has(nextNum)) nextNum++;
+    const newQuestions = { ...questions };
+    for (const q of incoming) {
+      const k = key(q.blockType, nextNum);
+      newQuestions[k] = {
+        ...q,
+        blockNumber: nextNum,
+        // Preserve setNumber from source, default to current activeSet
+        setNumber: q.setNumber ?? activeSet,
+      };
+      nextNum++;
+    }
+    setQuestions(newQuestions);
+    scheduleDraftSave(newQuestions);
+    toast.success(`Pasted ${incoming.length} questions — click Save on each to persist`);
+    setShowPasteDialog(false);
+    setPasteCode("");
+  }
+
   async function pushToApp() {
-    // Count questions that have been filled in
     const filledQuestions = Object.values(questions).filter(q => q.stem.trim());
     if (filledQuestions.length === 0) {
       toast.error("Cannot push: add at least one question first");
       return;
     }
 
-    // Auto-save any unsaved questions before pushing
     setPushing(true);
     try {
-      // Save all filled questions that haven't been saved yet
+      // Auto-save ALL filled questions — check each response
+      let saveErrors = 0;
       for (const q of filledQuestions) {
         const payload = {
           blockType: q.blockType,
           blockNumber: q.blockNumber,
+          setNumber: q.setNumber ?? activeSet,
           stem: q.stem,
           descType: q.descType,
           descText: q.descText || "",
@@ -633,11 +1055,22 @@ function ExamEditor({ test, testCategory, onClose }: { test: Test; testCategory:
           correctOption: q.correctOption,
           explanation: q.explanation || "",
         };
-        await fetch(`/api/admin/tests/${test.id}/questions`, {
+        const saveRes = await fetch(`/api/admin/tests/${test.id}/questions`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload),
         });
+        if (!saveRes.ok) {
+          const errData = await saveRes.json().catch(() => ({}));
+          console.error(`Question ${q.blockNumber} save failed:`, errData);
+          saveErrors++;
+        }
+      }
+
+      if (saveErrors > 0) {
+        toast.error(`${saveErrors} question(s) failed to save. Check console for details.`);
+        setPushing(false);
+        return;
       }
 
       // Now publish
@@ -648,6 +1081,10 @@ function ExamEditor({ test, testCategory, onClose }: { test: Test; testCategory:
         return;
       }
       setIsPublished(true);
+      // Clear the local draft — everything is now safely on the server
+      clearDraft(test.id);
+      setHasDraft(false);
+      setDirty(false);
       toast.success(d.message || "Pushed to app — students can now see this exam");
     } catch (e: any) {
       toast.error("Push failed: " + (e.message || "network error"));
@@ -656,11 +1093,50 @@ function ExamEditor({ test, testCategory, onClose }: { test: Test; testCategory:
     }
   }
 
+  function discardDraft() {
+    if (!hasDraft) return;
+    if (!confirm("Discard local draft? Only unsaved changes from this browser will be removed — server-side questions stay intact.")) return;
+    clearDraft(test.id);
+    setHasDraft(false);
+    setDirty(false);
+    // Reload from server
+    setLoading(true);
+    fetch(`/api/admin/tests/${test.id}/questions`)
+      .then((r) => r.json())
+      .then((d) => {
+        const map: Record<string, QuestionData> = {};
+        for (const q of d.questions || []) {
+          map[key(q.blockType, q.blockNumber)] = q;
+        }
+        setQuestions(map);
+      })
+      .finally(() => setLoading(false));
+    toast.success("Draft discarded");
+  }
+
+  function attemptClose() {
+    if (dirty && !isPublished) {
+      // Confirm — but reassure the user that the draft is auto-saved
+      if (!confirm("You have unsaved changes on this browser. They will be auto-saved as a draft — you can come back later. Close anyway?")) {
+        return;
+      }
+      // Final flush of the draft just in case the debounce hasn't fired
+      flushDraft();
+    }
+    onClose();
+  }
+
   function doPaste() {
     const allCopies = JSON.parse(localStorage.getItem("dk_copies") || "{}");
     const data = allCopies[pasteCode.trim()];
     if (!data) { toast.error("Invalid paste code"); return; }
     const parsed = JSON.parse(data);
+    // If this is a bulk-copy code (allQuestions array), paste all into this test
+    if (parsed.allQuestions && Array.isArray(parsed.allQuestions)) {
+      doPasteAll(pasteCode.trim());
+      return;
+    }
+    // Single-question paste
     const q = parsed.question as QuestionData;
     // Paste into current slot — keep current block number/type
     const pasted: QuestionData = {
@@ -706,6 +1182,8 @@ function ExamEditor({ test, testCategory, onClose }: { test: Test; testCategory:
     const next = { ...questions };
     delete next[k];
     setQuestions(next);
+    // Persist the deletion in the draft
+    saveDraft(test.id, next);
     // If it was persisted server-side, also delete via API
     if (q.testItemId) {
       fetch(`/api/admin/tests/${test.id}/questions/${q.testItemId}`, { method: "DELETE" }).catch(() => {});
@@ -720,15 +1198,61 @@ function ExamEditor({ test, testCategory, onClose }: { test: Test; testCategory:
   }
 
   return (
-    <Dialog open={true} onOpenChange={(v) => { if (!v) onClose(); }}>
+    <Dialog open={true} onOpenChange={(v) => { if (!v) attemptClose(); }}>
       <DialogContent className="sm:max-w-5xl max-h-[95vh] overflow-hidden flex flex-col">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
+          <DialogTitle className="flex items-center gap-2 flex-wrap">
             <span>{test.title}</span>
             <Badge variant="outline">{test.examType}</Badge>
             {test.category && <Badge variant="secondary">{test.category}</Badge>}
+            {/* Draft status pill */}
+            {hasDraft && (
+              <Badge
+                variant="outline"
+                className="ml-1 gap-1 text-amber-700 border-amber-300 bg-amber-50"
+                title={draftSavedAt ? `Auto-saved ${new Date(draftSavedAt).toLocaleTimeString()}` : "Auto-saved in this browser"}
+              >
+                <Cloud className="w-3 h-3" /> Draft saved
+                <button
+                  className="ml-1 hover:text-amber-900"
+                  onClick={discardDraft}
+                  title="Discard local draft"
+                >
+                  <RotateCcw className="w-3 h-3" />
+                </button>
+              </Badge>
+            )}
+            {!hasDraft && dirty && (
+              <Badge variant="outline" className="ml-1 gap-1 text-slate-600 border-slate-300">
+                <CloudOff className="w-3 h-3" /> Synced
+              </Badge>
+            )}
           </DialogTitle>
         </DialogHeader>
+
+        {/* Set selector — only for question_bank tests. Lets admin organize
+            questions into Set 1, 2, 3, 4, 5 within a single QBank test. */}
+        {isQBank && (
+          <div className="flex items-center gap-2 p-3 bg-purple-50 border border-purple-200 rounded-lg">
+            <span className="text-sm font-semibold text-purple-800">Set:</span>
+            {[1, 2, 3, 4, 5].map((s) => (
+              <button
+                key={s}
+                onClick={() => setActiveSet(s)}
+                className={`px-3 py-1 rounded-md text-sm font-medium transition-colors ${
+                  activeSet === s
+                    ? "bg-purple-600 text-white"
+                    : "bg-white text-purple-700 border border-purple-300 hover:bg-purple-100"
+                }`}
+              >
+                Set {s}
+              </button>
+            ))}
+            <span className="text-xs text-purple-600 ml-2">
+              Questions you add now go into Set {activeSet}. Use "Copy Set" on the test card to copy this set into another test.
+            </span>
+          </div>
+        )}
 
         {/* Block tabs — only for exam & demo */}
         {!isSimple && (
@@ -836,6 +1360,9 @@ function ExamEditor({ test, testCategory, onClose }: { test: Test; testCategory:
             </Button>
             <Button onClick={pasteQuestion} variant="outline" size="lg">
               <ClipboardPaste className="w-4 h-4 mr-1" /> Paste
+            </Button>
+            <Button onClick={copyAll} variant="outline" size="lg" className="text-purple-600 hover:text-purple-700">
+              <Copy className="w-4 h-4 mr-1" /> Copy All
             </Button>
             {isSimple && (
               <Button onClick={deleteActiveQuestion} variant="outline" size="lg" className="text-rose-600 hover:text-rose-700">
