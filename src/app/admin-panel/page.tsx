@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
+import { toast } from "sonner";
 
 const AdminApp = dynamic(() => import("@/components/admin/AdminApp").then(m => ({ default: m.AdminApp })), { ssr: false });
 
@@ -24,6 +25,25 @@ export default function AdminPanelPage() {
       .catch(() => router.push("/admin"))
       .finally(() => setReady(true));
   }, [router]);
+
+  // Surface any uncaught JS error as a toast so the user sees something
+  // useful instead of a silently broken button.
+  useEffect(() => {
+    const onErr = (e: ErrorEvent) => {
+      console.error("[admin-panel] uncaught error:", e.error || e.message);
+      toast.error("JS error: " + (e.message || "unknown"), { duration: 8000 });
+    };
+    const onRejection = (e: PromiseRejectionEvent) => {
+      console.error("[admin-panel] unhandled rejection:", e.reason);
+      toast.error("Promise error: " + (e.reason?.message || String(e.reason)), { duration: 8000 });
+    };
+    window.addEventListener("error", onErr);
+    window.addEventListener("unhandledrejection", onRejection);
+    return () => {
+      window.removeEventListener("error", onErr);
+      window.removeEventListener("unhandledrejection", onRejection);
+    };
+  }, []);
 
   if (!ready) return null;
   if (!allowed) return null;
