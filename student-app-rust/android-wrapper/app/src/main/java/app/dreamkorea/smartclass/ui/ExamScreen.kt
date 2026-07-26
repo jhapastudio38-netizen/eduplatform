@@ -59,6 +59,18 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
     // Retry trigger — increment to force reload
     var retryCount by remember { mutableStateOf(0) }
 
+    // ─── Force landscape for the entire exam ──────────────────────────────────
+    // The device is locked to landscape so the question + options layout has
+    // room to breathe. The lock is released when the student exits the exam.
+    val context = LocalContext.current
+    DisposableEffect(Unit) {
+        val activity = context as? android.app.Activity
+        activity?.requestedOrientation = android.content.pm.ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
+        onDispose {
+            activity?.requestedOrientation = android.content.pm.ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+        }
+    }
+
     // Load test detail — uses LaunchedEffect's own scope, finally block guarantees loading cleanup
     LaunchedEffect(testId, retryCount) {
         loading = true
@@ -216,7 +228,7 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
 
     // ─── Result screen ──────────────────────────────────────────────────────
     if (submitResult != null) {
-        ExamResultScreen(theme, submitResult!!, onExit, sound)
+        ExamResultScreen(theme, submitResult!!, onExit, sound, onEyeVision = { onExit() })
         return
     }
 
@@ -809,8 +821,14 @@ fun AsyncImage(url: String, modifier: Modifier = Modifier) {
 
 // ─── Result screen ────────────────────────────────────────────────────────────
 @Composable
-fun ExamResultScreen(theme: AppTheme, result: SubmitResponse, onExit: () -> Unit, sound: SoundManager) {
-    LaunchedEffect(Unit) { sound.success() }
+fun ExamResultScreen(theme: AppTheme, result: SubmitResponse, onExit: () -> Unit, sound: SoundManager, onEyeVision: () -> Unit = {}) {
+    LaunchedEffect(Unit) {
+        sound.success()
+        if (result.eyeVision.show) {
+            kotlinx.coroutines.delay(800)
+            sound.swoosh()
+        }
+    }
 
     LazyColumn(
         modifier = Modifier.fillMaxSize().background(theme.background).padding(16.dp),
@@ -859,6 +877,41 @@ fun ExamResultScreen(theme: AppTheme, result: SubmitResponse, onExit: () -> Unit
                         colors = ButtonDefaults.buttonColors(containerColor = theme.primary)
                     ) {
                         Text("Back to tests", fontWeight = FontWeight.SemiBold)
+                    }
+                }
+            }
+        }
+
+        // Eye vision CTA — only shown if server recommends it (mistakes > 30%)
+        if (result.eyeVision.show) {
+            item {
+                Surface(
+                    color = Color(0xFFFFF3E0),
+                    shape = RoundedCornerShape(16.dp),
+                    modifier = Modifier.fillMaxWidth(),
+                    shadowElevation = 2.dp,
+                    border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFFFB74D))
+                ) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Default.Visibility, null, tint = Color(0xFFE65100), modifier = Modifier.size(24.dp))
+                            Spacer(Modifier.width(10.dp))
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text("Eye Vision Check Recommended", color = Color(0xFFE65100), fontSize = 15.sp, fontWeight = FontWeight.Bold)
+                                Text(result.eyeVision.reason, color = Color(0xFF6D4C41), fontSize = 12.sp)
+                            }
+                        }
+                        Spacer(Modifier.height(12.dp))
+                        Button(
+                            onClick = { sound.click(); onEyeVision() },
+                            modifier = Modifier.fillMaxWidth().height(44.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFE65100)),
+                            shape = RoundedCornerShape(10.dp)
+                        ) {
+                            Icon(Icons.Default.ArrowForward, null, tint = Color.White, modifier = Modifier.size(18.dp))
+                            Spacer(Modifier.width(6.dp))
+                            Text("Take ${result.eyeVision.count} Eye Vision Test${if (result.eyeVision.count > 1) "s" else ""}", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                        }
                     }
                 }
             }
