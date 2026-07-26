@@ -183,68 +183,64 @@ fun MainScreen(userName: String, onLogout: () -> Unit) {
     }
 }
 
-// ─── Floating Pill Bottom Navigation Bar ──────────────────────────────────────
+// ─── Bottom Navigation Bar — clean, full-width ────────────────────────────────
 @Composable
 fun BottomNavBar(activeTab: BottomTab, onTabClick: (BottomTab) -> Unit) {
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 8.dp),
-        contentAlignment = Alignment.BottomCenter,
+    Surface(
+        color = CardWhite,
+        shadowElevation = 8.dp,
+        tonalElevation = 0.dp,
     ) {
-        Surface(
-            color = CardWhite,
-            shape = RoundedCornerShape(28.dp),
-            shadowElevation = 12.dp,
-            tonalElevation = 0.dp,
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .navigationBarsPadding()
+                .padding(vertical = 8.dp),
+            horizontalArrangement = Arrangement.SpaceEvenly,
+            verticalAlignment = Alignment.CenterVertically,
         ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .navigationBarsPadding()
-                    .padding(horizontal = 8.dp, vertical = 8.dp),
-                horizontalArrangement = Arrangement.SpaceEvenly,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                BottomTab.values().forEach { tab ->
-                    val isActive = tab == activeTab
-                    val iconColor = if (isActive) NavyBlue else Color(0xFF64748B)
-                    val textColor = if (isActive) NavyBlue else Color(0xFF94A3B8)
-                    val bgColor = if (isActive) NavyBlue.copy(alpha = 0.1f) else Color.Transparent
+            BottomTab.values().forEach { tab ->
+                val isActive = tab == activeTab
+                val iconColor = if (isActive) NavyBlue else Color(0xFF94A3B8)
+                val textColor = if (isActive) NavyBlue else Color(0xFF94A3B8)
 
-                    Box(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(20.dp))
-                            .background(bgColor)
-                            .clickable { onTabClick(tab) }
-                            .padding(horizontal = 16.dp, vertical = 8.dp),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Box(contentAlignment = Alignment.TopEnd) {
-                                Icon(
-                                    tab.icon,
-                                    tab.label,
-                                    tint = iconColor,
-                                    modifier = Modifier.size(24.dp),
-                                )
-                                // Notification badge on active tab
-                                if (isActive) {
-                                    Box(
-                                        modifier = Modifier
-                                            .size(7.dp)
-                                            .background(NavyBlue, CircleShape)
-                                    )
-                                }
-                            }
-                            Spacer(Modifier.height(4.dp))
-                            Text(
-                                tab.label,
-                                color = textColor,
-                                fontSize = 10.sp,
-                                fontWeight = if (isActive) FontWeight.SemiBold else FontWeight.Normal,
-                            )
-                        }
+                // Animated scale on press
+                var pressed by remember { mutableStateOf(false) }
+                val scale by animateFloatAsState(
+                    targetValue = if (pressed) 0.85f else 1f,
+                    animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy),
+                    label = "navScale"
+                )
+                // Animated background for active tab
+                val bgAlpha by animateFloatAsState(
+                    targetValue = if (isActive) 1f else 0f,
+                    animationSpec = tween(300, easing = FastOutSlowInEasing),
+                    label = "navBgAlpha"
+                )
+
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(NavyBlue.copy(alpha = 0.08f * bgAlpha))
+                        .clickable { onTabClick(tab) }
+                        .padding(horizontal = 16.dp, vertical = 6.dp)
+                        .scale(scale),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Icon(
+                            tab.icon,
+                            tab.label,
+                            tint = iconColor,
+                            modifier = Modifier.size(24.dp),
+                        )
+                        Spacer(Modifier.height(3.dp))
+                        Text(
+                            tab.label,
+                            color = textColor,
+                            fontSize = 10.sp,
+                            fontWeight = if (isActive) FontWeight.SemiBold else FontWeight.Normal,
+                        )
                     }
                 }
             }
