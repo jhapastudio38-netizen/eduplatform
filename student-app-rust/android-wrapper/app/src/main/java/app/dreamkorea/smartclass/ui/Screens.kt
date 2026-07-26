@@ -343,7 +343,7 @@ fun HomeScreen(theme: AppTheme, sound: SoundManager, userName: String, onNavigat
                         }
                     }
                     Spacer(Modifier.height(10.dp))
-                    val progress = ((stats?.averageScore ?: 0.0) / 100f).coerceIn(0f, 1f)
+                    val progress = ((stats?.averageScore ?: 0.0).toFloat() / 100f).coerceIn(0f, 1f)
                     LinearProgressIndicator(
                         progress = { progress },
                         color = Color.White,
@@ -794,7 +794,7 @@ fun VideosScreen(theme: AppTheme, sound: SoundManager, onBack: () -> Unit) {
                                 InfoChipWithIcon(theme, Icons.Default.Timer, "${v.durationMin} min", NavyBlue); Spacer(Modifier.width(6.dp))
                                 if (!v.level.isNullOrBlank()) { InfoChip(theme, v.level, AccentPurple); Spacer(Modifier.width(6.dp)) }
                                 if (!v.category.isNullOrBlank()) { InfoChip(theme, v.category, TextMid); Spacer(Modifier.width(6.dp)) }
-                                Spacer(Modifier.weight(1.dp))
+                                Spacer(Modifier.weight(1f))
                                 Text("${v.views} views", color = TextMid, fontSize = 9.sp)
                             }
                         }
