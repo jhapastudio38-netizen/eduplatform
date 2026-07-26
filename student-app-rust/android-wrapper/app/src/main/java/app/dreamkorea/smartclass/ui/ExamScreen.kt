@@ -308,7 +308,7 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
             // Description audio (if descType == "audio")
             if (q.descType == "audio" && !q.descAudioUrl.isNullOrBlank()) {
                 item {
-                    AudioPlayerCard(theme = theme, url = q.descAudioUrl!!, loopCount = 1, loopDelaySec = 0, sound = sound)
+                    AudioPlayerCard(theme = theme, url = q.descAudioUrl!!.toAbsoluteUrl(), loopCount = 1, loopDelaySec = 0, sound = sound)
                 }
             }
 
@@ -332,7 +332,7 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
             }
 
             // Question media audio — use new field or fall back to legacy
-            val mediaAudUrl = q.mediaAudioUrl ?: q.audioUrl
+            val mediaAudUrl = (q.mediaAudioUrl ?: q.audioUrl)?.toAbsoluteUrl()
             if (!mediaAudUrl.isNullOrBlank()) {
                 item {
                     AudioPlayerCard(
@@ -616,13 +616,13 @@ fun AnswerInputBlock(
                     ) {
                         Row(modifier = Modifier.padding(8.dp), verticalAlignment = Alignment.CenterVertically) {
                             coil.compose.AsyncImage(
-                                model = imgUrl,
+                                model = imgUrl.toAbsoluteUrl(),
                                 contentDescription = null,
                                 modifier = Modifier.size(72.dp).clip(RoundedCornerShape(8.dp)),
                                 contentScale = ContentScale.Crop
                             )
                             Spacer(Modifier.width(12.dp))
-                            Text("Option ${'A' + i}", color = theme.darkText, fontSize = 14.sp, fontWeight = FontWeight.Medium)
+                            Text(question.options.getOrNull(i) ?: "Option ${'A' + i}", color = theme.darkText, fontSize = 14.sp, fontWeight = FontWeight.Medium)
                             Spacer(Modifier.weight(1f))
                             if (selected) { Icon(Icons.Default.CheckCircle, null, tint = theme.primary, modifier = Modifier.size(20.dp)) }
                         }
@@ -652,9 +652,7 @@ fun AnswerInputBlock(
                         }
                     ) {
                         Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                            Text("Option ${'A' + i}", color = theme.darkText, fontSize = 14.sp, fontWeight = FontWeight.Medium)
-                            Spacer(Modifier.width(8.dp))
-                            Icon(Icons.Default.PlayArrow, null, tint = theme.primary, modifier = Modifier.size(20.dp))
+                            Text(question.options.getOrNull(i) ?: "Audio ${'A' + i}", color = theme.darkText, fontSize = 14.sp, fontWeight = FontWeight.Medium)
                             Spacer(Modifier.weight(1f))
                             if (selected) { Icon(Icons.Default.CheckCircle, null, tint = theme.primary, modifier = Modifier.size(20.dp)) }
                         }
@@ -797,21 +795,28 @@ fun AnswerInput(
     }
 }
 
+// Helper: convert relative URL to absolute (Coil needs full URLs)
+fun String.toAbsoluteUrl(): String {
+    if (this.startsWith("http://") || this.startsWith("https://")) return this
+    return "https://my-project-five-sepia.vercel.app" + (if (this.startsWith("/")) this else "/$this")
+}
+
 // ─── Async image (loads from URL using Coil) ─────────────────────────────────
 @Composable
 fun AsyncImage(url: String, modifier: Modifier = Modifier) {
     val theme = rememberAppTheme()
-    if (url.isBlank()) {
+    val absoluteUrl = url.toAbsoluteUrl()
+    if (absoluteUrl.isBlank()) {
         Box(modifier = modifier.background(Color(0xFFE0E0E0)), contentAlignment = Alignment.Center) {
             Icon(Icons.Default.Image, null, tint = Color.Gray, modifier = Modifier.size(32.dp))
         }
         return
     }
     coil.compose.AsyncImage(
-        model = url,
+        model = absoluteUrl,
         contentDescription = null,
         modifier = modifier,
-        contentScale = androidx.compose.ui.layout.ContentScale.Crop
+        contentScale = ContentScale.Crop
     )
 }
 

@@ -128,7 +128,7 @@ fun EyeVisionTestCard(theme: AppTheme, sound: SoundManager, test: EyeVisionTest)
 
             // Image
             coil.compose.AsyncImage(
-                model = test.imageUrl,
+                model = if (test.imageUrl.startsWith("http")) test.imageUrl else "https://my-project-five-sepia.vercel.app${test.imageUrl}",
                 contentDescription = "Eye vision test image",
                 modifier = Modifier.fillMaxWidth().height(200.dp).clip(RoundedCornerShape(12.dp)),
                 contentScale = ContentScale.Crop

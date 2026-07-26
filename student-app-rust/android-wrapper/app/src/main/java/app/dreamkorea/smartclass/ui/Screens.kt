@@ -93,48 +93,43 @@ fun MainScreen(userName: String, onLogout: () -> Unit) {
 
     fun navigateTo(s: Screen) {
         screen = s
-        // Update active tab based on screen
         activeTab = when (s) {
             is Screen.Home -> BottomTab.Home
-            is Screen.Profile -> BottomTab.Profile
-            is Screen.Results -> BottomTab.Progress
-            is Screen.UbtTest, is Screen.FreeExam, is Screen.Batch,
-            is Screen.Tests, is Screen.TestList, is Screen.QuestionBank,
+            is Screen.Tests, is Screen.UbtTest, is Screen.FreeExam,
+            is Screen.Batch, is Screen.TestList, is Screen.QuestionBank,
             is Screen.Exam -> BottomTab.Exams
+            is Screen.Books, is Screen.BookReader -> BottomTab.Books
+            is Screen.Learn -> BottomTab.Tools
             else -> activeTab
         }
     }
 
     Surface(modifier = Modifier.fillMaxSize(), color = BgGray) {
         Column(modifier = Modifier.fillMaxSize()) {
-            // ─── Top bar — hidden on Exam, BookReader, and main tab screens ──
+            // ─── Top bar — shown on Home with profile/settings icons ──────────
             val showTopBar = when (screen) {
                 is Screen.Exam -> false
                 is Screen.BookReader -> false
-                is Screen.Home -> false
-                is Screen.UbtTest, is Screen.FreeExam, is Screen.Batch -> false
-                is Screen.TestList -> false
-                is Screen.Tests -> false
-                is Screen.Profile -> false
-                is Screen.Results -> false
-                is Screen.QuestionBank -> false
-                is Screen.Join -> false
-                is Screen.EyeVision -> false
-                is Screen.Books -> false
+                is Screen.Home -> true
                 is Screen.Settings -> false
-                else -> true
+                else -> false
             }
             if (showTopBar) {
                 TopBar(theme, userName, sound, onProfile = { navigateTo(Screen.Profile) }, onSettings = { screen = Screen.Settings })
             }
 
-            // ─── Screen content ─────────────────────────────────────────────
+            // ─── Screen content with slide animation ─────────────────────────
             Box(modifier = Modifier.weight(1f)) {
                 AnimatedContent(
                     targetState = screen,
                     transitionSpec = {
-                        fadeIn(tween(300, easing = FastOutSlowInEasing)) togetherWith
-                        fadeOut(tween(200, easing = FastOutSlowInEasing))
+                        // Slide + fade for tab switches, fade for sub-screens
+                        if (screen is Screen.Home || screen is Screen.Tests || screen is Screen.Books || screen is Screen.Learn) {
+                            (fadeIn(tween(300)) + slideInHorizontally(tween(300), initialOffsetX = { it / 8 })) togetherWith
+                            (fadeOut(tween(200)) + slideOutHorizontally(tween(200), targetOffsetX = { -it / 8 }))
+                        } else {
+                            fadeIn(tween(300)) togetherWith fadeOut(tween(200))
+                        }
                     },
                     label = "screenTransition"
                 ) { s ->
@@ -179,8 +174,8 @@ fun MainScreen(userName: String, onLogout: () -> Unit) {
                     when (tab) {
                         BottomTab.Home -> navigateTo(Screen.Home)
                         BottomTab.Exams -> navigateTo(Screen.Tests)
-                        BottomTab.Progress -> navigateTo(Screen.Results)
-                        BottomTab.Profile -> navigateTo(Screen.Profile)
+                        BottomTab.Tools -> navigateTo(Screen.Learn)
+                        BottomTab.Books -> navigateTo(Screen.Books)
                     }
                 })
             }
@@ -264,13 +259,14 @@ fun TopBar(theme: AppTheme, userName: String, sound: SoundManager, onProfile: ()
 // Async image loader — uses Coil
 @Composable
 fun AsyncImageLoader(url: String, modifier: Modifier = Modifier) {
-    if (url.isBlank()) {
+    val absoluteUrl = if (url.isBlank()) "" else if (url.startsWith("http")) url else "https://my-project-five-sepia.vercel.app$url"
+    if (absoluteUrl.isBlank()) {
         Box(modifier = modifier.background(NavyBlue.copy(alpha = 0.05f)), contentAlignment = Alignment.Center) {
             Icon(Icons.Default.Image, null, tint = NavyBlue.copy(alpha = 0.2f), modifier = Modifier.size(32.dp))
         }
         return
     }
-    coil.compose.AsyncImage(model = url, contentDescription = null, modifier = modifier, contentScale = ContentScale.Crop)
+    coil.compose.AsyncImage(model = absoluteUrl, contentDescription = null, modifier = modifier, contentScale = ContentScale.Crop)
 }
 
 // ─── HOME SCREEN — Professional EdTech design ─────────────────────────────────
