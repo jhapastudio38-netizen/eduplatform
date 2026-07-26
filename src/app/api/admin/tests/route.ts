@@ -11,12 +11,16 @@ export async function GET(req: NextRequest) {
   }
   const url = new URL(req.url);
   const category = url.searchParams.get("category"); // exam | demo | batch | chapter | question_bank
+  const q = url.searchParams.get("q")?.trim() || ""; // free-text title search
   const where: Record<string, unknown> = {};
   if (
     category &&
     ["exam", "demo", "batch", "chapter", "question_bank"].includes(category)
   ) {
     where.testCategory = category;
+  }
+  if (q) {
+    where.title = { contains: q, mode: "insensitive" };
   }
   const tests = await db.test.findMany({
     where,

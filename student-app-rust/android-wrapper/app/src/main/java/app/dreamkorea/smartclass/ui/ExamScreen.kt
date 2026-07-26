@@ -860,6 +860,7 @@ fun String.toAbsoluteUrl(): String {
 }
 
 // ─── Async image (loads from URL using Coil) ─────────────────────────────────
+// Tap any rendered image to open it in the full-screen viewer (pinch-zoom).
 @Composable
 fun AsyncImage(url: String, modifier: Modifier = Modifier) {
     val theme = rememberAppTheme()
@@ -873,7 +874,7 @@ fun AsyncImage(url: String, modifier: Modifier = Modifier) {
     coil.compose.AsyncImage(
         model = absoluteUrl,
         contentDescription = null,
-        modifier = modifier,
+        modifier = modifier.clickable { FullScreenImageViewer.show(absoluteUrl) },
         contentScale = ContentScale.Crop
     )
 }

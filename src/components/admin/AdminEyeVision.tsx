@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/dialog";
 import { Eye, Plus, Trash2, Upload, Loader2, X } from "lucide-react";
 import { toast } from "sonner";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 interface EyeVisionTest {
   id: string;
@@ -149,6 +150,7 @@ function CreateEyeVisionDialog({ open, onOpenChange, onCreated }: {
     imageUrl: "",
     correctAnswer: "",
     category: "",
+    level: "1",
   });
   const [busy, setBusy] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -197,13 +199,14 @@ function CreateEyeVisionDialog({ open, onOpenChange, onCreated }: {
           imageUrl: form.imageUrl,
           correctAnswer: form.correctAnswer.trim(),
           category: form.category.trim(),
+          level: parseInt(form.level) || 1,
           isPublished: true,
         }),
       });
       const d = await res.json();
       if (!res.ok) { toast.error(d.error || "Failed to create"); return; }
       toast.success("Eye vision test created");
-      setForm({ title: "", description: "", imageUrl: "", correctAnswer: "", category: "" });
+      setForm({ title: "", description: "", imageUrl: "", correctAnswer: "", category: "", level: "1" });
       onCreated();
     } catch {
       toast.error("Failed to create");
@@ -270,14 +273,32 @@ function CreateEyeVisionDialog({ open, onOpenChange, onCreated }: {
             </p>
           </div>
 
-          {/* Category */}
-          <div>
-            <Label className="text-sm font-semibold">Category (optional)</Label>
-            <Input
-              value={form.category}
-              onChange={(e) => setForm((f) => ({ ...f, category: e.target.value }))}
-              placeholder="e.g. Letters, Numbers, Symbols"
-            />
+          {/* Difficulty level — drives the adaptive algorithm */}
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <Label className="text-sm font-semibold">Difficulty Level</Label>
+              <Select value={form.level} onValueChange={(v) => setForm((f) => ({ ...f, level: v }))}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="1">Level 1 — Easiest (large print)</SelectItem>
+                  <SelectItem value="2">Level 2 — Easy</SelectItem>
+                  <SelectItem value="3">Level 3 — Medium</SelectItem>
+                  <SelectItem value="4">Level 4 — Hard</SelectItem>
+                  <SelectItem value="5">Level 5 — Hardest (tiny print)</SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground mt-1">
+                Adaptive difficulty serves Level 1 by default. Students level up after 2 correct in a row, drop down after 2 wrong in a row.
+              </p>
+            </div>
+            <div>
+              <Label className="text-sm font-semibold">Category (optional)</Label>
+              <Input
+                value={form.category}
+                onChange={(e) => setForm((f) => ({ ...f, category: e.target.value }))}
+                placeholder="e.g. Letters, Numbers, Symbols"
+              />
+            </div>
           </div>
         </div>
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -9,8 +9,60 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { FileText, Plus, Trash2, Clock, Upload, X, ChevronRight, ChevronLeft, Image as ImageIcon, Headphones, CheckCircle2, Copy, ClipboardPaste, Save } from "lucide-react";
+import { FileText, Plus, Trash2, Clock, Upload, X, ChevronRight, ChevronLeft, Image as ImageIcon, Headphones, CheckCircle2, Copy, ClipboardPaste, Save, CloudOff, Cloud, RotateCcw } from "lucide-react";
 import { toast } from "sonner";
+
+// ─── Draft persistence (localStorage) ────────────────────────────────────────
+// Auto-saves in-progress question drafts keyed by testId so a misclick,
+// accidental close, or page refresh doesn't lose work. Drafts are cleared
+// after a successful "Push to App".
+
+const DRAFT_PREFIX = "dk_draft_test_";
+
+function loadDraft(testId: string): Record<string, QuestionData> | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = localStorage.getItem(DRAFT_PREFIX + testId);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== "object") return null;
+    // Sanity-check: only keep entries that look like questions
+    const out: Record<string, QuestionData> = {};
+    for (const [k, v] of Object.entries(parsed)) {
+      if (v && typeof v === "object" && "blockType" in (v as any)) {
+        out[k] = v as QuestionData;
+      }
+    }
+    return out;
+  } catch {
+    return null;
+  }
+}
+
+function saveDraft(testId: string, questions: Record<string, QuestionData>) {
+  if (typeof window === "undefined") return;
+  try {
+    // Only persist entries that have a stem (skip pure-empty placeholders)
+    const filtered: Record<string, QuestionData> = {};
+    for (const [k, q] of Object.entries(questions)) {
+      if (q && (q.stem?.trim() || q.descText?.trim() || q.mediaImageUrl || q.mediaAudioUrl || q.descImageUrl || (q.options && q.options.some((o) => o?.trim())))) {
+        filtered[k] = q;
+      }
+    }
+    localStorage.setItem(DRAFT_PREFIX + testId, JSON.stringify(filtered));
+  } catch {
+    // localStorage might be full or disabled — fail silently
+  }
+}
+
+function clearDraft(testId: string) {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.removeItem(DRAFT_PREFIX + testId);
+  } catch {
+    // ignore
+  }
+}
 
 interface Test {
   id: string;
@@ -508,6 +560,12 @@ function ExamEditor({ test, testCategory, onClose }: { test: Test; testCategory:
   const [pasteCode, setPasteCode] = useState("");
   const [pushing, setPushing] = useState(false);
   const [isPublished, setIsPublished] = useState(test.isPublished);
+  // Draft auto-save state
+  const [draftSavedAt, setDraftSavedAt] = useState<number | null>(null);
+  const [hasDraft, setHasDraft] = useState(false);
+  const draftTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Track unsaved server-side question IDs so we can show "unsaved changes"
+  const [dirty, setDirty] = useState(false);
 
   const textCount = test.textBlockCount || (isSimple ? 0 : 20);
   const audioCount = test.audioBlockCount || (isSimple ? 0 : 20);
@@ -516,25 +574,75 @@ function ExamEditor({ test, testCategory, onClose }: { test: Test; testCategory:
     return `${blockType}-${blockNumber}`;
   }
 
+  // Merge fetched server questions with any locally-saved draft.
+  // Draft wins when present (it represents the most recent edit), but we
+  // keep the server's `id` / `testItemId` so saving updates the same row
+  // instead of creating a duplicate.
   useEffect(() => {
-    // Load existing questions
-    fetch(`/api/admin/tests/${test.id}/questions`)
-      .then((r) => r.json())
-      .then((d) => {
-        const map: Record<string, QuestionData> = {};
+    let cancelled = false;
+    (async () => {
+      const serverMap: Record<string, QuestionData> = {};
+      try {
+        const r = await fetch(`/api/admin/tests/${test.id}/questions`);
+        const d = await r.json();
         for (const q of d.questions || []) {
-          map[key(q.blockType, q.blockNumber)] = q;
+          serverMap[key(q.blockType, q.blockNumber)] = q;
         }
-        setQuestions(map);
-      })
-      .finally(() => setLoading(false));
+      } catch {
+        // network error — fall through to draft-only
+      }
+      if (cancelled) return;
+
+      const draft = loadDraft(test.id);
+      if (draft) {
+        const merged: Record<string, QuestionData> = { ...serverMap };
+        for (const [k, dq] of Object.entries(draft)) {
+          const sq = serverMap[k];
+          merged[k] = sq
+            ? { ...sq, ...dq, id: sq.id, testItemId: sq.testItemId }
+            : dq;
+        }
+        setQuestions(merged);
+        setHasDraft(true);
+        toast.info("Restored unsaved draft from this browser.", { duration: 3500 });
+      } else {
+        setQuestions(serverMap);
+      }
+      setLoading(false);
+    })();
+    return () => { cancelled = true; };
   }, [test.id]);
 
+  // Debounced auto-save to localStorage whenever questions change.
+  // We also set a "dirty" flag so the editor can warn on close.
   const currentKey = key(activeBlock, activeNumber);
   const currentQuestion = questions[currentKey] || emptyQuestion(activeBlock, activeNumber);
 
+  const scheduleDraftSave = useCallback((next: Record<string, QuestionData>) => {
+    if (draftTimer.current) clearTimeout(draftTimer.current);
+    draftTimer.current = setTimeout(() => {
+      saveDraft(test.id, next);
+      setDraftSavedAt(Date.now());
+      setDirty(true);
+    }, 600); // 600ms debounce — feels instant but avoids thrashing on every keystroke
+  }, [test.id]);
+
   function updateQuestion(q: QuestionData) {
-    setQuestions((prev) => ({ ...prev, [currentKey]: q }));
+    setQuestions((prev) => {
+      const next = { ...prev, [currentKey]: q };
+      scheduleDraftSave(next);
+      return next;
+    });
+  }
+
+  // Force an immediate save (used after successful server-saves)
+  function flushDraft() {
+    if (draftTimer.current) clearTimeout(draftTimer.current);
+    // Save whatever's in state right now
+    setQuestions((prev) => {
+      saveDraft(test.id, prev);
+      return prev;
+    });
   }
 
   async function saveQuestion() {
@@ -571,6 +679,13 @@ function ExamEditor({ test, testCategory, onClose }: { test: Test; testCategory:
         toast.error(d.error || `Save failed (HTTP ${res.status})`);
         return;
       }
+      // Update local state with the saved question (preserves id/testItemId)
+      setQuestions((prev) => ({
+        ...prev,
+        [currentKey]: { ...q, id: d.question?.id, testItemId: d.question?.testItemId ?? q.testItemId },
+      }));
+      // Persist the updated state to the draft so a refresh still works
+      setTimeout(() => flushDraft(), 50);
       toast.success(`Question ${q.blockNumber} saved`);
     } catch (e: any) {
       toast.error("Save failed: " + (e.message || "network error"));
@@ -654,12 +769,49 @@ function ExamEditor({ test, testCategory, onClose }: { test: Test; testCategory:
         return;
       }
       setIsPublished(true);
+      // Clear the local draft — everything is now safely on the server
+      clearDraft(test.id);
+      setHasDraft(false);
+      setDirty(false);
       toast.success(d.message || "Pushed to app — students can now see this exam");
     } catch (e: any) {
       toast.error("Push failed: " + (e.message || "network error"));
     } finally {
       setPushing(false);
     }
+  }
+
+  function discardDraft() {
+    if (!hasDraft) return;
+    if (!confirm("Discard local draft? Only unsaved changes from this browser will be removed — server-side questions stay intact.")) return;
+    clearDraft(test.id);
+    setHasDraft(false);
+    setDirty(false);
+    // Reload from server
+    setLoading(true);
+    fetch(`/api/admin/tests/${test.id}/questions`)
+      .then((r) => r.json())
+      .then((d) => {
+        const map: Record<string, QuestionData> = {};
+        for (const q of d.questions || []) {
+          map[key(q.blockType, q.blockNumber)] = q;
+        }
+        setQuestions(map);
+      })
+      .finally(() => setLoading(false));
+    toast.success("Draft discarded");
+  }
+
+  function attemptClose() {
+    if (dirty && !isPublished) {
+      // Confirm — but reassure the user that the draft is auto-saved
+      if (!confirm("You have unsaved changes on this browser. They will be auto-saved as a draft — you can come back later. Close anyway?")) {
+        return;
+      }
+      // Final flush of the draft just in case the debounce hasn't fired
+      flushDraft();
+    }
+    onClose();
   }
 
   function doPaste() {
@@ -712,6 +864,8 @@ function ExamEditor({ test, testCategory, onClose }: { test: Test; testCategory:
     const next = { ...questions };
     delete next[k];
     setQuestions(next);
+    // Persist the deletion in the draft
+    saveDraft(test.id, next);
     // If it was persisted server-side, also delete via API
     if (q.testItemId) {
       fetch(`/api/admin/tests/${test.id}/questions/${q.testItemId}`, { method: "DELETE" }).catch(() => {});
@@ -726,13 +880,35 @@ function ExamEditor({ test, testCategory, onClose }: { test: Test; testCategory:
   }
 
   return (
-    <Dialog open={true} onOpenChange={(v) => { if (!v) onClose(); }}>
+    <Dialog open={true} onOpenChange={(v) => { if (!v) attemptClose(); }}>
       <DialogContent className="sm:max-w-5xl max-h-[95vh] overflow-hidden flex flex-col">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
+          <DialogTitle className="flex items-center gap-2 flex-wrap">
             <span>{test.title}</span>
             <Badge variant="outline">{test.examType}</Badge>
             {test.category && <Badge variant="secondary">{test.category}</Badge>}
+            {/* Draft status pill */}
+            {hasDraft && (
+              <Badge
+                variant="outline"
+                className="ml-1 gap-1 text-amber-700 border-amber-300 bg-amber-50"
+                title={draftSavedAt ? `Auto-saved ${new Date(draftSavedAt).toLocaleTimeString()}` : "Auto-saved in this browser"}
+              >
+                <Cloud className="w-3 h-3" /> Draft saved
+                <button
+                  className="ml-1 hover:text-amber-900"
+                  onClick={discardDraft}
+                  title="Discard local draft"
+                >
+                  <RotateCcw className="w-3 h-3" />
+                </button>
+              </Badge>
+            )}
+            {!hasDraft && dirty && (
+              <Badge variant="outline" className="ml-1 gap-1 text-slate-600 border-slate-300">
+                <CloudOff className="w-3 h-3" /> Synced
+              </Badge>
+            )}
           </DialogTitle>
         </DialogHeader>
 

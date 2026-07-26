@@ -188,6 +188,12 @@ fun MainScreen(userName: String, onLogout: () -> Unit) {
                 })
             }
         }
+
+        // Global full-screen image viewer overlay — renders above every screen
+        // when an image URL is set via FullScreenImageViewer.show(url).
+        // Used by EyeVisionScreen, ExamScreen, and any other place that shows
+        // images the student may want to tap to enlarge.
+        FullScreenViewerOverlay(theme = theme)
     }
 }
 
