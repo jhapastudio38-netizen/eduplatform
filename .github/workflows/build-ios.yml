@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - 'ios-app/**'
+      - '.github/workflows/build-ios.yml'
   workflow_dispatch:
 
 jobs:
@@ -13,6 +14,16 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: List available Xcode versions
+        run: ls /Applications/ | grep Xcode
+
+      - name: Select latest Xcode
+        run: |
+          LATEST_XCODE=$(ls -d /Applications/Xcode*.app | sort -V | tail -1)
+          echo "Using: $LATEST_XCODE"
+          sudo xcode-select -s "$LATEST_XCODE/Contents/Developer"
+          xcodebuild -version
+
       - name: Install XcodeGen
         run: brew install xcodegen
 
@@ -20,53 +31,33 @@ jobs:
         working-directory: ios-app
         run: xcodegen generate
 
-      - name: Select Xcode
-        run: sudo xcode-select -s /Applications/Xcode_15.4.app/Contents/Developer
-
-      - name: Build IPA
+      - name: Build Archive (unsigned)
         working-directory: ios-app
         run: |
-          xcodebuild -project DreamKorea.xcodeproj \
+          xcodebuild archive \
+            -project DreamKorea.xcodeproj \
             -scheme DreamKorea \
             -configuration Release \
             -destination 'generic/platform=iOS' \
             -archivePath build/DreamKorea.xcarchive \
-            archive \
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGN_IDENTITY="" \
-            COMPILER_INDEX_STORE_ENABLE=NO
+            COMPILER_INDEX_STORE_ENABLE=NO \
+            AD_HOC_CODE_SIGNING_ALLOWED=YES
 
-      - name: Export IPA
+      - name: Create IPA from Archive
         working-directory: ios-app
         run: |
-          mkdir -p build/ipa
-          cat > build/ExportOptions.plist << 'EOF'
-          <?xml version="1.0" encoding="UTF-8"?>
-          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-          <plist version="1.0">
-          <dict>
-            <key>method</key>
-            <string>development</string>
-            <key>signingStyle</key>
-            <string>manual</string>
-            <key>stripSwiftSymbols</key>
-            <true/>
-            <key>compileBitcode</key>
-            <false/>
-          </dict>
-          </plist>
-          EOF
-          xcodebuild -exportArchive \
-            -archivePath build/DreamKorea.xcarchive \
-            -exportOptionsPlist build/ExportOptions.plist \
-            -exportPath build/ipa \
-            CODE_SIGNING_ALLOWED=NO \
-            ALLOW_UNSIGNED_APP_INSTALLS=YES
+          mkdir -p build/ipa/Payload
+          cp -r build/DreamKorea.xcarchive/Products/Applications/DreamKorea.app build/ipa/Payload/
+          cd build/ipa
+          zip -r DreamKorea.ipa Payload
+          ls -lh DreamKorea.ipa
 
       - name: Upload IPA
         uses: actions/upload-artifact@v4
         with:
-          name: DreamKorea-iOS
-          path: ios-app/build/ipa/*.ipa
+          name: DreamKorea-iOS-IPA
+          path: ios-app/build/ipa/DreamKorea.ipa
           retention-days: 30
