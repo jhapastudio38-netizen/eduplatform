@@ -50,7 +50,6 @@ fun LoginScreen(onLoginSuccess: () -> Unit) {
     var phone by remember { mutableStateOf("") }
     var code by remember { mutableStateOf("") }
     var step by remember { mutableStateOf(1) }
-
     var loading by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf("") }
     var info by remember { mutableStateOf("") }
@@ -60,7 +59,7 @@ fun LoginScreen(onLoginSuccess: () -> Unit) {
     var formVisible by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) {
         logoVisible = true
-        kotlinx.coroutines.delay(200)
+        kotlinx.coroutines.delay(300)
         formVisible = true
     }
     val logoScale by animateFloatAsState(
@@ -73,129 +72,122 @@ fun LoginScreen(onLoginSuccess: () -> Unit) {
         animationSpec = tween(600, easing = FastOutSlowInEasing),
         label = "formAlpha"
     )
-    val formOffset by animateFloatAsState(
-        targetValue = if (formVisible) 0f else 50f,
-        animationSpec = tween(600, easing = FastOutSlowInEasing),
-        label = "formOffset"
-    )
 
-    Surface(modifier = Modifier.fillMaxSize(), color = Color(0xFFF8FAFC)) {
+    Box(modifier = Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(NavyBlue, Color(0xFF1E40AF), Color(0xFFF8FAFC)))) ) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(horizontal = 28.dp)
+                .padding(horizontal = 24.dp)
                 .verticalScroll(rememberScrollState()),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
-            Spacer(modifier = Modifier.height(40.dp))
+            Spacer(modifier = Modifier.height(60.dp))
 
-            // Logo with gradient glow
-            Box(contentAlignment = Alignment.Center) {
-                // Glow background
-                Box(
-                    modifier = Modifier
-                        .size(140.dp)
-                        .clip(RoundedCornerShape(36.dp))
-                        .background(
-                            Brush.radialGradient(
-                                listOf(NavyBlue.copy(alpha = 0.15f), Color.Transparent),
-                            )
-                        )
-                )
-                Image(
-                    painter = painterResource(id = app.dreamkorea.smartclass.R.drawable.dreamkorea_logo),
-                    contentDescription = "DreamKorea Logo",
-                    modifier = Modifier.size(100.dp).scale(logoScale),
-                    contentScale = ContentScale.Fit
-                )
+            // Logo in a clean white circle — blends naturally
+            Surface(
+                color = Color.White,
+                shape = androidx.compose.foundation.shape.CircleShape,
+                modifier = Modifier.size(110.dp).scale(logoScale),
+                shadowElevation = 8.dp,
+            ) {
+                Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
+                    Image(
+                        painter = painterResource(id = app.dreamkorea.smartclass.R.drawable.dreamkorea_logo),
+                        contentDescription = "DreamKorea Logo",
+                        modifier = Modifier.size(70.dp),
+                        contentScale = ContentScale.Fit
+                    )
+                }
             }
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // Title with fade-in
+            // Title
             AnimatedVisibility(
                 visible = logoVisible,
                 enter = fadeIn(tween(500)) + slideInVertically(tween(500)) { it / 3 }
             ) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text("DreamKorea", color = NavyBlue, fontSize = 28.sp, fontWeight = FontWeight.Bold)
-                    Text("SmartClass", color = TextMid, fontSize = 14.sp, fontWeight = FontWeight.Medium)
+                    Text("DreamKorea", color = Color.White, fontSize = 26.sp, fontWeight = FontWeight.Bold)
+                    Text("SmartClass", color = Color.White.copy(alpha = 0.7f), fontSize = 14.sp, fontWeight = FontWeight.Medium)
                 }
             }
             Spacer(modifier = Modifier.height(32.dp))
 
-            // Form with slide-up + fade
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .alpha(formAlpha)
-                    .offset(y = formOffset.dp)
+            // Form card — clean white card on the gradient background
+            Surface(
+                color = Color.White,
+                shape = RoundedCornerShape(20.dp),
+                modifier = Modifier.fillMaxWidth().alpha(formAlpha),
+                shadowElevation = 6.dp,
             ) {
-                // Info message
-                AnimatedVisibility(visible = info.isNotEmpty(), enter = fadeIn() + slideInVertically(), exit = fadeOut()) {
-                    Surface(color = Color(0xFFE8F5E9), shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)) {
-                        Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Default.CheckCircle, null, tint = SuccessGreen, modifier = Modifier.size(18.dp))
-                            Spacer(Modifier.width(8.dp))
-                            Text(info, color = SuccessGreen, fontSize = 13.sp, modifier = Modifier.weight(1f))
-                        }
-                    }
-                }
-
-                // Error message
-                AnimatedVisibility(visible = error.isNotEmpty(), enter = fadeIn() + slideInVertically(), exit = fadeOut()) {
-                    Surface(color = Color(0xFFFEE2E2), shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)) {
-                        Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Default.Error, null, tint = Color(0xFFEF4444), modifier = Modifier.size(18.dp))
-                            Spacer(Modifier.width(8.dp))
-                            Text(error, color = Color(0xFFEF4444), fontSize = 13.sp, modifier = Modifier.weight(1f))
-                        }
-                    }
-                }
-
-                // Step content with animated transition
-                AnimatedContent(
-                    targetState = step,
-                    transitionSpec = {
-                        (fadeIn(tween(300)) + slideInHorizontally(tween(300)) { it / 5 }) togetherWith
-                        (fadeOut(tween(200)) + slideOutHorizontally(tween(200)) { -it / 5 })
-                    },
-                    label = "stepTransition"
-                ) { currentStep ->
-                    when (currentStep) {
-                        1 -> Step1Details(name, email, phone, loading) { n, e, p ->
-                            name = n; email = e; phone = p
-                            loading = true; error = ""; info = ""
-                            scope.launch {
-                                try {
-                                    AppState.api.requestOtp(OtpRequest(email))
-                                    sound.success()
-                                    info = "Verification code sent to $email"
-                                    step = 2
-                                } catch (e: UnknownHostException) { sound.error(); error = "No internet connection." }
-                                catch (e: IOException) { sound.error(); error = "Could not connect to server." }
-                                catch (e: Exception) { sound.error(); error = "Could not send code. Try again." }
-                                loading = false
+                Column(modifier = Modifier.padding(24.dp)) {
+                    // Info message
+                    AnimatedVisibility(visible = info.isNotEmpty(), enter = fadeIn() + slideInVertically(), exit = fadeOut()) {
+                        Surface(color = Color(0xFFE8F5E9), shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)) {
+                            Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                                Icon(Icons.Default.CheckCircle, null, tint = SuccessGreen, modifier = Modifier.size(18.dp))
+                                Spacer(Modifier.width(8.dp))
+                                Text(info, color = SuccessGreen, fontSize = 13.sp, modifier = Modifier.weight(1f))
                             }
                         }
-                        2 -> Step2Verify(code, email, loading) { c ->
-                            code = c
-                            loading = true; error = ""; info = ""
-                            scope.launch {
-                                try {
-                                    val resp = AppState.api.verifyOtp(VerifyRequest(contact = email, code = code, role = "STUDENT", name = name, email = email, phone = phone))
-                                    if (resp.ok) {
+                    }
+
+                    // Error message
+                    AnimatedVisibility(visible = error.isNotEmpty(), enter = fadeIn() + slideInVertically(), exit = fadeOut()) {
+                        Surface(color = Color(0xFFFEE2E2), shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)) {
+                            Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                                Icon(Icons.Default.Error, null, tint = Color(0xFFEF4444), modifier = Modifier.size(18.dp))
+                                Spacer(Modifier.width(8.dp))
+                                Text(error, color = Color(0xFFEF4444), fontSize = 13.sp, modifier = Modifier.weight(1f))
+                            }
+                        }
+                    }
+
+                    // Step content with animated transition
+                    AnimatedContent(
+                        targetState = step,
+                        transitionSpec = {
+                            (fadeIn(tween(300)) + slideInHorizontally(tween(300)) { it / 5 }) togetherWith
+                            (fadeOut(tween(200)) + slideOutHorizontally(tween(200)) { -it / 5 })
+                        },
+                        label = "stepTransition"
+                    ) { currentStep ->
+                        when (currentStep) {
+                            1 -> Step1Details(name, email, phone, loading) { n, e, p ->
+                                name = n; email = e; phone = p
+                                loading = true; error = ""; info = ""
+                                scope.launch {
+                                    try {
+                                        AppState.api.requestOtp(OtpRequest(email))
                                         sound.success()
-                                        val token = resp.sessionToken ?: "session_via_cookie"
-                                        AppState.saveSession(token, resp.user)
-                                        AppState.invalidateCache()
-                                        onLoginSuccess()
-                                    } else { sound.error(); error = "Verification failed." }
-                                } catch (e: UnknownHostException) { sound.error(); error = "No internet connection." }
-                                catch (e: IOException) { sound.error(); error = "Could not connect." }
-                                catch (e: Exception) { sound.error(); error = "Wrong code. Try again." }
-                                loading = false
+                                        info = "Code sent to $email"
+                                        step = 2
+                                    } catch (e: UnknownHostException) { sound.error(); error = "No internet connection." }
+                                    catch (e: IOException) { sound.error(); error = "Could not connect to server." }
+                                    catch (e: Exception) { sound.error(); error = "Could not send code." }
+                                    loading = false
+                                }
+                            }
+                            2 -> Step2Verify(code, email, loading) { c ->
+                                code = c
+                                loading = true; error = ""; info = ""
+                                scope.launch {
+                                    try {
+                                        val resp = AppState.api.verifyOtp(VerifyRequest(contact = email, code = code, role = "STUDENT", name = name, email = email, phone = phone))
+                                        if (resp.ok) {
+                                            sound.success()
+                                            val token = resp.sessionToken ?: "session_via_cookie"
+                                            AppState.saveSession(token, resp.user)
+                                            AppState.invalidateCache()
+                                            onLoginSuccess()
+                                        } else { sound.error(); error = "Verification failed." }
+                                    } catch (e: UnknownHostException) { sound.error(); error = "No internet connection." }
+                                    catch (e: IOException) { sound.error(); error = "Could not connect." }
+                                    catch (e: Exception) { sound.error(); error = "Wrong code." }
+                                    loading = false
+                                }
                             }
                         }
                     }
@@ -211,47 +203,39 @@ private fun Step1Details(name: String, email: String, phone: String, loading: Bo
     var n by remember { mutableStateOf(name) }
     var e by remember { mutableStateOf(email) }
     var p by remember { mutableStateOf(phone) }
-    var error by remember { mutableStateOf("") }
 
     Column(modifier = Modifier.fillMaxWidth()) {
-        Text("Create your account", color = TextDark, fontSize = 22.sp, fontWeight = FontWeight.Bold)
-        Text("We'll send a verification code to your email", color = TextMid, fontSize = 13.sp)
-        Spacer(Modifier.height(24.dp))
-
-        // Name field
-        Field(label = "Full Name", value = n, onChange = { n = it }, icon = Icons.Default.Person, keyboardType = KeyboardType.Text)
-        Spacer(Modifier.height(12.dp))
-
-        // Email field
-        Field(label = "Email", value = e, onChange = { e = it }, icon = Icons.Default.Email, keyboardType = KeyboardType.Email)
-        Spacer(Modifier.height(12.dp))
-
-        // Phone field
-        Field(label = "Phone Number", value = p, onChange = { p = it.filter { c -> c.isDigit() || c == '+' } }, icon = Icons.Default.Phone, keyboardType = KeyboardType.Phone, placeholder = "+977 98XXXXXXXX")
-        Spacer(Modifier.height(8.dp))
-
-        Text("Returning user? Use the same email to log in.", color = TextLight, fontSize = 11.sp)
+        Text("Welcome", color = TextDark, fontSize = 22.sp, fontWeight = FontWeight.Bold)
+        Text("Sign up or log in with your email", color = TextMid, fontSize: 13.sp)
         Spacer(Modifier.height(20.dp))
 
-        // Submit button
+        Field(label = "Full Name", value = n, onChange = { n = it }, icon = Icons.Default.Person, keyboardType = KeyboardType.Text)
+        Spacer(Modifier.height(10.dp))
+        Field(label = "Email", value = e, onChange = { e = it }, icon = Icons.Default.Email, keyboardType = KeyboardType.Email)
+        Spacer(Modifier.height(10.dp))
+        Field(label = "Phone Number", value = p, onChange = { p = it.filter { c -> c.isDigit() || c == '+' } }, icon = Icons.Default.Phone, keyboardType = KeyboardType.Phone, placeholder = "+977 98XXXXXXXX")
+        Spacer(Modifier.height(6.dp))
+        Text("Returning user? Use the same email to log in.", color = TextLight, fontSize = 11.sp)
+        Spacer(Modifier.height(16.dp))
+
         Button(
             onClick = {
-                if (n.isBlank()) { error = "Please enter your name"; return@Button }
-                if (e.isBlank()) { error = "Please enter your email"; return@Button }
-                if (!isEmail(e)) { error = "Please enter a valid email"; return@Button }
-                if (p.isBlank()) { error = "Phone number is required"; return@Button }
-                if (!isValidPhone(p)) { error = "Please enter a valid phone number"; return@Button }
+                if (n.isBlank()) return@Button
+                if (e.isBlank()) return@Button
+                if (!isEmail(e)) return@Button
+                if (p.isBlank()) return@Button
+                if (!isValidPhone(p)) return@Button
                 onSubmit(n, e, p)
             },
-            modifier = Modifier.fillMaxWidth().height(52.dp),
+            modifier = Modifier.fillMaxWidth().height(50.dp),
             colors = ButtonDefaults.buttonColors(containerColor = NavyBlue),
-            shape = RoundedCornerShape(14.dp),
+            shape = RoundedCornerShape(12.dp),
             enabled = !loading && n.isNotBlank() && e.isNotBlank() && p.isNotBlank()
         ) {
             if (loading) {
                 CircularProgressIndicator(color = Color.White, modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
             } else {
-                Text("Send Verification Code", fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+                Text("Send Verification Code", fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
             }
         }
     }
@@ -260,21 +244,12 @@ private fun Step1Details(name: String, email: String, phone: String, loading: Bo
 @Composable
 private fun Step2Verify(code: String, email: String, loading: Boolean, onSubmit: (String) -> Unit) {
     var c by remember { mutableStateOf(code) }
-    var resendTimer by remember { mutableStateOf(0) }
-
-    LaunchedEffect(Unit) {
-        while (resendTimer > 0) {
-            kotlinx.coroutines.delay(1000)
-            resendTimer--
-        }
-    }
 
     Column(modifier = Modifier.fillMaxWidth()) {
-        Text("Enter Verification Code", color = TextDark, fontSize = 22.sp, fontWeight = FontWeight.Bold)
-        Text("We sent a 6-digit code to $email", color = TextMid, fontSize = 13.sp)
-        Spacer(Modifier.height(24.dp))
+        Text("Verify", color = TextDark, fontSize = 22.sp, fontWeight = FontWeight.Bold)
+        Text("Enter the 6-digit code sent to $email", color = TextMid, fontSize = 13.sp)
+        Spacer(Modifier.height(20.dp))
 
-        // OTP field — large, centered
         OutlinedTextField(
             value = c,
             onValueChange = { c = it.filter { ch -> ch.isDigit() }.take(6) },
@@ -286,7 +261,7 @@ private fun Step2Verify(code: String, email: String, loading: Boolean, onSubmit:
                 focusedBorderColor = NavyBlue, unfocusedBorderColor = DividerColor, cursorColor = NavyBlue,
             ),
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-            shape = RoundedCornerShape(14.dp),
+            shape = RoundedCornerShape(12.dp),
             leadingIcon = { Icon(Icons.Default.Password, null, tint = TextMid, modifier = Modifier.size(20.dp)) },
             textStyle = androidx.compose.ui.text.TextStyle(fontSize = 20.sp, fontWeight = FontWeight.Bold, letterSpacing = 8.sp)
         )
@@ -294,35 +269,23 @@ private fun Step2Verify(code: String, email: String, loading: Boolean, onSubmit:
 
         Button(
             onClick = { if (c.length >= 6) onSubmit(c) },
-            modifier = Modifier.fillMaxWidth().height(52.dp),
+            modifier = Modifier.fillMaxWidth().height(50.dp),
             colors = ButtonDefaults.buttonColors(containerColor = NavyBlue),
-            shape = RoundedCornerShape(14.dp),
+            shape = RoundedCornerShape(12.dp),
             enabled = !loading && c.length >= 6
         ) {
             if (loading) {
                 CircularProgressIndicator(color = Color.White, modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
             } else {
-                Text("Verify & Continue", fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+                Text("Verify & Continue", fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
             }
         }
-        Spacer(Modifier.height(12.dp))
-
-        // Resend button
-        TextButton(
-            onClick = {
-                // Resend OTP
-            },
-            enabled = resendTimer == 0,
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Text(
-                if (resendTimer > 0) "Resend code in ${resendTimer}s" else "Resend code",
-                color = if (resendTimer > 0) TextLight else NavyBlue,
-                fontSize = 13.sp, fontWeight = FontWeight.SemiBold
-            )
-        }
         Spacer(Modifier.height(8.dp))
-        TextButton(onClick = { /* go back to step 1 */ }, modifier = Modifier.fillMaxWidth()) {
+        TextButton(onClick = { }, modifier = Modifier.fillMaxWidth()) {
+            Text("Resend code", color = NavyBlue, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+        }
+        Spacer(Modifier.height(4.dp))
+        TextButton(onClick = { /* back to step 1 */ }, modifier = Modifier.fillMaxWidth()) {
             Text("Change details", color = TextMid, fontSize = 13.sp)
         }
     }
@@ -343,7 +306,7 @@ private fun Field(label: String, value: String, onChange: (String) -> Unit, icon
             focusedLabelColor = NavyBlue, unfocusedLabelColor = TextMid,
         ),
         keyboardOptions = KeyboardOptions(keyboardType = keyboardType),
-        shape = RoundedCornerShape(14.dp),
+        shape = RoundedCornerShape(12.dp),
         leadingIcon = { Icon(icon, null, tint = TextMid, modifier = Modifier.size(20.dp)) }
     )
 }

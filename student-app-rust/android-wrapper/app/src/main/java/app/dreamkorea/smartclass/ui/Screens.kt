@@ -7,6 +7,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
@@ -665,23 +666,25 @@ fun BooksScreen(theme: AppTheme, sound: SoundManager, onBack: () -> Unit, onBook
 // ─── Tests Screen ─────────────────────────────────────────────────────────────
 @Composable
 fun TestsScreen(theme: AppTheme, sound: SoundManager, filter: String = "all", title: String = "All Exams", onBack: () -> Unit, onStartExam: (String) -> Unit) {
+    // Local filter state — allows in-screen filtering via tabs
+    var activeFilter by remember { mutableStateOf(filter) }
     var tests by remember {
-        mutableStateOf<List<TestItem>>(AppState.getCachedNow<List<TestItem>>(AppState.keyTests(filter)) ?: emptyList())
+        mutableStateOf<List<TestItem>>(AppState.getCachedNow<List<TestItem>>(AppState.keyTests(activeFilter)) ?: emptyList())
     }
     var loading by remember { mutableStateOf(tests.isEmpty()) }
     var error by remember { mutableStateOf("") }
     var retryCount by remember { mutableStateOf(0) }
 
-    LaunchedEffect(filter, retryCount) {
+    LaunchedEffect(activeFilter, retryCount) {
         if (tests.isNotEmpty()) loading = false else loading = true
         error = ""
         try {
-            if (retryCount > 0) AppState.invalidateCache(AppState.keyTests(filter))
-            val result = kotlinx.coroutines.withTimeoutOrNull(20_000L) { AppState.getCachedTests(filter) }
+            if (retryCount > 0) AppState.invalidateCache(AppState.keyTests(activeFilter))
+            val result = kotlinx.coroutines.withTimeoutOrNull(20_000L) { AppState.getCachedTests(activeFilter) }
             if (result != null) tests = result
             else if (tests.isEmpty()) error = "The request timed out. Check your internet and try again."
         } catch (e: retrofit2.HttpException) {
-            if (tests.isEmpty()) error = when (e.code()) { 401 -> "Your session has expired. Please log out and sign in again." else -> "Could not load tests (HTTP ${e.code()})." }
+            if (tests.isEmpty()) error = when (e.code()) { 401 -> "Your session has expired." else -> "Could not load (HTTP ${e.code()})." }
         } catch (e: java.net.UnknownHostException) { if (tests.isEmpty()) error = "No internet connection." }
         catch (e: java.net.SocketTimeoutException) { if (tests.isEmpty()) error = "The request timed out." }
         catch (e: java.io.IOException) { if (tests.isEmpty()) error = "Network error." }
@@ -715,8 +718,44 @@ fun TestsScreen(theme: AppTheme, sound: SoundManager, filter: String = "all", ti
         return
     }
 
-    LazyColumn(modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        item { ScreenHeader(theme, sound, title, if (tests.isEmpty()) "No tests available." else "Tap a test to start.", onBack) }
+    LazyColumn(modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 100.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        item {
+            Column(modifier = Modifier.fillMaxWidth().padding(top = 16.dp)) {
+                Text(title, color = TextDark, fontSize = 24.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 16.dp))
+                Text(if (tests.isEmpty()) "No tests available." else "${tests.size} exams available", color = TextMid, fontSize = 13.sp, modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp))
+            }
+        }
+
+        // Filter tabs — only show when initial filter="all" (i.e., from bottom nav Exams tab)
+        if (filter == "all") {
+            item {
+                val filters = listOf("all" to "All", "exam" to "UBT", "demo" to "Demo", "batch" to "Batch", "chapter" to "Chapter", "question_bank" to "Q Bank")
+                LazyRow(
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    items(filters) { (key, label) ->
+                        val isActive = activeFilter == key
+                        Surface(
+                            color = if (isActive) NavyBlue else CardWhite,
+                            shape = RoundedCornerShape(20.dp),
+                            modifier = Modifier.clickable { sound.click(); activeFilter = key },
+                            shadowElevation = if (isActive) 2.dp else 0.dp,
+                            border = if (isActive) null else androidx.compose.foundation.BorderStroke(1.dp, DividerColor),
+                        ) {
+                            Text(
+                                label,
+                                color = if (isActive) Color.White else TextMid,
+                                fontSize = 13.sp,
+                                fontWeight = if (isActive) FontWeight.SemiBold else FontWeight.Normal,
+                                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
         if (tests.isEmpty()) {
             item { EmptyState(theme, "Nothing here yet", "Your teacher will add content to this section soon.", Icons.Default.Quiz) }
         } else {
