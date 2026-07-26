@@ -1,0 +1,1318 @@
+     1→"use client";
+     2→
+     3→import { useEffect, useState, useRef } from "react";
+     4→import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+     5→import { Button } from "@/components/ui/button";
+     6→import { Input } from "@/components/ui/input";
+     7→import { Label } from "@/components/ui/label";
+     8→import { Textarea } from "@/components/ui/textarea";
+     9→import { Badge } from "@/components/ui/badge";
+    10→import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+    11→import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+    12→import { FileText, Plus, Trash2, Clock, Upload, X, ChevronRight, ChevronLeft, Image as ImageIcon, Headphones, CheckCircle2, Copy, ClipboardPaste, Save } from "lucide-react";
+    13→import { toast } from "sonner";
+    14→
+    15→interface Test {
+    16→  id: string;
+    17→  title: string;
+    18→  description?: string;
+    19→  durationMin: number;
+    20→  isExam: boolean;
+    21→  examType: string;
+    22→  testCategory?: string | null;
+    23→  passScore: number;
+    24→  isActive: boolean;
+    25→  isPublished: boolean;
+    26→  category?: string | null;
+    27→  featuredImage?: string | null;
+    28→  price?: number | null;
+    29→  audioPlayMode?: string | null;
+    30→  audioGapSec?: number | null;
+    31→  textBlockCount?: number | null;
+    32→  audioBlockCount?: number | null;
+    33→  _count?: { items: number };
+    34→}
+    35→
+    36→interface QuestionData {
+    37→  id?: string;
+    38→  testItemId?: string;
+    39→  blockType: "text" | "audio";
+    40→  blockNumber: number;
+    41→  stem: string;
+    42→  descType: "none" | "text" | "image" | "audio";
+    43→  descText: string;
+    44→  descImageUrl: string;
+    45→  descAudioUrl: string;
+    46→  mediaType: "none" | "text" | "image" | "audio";
+    47→  mediaText: string;
+    48→  mediaImageUrl: string;
+    49→  mediaAudioUrl: string;
+    50→  answerType: "text" | "image" | "audio" | "choose";
+    51→  options: string[];
+    52→  optionImages: string[];
+    53→  optionAudios: string[];
+    54→  correctOption: number;
+    55→  explanation: string;
+    56→}
+    57→
+    58→function emptyQuestion(blockType: "text" | "audio", blockNumber: number): QuestionData {
+    59→  return {
+    60→    blockType,
+    61→    blockNumber,
+    62→    stem: "",
+    63→    descType: "none",
+    64→    descText: "",
+    65→    descImageUrl: "",
+    66→    descAudioUrl: "",
+    67→    mediaType: blockType === "audio" ? "audio" : "none",
+    68→    mediaText: "",
+    69→    mediaImageUrl: "",
+    70→    mediaAudioUrl: "",
+    71→    answerType: "text",
+    72→    options: ["", "", "", ""],
+    73→    optionImages: ["", "", "", ""],
+    74→    optionAudios: ["", "", "", ""],
+    75→    correctOption: 0,
+    76→    explanation: "",
+    77→  };
+    78→}
+    79→
+    80→// Categories that use the simple "flat list" question editor
+    81→// (instead of the 20+20 block grid used by exam & demo).
+    82→const SIMPLE_CATEGORIES = ["batch", "chapter", "question_bank"];
+    83→
+    84→const CATEGORY_META: Record<string, { title: string; subtitle: string; createLabel: string }> = {
+    85→  exam:          { title: "Exams",          subtitle: "Block-based exam builder — 20 text + 20 audio questions", createLabel: "New Exam" },
+    86→  demo:          { title: "Demo Exams",     subtitle: "Practice tests — same block builder as exams",            createLabel: "New Demo Exam" },
+    87→  batch:         { title: "Batch Exams",    subtitle: "Exams assigned to student batches — add questions freely",  createLabel: "New Batch Exam" },
+    88→  chapter:       { title: "Chapter Exams",  subtitle: "Chapter-scoped exams — add questions freely",                createLabel: "New Chapter Exam" },
+    89→  question_bank: { title: "Question Bank",  subtitle: "Reusable question bank — add questions freely",              createLabel: "New Question Set" },
+    90→};
+    91→
+    92→export function AdminTests({ testCategory = "exam" }: { testCategory?: string }) {
+    93→  const [tests, setTests] = useState<Test[]>([]);
+    94→  const [loading, setLoading] = useState(true);
+    95→  const [createOpen, setCreateOpen] = useState(false);
+    96→  const [editingTest, setEditingTest] = useState<Test | null>(null);
+    97→
+    98→  const meta = CATEGORY_META[testCategory] || CATEGORY_META.exam;
+    99→
+   100→  function load() {
+   101→    setLoading(true);
+   102→    fetch(`/api/admin/tests?category=${encodeURIComponent(testCategory)}`)
+   103→      .then((r) => r.json())
+   104→      .then((d) => setTests(d.tests || []))
+   105→      .finally(() => setLoading(false));
+   106→  }
+   107→  useEffect(load, [testCategory]);
+   108→
+   109→  async function deleteTest(test: Test) {
+   110→    if (!confirm(`Delete "${test.title}"? This removes all questions.`)) return;
+   111→    await fetch(`/api/admin/tests/${test.id}`, { method: "DELETE" });
+   112→    toast.success("Exam deleted");
+   113→    load();
+   114→  }
+   115→
+   116→  return (
+   117→    <div className="space-y-4">
+   118→      <div className="flex items-center justify-between">
+   119→        <div>
+   120→          <h1 className="text-2xl font-bold">{meta.title} ({tests.length})</h1>
+   121→          <p className="text-sm text-muted-foreground">{meta.subtitle}</p>
+   122→        </div>
+   123→        <Button size="lg" onClick={() => setCreateOpen(true)}>
+   124→          <Plus className="w-4 h-4 mr-1" /> {meta.createLabel}
+   125→        </Button>
+   126→      </div>
+   127→
+   128→      {loading ? (
+   129→        <p className="text-center py-8 text-muted-foreground">Loading…</p>
+   130→      ) : tests.length === 0 ? (
+   131→        <Card>
+   132→          <CardContent className="py-12 text-center">
+   133→            <FileText className="w-12 h-12 mx-auto mb-3 text-muted-foreground" />
+   134→            <p className="text-muted-foreground">Nothing here yet. Click "{meta.createLabel}" to create one.</p>
+   135→          </CardContent>
+   136→        </Card>
+   137→      ) : (
+   138→        <div className="grid gap-3">
+   139→          {tests.map((t) => (
+   140→            <Card key={t.id} className="hover:shadow-md transition-shadow cursor-pointer" onClick={() => setEditingTest(t)}>
+   141→              <CardContent className="flex items-center gap-4 py-4">
+   142→                {t.featuredImage ? (
+   143→                  <img src={t.featuredImage} alt="" className="w-16 h-16 rounded-lg object-cover" />
+   144→                ) : (
+   145→                  <div className="w-16 h-16 rounded-lg bg-slate-100 flex items-center justify-center">
+   146→                    <FileText className="w-6 h-6 text-slate-400" />
+   147→                  </div>
+   148→                )}
+   149→                <div className="flex-1 min-w-0">
+   150→                  <div className="flex items-center gap-2 flex-wrap">
+   151→                    <h3 className="font-semibold truncate">{t.title}</h3>
+   152→                    <Badge variant="outline">{t.examType}</Badge>
+   153→                    {t.category && <Badge variant="secondary">{t.category}</Badge>}
+   154→                    {t.price ? <Badge>₩{t.price}</Badge> : <Badge variant="outline">Free</Badge>}
+   155→                  </div>
+   156→                  <p className="text-sm text-muted-foreground mt-1">
+   157→                    {t.durationMin} min • {t._count?.items || 0} questions • Pass {t.passScore}%
+   158→                  </p>
+   159→                </div>
+   160→                <div className="flex items-center gap-2">
+   161→                  {t.isPublished ? (
+   162→                    <Badge className="bg-green-500">🚀 Live</Badge>
+   163→                  ) : (
+   164→                    <Badge variant="secondary">📝 Draft</Badge>
+   165→                  )}
+   166→                  <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); deleteTest(t); }}>
+   167→                    <Trash2 className="w-4 h-4 text-red-500" />
+   168→                  </Button>
+   169→                  <ChevronRight className="w-5 h-5 text-muted-foreground" />
+   170→                </div>
+   171→              </CardContent>
+   172→            </Card>
+   173→          ))}
+   174→        </div>
+   175→      )}
+   176→
+   177→      {createOpen && (
+   178→        <CreateExamDialog
+   179→          open={createOpen}
+   180→          testCategory={testCategory}
+   181→          onOpenChange={setCreateOpen}
+   182→          onCreated={(t) => { setCreateOpen(false); setEditingTest(t); load(); }}
+   183→        />
+   184→      )}
+   185→
+   186→      {editingTest && (
+   187→        <ExamEditor
+   188→          test={editingTest}
+   189→          testCategory={testCategory}
+   190→          onClose={() => { setEditingTest(null); load(); }}
+   191→        />
+   192→      )}
+   193→    </div>
+   194→  );
+   195→}
+   196→
+   197→// ─── Featured Image Upload (drag & drop + instant preview) ──────────────────
+   198→function FeaturedImageUpload({ url, onUpload, onClear, uploadFn }: {
+   199→  url: string;
+   200→  onUpload: (url: string) => void;
+   201→  onClear: () => void;
+   202→  uploadFn: (file: File) => Promise<string>;
+   203→}) {
+   204→  const [uploading, setUploading] = useState(false);
+   205→  const [dragOver, setDragOver] = useState(false);
+   206→  const [localPreview, setLocalPreview] = useState("");
+   207→
+   208→  async function compressImage(file: File): Promise<File> {
+   209→    if (file.size < 200_000) return file;
+   210→    return new Promise((resolve) => {
+   211→      const reader = new FileReader();
+   212→      reader.onload = (e) => {
+   213→        const img = new Image();
+   214→        img.onload = () => {
+   215→          const canvas = document.createElement("canvas");
+   216→          const maxDim = 800;
+   217→          let { width, height } = img;
+   218→          if (width > maxDim || height > maxDim) {
+   219→            if (width > height) { height = (height / width) * maxDim; width = maxDim; }
+   220→            else { width = (width / height) * maxDim; height = maxDim; }
+   221→          }
+   222→          canvas.width = width; canvas.height = height;
+   223→          const ctx = canvas.getContext("2d")!;
+   224→          ctx.drawImage(img, 0, 0, width, height);
+   225→          canvas.toBlob((blob) => {
+   226→            if (blob) resolve(new File([blob], "featured.jpg", { type: "image/jpeg" }));
+   227→            else resolve(file);
+   228→          }, "image/jpeg", 0.8);
+   229→        };
+   230→        img.src = e.target?.result as string;
+   231→      };
+   232→      reader.readAsDataURL(file);
+   233→    });
+   234→  }
+   235→
+   236→  async function handleFile(file: File) {
+   237→    const localUrl = URL.createObjectURL(file);
+   238→    setLocalPreview(localUrl);
+   239→    setUploading(true);
+   240→    try {
+   241→      const compressed = await compressImage(file);
+   242→      const u = await uploadFn(compressed);
+   243→      onUpload(u);
+   244→      toast.success("Image uploaded");
+   245→    } catch (err: any) {
+   246→      toast.error(err.message || "Upload failed");
+   247→      setLocalPreview("");
+   248→    } finally {
+   249→      setUploading(false);
+   250→      setTimeout(() => URL.revokeObjectURL(localUrl), 1000);
+   251→    }
+   252→  }
+   253→
+   254→  const displayUrl = uploading && localPreview ? localPreview : url;
+   255→
+   256→  return (
+   257→    <div className="mt-1">
+   258→      {displayUrl ? (
+   259→        <div className="relative inline-block">
+   260→          <img src={displayUrl} alt="Featured" className="w-24 h-24 rounded-lg object-cover border-2 border-slate-200" />
+   261→          {uploading && (
+   262→            <div className="absolute inset-0 bg-black/40 rounded-lg flex items-center justify-center">
+   263→              <div className="w-6 h-6 border-2 border-white border-t-transparent rounded-full animate-spin" />
+   264→            </div>
+   265→          )}
+   266→          {!uploading && (
+   267→            <button
+   268→              onClick={() => { onClear(); setLocalPreview(""); }}
+   269→              className="absolute -top-2 -right-2 w-7 h-7 bg-red-500 text-white rounded-full flex items-center justify-center text-sm font-bold hover:bg-red-600 shadow"
+   270→            >✕</button>
+   271→          )}
+   272→        </div>
+   273→      ) : (
+   274→        <div
+   275→          onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+   276→          onDragLeave={() => setDragOver(false)}
+   277→          onDrop={(e) => {
+   278→            e.preventDefault(); setDragOver(false);
+   279→            const f = e.dataTransfer.files?.[0]; if (f) handleFile(f);
+   280→          }}
+   281→          className={`flex flex-col items-center justify-center w-24 h-24 border-2 border-dashed rounded-lg cursor-pointer transition-all ${
+   282→            dragOver ? "border-primary bg-primary/10 scale-105" : "border-slate-300 hover:border-primary hover:bg-slate-50"
+   283→          }`}
+   284→        >
+   285→          <input type="file" accept="image/*" className="hidden" onChange={(e) => {
+   286→            const f = e.target.files?.[0]; if (!f) return;
+   287→            handleFile(f); e.target.value = "";
+   288→          }} />
+   289→          <ImageIcon className="w-7 h-7 text-slate-400 mb-1" />
+   290→          <span className="text-[10px] text-slate-500 text-center px-1">Drag & drop<br/>or click</span>
+   291→        </div>
+   292→      )}
+   293→    </div>
+   294→  );
+   295→}
+   296→
+   297→// ═══════════════════════════════════════════════════════════════════════════
+   298→// CREATE EXAM DIALOG — Step 1: exam details
+   299→// ═══════════════════════════════════════════════════════════════════════════
+   300→
+   301→function CreateExamDialog({ open, testCategory, onOpenChange, onCreated }: {
+   302→  open: boolean;
+   303→  testCategory: string;
+   304→  onOpenChange: (v: boolean) => void;
+   305→  onCreated: (t: Test) => void;
+   306→}) {
+   307→  const isSimple = SIMPLE_CATEGORIES.includes(testCategory);
+   308→  const [busy, setBusy] = useState(false);
+   309→  const [form, setForm] = useState({
+   310→    title: "",
+   311→    description: "",
+   312→    durationMin: 60,
+   313→    examType: "UBT",
+   314→    category: "",
+   315→    price: "",
+   316→    featuredImage: "",
+   317→    audioPlayMode: "single" as "single" | "double",
+   318→    audioGapSec: 2,
+   319→    textBlockCount: isSimple ? 0 : 20,
+   320→    audioBlockCount: isSimple ? 0 : 20,
+   321→  });
+   322→
+   323→  async function uploadFile(file: File, folder: string): Promise<string> {
+   324→    const fd = new FormData();
+   325→    fd.append("file", file);
+   326→    fd.append("folder", folder);
+   327→    const res = await fetch("/api/admin/file-upload", { method: "POST", body: fd });
+   328→    if (!res.ok) { const d = await res.json(); throw new Error(d.error || "Upload failed"); }
+   329→    const d = await res.json();
+   330→    return d.url;
+   331→  }
+   332→
+   333→  async function create() {
+   334→    if (!form.title.trim()) { toast.error("Exam name required"); return; }
+   335→    setBusy(true);
+   336→    try {
+   337→      const payload = {
+   338→        title: form.title,
+   339→        description: form.description,
+   340→        durationMin: form.durationMin,
+   341→        examType: form.examType,
+   342→        testCategory,
+   343→        category: form.category || undefined,
+   344→        price: form.price ? parseFloat(form.price) : undefined,
+   345→        featuredImage: form.featuredImage || undefined,
+   346→        audioPlayMode: form.audioPlayMode,
+   347→        audioGapSec: form.audioGapSec,
+   348→        textBlockCount: form.textBlockCount,
+   349→        audioBlockCount: form.audioBlockCount,
+   350→        isExam: true,
+   351→        isPublished: false, // Draft — admin pushes when ready
+   352→      };
+   353→      const res = await fetch("/api/admin/tests", {
+   354→        method: "POST",
+   355→        headers: { "Content-Type": "application/json" },
+   356→        body: JSON.stringify(payload),
+   357→      });
+   358→      const d = await res.json();
+   359→      if (!res.ok) { toast.error(d.error || `Failed (HTTP ${res.status})`); return; }
+   360→      toast.success("Created — now add questions");
+   361→      onCreated(d.test);
+   362→    } catch (e: any) {
+   363→      toast.error("Create failed: " + (e.message || "network error"));
+   364→    } finally { setBusy(false); }
+   365→  }
+   366→
+   367→  const dialogTitle = isSimple
+   368→    ? `Create New ${CATEGORY_META[testCategory]?.title || "Set"}`
+   369→    : "Create New Exam";
+   370→
+   371→  return (
+   372→    <Dialog open={open} onOpenChange={onOpenChange}>
+   373→      <DialogContent className="sm:max-w-4xl max-h-[90vh] overflow-y-auto">
+   374→        <DialogHeader><DialogTitle className="text-xl">{dialogTitle}</DialogTitle></DialogHeader>
+   375→        <div className="space-y-4">
+   376→          {/* Exam Name */}
+   377→          <div>
+   378→            <Label className="text-sm font-semibold">Name *</Label>
+   379→            <Input
+   380→              value={form.title}
+   381→              onChange={(e) => setForm(f => ({ ...f, title: e.target.value }))}
+   382→              placeholder="e.g. UBT Mock Test 1"
+   383→              className="h-12 text-base"
+   384→            />
+   385→          </div>
+   386→
+   387→          {/* Exam Details */}
+   388→          <div>
+   389→            <Label className="text-sm font-semibold">Description</Label>
+   390→            <Textarea
+   391→              rows={2}
+   392→              value={form.description}
+   393→              onChange={(e) => setForm(f => ({ ...f, description: e.target.value }))}
+   394→              placeholder="Brief description of the exam"
+   395→            />
+   396→          </div>
+   397→
+   398→          {/* Exam Time + Price */}
+   399→          <div className="grid grid-cols-2 gap-3">
+   400→            <div>
+   401→              <Label className="text-sm font-semibold">Time (minutes) *</Label>
+   402→              <Input type="number" value={form.durationMin} onChange={(e) => setForm(f => ({ ...f, durationMin: parseInt(e.target.value) || 60 }))} min={1} />
+   403→            </div>
+   404→            <div>
+   405→              <Label className="text-sm font-semibold">Price (optional)</Label>
+   406→              <Input type="number" value={form.price} onChange={(e) => setForm(f => ({ ...f, price: e.target.value }))} placeholder="0 = free" min={0} />
+   407→            </div>
+   408→          </div>
+   409→
+   410→          {/* Exam Type + Category */}
+   411→          <div className="grid grid-cols-2 gap-3">
+   412→            <div>
+   413→              <Label className="text-sm font-semibold">Exam Type *</Label>
+   414→              <Select value={form.examType} onValueChange={(v) => setForm(f => ({ ...f, examType: v }))}>
+   415→                <SelectTrigger><SelectValue /></SelectTrigger>
+   416→                <SelectContent>
+   417→                  <SelectItem value="UBT">UBT</SelectItem>
+   418→                  <SelectItem value="CBT">CBT</SelectItem>
+   419→                  <SelectItem value="CHAPTER">Chapter</SelectItem>
+   420→                </SelectContent>
+   421→              </Select>
+   422→            </div>
+   423→            <div>
+   424→              <Label className="text-sm font-semibold">Category (shows in app)</Label>
+   425→              <Input value={form.category} onChange={(e) => setForm(f => ({ ...f, category: e.target.value }))} placeholder="e.g. Beginner, TOPIK 1" />
+   426→            </div>
+   427→          </div>
+   428→
+   429→          {/* Featured Image — drag & drop with instant preview */}
+   430→          <div>
+   431→            <Label className="text-sm font-semibold">Featured Image (optional)</Label>
+   432→            <FeaturedImageUpload
+   433→              url={form.featuredImage}
+   434→              onUpload={(url) => setForm(f => ({ ...f, featuredImage: url }))}
+   435→              onClear={() => setForm(f => ({ ...f, featuredImage: "" }))}
+   436→              uploadFn={(file) => uploadFile(file, "exam-featured")}
+   437→            />
+   438→          </div>
+   439→
+   440→          {/* Audio Settings — only for exam & demo (block-based) */}
+   441→          {!isSimple && (
+   442→            <div className="p-4 border rounded-lg bg-slate-50 space-y-3">
+   443→              <Label className="text-base font-semibold">Audio Settings (optional)</Label>
+   444→              <div className="grid grid-cols-2 gap-3">
+   445→                <div>
+   446→                  <Label>Play Mode</Label>
+   447→                  <Select value={form.audioPlayMode} onValueChange={(v: any) => setForm(f => ({ ...f, audioPlayMode: v }))}>
+   448→                    <SelectTrigger><SelectValue /></SelectTrigger>
+   449→                    <SelectContent>
+   450→                      <SelectItem value="single">Single (play once)</SelectItem>
+   451→                      <SelectItem value="double">Double (play twice)</SelectItem>
+   452→                    </SelectContent>
+   453→                  </Select>
+   454→                </div>
+   455→                <div>
+   456→                  <Label>Gap Between Plays (seconds)</Label>
+   457→                  <Input type="number" value={form.audioGapSec} onChange={(e) => setForm(f => ({ ...f, audioGapSec: parseInt(e.target.value) || 2 }))} min={0} max={60} />
+   458→                </div>
+   459→              </div>
+   460→            </div>
+   461→          )}
+   462→
+   463→          {/* Block Counts — only for exam & demo */}
+   464→          {!isSimple && (
+   465→            <div className="grid grid-cols-2 gap-3">
+   466→              <div>
+   467→                <Label className="text-sm font-semibold">Text Questions Count</Label>
+   468→                <Input type="number" value={form.textBlockCount} onChange={(e) => setForm(f => ({ ...f, textBlockCount: parseInt(e.target.value) || 20 }))} min={1} max={100} />
+   469→              </div>
+   470→              <div>
+   471→                <Label className="text-sm font-semibold">Audio Questions Count</Label>
+   472→                <Input type="number" value={form.audioBlockCount} onChange={(e) => setForm(f => ({ ...f, audioBlockCount: parseInt(e.target.value) || 20 }))} min={1} max={100} />
+   473→              </div>
+   474→            </div>
+   475→          )}
+   476→
+   477→          {/* Simple mode hint */}
+   478→          {isSimple && (
+   479→            <div className="p-4 border rounded-lg bg-emerald-50 border-emerald-200 text-sm text-emerald-800">
+   480→              Questions can be added freely after creation — there is no fixed block layout for this category.
+   481→            </div>
+   482→          )}
+   483→        </div>
+   484→
+   485→        <div className="flex justify-end gap-2 pt-2 border-t">
+   486→          <Button variant="outline" size="lg" onClick={() => onOpenChange(false)}>Cancel</Button>
+   487→          <Button size="lg" onClick={create} disabled={busy}>
+   488→            {busy ? "Creating…" : <><Plus className="w-4 h-4 mr-1" /> Create</>}
+   489→          </Button>
+   490→        </div>
+   491→      </DialogContent>
+   492→    </Dialog>
+   493→  );
+   494→}
+   495→
+   496→// ═══════════════════════════════════════════════════════════════════════════
+   497→// EXAM EDITOR — Step 2: block-based question editor
+   498→// ═══════════════════════════════════════════════════════════════════════════
+   499→
+   500→function ExamEditor({ test, testCategory, onClose }: { test: Test; testCategory: string; onClose: () => void }) {
+   501→  const isSimple = SIMPLE_CATEGORIES.includes(testCategory);
+   502→  const [activeBlock, setActiveBlock] = useState<"text" | "audio">("text");
+   503→  const [activeNumber, setActiveNumber] = useState(1);
+   504→  const [questions, setQuestions] = useState<Record<string, QuestionData>>({});
+   505→  const [loading, setLoading] = useState(true);
+   506→  const [clipboard, setClipboard] = useState<string>("");
+   507→  const [showPasteDialog, setShowPasteDialog] = useState(false);
+   508→  const [pasteCode, setPasteCode] = useState("");
+   509→  const [pushing, setPushing] = useState(false);
+   510→  const [isPublished, setIsPublished] = useState(test.isPublished);
+   511→
+   512→  const textCount = test.textBlockCount || (isSimple ? 0 : 20);
+   513→  const audioCount = test.audioBlockCount || (isSimple ? 0 : 20);
+   514→
+   515→  function key(blockType: string, blockNumber: number) {
+   516→    return `${blockType}-${blockNumber}`;
+   517→  }
+   518→
+   519→  useEffect(() => {
+   520→    // Load existing questions
+   521→    fetch(`/api/admin/tests/${test.id}/questions`)
+   522→      .then((r) => r.json())
+   523→      .then((d) => {
+   524→        const map: Record<string, QuestionData> = {};
+   525→        for (const q of d.questions || []) {
+   526→          map[key(q.blockType, q.blockNumber)] = q;
+   527→        }
+   528→        setQuestions(map);
+   529→      })
+   530→      .finally(() => setLoading(false));
+   531→  }, [test.id]);
+   532→
+   533→  const currentKey = key(activeBlock, activeNumber);
+   534→  const currentQuestion = questions[currentKey] || emptyQuestion(activeBlock, activeNumber);
+   535→
+   536→  function updateQuestion(q: QuestionData) {
+   537→    setQuestions((prev) => ({ ...prev, [currentKey]: q }));
+   538→  }
+   539→
+   540→  async function saveQuestion() {
+   541→    const q = currentQuestion;
+   542→    if (!q.stem.trim()) { toast.error("Question text required"); return; }
+   543→    try {
+   544→      // Strip fields the API doesn't expect
+   545→      const payload = {
+   546→        blockType: q.blockType,
+   547→        blockNumber: q.blockNumber,
+   548→        stem: q.stem,
+   549→        descType: q.descType,
+   550→        descText: q.descText || "",
+   551→        descImageUrl: q.descImageUrl || "",
+   552→        descAudioUrl: q.descAudioUrl || "",
+   553→        mediaType: q.mediaType,
+   554→        mediaText: q.mediaText || "",
+   555→        mediaImageUrl: q.mediaImageUrl || "",
+   556→        mediaAudioUrl: q.mediaAudioUrl || "",
+   557→        answerType: q.answerType,
+   558→        options: q.options || [],
+   559→        optionImages: q.optionImages || [],
+   560→        optionAudios: q.optionAudios || [],
+   561→        correctOption: q.correctOption,
+   562→        explanation: q.explanation || "",
+   563→      };
+   564→      const res = await fetch(`/api/admin/tests/${test.id}/questions`, {
+   565→        method: "POST",
+   566→        headers: { "Content-Type": "application/json" },
+   567→        body: JSON.stringify(payload),
+   568→      });
+   569→      const d = await res.json();
+   570→      if (!res.ok) {
+   571→        toast.error(d.error || `Save failed (HTTP ${res.status})`);
+   572→        return;
+   573→      }
+   574→      toast.success(`Question ${q.blockNumber} saved`);
+   575→    } catch (e: any) {
+   576→      toast.error("Save failed: " + (e.message || "network error"));
+   577→    }
+   578→  }
+   579→
+   580→  function copyQuestion() {
+   581→    const q = currentQuestion;
+   582→    if (!q.stem.trim()) { toast.error("Nothing to copy — question is empty"); return; }
+   583→    // Generate a copy code — admin can define their own prefix
+   584→    const code = `DK-${activeBlock.toUpperCase()}-${q.blockNumber}-${Date.now().toString(36).toUpperCase()}`;
+   585→    const data = JSON.stringify({ code, question: q });
+   586→    // Store in localStorage so admin can paste later
+   587→    const allCopies = JSON.parse(localStorage.getItem("dk_copies") || "{}");
+   588→    allCopies[code] = data;
+   589→    localStorage.setItem("dk_copies", JSON.stringify(allCopies));
+   590→    setClipboard(code);
+   591→    // Copy code to clipboard
+   592→    navigator.clipboard.writeText(code);
+   593→    toast.success(`Copied! Code: ${code}`);
+   594→  }
+   595→
+   596→  function pasteQuestion() {
+   597→    setShowPasteDialog(true);
+   598→  }
+   599→
+   600→  async function pushToApp() {
+   601→    const filledQuestions = Object.values(questions).filter(q => q.stem.trim());
+   602→    if (filledQuestions.length === 0) {
+   603→      toast.error("Cannot push: add at least one question first");
+   604→      return;
+   605→    }
+   606→
+   607→    setPushing(true);
+   608→    try {
+   609→      // Auto-save ALL filled questions — check each response
+   610→      let saveErrors = 0;
+   611→      for (const q of filledQuestions) {
+   612→        const payload = {
+   613→          blockType: q.blockType,
+   614→          blockNumber: q.blockNumber,
+   615→          stem: q.stem,
+   616→          descType: q.descType,
+   617→          descText: q.descText || "",
+   618→          descImageUrl: q.descImageUrl || "",
+   619→          descAudioUrl: q.descAudioUrl || "",
+   620→          mediaType: q.mediaType,
+   621→          mediaText: q.mediaText || "",
+   622→          mediaImageUrl: q.mediaImageUrl || "",
+   623→          mediaAudioUrl: q.mediaAudioUrl || "",
+   624→          answerType: q.answerType,
+   625→          options: q.options || [],
+   626→          optionImages: q.optionImages || [],
+   627→          optionAudios: q.optionAudios || [],
+   628→          correctOption: q.correctOption,
+   629→          explanation: q.explanation || "",
+   630→        };
+   631→        const saveRes = await fetch(`/api/admin/tests/${test.id}/questions`, {
+   632→          method: "POST",
+   633→          headers: { "Content-Type": "application/json" },
+   634→          body: JSON.stringify(payload),
+   635→        });
+   636→        if (!saveRes.ok) {
+   637→          const errData = await saveRes.json().catch(() => ({}));
+   638→          console.error(`Question ${q.blockNumber} save failed:`, errData);
+   639→          saveErrors++;
+   640→        }
+   641→      }
+   642→
+   643→      if (saveErrors > 0) {
+   644→        toast.error(`${saveErrors} question(s) failed to save. Check console for details.`);
+   645→        setPushing(false);
+   646→        return;
+   647→      }
+   648→
+   649→      // Now publish
+   650→      const res = await fetch(`/api/admin/tests/${test.id}/publish`, { method: "POST" });
+   651→      const d = await res.json();
+   652→      if (!res.ok) {
+   653→        toast.error(d.error || `Push failed (HTTP ${res.status})`);
+   654→        return;
+   655→      }
+   656→      setIsPublished(true);
+   657→      toast.success(d.message || "Pushed to app — students can now see this exam");
+   658→    } catch (e: any) {
+   659→      toast.error("Push failed: " + (e.message || "network error"));
+   660→    } finally {
+   661→      setPushing(false);
+   662→    }
+   663→  }
+   664→
+   665→  function doPaste() {
+   666→    const allCopies = JSON.parse(localStorage.getItem("dk_copies") || "{}");
+   667→    const data = allCopies[pasteCode.trim()];
+   668→    if (!data) { toast.error("Invalid paste code"); return; }
+   669→    const parsed = JSON.parse(data);
+   670→    const q = parsed.question as QuestionData;
+   671→    // Paste into current slot — keep current block number/type
+   672→    const pasted: QuestionData = {
+   673→      ...q,
+   674→      blockType: activeBlock,
+   675→      blockNumber: activeNumber,
+   676→    };
+   677→    updateQuestion(pasted);
+   678→    toast.success("Question pasted — click Save to persist");
+   679→    setShowPasteDialog(false);
+   680→    setPasteCode("");
+   681→  }
+   682→
+   683→  const blockNumbers = activeBlock === "text"
+   684→    ? Array.from({ length: textCount }, (_, i) => i + 1)
+   685→    : Array.from({ length: audioCount }, (_, i) => i + 1);
+   686→
+   687→  // Simple-mode list of saved questions (sorted by block number)
+   688→  const simpleList = Object.values(questions)
+   689→    .filter((q) => q.stem.trim())
+   690→    .sort((a, b) => a.blockNumber - b.blockNumber);
+   691→
+   692→  function addQuestion() {
+   693→    // Pick the next free block number for the "text" block type
+   694→    const used = new Set(Object.values(questions).map((q) => q.blockNumber));
+   695→    let next = 1;
+   696→    while (used.has(next)) next++;
+   697→    setActiveBlock("text");
+   698→    setActiveNumber(next);
+   699→    // Pre-seed an empty question so it appears in the list immediately
+   700→    const k = key("text", next);
+   701→    if (!questions[k]) {
+   702→      setQuestions((prev) => ({ ...prev, [k]: emptyQuestion("text", next) }));
+   703→    }
+   704→  }
+   705→
+   706→  function deleteActiveQuestion() {
+   707→    const k = key(activeBlock, activeNumber);
+   708→    const q = questions[k];
+   709→    if (!q) return;
+   710→    if (!confirm(`Delete question ${q.blockNumber}?`)) return;
+   711→    // Remove locally
+   712→    const next = { ...questions };
+   713→    delete next[k];
+   714→    setQuestions(next);
+   715→    // If it was persisted server-side, also delete via API
+   716→    if (q.testItemId) {
+   717→      fetch(`/api/admin/tests/${test.id}/questions/${q.testItemId}`, { method: "DELETE" }).catch(() => {});
+   718→    }
+   719→    toast.success("Question removed");
+   720→    // Move selection to the first remaining question
+   721→    const remaining = Object.values(next).sort((a, b) => a.blockNumber - b.blockNumber);
+   722→    if (remaining.length > 0) {
+   723→      setActiveBlock(remaining[0].blockType);
+   724→      setActiveNumber(remaining[0].blockNumber);
+   725→    }
+   726→  }
+   727→
+   728→  return (
+   729→    <Dialog open={true} onOpenChange={(v) => { if (!v) onClose(); }}>
+   730→      <DialogContent className="sm:max-w-5xl max-h-[95vh] overflow-hidden flex flex-col">
+   731→        <DialogHeader>
+   732→          <DialogTitle className="flex items-center gap-2">
+   733→            <span>{test.title}</span>
+   734→            <Badge variant="outline">{test.examType}</Badge>
+   735→            {test.category && <Badge variant="secondary">{test.category}</Badge>}
+   736→          </DialogTitle>
+   737→        </DialogHeader>
+   738→
+   739→        {/* Block tabs — only for exam & demo */}
+   740→        {!isSimple && (
+   741→          <div className="flex gap-2 border-b pb-2">
+   742→            <Button
+   743→              variant={activeBlock === "text" ? "default" : "outline"}
+   744→              size="sm"
+   745→              onClick={() => { setActiveBlock("text"); setActiveNumber(1); }}
+   746→            >
+   747→              <FileText className="w-4 h-4 mr-1" /> Text Block (1-{textCount})
+   748→            </Button>
+   749→            <Button
+   750→              variant={activeBlock === "audio" ? "default" : "outline"}
+   751→              size="sm"
+   752→              onClick={() => { setActiveBlock("audio"); setActiveNumber(1); }}
+   753→            >
+   754→              <Headphones className="w-4 h-4 mr-1" /> Audio Block ({textCount + 1}-{textCount + audioCount})
+   755→            </Button>
+   756→          </div>
+   757→        )}
+   758→
+   759→        {/* Block number selector — grid of numbered buttons (exam & demo only) */}
+   760→        {!isSimple && (
+   761→          <div className="grid grid-cols-10 gap-1 max-h-24 overflow-y-auto p-1 bg-slate-50 rounded">
+   762→            {blockNumbers.map((num) => {
+   763→              const k = key(activeBlock, num);
+   764→              const isFilled = questions[k] && questions[k].stem.trim();
+   765→              const isActive = num === activeNumber;
+   766→              return (
+   767→                <button
+   768→                  key={num}
+   769→                  onClick={() => setActiveNumber(num)}
+   770→                  className={`h-8 rounded text-xs font-medium transition-colors ${
+   771→                    isActive ? "bg-primary text-primary-foreground" :
+   772→                    isFilled ? "bg-green-100 text-green-700 border border-green-300" :
+   773→                    "bg-white border hover:bg-slate-100"
+   774→                  }`}
+   775→                >
+   776→                  {num}
+   777→                </button>
+   778→              );
+   779→            })}
+   780→          </div>
+   781→        )}
+   782→
+   783→        {/* Simple question list — for batch / chapter / question_bank */}
+   784→        {isSimple && (
+   785→          <div className="space-y-2 border-b pb-3">
+   786→            <div className="flex items-center justify-between">
+   787→              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+   788→                Questions ({simpleList.length})
+   789→              </p>
+   790→              <Button size="sm" onClick={addQuestion}>
+   791→                <Plus className="w-4 h-4 mr-1" /> Add Question
+   792→              </Button>
+   793→            </div>
+   794→            <div className="flex gap-2 flex-wrap max-h-24 overflow-y-auto p-1 bg-slate-50 rounded">
+   795→              {simpleList.length === 0 && (
+   796→                <p className="text-xs text-muted-foreground p-2">
+   797→                  No questions yet. Click &ldquo;Add Question&rdquo; to start.
+   798→                </p>
+   799→              )}
+   800→              {simpleList.map((q) => {
+   801→                const isActive = q.blockType === activeBlock && q.blockNumber === activeNumber;
+   802→                return (
+   803→                  <button
+   804→                    key={key(q.blockType, q.blockNumber)}
+   805→                    onClick={() => { setActiveBlock(q.blockType); setActiveNumber(q.blockNumber); }}
+   806→                    className={`h-8 px-3 rounded text-xs font-medium transition-colors ${
+   807→                      isActive ? "bg-primary text-primary-foreground" :
+   808→                      "bg-green-100 text-green-700 border border-green-300 hover:bg-green-200"
+   809→                    }`}
+   810→                    title={q.stem}
+   811→                  >
+   812→                    Q{q.blockNumber}
+   813→                  </button>
+   814→                );
+   815→              })}
+   816→            </div>
+   817→          </div>
+   818→        )}
+   819→
+   820→        {/* Question editor */}
+   821→        <div className="flex-1 overflow-y-auto pr-1">
+   822→          {loading ? (
+   823→            <p className="text-center py-8 text-muted-foreground">Loading questions…</p>
+   824→          ) : (
+   825→            <QuestionEditor
+   826→              question={currentQuestion}
+   827→              onChange={updateQuestion}
+   828→              blockLabel={`Question ${activeBlock === "audio" ? textCount + activeNumber : activeNumber}`}
+   829→              isAudioBlock={activeBlock === "audio"}
+   830→            />
+   831→          )}
+   832→        </div>
+   833→
+   834→        {/* Action buttons — Done, Copy, Paste, Delete (simple), Push to App */}
+   835→        <div className="flex items-center justify-between border-t pt-3">
+   836→          <div className="flex gap-2 flex-wrap">
+   837→            <Button onClick={saveQuestion} variant="default" size="lg">
+   838→              <Save className="w-4 h-4 mr-1" /> Save
+   839→            </Button>
+   840→            <Button onClick={copyQuestion} variant="outline" size="lg">
+   841→              <Copy className="w-4 h-4 mr-1" /> Copy
+   842→            </Button>
+   843→            <Button onClick={pasteQuestion} variant="outline" size="lg">
+   844→              <ClipboardPaste className="w-4 h-4 mr-1" /> Paste
+   845→            </Button>
+   846→            {isSimple && (
+   847→              <Button onClick={deleteActiveQuestion} variant="outline" size="lg" className="text-rose-600 hover:text-rose-700">
+   848→                <Trash2 className="w-4 h-4 mr-1" /> Delete
+   849→              </Button>
+   850→            )}
+   851→          </div>
+   852→          <div className="flex items-center gap-2">
+   853→            {isPublished && (
+   854→              <Badge className="bg-green-500">
+   855→                <CheckCircle2 className="w-3 h-3 mr-1" /> Live in App
+   856→              </Badge>
+   857→            )}
+   858→            <Button
+   859→              onClick={pushToApp}
+   860→              disabled={pushing || isPublished}
+   861→              variant={isPublished ? "outline" : "default"}
+   862→              size="lg"
+   863→              className={isPublished ? "" : "bg-green-600 hover:bg-green-700"}
+   864→            >
+   865→              {pushing ? (
+   866→                <><span className="animate-spin mr-1">⏳</span> Pushing…</>
+   867→              ) : isPublished ? (
+   868→                <><CheckCircle2 className="w-4 h-4 mr-1" /> Pushed</>
+   869→              ) : (
+   870→                <><span className="mr-1">🚀</span> Push to App</>
+   871→              )}
+   872→            </Button>
+   873→            <Button variant="ghost" size="lg" onClick={onClose}>Close</Button>
+   874→          </div>
+   875→        </div>
+   876→      </DialogContent>
+   877→
+   878→      {/* Paste dialog */}
+   879→      {showPasteDialog && (
+   880→        <Dialog open={true} onOpenChange={setShowPasteDialog}>
+   881→          <DialogContent className="max-w-md">
+   882→            <DialogHeader><DialogTitle>Paste Question</DialogTitle></DialogHeader>
+   883→            <div className="space-y-3">
+   884→              <Label>Enter paste code</Label>
+   885→              <Input value={pasteCode} onChange={(e) => setPasteCode(e.target.value)} placeholder="DK-TEXT-1-XXXX" />
+   886→              <p className="text-xs text-muted-foreground">Paste the code you got from "Copy Question" to duplicate that question here.</p>
+   887→            </div>
+   888→            <div className="flex justify-end gap-2">
+   889→              <Button variant="outline" onClick={() => setShowPasteDialog(false)}>Cancel</Button>
+   890→              <Button onClick={doPaste}>Paste</Button>
+   891→            </div>
+   892→          </DialogContent>
+   893→        </Dialog>
+   894→      )}
+   895→    </Dialog>
+   896→  );
+   897→}
+   898→
+   899→// ═══════════════════════════════════════════════════════════════════════════
+   900→// ═══════════════════════════════════════════════════════════════════════════
+   901→// QUESTION EDITOR — clean, PC-optimized, two-column layout
+   902→// ═══════════════════════════════════════════════════════════════════════════
+   903→
+   904→function QuestionEditor({ question, onChange, blockLabel, isAudioBlock }: {
+   905→  question: QuestionData;
+   906→  onChange: (q: QuestionData) => void;
+   907→  blockLabel: string;
+   908→  isAudioBlock: boolean;
+   909→}) {
+   910→  async function uploadFile(file: File): Promise<string> {
+   911→    const fd = new FormData();
+   912→    fd.append("file", file);
+   913→    fd.append("folder", "questions");
+   914→    const res = await fetch("/api/admin/file-upload", { method: "POST", body: fd });
+   915→    if (!res.ok) { const d = await res.json(); throw new Error(d.error || "Upload failed"); }
+   916→    const d = await res.json();
+   917→    return d.url;
+   918→  }
+   919→
+   920→  // ─── Reusable upload field with drag-drop + instant preview ───────────────
+   921→  function MediaUpload({
+   922→    label, accept, url, onUpload, onClear, type,
+   923→  }: {
+   924→    label: string;
+   925→    accept: string;
+   926→    url: string;
+   927→    onUpload: (url: string) => void;
+   928→    onClear: () => void;
+   929→    type: "image" | "audio";
+   930→  }) {
+   931→    const [uploading, setUploading] = useState(false);
+   932→    const [dragOver, setDragOver] = useState(false);
+   933→    const [localPreview, setLocalPreview] = useState<string>(""); // instant blob URL
+   934→
+   935→    // Compress images before upload (max 800px, 80% quality) — much faster
+   936→    async function compressImage(file: File): Promise<File> {
+   937→      if (file.size < 200_000) return file; // skip small images
+   938→      return new Promise((resolve) => {
+   939→        const reader = new FileReader();
+   940→        reader.onload = (e) => {
+   941→          const img = new Image();
+   942→          img.onload = () => {
+   943→            const canvas = document.createElement("canvas");
+   944→            const maxDim = 800;
+   945→            let { width, height } = img;
+   946→            if (width > maxDim || height > maxDim) {
+   947→              if (width > height) { height = (height / width) * maxDim; width = maxDim; }
+   948→              else { width = (width / height) * maxDim; height = maxDim; }
+   949→            }
+   950→            canvas.width = width; canvas.height = height;
+   951→            const ctx = canvas.getContext("2d")!;
+   952→            ctx.drawImage(img, 0, 0, width, height);
+   953→            canvas.toBlob((blob) => {
+   954→              if (blob) resolve(new File([blob], file.name.replace(/\.\w+$/, ".jpg"), { type: "image/jpeg" }));
+   955→              else resolve(file);
+   956→            }, "image/jpeg", 0.8);
+   957→          };
+   958→          img.src = e.target?.result as string;
+   959→        };
+   960→        reader.readAsDataURL(file);
+   961→      });
+   962→    }
+   963→
+   964→    async function handleFile(file: File) {
+   965→      // Instant local preview (no waiting for upload)
+   966→      const localUrl = URL.createObjectURL(file);
+   967→      setLocalPreview(localUrl);
+   968→
+   969→      setUploading(true);
+   970→      try {
+   971→        // Compress images for faster upload
+   972→        const fileToUpload = type === "image" ? await compressImage(file) : file;
+   973→        const u = await uploadFile(fileToUpload);
+   974→        onUpload(u);
+   975→        toast.success("Uploaded");
+   976→      } catch (err: any) {
+   977→        toast.error(err.message || "Upload failed");
+   978→        setLocalPreview(""); // clear preview on error
+   979→      } finally {
+   980→        setUploading(false);
+   981→        // Clean up the blob URL after a delay (let React render the real URL)
+   982→        setTimeout(() => URL.revokeObjectURL(localUrl), 1000);
+   983→      }
+   984→    }
+   985→
+   986→    // The display URL: local preview during upload, real URL after
+   987→    const displayUrl = uploading && localPreview ? localPreview : url;
+   988→
+   989→    return (
+   990→      <div className="space-y-2">
+   991→        {label && <Label className="text-sm font-medium">{label}</Label>}
+   992→
+   993→        {displayUrl ? (
+   994→          /* ─── Preview shown (either local or uploaded) ─── */
+   995→          <div className="flex items-start gap-3">
+   996→            {type === "image" ? (
+   997→              <div className="relative">
+   998→                <img src={displayUrl} alt={label} className="w-28 h-28 rounded-lg object-cover border-2 border-slate-200" />
+   999→                {uploading && (
+  1000→                  <div className="absolute inset-0 bg-black/40 rounded-lg flex items-center justify-center">
+  1001→                    <div className="w-6 h-6 border-2 border-white border-t-transparent rounded-full animate-spin" />
+  1002→                  </div>
+  1003→                )}
+  1004→                {!uploading && (
+  1005→                  <button
+  1006→                    onClick={() => { onClear(); setLocalPreview(""); }}
+  1007→                    className="absolute -top-2 -right-2 w-7 h-7 bg-red-500 text-white rounded-full flex items-center justify-center text-sm font-bold hover:bg-red-600 shadow"
+  1008→                    title="Remove"
+  1009→                  >✕</button>
+  1010→                )}
+  1011→              </div>
+  1012→            ) : (
+  1013→              <div className="relative flex-1">
+  1014→                <audio controls src={displayUrl} className="w-full" />
+  1015→                {uploading && (
+  1016→                  <div className="absolute inset-0 bg-black/20 rounded flex items-center justify-center">
+  1017→                    <div className="bg-white px-3 py-1 rounded-full text-xs font-medium flex items-center gap-2">
+  1018→                      <div className="w-3 h-3 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+  1019→                      Uploading…
+  1020→                    </div>
+  1021→                  </div>
+  1022→                )}
+  1023→                {!uploading && (
+  1024→                  <button
+  1025→                    onClick={() => { onClear(); setLocalPreview(""); }}
+  1026→                    className="absolute -top-2 -right-2 w-7 h-7 bg-red-500 text-white rounded-full flex items-center justify-center text-sm font-bold hover:bg-red-600 shadow"
+  1027→                    title="Remove"
+  1028→                  >✕</button>
+  1029→                )}
+  1030→              </div>
+  1031→            )}
+  1032→          </div>
+  1033→        ) : (
+  1034→          /* ─── Upload zone (drag-drop + click) ─── */
+  1035→          <div
+  1036→            onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+  1037→            onDragLeave={() => setDragOver(false)}
+  1038→            onDrop={(e) => {
+  1039→              e.preventDefault();
+  1040→              setDragOver(false);
+  1041→              const f = e.dataTransfer.files?.[0];
+  1042→              if (f) handleFile(f);
+  1043→            }}
+  1044→            className={`flex flex-col items-center justify-center w-full h-28 border-2 border-dashed rounded-lg cursor-pointer transition-all ${
+  1045→              dragOver ? "border-primary bg-primary/10 scale-[1.02]" : "border-slate-300 hover:border-primary hover:bg-slate-50"
+  1046→            }`}
+  1047→          >
+  1048→            <input type="file" accept={accept} className="hidden" onChange={(e) => {
+  1049→              const f = e.target.files?.[0]; if (!f) return;
+  1050→              handleFile(f);
+  1051→              e.target.value = "";
+  1052→            }} />
+  1053→            <Upload className="w-7 h-7 text-slate-400 mb-1" />
+  1054→            <span className="text-xs text-slate-500 font-medium">
+  1055→              {dragOver ? "Drop here!" : `Drag & drop or click to upload ${type}`}
+  1056→            </span>
+  1057→          </div>
+  1058→        )}
+  1059→      </div>
+  1060→    );
+  1061→  }
+  1062→
+  1063→  return (
+  1064→    <div className="space-y-5 p-1">
+  1065→      {/* ─── Question number + label ──────────────────────────────────────── */}
+  1066→      <div className="flex items-center gap-3 pb-3 border-b">
+  1067→        <div className="w-12 h-12 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-lg font-bold">
+  1068→          {question.blockNumber}
+  1069→        </div>
+  1070→        <div>
+  1071→          <p className="font-bold text-base">{blockLabel}</p>
+  1072→          <p className="text-xs text-muted-foreground">{isAudioBlock ? "Audio question" : "Text question"}</p>
+  1073→        </div>
+  1074→      </div>
+  1075→
+  1076→      {/* ─── Two-column layout for PC ─────────────────────────────────────── */}
+  1077→      <div className="grid grid-cols-2 gap-6">
+  1078→
+  1079→        {/* ─── LEFT COLUMN: Description + Question ─────────────────────────── */}
+  1080→        <div className="space-y-5">
+  1081→
+  1082→          {/* Description Type */}
+  1083→          <div className="space-y-2">
+  1084→            <Label className="text-sm font-semibold">Description Type</Label>
+  1085→            <div className="flex gap-1">
+  1086→              {(["none", "text", "image", "audio"] as const).map((t) => (
+  1087→                <Button
+  1088→                  key={t}
+  1089→                  variant={question.descType === t ? "default" : "outline"}
+  1090→                  size="sm"
+  1091→                  className="flex-1"
+  1092→                  onClick={() => onChange({ ...question, descType: t })}
+  1093→                >
+  1094→                  {t === "none" ? "None" : t.charAt(0).toUpperCase() + t.slice(1)}
+  1095→                </Button>
+  1096→              ))}
+  1097→            </div>
+  1098→          </div>
+  1099→
+  1100→          {/* Description content */}
+  1101→          {question.descType === "text" && (
+  1102→            <div className="space-y-1">
+  1103→              <Label className="text-xs text-muted-foreground">Description Text</Label>
+  1104→              <Textarea rows={2} value={question.descText} onChange={(e) => onChange({ ...question, descText: e.target.value })} placeholder="Enter description…" />
+  1105→            </div>
+  1106→          )}
+  1107→          {question.descType === "image" && (
+  1108→            <MediaUpload
+  1109→              label="Description Image"
+  1110→              accept="image/*"
+  1111→              url={question.descImageUrl}
+  1112→              onUpload={(url) => onChange({ ...question, descImageUrl: url })}
+  1113→              onClear={() => onChange({ ...question, descImageUrl: "" })}
+  1114→              type="image"
+  1115→            />
+  1116→          )}
+  1117→          {question.descType === "audio" && (
+  1118→            <MediaUpload
+  1119→              label="Description Audio"
+  1120→              accept="audio/*"
+  1121→              url={question.descAudioUrl}
+  1122→              onUpload={(url) => onChange({ ...question, descAudioUrl: url })}
+  1123→              onClear={() => onChange({ ...question, descAudioUrl: "" })}
+  1124→              type="audio"
+  1125→            />
+  1126→          )}
+  1127→
+  1128→          {/* Question text */}
+  1129→          <div className="space-y-1">
+  1130→            <Label className="text-sm font-semibold">Question <span className="text-red-500">*</span></Label>
+  1131→            <Textarea rows={3} value={question.stem} onChange={(e) => onChange({ ...question, stem: e.target.value })} placeholder="What is the question?" className="text-base" />
+  1132→          </div>
+  1133→
+  1134→          {/* Question Media Type */}
+  1135→          <div className="space-y-2">
+  1136→            <Label className="text-sm font-semibold">Question Media (shows in exam)</Label>
+  1137→            <div className="flex gap-1">
+  1138→              {(["none", "text", "image", "audio"] as const).map((t) => (
+  1139→                <Button
+  1140→                  key={t}
+  1141→                  variant={question.mediaType === t ? "default" : "outline"}
+  1142→                  size="sm"
+  1143→                  className="flex-1"
+  1144→                  onClick={() => onChange({ ...question, mediaType: t })}
+  1145→                  disabled={isAudioBlock && t === "none"}
+  1146→                >
+  1147→                  {t === "none" ? "None" : t.charAt(0).toUpperCase() + t.slice(1)}
+  1148→                </Button>
+  1149→              ))}
+  1150→            </div>
+  1151→          </div>
+  1152→
+  1153→          {/* Media content */}
+  1154→          {question.mediaType === "text" && (
+  1155→            <div className="space-y-1">
+  1156→              <Label className="text-xs text-muted-foreground">Media Text</Label>
+  1157→              <Textarea rows={2} value={question.mediaText} onChange={(e) => onChange({ ...question, mediaText: e.target.value })} placeholder="Media text…" />
+  1158→            </div>
+  1159→          )}
+  1160→          {question.mediaType === "image" && (
+  1161→            <MediaUpload
+  1162→              label="Question Image"
+  1163→              accept="image/*"
+  1164→              url={question.mediaImageUrl}
+  1165→              onUpload={(url) => onChange({ ...question, mediaImageUrl: url })}
+  1166→              onClear={() => onChange({ ...question, mediaImageUrl: "" })}
+  1167→              type="image"
+  1168→            />
+  1169→          )}
+  1170→          {question.mediaType === "audio" && (
+  1171→            <MediaUpload
+  1172→              label="Question Audio"
+  1173→              accept="audio/*"
+  1174→              url={question.mediaAudioUrl}
+  1175→              onUpload={(url) => onChange({ ...question, mediaAudioUrl: url })}
+  1176→              onClear={() => onChange({ ...question, mediaAudioUrl: "" })}
+  1177→              type="audio"
+  1178→            />
+  1179→          )}
+  1180→        </div>
+  1181→
+  1182→        {/* ─── RIGHT COLUMN: Answer type + options ────────────────────────── */}
+  1183→        <div className="space-y-5">
+  1184→
+  1185→          {/* Answer Type */}
+  1186→          <div className="space-y-2">
+  1187→            <Label className="text-sm font-semibold">Answer Type</Label>
+  1188→            <div className="grid grid-cols-2 gap-1">
+  1189→              {(["text", "image", "audio", "choose"] as const).map((t) => (
+  1190→                <Button
+  1191→                  key={t}
+  1192→                  variant={question.answerType === t ? "default" : "outline"}
+  1193→                  size="sm"
+  1194→                  onClick={() => onChange({ ...question, answerType: t })}
+  1195→                >
+  1196→                  {t === "text" ? "Text Options" : t === "image" ? "Image Options" : t === "audio" ? "Audio Options" : "Choose Correct"}
+  1197→                </Button>
+  1198→              ))}
+  1199→            </div>
+  1200→          </div>
+  1201→
+  1202→          {/* Options based on answer type */}
+  1203→          {(question.answerType === "text" || question.answerType === "choose") && (
+  1204→            <div className="space-y-3 p-4 border rounded-lg bg-slate-50">
+  1205→              <Label className="text-sm font-semibold">4 Options — click circle to mark correct</Label>
+  1206→              <div className="space-y-2">
+  1207→                {[0, 1, 2, 3].map((i) => (
+  1208→                  <div key={i} className="flex items-center gap-3">
+  1209→                    <button
+  1210→                      onClick={() => onChange({ ...question, correctOption: i })}
+  1211→                      className={`w-8 h-8 rounded-full border-2 flex items-center justify-center text-sm font-bold flex-shrink-0 ${
+  1212→                        question.correctOption === i ? "bg-green-500 text-white border-green-500" : "border-slate-300 text-slate-400"
+  1213→                      }`}
+  1214→                      title="Mark as correct"
+  1215→                    >
+  1216→                      {question.correctOption === i ? "✓" : String.fromCharCode(65 + i)}
+  1217→                    </button>
+  1218→                    <Input
+  1219→                      value={question.options[i] || ""}
+  1220→                      onChange={(e) => {
+  1221→                        const opts = [...question.options];
+  1222→                        opts[i] = e.target.value;
+  1223→                        onChange({ ...question, options: opts });
+  1224→                      }}
+  1225→                      placeholder={`Option ${String.fromCharCode(65 + i)}`}
+  1226→                      className="flex-1"
+  1227→                    />
+  1228→                  </div>
+  1229→                ))}
+  1230→              </div>
+  1231→            </div>
+  1232→          )}
+  1233→
+  1234→          {question.answerType === "image" && (
+  1235→            <div className="space-y-3 p-4 border rounded-lg bg-slate-50">
+  1236→              <Label className="text-sm font-semibold">4 Image Options — click circle to mark correct</Label>
+  1237→              <div className="grid grid-cols-2 gap-3">
+  1238→                {[0, 1, 2, 3].map((i) => (
+  1239→                  <div key={i} className="space-y-2 p-3 border rounded bg-white">
+  1240→                    <div className="flex items-center gap-2 mb-1">
+  1241→                      <button
+  1242→                        onClick={() => onChange({ ...question, correctOption: i })}
+  1243→                        className={`w-7 h-7 rounded-full border-2 flex items-center justify-center text-xs font-bold flex-shrink-0 ${
+  1244→                          question.correctOption === i ? "bg-green-500 text-white border-green-500" : "border-slate-300 text-slate-400"
+  1245→                        }`}
+  1246→                      >
+  1247→                        {question.correctOption === i ? "✓" : String.fromCharCode(65 + i)}
+  1248→                      </button>
+  1249→                      <span className="text-xs font-medium">Option {String.fromCharCode(65 + i)}</span>
+  1250→                    </div>
+  1251→                    <MediaUpload
+  1252→                      label=""
+  1253→                      accept="image/*"
+  1254→                      url={question.optionImages[i] || ""}
+  1255→                      onUpload={(url) => {
+  1256→                        const imgs = [...question.optionImages]; imgs[i] = url;
+  1257→                        onChange({ ...question, optionImages: imgs });
+  1258→                      }}
+  1259→                      onClear={() => {
+  1260→                        const imgs = [...question.optionImages]; imgs[i] = "";
+  1261→                        onChange({ ...question, optionImages: imgs });
+  1262→                      }}
+  1263→                      type="image"
+  1264→                    />
+  1265→                  </div>
+  1266→                ))}
+  1267→              </div>
+  1268→            </div>
+  1269→          )}
+  1270→
+  1271→          {question.answerType === "audio" && (
+  1272→            <div className="space-y-3 p-4 border rounded-lg bg-slate-50">
+  1273→              <Label className="text-sm font-semibold">4 Audio Options — click circle to mark correct</Label>
+  1274→              <div className="space-y-3">
+  1275→                {[0, 1, 2, 3].map((i) => (
+  1276→                  <div key={i} className="p-3 border rounded bg-white">
+  1277→                    <div className="flex items-center gap-2 mb-2">
+  1278→                      <button
+  1279→                        onClick={() => onChange({ ...question, correctOption: i })}
+  1280→                        className={`w-7 h-7 rounded-full border-2 flex items-center justify-center text-xs font-bold flex-shrink-0 ${
+  1281→                          question.correctOption === i ? "bg-green-500 text-white border-green-500" : "border-slate-300 text-slate-400"
+  1282→                        }`}
+  1283→                      >
+  1284→                        {question.correctOption === i ? "✓" : String.fromCharCode(65 + i)}
+  1285→                      </button>
+  1286→                      <span className="text-xs font-medium">Audio {String.fromCharCode(65 + i)}</span>
+  1287→                    </div>
+  1288→                    <MediaUpload
+  1289→                      label=""
+  1290→                      accept="audio/*"
+  1291→                      url={question.optionAudios[i] || ""}
+  1292→                      onUpload={(url) => {
+  1293→                        const auds = [...question.optionAudios]; auds[i] = url;
+  1294→                        onChange({ ...question, optionAudios: auds });
+  1295→                      }}
+  1296→                      onClear={() => {
+  1297→                        const auds = [...question.optionAudios]; auds[i] = "";
+  1298→                        onChange({ ...question, optionAudios: auds });
+  1299→                      }}
+  1300→                      type="audio"
+  1301→                    />
+  1302→                  </div>
+  1303→                ))}
+  1304→              </div>
+  1305→            </div>
+  1306→          )}
+  1307→
+  1308→          {/* Answer Description */}
+  1309→          <div className="space-y-1">
+  1310→            <Label className="text-sm font-semibold">Answer Description (optional)</Label>
+  1311→            <Textarea rows={2} value={question.explanation} onChange={(e) => onChange({ ...question, explanation: e.target.value })} placeholder="Explanation shown after answering…" />
+  1312→          </div>
+  1313→        </div>
+  1314→      </div>
+  1315→    </div>
+  1316→  );
+  1317→}
+  1318→
