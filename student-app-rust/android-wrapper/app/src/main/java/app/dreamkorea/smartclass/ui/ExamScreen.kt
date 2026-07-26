@@ -583,15 +583,16 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
                             modifier = Modifier.padding(bottom = 12.dp)
                         )
                         // Grid — 6 columns of numbered buttons
-                        // Use LazyVerticalGrid for performance on big tests
+                        // Use LazyVerticalGrid for performance on big tests.
+                        // Note: gridItems() takes a List<T>, not a count.
                         LazyVerticalGrid(
                             columns = GridCells.Fixed(6),
                             modifier = Modifier.weight(1f),
                             verticalArrangement = Arrangement.spacedBy(6.dp),
                             horizontalArrangement = Arrangement.spacedBy(6.dp)
                         ) {
-                            gridItems(t.items.size) { idx ->
-                                val item = t.items[idx]
+                            gridItems(t.items) { item ->
+                                val idx = t.items.indexOf(item)
                                 val isAnswered = answers.containsKey(item.question.id)
                                 val isCurrent = idx == currentIdx
                                 Surface(
