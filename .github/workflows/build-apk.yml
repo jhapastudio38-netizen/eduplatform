@@ -4,6 +4,8 @@ on:
     branches:
       - main
   workflow_dispatch: {}
+permissions:
+  contents: write
 jobs:
   build:
     runs-on: ubuntu-22.04
@@ -20,7 +22,6 @@ jobs:
           path: |
             ~/.gradle/caches
             ~/.gradle/wrapper
-            ~/.android/sdk
           key: gradle-${{ runner.os }}-${{ hashFiles('student-app-rust/android-wrapper/**/*.gradle*', 'student-app-rust/android-wrapper/**/gradle-wrapper.properties') }}
           restore-keys: |
             gradle-${{ runner.os }}-
@@ -33,8 +34,35 @@ jobs:
           echo "$HOME/gradle-8.7/bin" >> $GITHUB_PATH
       - run: gradle assembleDebug --no-daemon --build-cache --parallel
         working-directory: student-app-rust/android-wrapper
-      - uses: actions/upload-artifact@v4
+      - name: Rename APK with version
+        run: |
+          mv student-app-rust/android-wrapper/app/build/outputs/apk/debug/app-debug.apk \
+             student-app-rust/android-wrapper/app/build/outputs/apk/debug/dreamkorea-v3.2.0-debug.apk
+      # Upload as a GitHub Release asset — Releases storage is UNLIMITED for
+      # public repos and doesn't count against the Actions artifact quota
+      # (which we've already hit).
+      - name: Create or update release
+        uses: softprops/action-gh-release@v2
         with:
-          name: dreamkorea-apk
-          path: student-app-rust/android-wrapper/app/build/outputs/apk/debug/app-debug.apk
-          if-no-files-found: error
+          tag_name: v3.2.0-${{ github.run_number }}
+          name: DreamKorea v3.2.0 (Build ${{ github.run_number }})
+          body: |
+            ## What's new in v3.2.0
+
+            - **Auto-landscape for exams** — phone rotates to landscape when you
+              enter any exam, even if Horizontal Layout is off in profile.
+            - **Pre-exam briefing screen** — DK logo, title, time, pass mark,
+              question count, block structure. Big Start button.
+            - **Question grid (bubble-sheet)** — tap "Grid" in the exam header
+              to see all questions, jump to any, submit from there.
+            - **Packages screen** — browse QBank / Batch / Exam / Chapter
+              packages and the tests inside each one.
+            - **Admin block toggle** — admin/teacher can disable Text or Audio
+              block per exam; disabled blocks hide from students.
+            - Block grid + horizontal layout now work for all exams.
+
+            SHA: ${{ github.sha }}
+          files: |
+            student-app-rust/android-wrapper/app/build/outputs/apk/debug/dreamkorea-v3.2.0-debug.apk
+          draft: false
+          prerelease: false
