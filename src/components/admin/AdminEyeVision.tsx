@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
+import { FastImageUpload } from "./FastImageUpload";
 import {
   Dialog,
   DialogContent,
@@ -15,6 +16,7 @@ import {
 } from "@/components/ui/dialog";
 import { Eye, Plus, Trash2, Upload, Loader2, X } from "lucide-react";
 import { toast } from "sonner";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 interface EyeVisionTest {
   id: string;
@@ -148,6 +150,7 @@ function CreateEyeVisionDialog({ open, onOpenChange, onCreated }: {
     imageUrl: "",
     correctAnswer: "",
     category: "",
+    level: "1",
   });
   const [busy, setBusy] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -196,13 +199,14 @@ function CreateEyeVisionDialog({ open, onOpenChange, onCreated }: {
           imageUrl: form.imageUrl,
           correctAnswer: form.correctAnswer.trim(),
           category: form.category.trim(),
+          level: parseInt(form.level) || 1,
           isPublished: true,
         }),
       });
       const d = await res.json();
       if (!res.ok) { toast.error(d.error || "Failed to create"); return; }
       toast.success("Eye vision test created");
-      setForm({ title: "", description: "", imageUrl: "", correctAnswer: "", category: "" });
+      setForm({ title: "", description: "", imageUrl: "", correctAnswer: "", category: "", level: "1" });
       onCreated();
     } catch {
       toast.error("Failed to create");
@@ -240,64 +244,19 @@ function CreateEyeVisionDialog({ open, onOpenChange, onCreated }: {
             />
           </div>
 
-          {/* Image upload */}
+          {/* Image upload — drag & drop with instant preview */}
           <div className="space-y-2">
             <Label className="text-sm font-semibold">Image *</Label>
             <p className="text-xs text-muted-foreground">
               Upload the image students should look at. The correct answer below is matched case-insensitively against what the student types.
             </p>
-            {form.imageUrl ? (
-              <div className="relative w-full max-w-md rounded-lg overflow-hidden border">
-                <img src={form.imageUrl} alt="Eye vision" className="w-full max-h-72 object-contain bg-slate-50" />
-                <Button
-                  size="icon"
-                  variant="destructive"
-                  className="absolute top-2 right-2 h-8 w-8"
-                  onClick={() => setForm((f) => ({ ...f, imageUrl: "" }))}
-                >
-                  <X className="h-4 w-4" />
-                </Button>
-              </div>
-            ) : (
-              <button
-                type="button"
-                onClick={() => fileRef.current?.click()}
-                disabled={uploading}
-                className="w-full max-w-md h-48 rounded-lg border-2 border-dashed border-slate-300 hover:border-primary hover:bg-slate-50 transition-colors grid place-items-center text-slate-500"
-              >
-                {uploading ? (
-                  <div className="flex flex-col items-center gap-2">
-                    <Loader2 className="h-6 w-6 animate-spin" />
-                    <span className="text-sm">Uploading…</span>
-                  </div>
-                ) : (
-                  <div className="flex flex-col items-center gap-2">
-                    <Upload className="h-8 w-8" />
-                    <span className="text-sm font-medium">Click to upload image</span>
-                    <span className="text-xs">PNG, JPG, WebP</span>
-                  </div>
-                )}
-              </button>
-            )}
-            <input
-              ref={fileRef}
-              type="file"
-              accept="image/*"
-              className="hidden"
-              onChange={onPickFile}
+            <FastImageUpload
+              url={form.imageUrl}
+              onUpload={(url) => setForm((p) => ({ ...p, imageUrl: url }))}
+              onClear={() => setForm((f) => ({ ...f, imageUrl: "" }))}
+              folder="eye-vision"
+              previewClassName="w-full max-w-md h-48"
             />
-            {form.imageUrl && (
-              <div className="flex gap-2 items-center">
-                <Input
-                  value={form.imageUrl}
-                  onChange={(e) => setForm((f) => ({ ...f, imageUrl: e.target.value }))}
-                  placeholder="Or paste image URL…"
-                />
-                <Button variant="outline" size="lg" onClick={() => fileRef.current?.click()} disabled={uploading}>
-                  <Upload className="w-4 h-4 mr-1" /> Replace
-                </Button>
-              </div>
-            )}
           </div>
 
           {/* Correct answer */}
@@ -314,14 +273,32 @@ function CreateEyeVisionDialog({ open, onOpenChange, onCreated }: {
             </p>
           </div>
 
-          {/* Category */}
-          <div>
-            <Label className="text-sm font-semibold">Category (optional)</Label>
-            <Input
-              value={form.category}
-              onChange={(e) => setForm((f) => ({ ...f, category: e.target.value }))}
-              placeholder="e.g. Letters, Numbers, Symbols"
-            />
+          {/* Difficulty level — drives the adaptive algorithm */}
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <Label className="text-sm font-semibold">Difficulty Level</Label>
+              <Select value={form.level} onValueChange={(v) => setForm((f) => ({ ...f, level: v }))}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="1">Level 1 — Easiest (large print)</SelectItem>
+                  <SelectItem value="2">Level 2 — Easy</SelectItem>
+                  <SelectItem value="3">Level 3 — Medium</SelectItem>
+                  <SelectItem value="4">Level 4 — Hard</SelectItem>
+                  <SelectItem value="5">Level 5 — Hardest (tiny print)</SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground mt-1">
+                Adaptive difficulty serves Level 1 by default. Students level up after 2 correct in a row, drop down after 2 wrong in a row.
+              </p>
+            </div>
+            <div>
+              <Label className="text-sm font-semibold">Category (optional)</Label>
+              <Input
+                value={form.category}
+                onChange={(e) => setForm((f) => ({ ...f, category: e.target.value }))}
+                placeholder="e.g. Letters, Numbers, Symbols"
+              />
+            </div>
           </div>
         </div>
 
