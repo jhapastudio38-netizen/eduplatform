@@ -940,8 +940,9 @@ fun ReviewCard(theme: AppTheme, review: ReviewItem) {
             }
         }
     }
-@Composable
 }
+
+@Composable
 fun AnswerInputBlock(
     theme: AppTheme,
     question: QuestionDetail,
