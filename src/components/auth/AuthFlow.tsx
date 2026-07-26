@@ -62,8 +62,10 @@ export function AuthFlow() {
   const [code, setCode] = useState("");
   const [name, setName] = useState("");
   const [busy, setBusy] = useState(false);
-  // Auth mode toggle — students can use OTP (default) or email+password
-  const [authMode, setAuthMode] = useState<AuthMode>("otp");
+  // Auth mode toggle — default to PASSWORD mode (email + password) so the
+  // student immediately sees Sign In / Sign Up tabs. OTP mode is still
+  // available as a toggle at the bottom of the password form.
+  const [authMode, setAuthMode] = useState<AuthMode>("password");
   // Password mode state
   const [pwEmail, setPwEmail] = useState("");
   const [pwPassword, setPwPassword] = useState("");
