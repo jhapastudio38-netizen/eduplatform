@@ -271,24 +271,29 @@ function CreateBundleDialog({ kind, onOpenChange, onCreated }: {
   async function create() {
     if (!form.title.trim()) { toast.error("Title is required"); return; }
     setBusy(true);
+    console.log("[AdminBundles] creating bundle", { kind, title: form.title.trim() });
     try {
+      const payload = {
+        title: form.title.trim(),
+        description: form.description.trim(),
+        kind,
+        coverUrl: form.coverUrl || undefined,
+        price: parseInt(form.price) || 0,
+      };
+      console.log("[AdminBundles] POST /api/admin/bundles", payload);
       const res = await fetch("/api/admin/bundles", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          title: form.title.trim(),
-          description: form.description.trim(),
-          kind,
-          coverUrl: form.coverUrl || undefined,
-          price: parseInt(form.price) || 0,
-        }),
+        body: JSON.stringify(payload),
       });
       const d = await res.json();
+      console.log("[AdminBundles] response", { status: res.status, body: d });
       if (!res.ok) { toast.error(d.error || "Failed to create"); return; }
       toast.success("Package created — add tests now");
       onCreated(d.bundle);
-    } catch {
-      toast.error("Failed to create");
+    } catch (e: any) {
+      console.error("[AdminBundles] create failed", e);
+      toast.error("Failed to create: " + (e?.message || "network error"));
     } finally {
       setBusy(false);
     }
