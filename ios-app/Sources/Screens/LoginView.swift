@@ -96,7 +96,7 @@ struct LoginView: View {
     }
 
     private func sendOTP() {
-        guard name.trimmingCharacters(in: .whitespaces).isNotEmpty,
+        guard !name.trimmingCharacters(in: .whitespaces).isEmpty,
               email.contains("@"), phone.count >= 7 else {
             error = "Please fill all fields correctly"
             return
@@ -276,7 +276,7 @@ struct InfoBanner: View {
 }
 
 struct PrimaryButtonStyle: ButtonStyle {
-    func makeBody(configuration: Configuration) -> bool -> some View {
+    func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .foregroundStyle(.white)
             .background(Theme.navyBlue)
