@@ -183,16 +183,14 @@ fun LoginScreen(onLoginSuccess: () -> Unit) {
                                                 onLoginSuccess()
                                             } else {
                                                 sound.error()
-                                                error = when {
-                                                    resp.error?.contains("password", ignoreCase = true) == true -> "Wrong password."
-                                                    resp.error?.contains("not found", ignoreCase = true) == true -> "No account found with that email."
-                                                    resp.error?.contains("suspended", ignoreCase = true) == true -> "Account suspended."
-                                                    else -> "Wrong email or password."
-                                                }
+                                                error = resp.error ?: "Wrong email or password."
                                             }
+                                        } catch (e: retrofit2.HttpException) {
+                                            sound.error()
+                                            error = extractHttpError(e) ?: "Wrong email or password."
                                         } catch (e: java.net.UnknownHostException) { sound.error(); error = "No internet connection." }
                                         catch (e: java.io.IOException) { sound.error(); error = "Could not connect." }
-                                        catch (e: Exception) { sound.error(); error = "Login failed." }
+                                        catch (e: Exception) { sound.error(); error = "Login failed: ${e.message ?: "unknown"}" }
                                         loading = false
                                     }
                                 }
@@ -226,9 +224,12 @@ fun LoginScreen(onLoginSuccess: () -> Unit) {
                                                 sound.error()
                                                 error = resp.error ?: "Signup failed."
                                             }
+                                        } catch (e: retrofit2.HttpException) {
+                                            sound.error()
+                                            error = extractHttpError(e) ?: "Signup failed."
                                         } catch (e: java.net.UnknownHostException) { sound.error(); error = "No internet connection." }
                                         catch (e: java.io.IOException) { sound.error(); error = "Could not connect." }
-                                        catch (e: Exception) { sound.error(); error = "Signup failed." }
+                                        catch (e: Exception) { sound.error(); error = "Signup failed: ${e.message ?: "unknown"}" }
                                         loading = false
                                     }
                                 }
@@ -276,9 +277,12 @@ fun LoginScreen(onLoginSuccess: () -> Unit) {
                                                 sound.error()
                                                 error = resp.error ?: "Reset failed."
                                             }
+                                        } catch (e: retrofit2.HttpException) {
+                                            sound.error()
+                                            error = extractHttpError(e) ?: "Reset failed."
                                         } catch (e: java.net.UnknownHostException) { sound.error(); error = "No internet connection." }
                                         catch (e: java.io.IOException) { sound.error(); error = "Could not connect." }
-                                        catch (e: Exception) { sound.error(); error = "Reset failed." }
+                                        catch (e: Exception) { sound.error(); error = "Reset failed: ${e.message ?: "unknown"}" }
                                         loading = false
                                     }
                                 }
@@ -467,4 +471,22 @@ private fun PasswordField(label: String, value: String, onChange: (String) -> Un
         },
         visualTransformation = if (visible) VisualTransformation.None else PasswordVisualTransformation()
     )
+}
+
+/**
+ * Extract the human-readable error message from a Retrofit HttpException.
+ *
+ * The server returns errors as JSON: {"error": "Email already registered"}
+ * We parse the response body to pull out the "error" field. If parsing fails
+ * or the body is empty, we return null so the caller can use a fallback.
+ */
+private fun extractHttpError(e: retrofit2.HttpException): String? {
+    return try {
+        val raw = e.response()?.errorBody()?.string()
+        if (raw.isNullOrBlank()) return null
+        val json = com.google.gson.JsonParser.parseString(raw).asJsonObject
+        json.get("error")?.asString
+    } catch (_: Exception) {
+        null
+    }
 }
