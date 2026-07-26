@@ -38,7 +38,17 @@ const createSchema = z.object({
   slug: z.string().trim().max(120).optional().or(z.literal("")),
   description: z.string().trim().max(2000).optional().or(z.literal("")),
   kind: z.enum(["qbank", "batch", "exam", "chapter"]).default("qbank"),
-  coverUrl: z.string().url().optional().or(z.literal("")),
+  // Accept both absolute URLs (https://...) and relative paths (/api/files/...)
+  // because the file-upload endpoint returns relative paths.
+  coverUrl: z
+    .string()
+    .max(2000)
+    .optional()
+    .or(z.literal(""))
+    .refine(
+      (v) => !v || v.startsWith("/") || /^https?:\/\//.test(v),
+      "Must be a relative path (/...) or absolute URL (https://...)",
+    ),
   price: z.number().int().min(0).max(10_000_000).default(0),
   batchId: z.string().optional().or(z.literal("")),
 });

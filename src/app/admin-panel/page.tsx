@@ -4,27 +4,38 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
 import { toast } from "sonner";
+import { useAuthStore } from "@/stores/auth";
 
 const AdminApp = dynamic(() => import("@/components/admin/AdminApp").then(m => ({ default: m.AdminApp })), { ssr: false });
 
 export default function AdminPanelPage() {
   const router = useRouter();
+  const { fetchUser } = useAuthStore();
   const [ready, setReady] = useState(false);
   const [allowed, setAllowed] = useState(false);
 
   useEffect(() => {
-    fetch("/api/auth/me")
-      .then((r) => r.json())
-      .then((d) => {
-        if (d.user && (d.user.role === "ADMIN" || d.user.role === "TEACHER")) {
+    // IMPORTANT: call fetchUser() to populate the Zustand auth store.
+    // Many admin components (AdminTeacherInvites, AdminUsers) read
+    // useAuthStore().user.role to decide whether to show admin-only UI
+    // like the "Generate Invite" button. Without this, the store stays
+    // null even though /api/auth/me would return the user.
+    (async () => {
+      try {
+        await fetchUser();
+        const { user } = useAuthStore.getState();
+        if (user && (user.role === "ADMIN" || user.role === "TEACHER")) {
           setAllowed(true);
         } else {
           router.push("/admin");
         }
-      })
-      .catch(() => router.push("/admin"))
-      .finally(() => setReady(true));
-  }, [router]);
+      } catch {
+        router.push("/admin");
+      } finally {
+        setReady(true);
+      }
+    })();
+  }, [router, fetchUser]);
 
   // Surface any uncaught JS error as a toast so the user sees something
   // useful instead of a silently broken button.

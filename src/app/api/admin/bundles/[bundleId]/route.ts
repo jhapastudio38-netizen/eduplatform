@@ -42,7 +42,17 @@ const patchSchema = z.object({
   title: z.string().trim().min(2).max(200).optional(),
   description: z.string().trim().max(2000).optional().or(z.literal("")),
   kind: z.enum(["qbank", "batch", "exam", "chapter"]).optional(),
-  coverUrl: z.string().url().optional().or(z.literal("")).or(z.null()),
+  // Accept relative paths (/api/files/...) OR absolute URLs OR null (to clear)
+  coverUrl: z
+    .string()
+    .max(2000)
+    .optional()
+    .or(z.literal(""))
+    .or(z.null())
+    .refine(
+      (v) => v === null || v === "" || v === undefined || v.startsWith("/") || /^https?:\/\//.test(v),
+      "Must be a relative path (/...) or absolute URL (https://...)",
+    ),
   price: z.number().int().min(0).max(10_000_000).optional(),
   isPublished: z.boolean().optional(),
   batchId: z.string().optional().or(z.literal("")).or(z.null()),
