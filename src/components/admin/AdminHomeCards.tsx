@@ -269,11 +269,14 @@ function CardEditDialog({
               <Select value={route} onValueChange={setRoute}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="tests">Tests</SelectItem>
+                  <SelectItem value="tests">Exams</SelectItem>
                   <SelectItem value="books">Books</SelectItem>
                   <SelectItem value="videos">Videos</SelectItem>
-                  <SelectItem value="learn">Learn</SelectItem>
-                  <SelectItem value="live">Live Class</SelectItem>
+                  <SelectItem value="learn">Tools</SelectItem>
+                  <SelectItem value="join">Join Live Session</SelectItem>
+                  <SelectItem value="eyevision">Eye Vision Test</SelectItem>
+                  <SelectItem value="questionbank">Question Bank</SelectItem>
+                  <SelectItem value="results">Results</SelectItem>
                   <SelectItem value="profile">Profile</SelectItem>
                 </SelectContent>
               </Select>
