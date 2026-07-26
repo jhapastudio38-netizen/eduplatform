@@ -82,11 +82,8 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ testId: str
           id: i.question.id, type: i.question.type, difficulty: i.question.difficulty,
           stem: i.question.stem,
           options: i.question.options ? JSON.parse(i.question.options) : null,
-<<<<<<< HEAD
           optionBlanks: i.question.optionBlanks ? JSON.parse(i.question.optionBlanks) : [],
-=======
           // Legacy fields
->>>>>>> a840ebe22aa73b9224e27c4423bc9fc4aafe354d
           imageUrl: i.question.imageUrl || null,
           audioUrl: i.question.audioUrl || null,
           audioLoop: i.question.audioLoop || 0,
