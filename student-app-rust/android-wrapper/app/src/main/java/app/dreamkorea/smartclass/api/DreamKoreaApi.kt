@@ -91,10 +91,27 @@ data class QuestionDetail(
     val difficulty: String,
     val stem: String,
     val options: List<String>?,
+    // Legacy fields
     val imageUrl: String?,
     val audioUrl: String?,
     val audioLoop: Int = 0,
-    val audioLoopDelay: Int = 0
+    val audioLoopDelay: Int = 0,
+    // New block-based fields
+    val blockType: String = "text",
+    val blockNumber: Int = 0,
+    val descType: String = "none",
+    val descText: String? = null,
+    val descImageUrl: String? = null,
+    val descAudioUrl: String? = null,
+    val mediaType: String = "none",
+    val mediaText: String? = null,
+    val mediaImageUrl: String? = null,
+    val mediaAudioUrl: String? = null,
+    val answerType: String = "text",
+    val optionImages: List<String> = emptyList(),
+    val optionAudios: List<String> = emptyList(),
+    val correctOption: Int = 0,
+    val explanation: String? = null
 )
 data class TestItemDetail(
     val id: String,
