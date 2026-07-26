@@ -51,6 +51,7 @@ interface QuestionData {
   options: string[];
   optionImages: string[];
   optionAudios: string[];
+  optionBlanks: string[];
   correctOption: number;
   explanation: string;
 }
@@ -72,6 +73,7 @@ function emptyQuestion(blockType: "text" | "audio", blockNumber: number): Questi
     options: ["", "", "", ""],
     optionImages: ["", "", "", ""],
     optionAudios: ["", "", "", ""],
+    optionBlanks: ["", "", "", ""],
     correctOption: 0,
     explanation: "",
   };
@@ -557,6 +559,7 @@ function ExamEditor({ test, testCategory, onClose }: { test: Test; testCategory:
         answerType: q.answerType,
         options: q.options || [],
         optionImages: q.optionImages || [],
+        optionBlanks: q.optionBlanks || [],
         optionAudios: q.optionAudios || [],
         correctOption: q.correctOption,
         explanation: q.explanation || "",
@@ -625,6 +628,7 @@ function ExamEditor({ test, testCategory, onClose }: { test: Test; testCategory:
           answerType: q.answerType,
           options: q.options || [],
           optionImages: q.optionImages || [],
+        optionBlanks: q.optionBlanks || [],
           optionAudios: q.optionAudios || [],
           correctOption: q.correctOption,
           explanation: q.explanation || "",
@@ -1195,26 +1199,42 @@ function QuestionEditor({ question, onChange, blockLabel, isAudioBlock }: {
               <Label className="text-sm font-semibold">4 Options — click circle to mark correct</Label>
               <div className="space-y-2">
                 {[0, 1, 2, 3].map((i) => (
-                  <div key={i} className="flex items-center gap-3">
-                    <button
-                      onClick={() => onChange({ ...question, correctOption: i })}
-                      className={`w-8 h-8 rounded-full border-2 flex items-center justify-center text-sm font-bold flex-shrink-0 ${
-                        question.correctOption === i ? "bg-green-500 text-white border-green-500" : "border-slate-300 text-slate-400"
-                      }`}
-                      title="Mark as correct"
-                    >
-                      {question.correctOption === i ? "✓" : String.fromCharCode(65 + i)}
-                    </button>
-                    <Input
-                      value={question.options[i] || ""}
-                      onChange={(e) => {
-                        const opts = [...question.options];
-                        opts[i] = e.target.value;
-                        onChange({ ...question, options: opts });
-                      }}
-                      placeholder={`Option ${String.fromCharCode(65 + i)}`}
-                      className="flex-1"
-                    />
+                  <div key={i} className="space-y-1">
+                    <div className="flex items-center gap-3">
+                      <button
+                        onClick={() => onChange({ ...question, correctOption: i })}
+                        className={`w-8 h-8 rounded-full border-2 flex items-center justify-center text-sm font-bold flex-shrink-0 ${
+                          question.correctOption === i ? "bg-green-500 text-white border-green-500" : "border-slate-300 text-slate-400"
+                        }`}
+                        title="Mark as correct"
+                      >
+                        {question.correctOption === i ? "✓" : String.fromCharCode(65 + i)}
+                      </button>
+                      <Input
+                        value={question.options[i] || ""}
+                        onChange={(e) => {
+                          const opts = [...question.options];
+                          opts[i] = e.target.value;
+                          onChange({ ...question, options: opts });
+                        }}
+                        placeholder={`Option ${String.fromCharCode(65 + i)}`}
+                        className="flex-1"
+                      />
+                    </div>
+                    {/* Underline bar — admin types a word that gets underlined in the option */}
+                    <div className="flex items-center gap-2 pl-11">
+                      <span className="text-xs text-slate-400 whitespace-nowrap">underline:</span>
+                      <Input
+                        value={question.optionBlanks[i] || ""}
+                        onChange={(e) => {
+                          const blanks = [...question.optionBlanks];
+                          blanks[i] = e.target.value;
+                          onChange({ ...question, optionBlanks: blanks });
+                        }}
+                        placeholder="word to underline (optional)"
+                        className="h-7 text-xs flex-1 border-dashed border-slate-300"
+                      />
+                    </div>
                   </div>
                 ))}
               </div>

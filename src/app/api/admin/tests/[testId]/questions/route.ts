@@ -39,6 +39,7 @@ const questionSchema = z.object({
   options: z.array(z.string()).optional().default([]),
   optionImages: z.array(z.string()).optional().default([]),
   optionAudios: z.array(z.string()).optional().default([]),
+  optionBlanks: z.array(z.string()).optional().default([]),
   correctOption: z.number().int().min(0).max(3).default(0),
   explanation: z.string().optional().or(z.literal("")),
 });
@@ -73,6 +74,7 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ testId: str
       options: i.question.options ? JSON.parse(i.question.options) : [],
       optionImages: i.question.optionImages ? JSON.parse(i.question.optionImages) : [],
       optionAudios: i.question.optionAudios ? JSON.parse(i.question.optionAudios) : [],
+      optionBlanks: i.question.optionBlanks ? JSON.parse(i.question.optionBlanks) : [],
       correctOption: i.question.correctOption,
       explanation: i.question.explanation,
       points: i.points,
@@ -153,6 +155,7 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ testId: st
           answerType: d.answerType,
           optionImages: d.optionImages.length > 0 ? JSON.stringify(d.optionImages) : null,
           optionAudios: d.optionAudios.length > 0 ? JSON.stringify(d.optionAudios) : null,
+          optionBlanks: d.optionBlanks.length > 0 ? JSON.stringify(d.optionBlanks) : null,
           correctOption: d.correctOption,
         },
       });
@@ -183,6 +186,7 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ testId: st
           answerType: d.answerType,
           optionImages: d.optionImages.length > 0 ? JSON.stringify(d.optionImages) : null,
           optionAudios: d.optionAudios.length > 0 ? JSON.stringify(d.optionAudios) : null,
+          optionBlanks: d.optionBlanks.length > 0 ? JSON.stringify(d.optionBlanks) : null,
           correctOption: d.correctOption,
         },
       });
