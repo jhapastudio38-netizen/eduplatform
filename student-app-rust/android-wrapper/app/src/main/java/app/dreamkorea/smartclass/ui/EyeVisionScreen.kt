@@ -43,10 +43,10 @@ fun EyeVisionScreen(theme: AppTheme, sound: SoundManager, onBack: () -> Unit) {
     LaunchedEffect(Unit) {
         scope.launch {
             try {
-                // Use the eye-vision API
                 val resp = AppState.api.getEyeVisionTests()
                 tests = resp.tests.map {
-                    EyeVisionTest(it.id, it.title, it.description, it.imageUrl, it.category)
+                    val absUrl = if (it.imageUrl.startsWith("http")) it.imageUrl else "https://my-project-five-sepia.vercel.app${it.imageUrl}"
+                    EyeVisionTest(it.id, it.title, it.description, absUrl, it.category)
                 }
             } catch (e: Exception) {
                 error = "Could not load eye vision tests"
@@ -128,7 +128,7 @@ fun EyeVisionTestCard(theme: AppTheme, sound: SoundManager, test: EyeVisionTest)
 
             // Image
             coil.compose.AsyncImage(
-                model = if (test.imageUrl.startsWith("http")) test.imageUrl else "https://my-project-five-sepia.vercel.app${test.imageUrl}",
+                model = test.imageUrl,
                 contentDescription = "Eye vision test image",
                 modifier = Modifier.fillMaxWidth().height(200.dp).clip(RoundedCornerShape(12.dp)),
                 contentScale = ContentScale.Crop
