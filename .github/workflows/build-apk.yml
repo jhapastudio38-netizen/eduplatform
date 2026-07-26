@@ -37,32 +37,31 @@ jobs:
       - name: Rename APK with version
         run: |
           mv student-app-rust/android-wrapper/app/build/outputs/apk/debug/app-debug.apk \
-             student-app-rust/android-wrapper/app/build/outputs/apk/debug/dreamkorea-v3.2.0-debug.apk
+             student-app-rust/android-wrapper/app/build/outputs/apk/debug/dreamkorea-v3.2.1-debug.apk
       # Upload as a GitHub Release asset — Releases storage is UNLIMITED for
       # public repos and doesn't count against the Actions artifact quota
       # (which we've already hit).
       - name: Create or update release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v3.2.0-${{ github.run_number }}
-          name: DreamKorea v3.2.0 (Build ${{ github.run_number }})
+          tag_name: v3.2.1-${{ github.run_number }}
+          name: DreamKorea v3.2.1 (Build ${{ github.run_number }})
           body: |
-            ## What's new in v3.2.0
+            ## What's new in v3.2.1
 
-            - **Auto-landscape for exams** — phone rotates to landscape when you
-              enter any exam, even if Horizontal Layout is off in profile.
-            - **Pre-exam briefing screen** — DK logo, title, time, pass mark,
-              question count, block structure. Big Start button.
-            - **Question grid (bubble-sheet)** — tap "Grid" in the exam header
-              to see all questions, jump to any, submit from there.
-            - **Packages screen** — browse QBank / Batch / Exam / Chapter
-              packages and the tests inside each one.
-            - **Admin block toggle** — admin/teacher can disable Text or Audio
-              block per exam; disabled blocks hide from students.
-            - Block grid + horizontal layout now work for all exams.
+            - **Fixed: Next button now clickable in horizontal mode.** The
+              inner LazyColumns no longer use fillMaxHeight() which was
+              pushing the bottom button bar off-screen.
+            - **QBank in app now matches admin.** The student Question Bank
+              screen now lists QBank TESTS (created in admin under
+              "Question Bank"), not standalone practice questions that were
+              never created. Tapping a QBank test opens the same
+              auto-landscape + block-grid flow as a regular exam.
+            - All exams, QBank tests, and packages flow through the same
+              ExamEntryScreen (briefing card → auto-landscape → block grid).
 
             SHA: ${{ github.sha }}
           files: |
-            student-app-rust/android-wrapper/app/build/outputs/apk/debug/dreamkorea-v3.2.0-debug.apk
+            student-app-rust/android-wrapper/app/build/outputs/apk/debug/dreamkorea-v3.2.1-debug.apk
           draft: false
           prerelease: false

@@ -325,11 +325,21 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
         val isHorizontalMode = true
 
         if (isHorizontalMode) {
-            // HORIZONTAL MODE: question on left, options on right
-            Row(modifier = Modifier.weight(1f).fillMaxWidth().padding(8.dp)) {
+            // HORIZONTAL MODE: question on left, options on right.
+            // CRITICAL: do NOT use fillMaxHeight() on the inner LazyColumns —
+            // that would let them expand and push the bottom button bar off
+            // screen (which made Next unclickable in v3.2.0). Instead, the
+            // parent Row uses weight(1f) inside the Column, and the
+            // LazyColumns inherit the constrained height naturally.
+            Row(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxWidth()
+                    .padding(8.dp)
+            ) {
                 // Left: Question + media (scrollable)
                 LazyColumn(
-                    modifier = Modifier.weight(1f).fillMaxHeight().padding(end = 4.dp),
+                    modifier = Modifier.weight(1f).padding(end = 4.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     item {
@@ -361,7 +371,7 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
 
                 // Right: Answer options
                 LazyColumn(
-                    modifier = Modifier.weight(1f).fillMaxHeight().padding(start = 4.dp),
+                    modifier = Modifier.weight(1f).padding(start = 4.dp),
                     verticalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
                     item { AnswerInputBlock(theme, q, answers[q.id], questionFeedback, sound) { ans ->

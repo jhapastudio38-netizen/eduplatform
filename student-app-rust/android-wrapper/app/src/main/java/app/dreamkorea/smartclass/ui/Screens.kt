@@ -160,7 +160,7 @@ fun MainScreen(userName: String, onLogout: () -> Unit) {
                         is Screen.FreeExam -> TestsScreen(theme, sound, filter = "demo", title = "Demo Exams", onBack = { navigateTo(Screen.Home) }, onStartExam = { screen = Screen.ExamEntry(it) })
                         is Screen.Batch -> TestsScreen(theme, sound, filter = "batch", title = "Batch Exams", onBack = { navigateTo(Screen.Home) }, onStartExam = { screen = Screen.ExamEntry(it) })
                         is Screen.Results -> ResultsScreen(theme, sound, onBack = { navigateTo(Screen.Home) })
-                        is Screen.QuestionBank -> QuestionBankScreen(theme, sound, onBack = { navigateTo(Screen.Home) })
+                        is Screen.QuestionBank -> QuestionBankScreen(theme, sound, onBack = { navigateTo(Screen.Home) }, onStartExam = { screen = Screen.ExamEntry(it) })
                         is Screen.AudioLessons -> LearnScreen(theme, sound, onBack = { navigateTo(Screen.Home) })
                         is Screen.Classroom -> LiveRoomScreen(theme, onBack = { navigateTo(Screen.Home) })
                         is Screen.RecordedVideo -> VideosScreen(theme, sound, onBack = { navigateTo(Screen.Home) })
