@@ -43,10 +43,24 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ testId: str
   // an admin-created test had an empty endAt or isActive=false by default.
   // Published tests are always openable; admins control visibility via isPublished.
 
+  // ─── Filter out disabled blocks ────────────────────────────────────────────
+  // Admin can disable the text or audio block of an exam (textBlockEnabled /
+  // audioBlockEnabled). When disabled, we drop those items entirely so the
+  // student never sees them — they don't count toward the question count, the
+  // timer, or the score.
+  const textEnabled = test.textBlockEnabled !== false; // default true if null
+  const audioEnabled = test.audioBlockEnabled !== false;
+  const filteredItems = test.items.filter((i) => {
+    const bt = i.question.blockType || "text";
+    if (bt === "text" && !textEnabled) return false;
+    if (bt === "audio" && !audioEnabled) return false;
+    return true;
+  });
+
   // Create or fetch a draft submission so the timer starts now
   const draft = await db.submission.upsert({
     where: { testId_userId: { testId, userId: user.id } },
-    create: { testId, userId: user.id, answers: "{}", maxScore: test.items.reduce((s, i) => s + i.points, 0) },
+    create: { testId, userId: user.id, answers: "{}", maxScore: filteredItems.reduce((s, i) => s + i.points, 0) },
     update: {},
   });
 
@@ -54,7 +68,13 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ testId: str
     test: {
       id: test.id, title: test.title, description: test.description,
       durationMin: test.durationMin, isExam: test.isExam, passScore: test.passScore,
-      items: test.items.map((i) => ({
+      // Expose block flags + counts so the app can show "X text + Y audio"
+      // on the pre-exam info screen.
+      textBlockCount: test.textBlockCount ?? 0,
+      audioBlockCount: test.audioBlockCount ?? 0,
+      textBlockEnabled: textEnabled,
+      audioBlockEnabled: audioEnabled,
+      items: filteredItems.map((i) => ({
         id: i.id,
         order: i.order,
         points: i.points,

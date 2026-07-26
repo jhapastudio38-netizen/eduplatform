@@ -264,6 +264,11 @@ model Test {
   // Block configuration (only for "exam" and "demo" categories)
   textBlockCount  Int? @default(20) // number of text questions (default 20)
   audioBlockCount Int? @default(20) // number of audio questions (default 20)
+  // Per-block enable/disable — admin can hide the audio or text section of an
+  // exam without deleting the questions. Disabled blocks are filtered out on
+  // the student app.
+  textBlockEnabled  Boolean? @default(true)
+  audioBlockEnabled Boolean? @default(true)
 
   chapter     Chapter? @relation(fields: [chapterId], references: [id], onDelete: SetNull)
   items       TestItem[]

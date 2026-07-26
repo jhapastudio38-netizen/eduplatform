@@ -71,9 +71,12 @@ sealed class Screen {
     object CourseVideo : Screen()
     object Join : Screen()
     object EyeVision : Screen()
+    object Bundles : Screen()
     data class Exam(val testId: String) : Screen()
+    data class ExamEntry(val testId: String) : Screen()
     data class BookReader(val book: Book) : Screen()
     data class TestList(val filter: String, val title: String) : Screen()
+    data class BundleDetail(val bundleId: String, val bundleTitle: String) : Screen()
 }
 
 // Tab destinations for bottom navigation
@@ -145,16 +148,17 @@ fun MainScreen(userName: String, onLogout: () -> Unit) {
                         is Screen.Home -> HomeScreen(theme, sound, userName, onNavigate = { navigateTo(it) })
                         is Screen.Learn -> LearnScreen(theme, sound, onBack = { navigateTo(Screen.Home) })
                         is Screen.Books -> BooksScreen(theme, sound, onBack = { navigateTo(Screen.Home) }, onBookClick = { screen = Screen.BookReader(it) })
-                        is Screen.Tests -> TestsScreen(theme, sound, filter = "all", title = "All Exams", onBack = { navigateTo(Screen.Home) }, onStartExam = { screen = Screen.Exam(it) })
+                        is Screen.Tests -> TestsScreen(theme, sound, filter = "all", title = "All Exams", onBack = { navigateTo(Screen.Home) }, onStartExam = { screen = Screen.ExamEntry(it) })
                         is Screen.Videos -> VideosScreen(theme, sound, onBack = { navigateTo(Screen.Home) })
                         is Screen.Profile -> ProfileScreen(theme, sound, userName, onBack = { navigateTo(Screen.Home) }, onLogout = onLogout)
                         is Screen.LiveRoom -> LiveRoomScreen(theme, onBack = { navigateTo(Screen.Home) })
                         is Screen.Settings -> SettingsScreen(theme, sound, onBack = { navigateTo(Screen.Home) })
+                        is Screen.ExamEntry -> ExamEntryScreen(theme, sound, testId = s.testId, onStart = { screen = Screen.Exam(s.testId) }, onBack = { navigateTo(Screen.Home) })
                         is Screen.Exam -> ExamScreen(theme, testId = s.testId, onExit = { navigateTo(Screen.Home) })
                         is Screen.BookReader -> BookReaderScreen(theme, sound, s.book, onBack = { screen = Screen.Books })
-                        is Screen.UbtTest -> TestsScreen(theme, sound, filter = "exam", title = "UBT Exams", onBack = { navigateTo(Screen.Home) }, onStartExam = { screen = Screen.Exam(it) })
-                        is Screen.FreeExam -> TestsScreen(theme, sound, filter = "demo", title = "Demo Exams", onBack = { navigateTo(Screen.Home) }, onStartExam = { screen = Screen.Exam(it) })
-                        is Screen.Batch -> TestsScreen(theme, sound, filter = "batch", title = "Batch Exams", onBack = { navigateTo(Screen.Home) }, onStartExam = { screen = Screen.Exam(it) })
+                        is Screen.UbtTest -> TestsScreen(theme, sound, filter = "exam", title = "UBT Exams", onBack = { navigateTo(Screen.Home) }, onStartExam = { screen = Screen.ExamEntry(it) })
+                        is Screen.FreeExam -> TestsScreen(theme, sound, filter = "demo", title = "Demo Exams", onBack = { navigateTo(Screen.Home) }, onStartExam = { screen = Screen.ExamEntry(it) })
+                        is Screen.Batch -> TestsScreen(theme, sound, filter = "batch", title = "Batch Exams", onBack = { navigateTo(Screen.Home) }, onStartExam = { screen = Screen.ExamEntry(it) })
                         is Screen.Results -> ResultsScreen(theme, sound, onBack = { navigateTo(Screen.Home) })
                         is Screen.QuestionBank -> QuestionBankScreen(theme, sound, onBack = { navigateTo(Screen.Home) })
                         is Screen.AudioLessons -> LearnScreen(theme, sound, onBack = { navigateTo(Screen.Home) })
@@ -162,9 +166,11 @@ fun MainScreen(userName: String, onLogout: () -> Unit) {
                         is Screen.RecordedVideo -> VideosScreen(theme, sound, onBack = { navigateTo(Screen.Home) })
                         is Screen.ClassResult -> ResultsScreen(theme, sound, onBack = { navigateTo(Screen.Home) })
                         is Screen.CourseVideo -> VideosScreen(theme, sound, onBack = { navigateTo(Screen.Home) })
-                        is Screen.TestList -> TestsScreen(theme, sound, filter = s.filter, title = s.title, onBack = { navigateTo(Screen.Home) }, onStartExam = { screen = Screen.Exam(it) })
+                        is Screen.TestList -> TestsScreen(theme, sound, filter = s.filter, title = s.title, onBack = { navigateTo(Screen.Home) }, onStartExam = { screen = Screen.ExamEntry(it) })
                         is Screen.Join -> JoinScreen(theme, sound, onBack = { navigateTo(Screen.Home) })
                         is Screen.EyeVision -> EyeVisionScreen(theme, sound, onBack = { navigateTo(Screen.Home) })
+                        is Screen.Bundles -> BundlesScreen(theme, sound, onBack = { navigateTo(Screen.Home) }, onOpenBundle = { id, title -> screen = Screen.BundleDetail(id, title) }, onOpenTest = { screen = Screen.ExamEntry(it) })
+                        is Screen.BundleDetail -> BundleDetailScreen(theme, sound, bundleId = s.bundleId, bundleTitle = s.bundleTitle, onBack = { screen = Screen.Bundles }, onOpenTest = { screen = Screen.ExamEntry(it) })
                     }
                 }
             }
@@ -172,7 +178,9 @@ fun MainScreen(userName: String, onLogout: () -> Unit) {
             // ─── Bottom navigation bar ──────────────────────────────────────
             val showBottomBar = when (screen) {
                 is Screen.Exam -> false
+                is Screen.ExamEntry -> false
                 is Screen.BookReader -> false
+                is Screen.BundleDetail -> false
                 is Screen.Settings -> false
                 else -> true
             }
@@ -502,6 +510,7 @@ fun HomeScreen(theme: AppTheme, sound: SoundManager, userName: String, onNavigat
                                     "course_video" -> Screen.CourseVideo
                                     "audio_lessons" -> Screen.AudioLessons
                                     "recorded_video" -> Screen.RecordedVideo
+                                    "packages" -> Screen.Bundles
                                     else -> when (card.route) {
                                         "books" -> Screen.Books
                                         "videos" -> Screen.Videos
@@ -509,6 +518,7 @@ fun HomeScreen(theme: AppTheme, sound: SoundManager, userName: String, onNavigat
                                         "live" -> Screen.Join
                                         "eyevision" -> Screen.EyeVision
                                         "questionbank" -> Screen.QuestionBank
+                                        "packages" -> Screen.Bundles
                                         "join" -> Screen.Join
                                         else -> Screen.Tests
                                     }

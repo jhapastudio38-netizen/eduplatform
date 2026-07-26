@@ -82,6 +82,9 @@ interface Test {
   audioGapSec?: number | null;
   textBlockCount?: number | null;
   audioBlockCount?: number | null;
+  // Per-block enable flags — admin can hide the audio or text section
+  textBlockEnabled?: boolean | null;
+  audioBlockEnabled?: boolean | null;
   _count?: { items: number };
 }
 
@@ -208,6 +211,59 @@ export function AdminTests({ testCategory = "exam" }: { testCategory?: string })
                   <p className="text-sm text-muted-foreground mt-1">
                     {t.durationMin} min • {t._count?.items || 0} questions • Pass {t.passScore}%
                   </p>
+                  {/* Block enable/disable toggles — only for exam & demo categories */}
+                  {(testCategory === "exam" || testCategory === "demo") && (
+                    <div className="flex items-center gap-1 mt-2" onClick={(e) => e.stopPropagation()}>
+                      <button
+                        onClick={async () => {
+                          const next = !(t.textBlockEnabled !== false);
+                          try {
+                            await fetch(`/api/admin/tests/${t.id}/toggle-block`, {
+                              method: "POST",
+                              headers: { "Content-Type": "application/json" },
+                              body: JSON.stringify({ block: "text", enabled: next }),
+                            });
+                            toast.success(next ? "Text block enabled" : "Text block disabled — students won't see text questions");
+                            load();
+                          } catch {
+                            toast.error("Failed to toggle");
+                          }
+                        }}
+                        className={`text-[10px] px-2 py-0.5 rounded-full border transition-colors ${
+                          t.textBlockEnabled !== false
+                            ? "bg-emerald-50 text-emerald-700 border-emerald-300"
+                            : "bg-slate-100 text-slate-500 border-slate-300 line-through"
+                        }`}
+                        title="Toggle text block visibility for students"
+                      >
+                        Text
+                      </button>
+                      <button
+                        onClick={async () => {
+                          const next = !(t.audioBlockEnabled !== false);
+                          try {
+                            await fetch(`/api/admin/tests/${t.id}/toggle-block`, {
+                              method: "POST",
+                              headers: { "Content-Type": "application/json" },
+                              body: JSON.stringify({ block: "audio", enabled: next }),
+                            });
+                            toast.success(next ? "Audio block enabled" : "Audio block disabled — students won't see audio questions");
+                            load();
+                          } catch {
+                            toast.error("Failed to toggle");
+                          }
+                        }}
+                        className={`text-[10px] px-2 py-0.5 rounded-full border transition-colors ${
+                          t.audioBlockEnabled !== false
+                            ? "bg-amber-50 text-amber-700 border-amber-300"
+                            : "bg-slate-100 text-slate-500 border-slate-300 line-through"
+                        }`}
+                        title="Toggle audio block visibility for students"
+                      >
+                        Audio
+                      </button>
+                    </div>
+                  )}
                 </div>
                 <div className="flex items-center gap-2">
                   {t.isPublished ? (
