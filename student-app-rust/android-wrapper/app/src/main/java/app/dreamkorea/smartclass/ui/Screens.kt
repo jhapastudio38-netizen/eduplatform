@@ -915,6 +915,56 @@ fun ProfileScreen(theme: AppTheme, sound: SoundManager, userName: String, onBack
             }
         }
 
+        // Display Mode toggle
+        item {
+            Surface(color = theme.cardBg, shape = RoundedCornerShape(14.dp), modifier = Modifier.fillMaxWidth(), shadowElevation = 1.dp) {
+                Column(modifier = Modifier.padding(14.dp)) {
+                    Text("Display Mode", color = theme.darkText, fontSize = 14.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(bottom = 10.dp))
+                    val isHorizontal = AppState.getTextSizeMultiplier() > 1.0f
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Button(
+                            onClick = {
+                                sound.click()
+                                AppState.setTextSizeMultiplier(1.0f)
+                            },
+                            modifier = Modifier.weight(1f).height(44.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = if (!isHorizontal) theme.primary else Color.Transparent,
+                                contentColor = if (!isHorizontal) Color.White else theme.subText
+                            ),
+                            shape = RoundedCornerShape(10.dp),
+                            border = if (!isHorizontal) null else androidx.compose.foundation.BorderStroke(1.dp, theme.divider)
+                        ) {
+                            Text("Stable", fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                        }
+                        Button(
+                            onClick = {
+                                sound.click()
+                                AppState.setTextSizeMultiplier(1.15f)
+                            },
+                            modifier = Modifier.weight(1f).height(44.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = if (isHorizontal) theme.primary else Color.Transparent,
+                                contentColor = if (isHorizontal) Color.White else theme.subText
+                            ),
+                            shape = RoundedCornerShape(10.dp),
+                            border = if (isHorizontal) null else androidx.compose.foundation.BorderStroke(1.dp, theme.divider)
+                        ) {
+                            Text("Horizontal", fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                        }
+                    }
+                    Spacer(Modifier.height(6.dp))
+                    Text(
+                        if (isHorizontal) "Questions display side-by-side (landscape recommended)" else "Questions display vertically (portrait)",
+                        color = theme.subText, fontSize = 11.sp
+                    )
+                }
+            }
+        }
+
         // Logout
         item {
             Button(

@@ -270,10 +270,67 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
         }
 
         val q = currentQuestion.question
-        LazyColumn(
-            modifier = Modifier.weight(1f).fillMaxWidth().padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
+        val isHorizontalMode = AppState.getTextSizeMultiplier() > 1.0f
+
+        if (isHorizontalMode) {
+            // HORIZONTAL MODE: question on left, options on right
+            Row(modifier = Modifier.weight(1f).fillMaxWidth().padding(8.dp)) {
+                // Left: Question + media (scrollable)
+                LazyColumn(
+                    modifier = Modifier.weight(1f).fillMaxHeight().padding(end = 4.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    item {
+                        Surface(color = theme.cardBg, shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth(), shadowElevation = 2.dp) {
+                            Column(modifier = Modifier.padding(12.dp)) {
+                                Text(q.stem, color = theme.darkText, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                            }
+                        }
+                    }
+                    // Description image
+                    if (q.descType == "image" && !q.descImageUrl.isNullOrBlank()) {
+                        item {
+                            AsyncImage(url = q.descImageUrl!!.toAbsoluteUrl(), modifier = Modifier.fillMaxWidth().heightIn(max = 120.dp).clip(RoundedCornerShape(8.dp)))
+                        }
+                    }
+                    // Media image
+                    val mediaImgUrl = (q.mediaImageUrl ?: q.imageUrl)?.toAbsoluteUrl()
+                    if (!mediaImgUrl.isNullOrBlank()) {
+                        item {
+                            AsyncImage(url = mediaImgUrl, modifier = Modifier.fillMaxWidth().heightIn(max = 150.dp).clip(RoundedCornerShape(8.dp)))
+                        }
+                    }
+                    // Media audio
+                    val mediaAudUrl = (q.mediaAudioUrl ?: q.audioUrl)?.toAbsoluteUrl()
+                    if (!mediaAudUrl.isNullOrBlank()) {
+                        item { AudioPlayerCard(theme = theme, url = mediaAudUrl, loopCount = q.audioLoop, loopDelaySec = q.audioLoopDelay, sound = sound) }
+                    }
+                }
+
+                // Right: Answer options
+                LazyColumn(
+                    modifier = Modifier.weight(1f).fillMaxHeight().padding(start = 4.dp),
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    item { AnswerInputBlock(theme, q, answers[q.id], questionFeedback, sound) { ans ->
+                        answers[q.id] = ans
+                        val correctIdx = q.correctOption
+                        val isCorrect = when {
+                            q.answerType == "text" || q.answerType == "choose" -> q.options?.getOrNull(correctIdx) == ans
+                            q.answerType == "image" -> q.optionImages.getOrNull(correctIdx) == ans
+                            q.answerType == "audio" -> q.optionAudios.getOrNull(correctIdx) == ans
+                            else -> false
+                        }
+                        questionFeedback = QuestionFeedback(isCorrect, "")
+                    }}
+                }
+            }
+        } else {
+            // STABLE MODE: vertical scroll (current behavior)
+            LazyColumn(
+                modifier = Modifier.weight(1f).fillMaxWidth().padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
             // Question stem
             item {
                 Surface(color = theme.cardBg, shape = RoundedCornerShape(14.dp), modifier = Modifier.fillMaxWidth(), shadowElevation = 2.dp) {
@@ -330,6 +387,7 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
                     }
                 )
             }
+        }
         }
 
         // Bottom navigation buttons
