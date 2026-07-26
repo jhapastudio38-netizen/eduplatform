@@ -11,11 +11,10 @@ on:
 jobs:
   build-ios:
     runs-on: macos-14
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v4
-
-      - name: List available Xcode versions
-        run: ls /Applications/ | grep Xcode
 
       - name: Select latest Xcode
         run: |
@@ -55,9 +54,12 @@ jobs:
           zip -r DreamKorea.ipa Payload
           ls -lh DreamKorea.ipa
 
-      - name: Upload IPA
-        uses: actions/upload-artifact@v4
+      - name: Upload IPA as Release
+        uses: softprops/action-gh-release@v1
         with:
-          name: DreamKorea-iOS-IPA
-          path: ios-app/build/ipa/DreamKorea.ipa
-          retention-days: 30
+          tag_name: ios-v3.0.0
+          name: DreamKorea iOS v3.0.0
+          files: ios-app/build/ipa/DreamKorea.ipa
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
