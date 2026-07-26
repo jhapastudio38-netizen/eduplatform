@@ -153,10 +153,41 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ testId: st
     ip: req.headers.get("x-forwarded-for")?.split(",")[0],
   });
 
+  // ─── Eye Vision auto-trigger ──────────────────────────────────────────────
+  // After the exam, recommend eye vision tests based on the student's score:
+  //   • score < 70% (mistakes > 30%) → recommend 3-5 eye vision tests
+  //   • score 70-85% → recommend 2 tests (some mistakes)
+  //   • score > 85% → recommend 0 (skip eye vision entirely)
+  // The Android app reads these flags + fetches the tests via /api/student/eye-vision
+  let eyeVisionRecommendation: { show: boolean; count: number; reason: string } = {
+    show: false,
+    count: 0,
+    reason: "",
+  };
+  if (maxScore > 0) {
+    const mistakesPct = 100 - pct;
+    if (mistakesPct > 30) {
+      // Scale: 30-50% mistakes → 3 tests, 50-70% → 4 tests, 70%+ → 5 tests
+      const count = mistakesPct >= 70 ? 5 : mistakesPct >= 50 ? 4 : 3;
+      eyeVisionRecommendation = {
+        show: true,
+        count,
+        reason: `You made ${Math.round(mistakesPct)}% mistakes. Let's check your eye vision with ${count} quick tests.`,
+      };
+    } else if (mistakesPct >= 15) {
+      eyeVisionRecommendation = {
+        show: true,
+        count: 2,
+        reason: `You made ${Math.round(mistakesPct)}% mistakes. A quick eye vision check is recommended.`,
+      };
+    }
+  }
+
   return NextResponse.json({
     score, maxScore,
     graded: submission.graded,
     submissionId: submission.id,
     review,
+    eyeVision: eyeVisionRecommendation,
   });
 }

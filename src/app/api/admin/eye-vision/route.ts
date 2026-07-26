@@ -26,6 +26,7 @@ const schema = z.object({
   imageUrl: z.string().min(1, "Image is required"),
   correctAnswer: z.string().min(1, "Correct answer is required").max(200),
   category: z.string().max(100).optional().or(z.literal("")),
+  level: z.number().int().min(1).max(5).default(1),
   sortOrder: z.number().int().default(0),
   isPublished: z.boolean().default(true),
 });
@@ -52,6 +53,7 @@ export async function POST(req: NextRequest) {
         imageUrl: d.imageUrl,
         correctAnswer: d.correctAnswer,
         category: d.category || null,
+        level: d.level,
         sortOrder: d.sortOrder,
         isPublished: d.isPublished,
         createdBy: user.id,
