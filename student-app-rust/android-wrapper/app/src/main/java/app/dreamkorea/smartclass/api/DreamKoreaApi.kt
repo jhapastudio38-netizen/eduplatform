@@ -223,7 +223,7 @@ interface DreamKoreaApi {
     suspend fun getLessons(@Path("id") id: String): LessonsResponse
 
     @GET("api/student/tests")
-    suspend fun getTests(@Query("filter") filter: String = "all"): TestsResponse
+    suspend fun getTests(@Query("category") category: String = "all", @Query("filter") filter: String? = null): TestsResponse
 
     @GET("api/student/tests/{id}")
     suspend fun getTestDetail(@Path("id") id: String): TestDetailResponse
@@ -254,6 +254,9 @@ interface DreamKoreaApi {
 
     @POST("api/student/live-sessions/join")
     suspend fun joinLiveSession(@Body body: Map<String, String>): LiveSessionJoinResponse
+
+    @GET("api/student/eye-vision")
+    suspend fun getEyeVisionTests(): EyeVisionResponse
 }
 
 // ─── Notifications ────────────────────────────────────────────────────────────
@@ -280,6 +283,16 @@ data class LiveSessionJoinResponse(
     val session: LiveSessionData? = null,
     val error: String? = null
 )
+
+// ─── Eye Vision ──────────────────────────────────────────────────────────────
+data class EyeVisionTestItem(
+    val id: String,
+    val title: String,
+    val description: String? = null,
+    val imageUrl: String,
+    val category: String? = null
+)
+data class EyeVisionResponse(val tests: List<EyeVisionTestItem> = emptyList())
 
 // ─── Question Bank ────────────────────────────────────────────────────────────
 data class QuestionBankQuestion(
