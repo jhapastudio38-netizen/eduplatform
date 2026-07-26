@@ -21,7 +21,7 @@ jobs:
         run: xcodegen generate
 
       - name: Select Xcode
-        run: sudo xcode-select -s /Applications/Xcode_15.4.app
+        run: sudo xcode-select -s /Applications/Xcode_15.4.app/Contents/Developer
 
       - name: Build IPA
         working-directory: ios-app
@@ -34,7 +34,8 @@ jobs:
             archive \
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
-            CODE_SIGN_IDENTITY=""
+            CODE_SIGN_IDENTITY="" \
+            COMPILER_INDEX_STORE_ENABLE=NO
 
       - name: Export IPA
         working-directory: ios-app
@@ -51,8 +52,6 @@ jobs:
             <string>manual</string>
             <key>stripSwiftSymbols</key>
             <true/>
-            <key>teamID</key>
-            <string></string>
             <key>compileBitcode</key>
             <false/>
           </dict>
@@ -62,7 +61,8 @@ jobs:
             -archivePath build/DreamKorea.xcarchive \
             -exportOptionsPlist build/ExportOptions.plist \
             -exportPath build/ipa \
-            CODE_SIGNING_ALLOWED=NO
+            CODE_SIGNING_ALLOWED=NO \
+            ALLOW_UNSIGNED_APP_INSTALLS=YES
 
       - name: Upload IPA
         uses: actions/upload-artifact@v4
