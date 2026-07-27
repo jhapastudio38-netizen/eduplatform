@@ -447,8 +447,10 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
                     "text", "choose" -> {
                         (0 until minOf(4, options.size)).forEach { i ->
                             val isSelected = answers[q.id] == options.getOrNull(i)
+                            val optText = options.getOrNull(i) ?: ""
+                            val blankWord = q.optionBlanks.getOrNull(i)?.takeIf { it.isNotBlank() }
                             Row(
-                                modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp).clickable { sound.click(); answers[q.id] = options.getOrNull(i) ?: "" },
+                                modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp).clickable { sound.click(); answers[q.id] = optText },
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Surface(
@@ -460,7 +462,13 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
                                     Box(contentAlignment = Alignment.Center) { Text("${i+1}", color = if (isSelected) Color.White else Color.Black, fontSize = 13.sp, fontWeight = FontWeight.Bold) }
                                 }
                                 Spacer(Modifier.width(8.dp))
-                                Text(options.getOrNull(i) ?: "", color = Color.Black, fontSize = 12.sp, modifier = Modifier.weight(1f))
+                                // Render option text with underlined blank word (if set by admin)
+                                Text(
+                                    text = buildUnderlinedText(optText, blankWord),
+                                    color = Color.Black,
+                                    fontSize = 13.sp,
+                                    modifier = Modifier.weight(1f)
+                                )
                             }
                         }
                     }
@@ -1701,6 +1709,25 @@ fun AnswerInputBlock(
 fun String.toAbsoluteUrl(): String {
     if (this.startsWith("http://") || this.startsWith("https://")) return this
     return "https://my-project-five-sepia.vercel.app" + (if (this.startsWith("/")) this else "/$this")
+}
+
+/**
+ * Builds an AnnotatedString where the [blankWord] is underlined within [text].
+ * If blankWord is null/empty, returns the plain text.
+ * The underlined word is case-insensitive matched.
+ */
+fun buildUnderlinedText(text: String, blankWord: String?): androidx.compose.ui.text.AnnotatedString {
+    if (blankWord.isNullOrBlank()) return androidx.compose.ui.text.AnnotatedString(text)
+    // Find the blank word in the text (case-insensitive)
+    val idx = text.indexOf(blankWord, ignoreCase = true)
+    if (idx < 0) return androidx.compose.ui.text.AnnotatedString(text)
+    return androidx.compose.ui.text.buildAnnotatedString {
+        append(text.substring(0, idx))
+        withStyle(androidx.compose.ui.text.style.TextDecoration.Underline) {
+            append(text.substring(idx, idx + blankWord.length))
+        }
+        append(text.substring(idx + blankWord.length))
+    }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════

@@ -112,6 +112,7 @@ data class QuestionDetail(
     val answerType: String = "text",
     val optionImages: List<String> = emptyList(),
     val optionAudios: List<String> = emptyList(),
+    val optionBlanks: List<String> = emptyList(), // word to underline in each option
     val correctOption: Int = 0,
     val explanation: String? = null
 )
