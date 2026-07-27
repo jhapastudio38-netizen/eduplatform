@@ -183,6 +183,8 @@ model Question {
   chapterId   String?
   type        QuestionType
   difficulty  Difficulty @default(MEDIUM)
+  title       String?    // per-question title (admin/teacher sets this; shown
+                        // at the top of each question in the exam UI)
   stem        String // question text (markdown)
   options     String? // JSON array for MCQ
   correctAnswer String? // JSON: string | string[] | {match: ...}

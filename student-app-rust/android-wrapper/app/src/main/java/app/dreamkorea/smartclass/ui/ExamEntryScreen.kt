@@ -3,6 +3,7 @@ package app.dreamkorea.smartclass.ui
 import android.app.Activity
 import android.content.pm.ActivityInfo
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
@@ -18,7 +19,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -158,25 +161,49 @@ fun ExamEntryScreen(theme: AppTheme, sound: SoundManager, testId: String, onStar
     val studentEmail = AppState.getUserEmail()
 
     // ── OUTER BORDER: thin black rectangle around the entire screen ──────
-    Box(
+    Column(
         modifier = Modifier
             .fillMaxSize()
             .background(Color.White)
             .border(2.dp, Color.Black)
-            .padding(16.dp)
     ) {
-        // Landscape-friendly layout: Row with LEFT (student) + RIGHT (exam)
-        Row(
-            modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()),
-            horizontalArrangement = Arrangement.spacedBy(24.dp),
-            verticalAlignment = Alignment.CenterVertically
+        // ── DreamKorea logo at top centre ────────────────────────────────
+        Box(
+            modifier = Modifier.fillMaxWidth().padding(top = 8.dp, bottom = 4.dp),
+            contentAlignment = Alignment.Center
         ) {
-            // ── LEFT: Student info ────────────────────────────────────────
-            Column(
-                modifier = Modifier.weight(0.4f),
-                horizontalAlignment = Alignment.CenterHorizontally
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Image(
+                    painter = painterResource(id = app.dreamkorea.smartclass.R.drawable.dreamkorea_logo),
+                    contentDescription = "DreamKorea Logo",
+                    modifier = Modifier.size(32.dp),
+                    contentScale = ContentScale.Fit
+                )
+                Spacer(Modifier.width(8.dp))
+                Text(
+                    "DreamKorea SmartClass",
+                    color = Color(0xFF003478),
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Bold,
+                )
+            }
+        }
+
+        Box(
+            modifier = Modifier.weight(1f).padding(16.dp)
+        ) {
+            // Landscape-friendly layout: Row with LEFT (student) + RIGHT (exam)
+            Row(
+                modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(24.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                // Title at top
+                // ── LEFT: Student info ────────────────────────────────────
+                Column(
+                    modifier = Modifier.weight(0.4f),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    // Title at top
                 Text(
                     t.title,
                     color = Color.Black,
@@ -257,6 +284,87 @@ fun ExamEntryScreen(theme: AppTheme, sound: SoundManager, testId: String, onStar
                     StatChip("${t.passScore}%", "Pass", Modifier.weight(1f))
                 }
 
+                Spacer(Modifier.height(12.dp))
+
+                // ── Block system overview ─────────────────────────────────
+                // Shows the text block count + audio block count so the student
+                // knows what to expect (e.g. "20 Reading + 20 Listening")
+                Surface(
+                    color = Color(0xFFF5F5F5),
+                    shape = RoundedCornerShape(10.dp),
+                    border = BorderStroke(1.dp, Color(0xFFCCCCCC)),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(modifier = Modifier.padding(12.dp)) {
+                        Text(
+                            "Exam Structure",
+                            color = Color(0xFF003478),
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold,
+                        )
+                        Spacer(Modifier.height(8.dp))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            // Reading block
+                            Surface(
+                                color = Color(0xFF003478).copy(alpha = 0.1f),
+                                shape = RoundedCornerShape(8.dp),
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(10.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(Icons.Default.MenuBook, null, tint = Color(0xFF003478), modifier = Modifier.size(20.dp))
+                                    Spacer(Modifier.width(8.dp))
+                                    Column {
+                                        Text(
+                                            "${t.textBlockCount}",
+                                            color = Color(0xFF003478),
+                                            fontSize = 16.sp,
+                                            fontWeight = FontWeight.Bold,
+                                        )
+                                        Text(
+                                            "Reading",
+                                            color = Color.Gray,
+                                            fontSize = 10.sp,
+                                        )
+                                    }
+                                }
+                            }
+                            // Listening block
+                            Surface(
+                                color = Color(0xFFEF6C00).copy(alpha = 0.1f),
+                                shape = RoundedCornerShape(8.dp),
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(10.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(Icons.Default.Headphones, null, tint = Color(0xFFEF6C00), modifier = Modifier.size(20.dp))
+                                    Spacer(Modifier.width(8.dp))
+                                    Column {
+                                        Text(
+                                            "${t.audioBlockCount}",
+                                            color = Color(0xFFEF6C00),
+                                            fontSize = 16.sp,
+                                            fontWeight = FontWeight.Bold,
+                                        )
+                                        Text(
+                                            "Listening",
+                                            color = Color.Gray,
+                                            fontSize = 10.sp,
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
                 Spacer(Modifier.height(20.dp))
 
                 // Get Started button
@@ -282,6 +390,7 @@ fun ExamEntryScreen(theme: AppTheme, sound: SoundManager, testId: String, onStar
                     Text("Cancel", fontSize = 13.sp)
                 }
             }
+        }
         }
     }
 }

@@ -90,6 +90,7 @@ data class QuestionDetail(
     val type: String,
     val difficulty: String,
     val stem: String,
+    val title: String? = null, // optional per-question title shown at top of question
     val options: List<String>?,
     // Legacy fields
     val imageUrl: String?,
@@ -141,6 +142,7 @@ data class SubmitRequest(val answers: Map<String, Any>)
 data class ReviewItem(
     val questionId: String,
     val stem: String,
+    val title: String? = null, // optional per-question title
     val type: String,
     val options: List<String>?,
     val imageUrl: String?,

@@ -4,6 +4,7 @@ import android.app.Activity
 import android.content.pm.ActivityInfo
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -25,6 +26,7 @@ import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -295,9 +297,19 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
     var showGrid by remember { mutableStateOf(false) }
 
     Column(modifier = Modifier.fillMaxSize().background(Color.White)) {
-        // ── 1. TOP STATUS HEADER ── 4 equal sections with vertical dividers
+        // ── 1. TOP STATUS HEADER ── logo + 4 equal sections with vertical dividers
         Surface(border = androidx.compose.foundation.BorderStroke(2.dp, Color.Black)) {
             Row(modifier = Modifier.fillMaxWidth().height(48.dp), verticalAlignment = Alignment.CenterVertically) {
+                // DreamKorea logo (small, at the left)
+                Box(modifier = Modifier.padding(start = 8.dp).size(32.dp), contentAlignment = Alignment.Center) {
+                    Image(
+                        painter = painterResource(id = app.dreamkorea.smartclass.R.drawable.dreamkorea_logo),
+                        contentDescription = "DreamKorea Logo",
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Fit
+                    )
+                }
+                Box(modifier = Modifier.width(1.dp).fillMaxHeight().background(Color.Black))
                 // Section type
                 Box(modifier = Modifier.weight(1f).fillMaxHeight(), contentAlignment = Alignment.Center) {
                     val sectionLabel = if (q.blockType == "audio") "Listening ($listeningCount que)" else "Reading ($readingCount que)"
@@ -322,11 +334,13 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
             }
         }
 
-        // ── 2. INSTRUCTION ROW ── question number + instruction text + divider
+        // ── 2. INSTRUCTION ROW ── question number + title/stem + divider
         Surface(modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text("${currentIdx + 1}. ", color = Color.Black, fontSize = 14.sp, fontWeight = FontWeight.Bold)
-                Text(q.stem.take(80), color = Color.Black, fontSize = 13.sp, fontWeight = FontWeight.Bold, maxLines = 2)
+                // Show title if present, otherwise show stem preview
+                val displayText = if (!q.title.isNullOrBlank()) q.title else q.stem.take(80)
+                Text(displayText, color = Color.Black, fontSize = 13.sp, fontWeight = FontWeight.Bold, maxLines = 2)
                 Spacer(Modifier.weight(1f))
                 IconButton(onClick = { showGrid = true }, modifier = Modifier.size(28.dp)) {
                     Icon(Icons.Default.GridView, null, tint = Color.Black, modifier = Modifier.size(16.dp))
@@ -343,7 +357,26 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
                 verticalArrangement = Arrangement.Center,
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                // Question card
+                // Question title (if set by admin) — prominent header
+                if (!q.title.isNullOrBlank()) {
+                    Surface(
+                        color = Color(0xFF003478),
+                        shape = RoundedCornerShape(10.dp),
+                        modifier = Modifier.fillMaxWidth(0.92f)
+                    ) {
+                        Text(
+                            q.title,
+                            color = Color.White,
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Bold,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.padding(vertical = 8.dp, horizontal = 12.dp),
+                            maxLines = 2,
+                        )
+                    }
+                    Spacer(Modifier.height(6.dp))
+                }
+                // Question card (stem)
                 Surface(
                     border = androidx.compose.foundation.BorderStroke(2.dp, Color.Black),
                     shape = RoundedCornerShape(14.dp),
@@ -792,6 +825,30 @@ fun ExamResultScreen(
         modifier = Modifier.fillMaxSize().background(theme.background).padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
+        // ── DreamKorea logo at top centre ──────────────────────────────
+        item {
+            Box(
+                modifier = Modifier.fillMaxWidth(),
+                contentAlignment = Alignment.Center
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Image(
+                        painter = painterResource(id = app.dreamkorea.smartclass.R.drawable.dreamkorea_logo),
+                        contentDescription = "DreamKorea Logo",
+                        modifier = Modifier.size(40.dp),
+                        contentScale = ContentScale.Fit
+                    )
+                    Spacer(Modifier.width(10.dp))
+                    Text(
+                        "DreamKorea SmartClass",
+                        color = theme.primary,
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.Bold,
+                    )
+                }
+            }
+        }
+
         // ── Exam title + description ──────────────────────────────────────
         item {
             Surface(
@@ -800,7 +857,7 @@ fun ExamResultScreen(
                 modifier = Modifier.fillMaxWidth(),
                 shadowElevation = 4.dp
             ) {
-                Column(modifier = Modifier.padding(16.dp)) {
+                Column(modifier = Modifier.padding(16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                     Text(
                         examTitle,
                         color = Color.White,
@@ -808,6 +865,7 @@ fun ExamResultScreen(
                         fontWeight = FontWeight.Bold,
                         maxLines = 2,
                         overflow = TextOverflow.Ellipsis,
+                        textAlign = TextAlign.Center,
                     )
                     if (!examDescription.isNullOrBlank()) {
                         Spacer(Modifier.height(4.dp))
@@ -817,6 +875,7 @@ fun ExamResultScreen(
                             fontSize = 12.sp,
                             maxLines = 2,
                             overflow = TextOverflow.Ellipsis,
+                            textAlign = TextAlign.Center,
                         )
                     }
                     Spacer(Modifier.height(6.dp))
@@ -1027,6 +1086,24 @@ fun ReviewCard(theme: AppTheme, review: ReviewItem, questionNumber: Int = 0) {
                 }
             }
             Spacer(Modifier.height(8.dp))
+
+            // ── Question title (if set by admin) ────────────────────────
+            if (!review.title.isNullOrBlank()) {
+                Surface(
+                    color = theme.primary.copy(alpha = 0.1f),
+                    shape = RoundedCornerShape(6.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(
+                        review.title,
+                        color = theme.primary,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                    )
+                }
+                Spacer(Modifier.height(6.dp))
+            }
 
             // ── Question stem ─────────────────────────────────────────────
             Text(
@@ -1344,6 +1421,7 @@ private fun gradeCombinedExamClientSide(
             ReviewItem(
                 questionId = q.id,
                 stem = q.stem,
+                title = q.title,
                 type = q.type,
                 options = q.options,
                 imageUrl = q.imageUrl,
