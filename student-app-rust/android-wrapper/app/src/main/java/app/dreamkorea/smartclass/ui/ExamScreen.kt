@@ -318,14 +318,14 @@ private fun ExamOverviewScreen(
         }
         Spacer(Modifier.height(4.dp))
 
-        // ── SECTION HEADERS ──
-        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        // ── SECTION HEADERS ── compact, no overlap
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
             Surface(border = androidx.compose.foundation.BorderStroke(1.dp, Color.Black), modifier = Modifier.weight(1f)) {
-                Text("Reading", color = Color.Black, fontSize = 11.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(vertical = 4.dp, horizontal = 8.dp))
+                Text("Reading", color = Color.Black, fontSize = 9.sp, fontWeight = FontWeight.Bold, maxLines = 1, modifier = Modifier.padding(vertical = 2.dp, horizontal = 4.dp))
             }
             if (listeningItems.isNotEmpty()) {
                 Surface(border = androidx.compose.foundation.BorderStroke(1.dp, Color.Black), modifier = Modifier.weight(1f)) {
-                    Text("Listening", color = Color.Black, fontSize = 11.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(vertical = 4.dp, horizontal = 8.dp))
+                    Text("Listening", color = Color.Black, fontSize = 9.sp, fontWeight = FontWeight.Bold, maxLines = 1, modifier = Modifier.padding(vertical = 2.dp, horizontal = 4.dp))
                 }
             }
         }
@@ -392,10 +392,10 @@ private fun LargeGridBlocks(
                         color = if (answered) Color(0xFFC8E6C9) else Color.White,
                         border = androidx.compose.foundation.BorderStroke(2.dp, Color.Black),
                         shape = RoundedCornerShape(2.dp),
-                        modifier = Modifier.weight(1f).aspectRatio(1.1f).clickable { sound.click(); onTap(idx) }
+                        modifier = Modifier.weight(1f).aspectRatio(1.2f).clickable { sound.click(); onTap(idx) }
                     ) {
                         Box(contentAlignment = Alignment.Center) {
-                            Text("${idx + 1}", color = Color.Black, fontSize = 14.sp, fontWeight = FontWeight.Normal)
+                            Text("${idx + 1}", color = Color.Black, fontSize = 11.sp, fontWeight = FontWeight.Normal)
                         }
                     }
                 }
