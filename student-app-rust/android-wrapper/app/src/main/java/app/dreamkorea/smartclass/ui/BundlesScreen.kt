@@ -47,31 +47,40 @@ import kotlinx.coroutines.withTimeoutOrNull
  *    old devices).
  */
 @Composable
-fun BundlesScreen(theme: AppTheme, sound: SoundManager, onBack: () -> Unit, onOpenBundle: (String, String) -> Unit, onOpenTest: (String) -> Unit) {
+fun BundlesScreen(theme: AppTheme, sound: SoundManager, onBack: () -> Unit, onOpenBundle: (String, String) -> Unit, onOpenTest: (String) -> Unit, initialKind: String? = null) {
     var bundles by remember { mutableStateOf<List<BundleSummary>>(emptyList()) }
     var loading by remember { mutableStateOf(true) }
     var error by remember { mutableStateOf("") }
     var retryCount by remember { mutableStateOf(0) }
 
+    // Title based on kind filter
+    val screenTitle = when (initialKind) {
+        "qbank" -> "Question Bank"
+        "batch" -> "Batch"
+        else -> "Packages"
+    }
+
     LaunchedEffect(retryCount) {
         loading = true
         error = ""
         try {
-            // Always fetch fresh — admin may have just published a new package
+            // Always fetch fresh — filter by kind if specified
             val result = withTimeoutOrNull(20_000L) {
-                AppState.cachedFresh("bundles") { AppState.api.getStudentBundles().bundles }
+                AppState.cachedFresh("bundles_${initialKind ?: "all"}") {
+                    AppState.api.getStudentBundles(initialKind).bundles
+                }
             }
             if (result != null) bundles = result
             else error = "The request timed out. Check your internet and try again."
         } catch (e: retrofit2.HttpException) {
             error = when (e.code()) {
                 401 -> "Your session has expired. Please log in again."
-                else -> "Could not load packages (HTTP ${e.code()})."
+                else -> "Could not load (HTTP ${e.code()})."
             }
         } catch (e: java.io.IOException) {
             error = "No internet connection."
         } catch (e: Exception) {
-            error = "Could not load packages."
+            error = "Could not load."
         } finally {
             loading = false
         }
@@ -79,7 +88,7 @@ fun BundlesScreen(theme: AppTheme, sound: SoundManager, onBack: () -> Unit, onOp
 
     Column(modifier = Modifier.fillMaxSize().background(theme.background)) {
         // Header
-        ScreenHeader(theme, sound, "Packages", "Question banks, batches, exam packs", onBack)
+        ScreenHeader(theme, sound, screenTitle, if (bundles.isEmpty()) "No packages yet" else "${bundles.size} packages available", onBack)
 
         if (loading) {
             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
