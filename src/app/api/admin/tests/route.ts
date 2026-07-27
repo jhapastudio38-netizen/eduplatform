@@ -42,6 +42,7 @@ const testSchema = z.object({
   isPublished: z.boolean().default(false),
   // New fields
   price: z.number().min(0).optional(),
+  priceNpr: z.number().int().min(0).max(10_000_000).optional(),
   featuredImage: z.string().optional().or(z.literal("")),
   category: z.string().max(100).optional().or(z.literal("")),
   audioPlayMode: z.enum(["single", "double"]).default("single"),
@@ -78,6 +79,7 @@ export async function POST(req: NextRequest) {
         isActive: true,
         createdBy: user.id,
         price: d.price ?? null,
+        priceNpr: d.priceNpr ?? null,
         featuredImage: d.featuredImage || null,
         category: d.category || null,
         audioPlayMode: d.audioPlayMode,
