@@ -1720,12 +1720,11 @@ fun String.toAbsoluteUrl(): String {
  */
 fun buildUnderlinedText(text: String, blankWord: String?): androidx.compose.ui.text.AnnotatedString {
     if (blankWord.isNullOrBlank()) return androidx.compose.ui.text.AnnotatedString(text)
-    // Find the blank word in the text (case-insensitive)
     val idx = text.indexOf(blankWord, ignoreCase = true)
     if (idx < 0) return androidx.compose.ui.text.AnnotatedString(text)
     return androidx.compose.ui.text.buildAnnotatedString {
         append(text.substring(0, idx))
-        withStyle(androidx.compose.ui.text.style.TextDecoration.Underline) {
+        withStyle(androidx.compose.ui.text.SpanStyle(textDecoration = androidx.compose.ui.text.style.TextDecoration.Underline)) {
             append(text.substring(idx, idx + blankWord.length))
         }
         append(text.substring(idx + blankWord.length))
