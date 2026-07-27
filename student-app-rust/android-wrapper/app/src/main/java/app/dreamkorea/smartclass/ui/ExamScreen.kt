@@ -600,29 +600,25 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
                         }
                     }
 
-                    // CENTER: Grids (Reading + Listening) — scrollable
-                    LazyColumn(
-                        modifier = Modifier.weight(1f).fillMaxHeight().padding(8.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    // CENTER: Grids (Reading + Listening) — scrollable, both fit on one screen
+                    Column(
+                        modifier = Modifier.weight(1f).fillMaxHeight().padding(6.dp).verticalScroll(rememberScrollState()),
+                        verticalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
                         // Reading grid
                         if (readingList.isNotEmpty()) {
-                            item {
-                                Text("Reading", color = Color.Black, fontSize = 14.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(bottom = 4.dp))
-                            }
-                            item { QuestionGridSection(t, readingList, answers, currentIdx, tabFilter, sound) { idx ->
+                            Text("Reading", color = Color.Black, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                            QuestionGridSection(t, readingList, answers, currentIdx, tabFilter, sound) { idx ->
                                 currentIdx = idx; showGrid = false
-                            } }
+                            }
                         }
                         // Listening grid
                         if (listeningList.isNotEmpty()) {
-                            item {
-                                Spacer(Modifier.height(8.dp))
-                                Text("Listening", color = Color.Black, fontSize = 14.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(bottom = 4.dp))
-                            }
-                            item { QuestionGridSection(t, listeningList, answers, currentIdx, tabFilter, sound) { idx ->
+                            Spacer(Modifier.height(4.dp))
+                            Text("Listening", color = Color.Black, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                            QuestionGridSection(t, listeningList, answers, currentIdx, tabFilter, sound) { idx ->
                                 currentIdx = idx; showGrid = false
-                            } }
+                            }
                         }
                     }
 
@@ -772,7 +768,9 @@ private fun QuestionGridSection(
     onPick: (Int) -> Unit,
 ) {
     val globalIndices = items.mapNotNull { item -> test.items.indexOfFirst { it.question.id == item.question.id }.takeIf { it >= 0 } }
-    val cols = 4
+    // 5 columns so both Reading + Listening fit on one screen (landscape).
+    // Column-major: 1,2,3,4 down col 1; 5,6,7,8 down col 2; etc.
+    val cols = 5
     val rowsCount = (items.size + cols - 1) / cols
 
     Surface(
@@ -780,7 +778,7 @@ private fun QuestionGridSection(
         border = androidx.compose.foundation.BorderStroke(2.dp, Color.Black),
         modifier = Modifier.fillMaxWidth()
     ) {
-        Column(modifier = Modifier.padding(4.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        Column(modifier = Modifier.padding(3.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
             for (rowIdx in 0 until rowsCount) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -801,8 +799,8 @@ private fun QuestionGridSection(
                                 Box(
                                     modifier = Modifier
                                         .weight(1f)
-                                        .aspectRatio(1f)
-                                        .border(2.dp, Color.Black)
+                                        .aspectRatio(1.1f) // slightly wider than tall, smaller boxes
+                                        .border(1.5.dp, Color.Black)
                                         .background(if (isAnswered) Color.Black else Color.White)
                                         .clickable { sound.click(); onPick(globalIdx) },
                                     contentAlignment = Alignment.Center
@@ -810,15 +808,15 @@ private fun QuestionGridSection(
                                     Text(
                                         "${globalIdx + 1}",
                                         color = if (isAnswered) Color.White else Color.Black,
-                                        fontSize = 14.sp,
+                                        fontSize = 12.sp,
                                         fontWeight = FontWeight.Normal,
                                     )
                                 }
                             } else {
-                                Spacer(modifier = Modifier.weight(1f).aspectRatio(1f))
+                                Spacer(modifier = Modifier.weight(1f).aspectRatio(1.1f))
                             }
                         } else {
-                            Spacer(modifier = Modifier.weight(1f).aspectRatio(1f))
+                            Spacer(modifier = Modifier.weight(1f).aspectRatio(1.1f))
                         }
                     }
                 }
