@@ -520,87 +520,139 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
         }
     }
 
-    // ── QUESTION GRID PAGE ── full-screen block picker. Shown FIRST when the
-    // exam starts (showGrid starts true). Student picks a question number →
-    // answers it → returns to grid → picks next → taps Submit when done.
+    // ── QUESTION GRID PAGE ── flat B&W block picker. Shown FIRST when the exam
+    // starts (showGrid starts true). Student picks a question number → answers
+    // it → returns to grid → picks next → taps Submit when done.
+    //
+    // Design spec:
+    //   • Top bar: solid black, thin
+    //   • Main frame: white with 3px black border
+    //   • 8-column grid of square boxes with 3px black borders, no rounded corners
+    //   • Numbers 1-80: rightmost column = 1-10 (top→bottom), next = 11-20, etc.
+    //   • Answered = black fill / white text; not answered = white fill / black text
+    //   • No icons, no labels, no decorative elements — just question numbers
+    //   • Scrollable if more boxes than fit on screen
+    //   • Submit button only shows if user has answered at least 1 question
     if (showGrid) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .background(Color.White)
         ) {
-            // Header with title + answered count
+            // ── TOP BAR ── solid black, thin, with question count ──────────
             Surface(
-                color = theme.primary,
+                color = Color.Black,
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column {
-                            Text("Choose a Question", color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold)
-                            Text("$answeredCount of ${t.items.size} answered", color = Color.White.copy(alpha = 0.85f), fontSize = 12.sp)
-                        }
-                        // Progress ring
-                        val pct = if (t.items.isNotEmpty()) (answeredCount * 100 / t.items.size) else 0
-                        Surface(color = Color.White.copy(alpha = 0.2f), shape = RoundedCornerShape(8.dp)) {
-                            Text("$pct%", color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp))
-                        }
-                    }
-                    Spacer(Modifier.height(8.dp))
-                    // Progress bar
-                    LinearProgressIndicator(
-                        progress = { if (t.items.isNotEmpty()) answeredCount.toFloat() / t.items.size else 0f },
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        "${t.items.size} Questions",
                         color = Color.White,
-                        trackColor = Color.White.copy(alpha = 0.25f),
-                        modifier = Modifier.fillMaxWidth().height(6.dp).clip(RoundedCornerShape(3.dp)),
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Bold,
+                    )
+                    Text(
+                        "$answeredCount answered",
+                        color = Color.White,
+                        fontSize = 12.sp,
                     )
                 }
             }
 
-            // Legend
-            Row(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 6.dp),
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            // ── MAIN FRAME ── white with 3px black border, contains the grid ──
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxWidth()
+                    .padding(6.dp)
+                    .border(3.dp, Color.Black)
             ) {
-                LegendItem(Color(0xFFC8E6C9), "Answered")
-                LegendItem(theme.primary, "Current")
-                LegendItem(Color.White, "Not visited")
-            }
+                if (t.items.isEmpty()) {
+                    Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
+                        Text("No questions in this exam", color = Color.Black, fontSize = 14.sp)
+                    }
+                } else {
+                    // Grid — 8 columns. Numbers go right-to-left column-wise:
+                    //   rightmost col = 1-10, next = 11-20, ..., leftmost = 71-80
+                    // We build rows of 8, where row r contains numbers:
+                    //   (80-r*8), (80-r*8-1), ... actually simpler: build a list
+                    //   of question indices in display order (left-to-right, top-to-bottom)
+                    //   where leftmost column has the highest numbers.
+                    //
+                    // For 80 questions in 8 cols × 10 rows:
+                    //   row 0 (top):    72, 64, 56, 48, 40, 32, 24, 16, 8, 1 ... wait
+                    // Actually per spec: rightmost = 1-10 (top→bottom), so:
+                    //   col 7 (rightmost): rows 0-9 = Q1, Q2, ..., Q10
+                    //   col 6: rows 0-9 = Q11, Q12, ..., Q20
+                    //   ...
+                    //   col 0 (leftmost): rows 0-9 = Q71, Q72, ..., Q80
+                    //
+                    // Display order (left-to-right, top-to-bottom):
+                    //   row 0: Q71, Q61, Q51, Q41, Q31, Q21, Q11, Q1
+                    //   row 1: Q72, Q62, Q52, Q42, Q32, Q22, Q12, Q2
+                    //   ...
+                    // But we have a variable number of questions (not always 80).
+                    // So we compute: for each cell (row, col), the question index is:
+                    //   totalQuestions - col*rowsPerCol - row - 1 ... but we want 1-based.
+                    // Simpler: build the display order list directly.
 
-            // Grid — 10 columns, scrollable
-            val rows = t.items.toList().chunked(10)
-            LazyColumn(
-                modifier = Modifier.weight(1f).fillMaxWidth().padding(horizontal = 8.dp),
-                contentPadding = PaddingValues(vertical = 4.dp)
-            ) {
-                items(rows.size) { rowIdx ->
-                    Row(
-                        modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp),
-                        horizontalArrangement = Arrangement.spacedBy(3.dp)
+                    val totalQ = t.items.size
+                    val cols = 8
+                    val rowsCount = (totalQ + cols - 1) / cols // ceiling division
+                    // Build display order: for each column from right to left,
+                    //   for each row from top to bottom, push the question index.
+                    // Column c (0=leftmost, 7=rightmost) contains questions:
+                    //   (cols - 1 - c) * rowsCount + row  → but we want rightmost col = 1-10
+                    // Actually: rightmost col (c=7) = Q1..Q10 (indices 0..9)
+                    //           next col (c=6) = Q11..Q20 (indices 10..19)
+                    // So question index for cell (row, col) = (cols-1-col) * rowsCount + row
+                    // But we need to skip indices >= totalQ (for non-full grids).
+
+                    LazyColumn(
+                        modifier = Modifier.fillMaxSize().padding(8.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
-                        rows[rowIdx].forEachIndexed { colIdx, _ ->
-                            val globalIdx = rowIdx * 10 + colIdx
-                            val isAnswered = answers.containsKey(t.items[globalIdx].question.id)
-                            val isCurrent = globalIdx == currentIdx
-                            val isFree = t.items[globalIdx].question.isFree
-                            Surface(
-                                color = when { isCurrent -> theme.primary; isAnswered -> Color(0xFFC8E6C9); else -> Color.White },
-                                border = androidx.compose.foundation.BorderStroke(1.5.dp, if (isCurrent) theme.primary else Color.Black),
-                                shape = RoundedCornerShape(4.dp),
-                                modifier = Modifier.weight(1f).aspectRatio(1.2f).clickable { sound.click(); currentIdx = globalIdx; showGrid = false }
+                        items(rowsCount) { rowIdx ->
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(10.dp)
                             ) {
-                                Box(contentAlignment = Alignment.Center) {
-                                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                        Text("${globalIdx+1}", color = if (isCurrent) Color.White else Color.Black, fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                                        if (isFree) {
-                                            Surface(color = Color(0xFF22C55E), shape = RoundedCornerShape(2.dp)) {
-                                                Text("FREE", color = Color.White, fontSize = 6.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 2.dp, vertical = 0.dp))
-                                            }
+                                for (colIdx in 0 until cols) {
+                                    // Question index for this cell
+                                    val qIdx = (cols - 1 - colIdx) * rowsCount + rowIdx
+                                    if (qIdx < totalQ) {
+                                        val isAnswered = answers.containsKey(t.items[qIdx].question.id)
+                                        val isCurrent = qIdx == currentIdx
+                                        // Flat B&W: answered or current = black fill + white text;
+                                        // not answered = white fill + black text
+                                        val isHighlighted = isAnswered || isCurrent
+                                        Box(
+                                            modifier = Modifier
+                                                .weight(1f)
+                                                .aspectRatio(0.72f) // slightly taller than wide, matches spec 73×102
+                                                .border(3.dp, Color.Black)
+                                                .background(if (isHighlighted) Color.Black else Color.White)
+                                                .clickable {
+                                                    sound.click()
+                                                    currentIdx = qIdx
+                                                    showGrid = false
+                                                },
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Text(
+                                                "${qIdx + 1}",
+                                                color = if (isHighlighted) Color.White else Color.Black,
+                                                fontSize = 18.sp,
+                                                fontWeight = FontWeight.Normal,
+                                            )
                                         }
+                                    } else {
+                                        // Empty cell — just a spacer to keep the grid aligned
+                                        Spacer(modifier = Modifier.weight(1f).aspectRatio(0.72f))
                                     }
                                 }
                             }
@@ -609,54 +661,84 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
                 }
             }
 
-            // Bottom action bar — Submit + Cancel
+            // ── BOTTOM BAR ── Exit + Submit (Submit only if ≥1 answered) ────
             Surface(
-                color = Color(0xFFF5F5F5),
-                border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFCCCCCC)),
+                color = Color.White,
+                border = androidx.compose.foundation.BorderStroke(3.dp, Color.Black),
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Row(
                     modifier = Modifier.fillMaxWidth().padding(12.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    OutlinedButton(
-                        onClick = { sound.click(); onExit() },
-                        modifier = Modifier.weight(1f).height(44.dp),
-                        shape = RoundedCornerShape(8.dp),
-                        colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.Black),
-                        border = androidx.compose.foundation.BorderStroke(1.dp, Color.Black)
+                    // Exit button — always shown
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(48.dp)
+                            .border(3.dp, Color.Black)
+                            .background(Color.White)
+                            .clickable { sound.click(); onExit() },
+                        contentAlignment = Alignment.Center
                     ) {
-                        Text("Exit Exam", fontSize = 12.sp)
+                        Text("Exit", color = Color.Black, fontSize = 14.sp, fontWeight = FontWeight.Bold)
                     }
-                    Button(
-                        onClick = {
-                            sound.swoosh()
-                            submitting = true
-                            scope.launch {
-                                try {
-                                    submitResult = if (t.id == "qbank-combined" || t.id.startsWith("bundle-")) {
-                                        submitCombinedExamWithFallback(t, answers.toMap())
-                                    } else {
-                                        AppState.api.submitTest(t.id, SubmitRequest(answers.toMap()))
+                    // Submit button — only shown if user has answered at least 1 question
+                    if (answeredCount > 0) {
+                        Box(
+                            modifier = Modifier
+                                .weight(2f)
+                                .height(48.dp)
+                                .border(3.dp, Color.Black)
+                                .background(Color.Black)
+                                .clickable {
+                                    if (!submitting) {
+                                        sound.swoosh()
+                                        submitting = true
+                                        scope.launch {
+                                            try {
+                                                submitResult = if (t.id == "qbank-combined" || t.id.startsWith("bundle-")) {
+                                                    submitCombinedExamWithFallback(t, answers.toMap())
+                                                } else {
+                                                    AppState.api.submitTest(t.id, SubmitRequest(answers.toMap()))
+                                                }
+                                                sound.success()
+                                            } catch (e: Exception) {
+                                                error = "Submit failed: ${e.message ?: "unknown error"}"
+                                            }
+                                            submitting = false
+                                        }
                                     }
-                                    sound.success()
-                                } catch (e: Exception) {
-                                    error = "Submit failed."
-                                }
-                                submitting = false
+                                },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            if (submitting) {
+                                CircularProgressIndicator(color = Color.White, modifier = Modifier.size(20.dp), strokeWidth = 3.dp)
+                            } else {
+                                Text(
+                                    "Submit ($answeredCount)",
+                                    color = Color.White,
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.Bold,
+                                )
                             }
-                        },
-                        modifier = Modifier.weight(2f).height(44.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = theme.primary),
-                        shape = RoundedCornerShape(8.dp),
-                        enabled = !submitting
-                    ) {
-                        if (submitting) {
-                            CircularProgressIndicator(color = Color.White, modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
-                        } else {
-                            Icon(Icons.Default.Send, null, tint = Color.White, modifier = Modifier.size(16.dp))
-                            Spacer(Modifier.width(6.dp))
-                            Text("Submit (${answeredCount}/${t.items.size})", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                        }
+                    } else {
+                        // No questions answered yet — show a hint instead of Submit
+                        Box(
+                            modifier = Modifier
+                                .weight(2f)
+                                .height(48.dp)
+                                .border(3.dp, Color.Black)
+                                .background(Color.White),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                "Tap a number to start",
+                                color = Color.Black,
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Normal,
+                            )
                         }
                     }
                 }
@@ -1613,10 +1695,12 @@ private suspend fun submitCombinedExamWithFallback(
     return try {
         AppState.api.submitTest(test.id, SubmitRequest(answers))
     } catch (e: retrofit2.HttpException) {
-        if (e.code() == 404 || e.code() == 500) {
-            // Server doesn't know how to handle this combined exam ID —
-            // grade it client-side as a fallback
-            gradeCombinedExamClientSide(test, answers)
-        } else throw e
+        // ANY server error (404, 500, 403, etc.) → fall back to client-side grading.
+        // The server may not support combined exam IDs, so we grade locally.
+        gradeCombinedExamClientSide(test, answers)
+    } catch (e: Exception) {
+        // Network errors, timeouts, etc. → also fall back to client-side grading
+        // so the student always gets a result.
+        gradeCombinedExamClientSide(test, answers)
     }
 }
