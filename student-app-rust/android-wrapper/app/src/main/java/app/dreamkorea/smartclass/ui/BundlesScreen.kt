@@ -152,7 +152,7 @@ private fun BundleCard(theme: AppTheme, sound: SoundManager, bundle: BundleSumma
                         model = absUrl,
                         contentDescription = null,
                         modifier = Modifier.fillMaxSize(),
-                        contentScale = ContentScale.Crop
+                        contentScale = ContentScale.Fit
                     )
                 } else {
                     Icon(Icons.Default.Inventory2, null, tint = theme.primary, modifier = Modifier.size(36.dp))

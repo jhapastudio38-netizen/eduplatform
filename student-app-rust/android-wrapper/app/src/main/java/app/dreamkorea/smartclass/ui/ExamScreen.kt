@@ -59,12 +59,21 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
     // Retry trigger — increment to force reload
     var retryCount by remember { mutableStateOf(0) }
 
-    // Load test detail — uses LaunchedEffect's own scope, finally block guarantees loading cleanup
+    // ─── Force landscape for the entire exam — NO vertical option ────────
+    val context = LocalContext.current
+    DisposableEffect(Unit) {
+        val activity = context as? android.app.Activity
+        activity?.requestedOrientation = android.content.pm.ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
+        onDispose {
+            activity?.requestedOrientation = android.content.pm.ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+        }
+    }
+
+    // Load test detail
     LaunchedEffect(testId, retryCount) {
         loading = true
         error = ""
         try {
-            // 20-second timeout — if the API hangs, show a timeout error
             val result = withTimeoutOrNull(20_000L) {
                 AppState.api.getTestDetail(testId).test
             }
@@ -812,7 +821,7 @@ fun AsyncImage(url: String, modifier: Modifier = Modifier) {
         model = url,
         contentDescription = null,
         modifier = modifier,
-        contentScale = androidx.compose.ui.layout.ContentScale.Crop
+        contentScale = androidx.compose.ui.layout.ContentScale.Fit
     )
 }
 
@@ -1020,7 +1029,7 @@ fun AnswerInputBlock(
                                 model = imgUrl.toAbsoluteUrl(),
                                 contentDescription = null,
                                 modifier = Modifier.size(72.dp).clip(RoundedCornerShape(8.dp)),
-                                contentScale = ContentScale.Crop
+                                contentScale = ContentScale.Fit
                             )
                             Spacer(Modifier.width(12.dp))
                             Text(question.options?.getOrNull(i) ?: "Option ${'A' + i}", color = theme.darkText, fontSize = 14.sp, fontWeight = FontWeight.Medium)

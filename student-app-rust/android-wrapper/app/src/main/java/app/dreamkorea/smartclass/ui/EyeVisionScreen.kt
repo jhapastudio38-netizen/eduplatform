@@ -264,7 +264,7 @@ fun EyeVisionTestCard(
                         // Open full-screen image viewer
                         FullScreenImageViewer.show(test.imageUrl)
                     },
-                contentScale = ContentScale.Crop
+                contentScale = ContentScale.Fit
             )
 
             Spacer(Modifier.height(12.dp))
