@@ -31,6 +31,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.viewinterop.AndroidView
 import app.dreamkorea.smartclass.api.*
 import app.dreamkorea.smartclass.data.AppState
 import kotlinx.coroutines.launch
@@ -1166,31 +1167,42 @@ fun AnimatedListItem(index: Int, theme: AppTheme, content: @Composable () -> Uni
     }
 }
 
-// ─── Book Reader Screen ───────────────────────────────────────────────────────
+// ─── Book Reader Screen — in-app PDF viewer via WebView ──────────────────────
 @Composable
 fun BookReaderScreen(theme: AppTheme, sound: SoundManager, book: Book, onBack: () -> Unit) {
     Column(modifier = Modifier.fillMaxSize().background(BgGray)) {
-        ScreenHeader(theme, sound, book.title, "Tap 'Open PDF' to read", onBack)
-        Column(modifier = Modifier.fillMaxSize().padding(20.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
-            Surface(color = NavyBlue, shape = RoundedCornerShape(8.dp), modifier = Modifier.size(120.dp, 160.dp), shadowElevation = 4.dp) {
-                Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) { Icon(Icons.Default.Book, null, tint = Color.White, modifier = Modifier.size(48.dp)) }
-            }
-            Spacer(Modifier.height(16.dp))
-            Text(book.title, color = TextDark, fontSize = 18.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
-            if (!book.author.isNullOrBlank()) Text("by ${book.author}", color = TextMid, fontSize = 13.sp)
-            Spacer(Modifier.height(24.dp))
-            if (!book.pdfUrl.isNullOrBlank()) {
-                val context = androidx.compose.ui.platform.LocalContext.current
-                Button(
-                    onClick = { sound.click(); val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(book.pdfUrl)); context.startActivity(intent) },
-                    modifier = Modifier.fillMaxWidth().height(48.dp), colors = ButtonDefaults.buttonColors(containerColor = NavyBlue), shape = RoundedCornerShape(10.dp)
-                ) {
-                    Icon(Icons.Default.Book, null, modifier = Modifier.size(18.dp)); Spacer(Modifier.width(8.dp))
-                    Text("Open PDF", fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+        ScreenHeader(theme, sound, book.title, if (book.pdfUrl.isNullOrBlank()) "No PDF" else "Reading…", onBack)
+
+        if (book.pdfUrl.isNullOrBlank()) {
+            Column(modifier = Modifier.fillMaxSize().padding(20.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
+                Surface(color = NavyBlue, shape = RoundedCornerShape(8.dp), modifier = Modifier.size(120.dp, 160.dp), shadowElevation = 4.dp) {
+                    Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) { Icon(Icons.Default.Book, null, tint = Color.White, modifier = Modifier.size(48.dp)) }
                 }
-            } else {
-                Text("No PDF available", color = TextMid, fontSize = 13.sp)
+                Spacer(Modifier.height(16.dp))
+                Text(book.title, color = TextDark, fontSize = 18.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
+                if (!book.author.isNullOrBlank()) Text("by ${book.author}", color = TextMid, fontSize = 13.sp)
+                Spacer(Modifier.height(16.dp))
+                Text("No PDF available for this book", color = TextMid, fontSize = 13.sp, textAlign = TextAlign.Center)
             }
+        } else {
+            // In-app PDF viewer using Android WebView
+            // Google Docs Viewer embeds the PDF inside a WebView — no external app needed
+            val pdfUrl = book.pdfUrl!!
+            val googleDocsUrl = "https://docs.google.com/viewer?embedded=true&url=${android.net.Uri.encode(pdfUrl)}"
+            AndroidView(
+                factory = { ctx ->
+                    android.webkit.WebView(ctx).apply {
+                        settings.javaScriptEnabled = true
+                        settings.loadWithOverviewMode = true
+                        settings.useWideViewPort = true
+                        settings.builtInZoomControls = true
+                        settings.displayZoomControls = false
+                        webViewClient = android.webkit.WebViewClient()
+                        loadUrl(googleDocsUrl)
+                    }
+                },
+                modifier = Modifier.fillMaxSize()
+            )
         }
     }
 }
