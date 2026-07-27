@@ -309,7 +309,8 @@ fun AsyncImageLoader(url: String, modifier: Modifier = Modifier) {
         }
         return
     }
-    coil.compose.AsyncImage(model = absoluteUrl, contentDescription = null, modifier = modifier, contentScale = ContentScale.Fit)
+    // Use Crop so the image fills the entire card — no empty space, no "cut" look
+    coil.compose.AsyncImage(model = absoluteUrl, contentDescription = null, modifier = modifier, contentScale = ContentScale.Crop)
 }
 
 // ─── HOME SCREEN — Professional EdTech design ─────────────────────────────────
