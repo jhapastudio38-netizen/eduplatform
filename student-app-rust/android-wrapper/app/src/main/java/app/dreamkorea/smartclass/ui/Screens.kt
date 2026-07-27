@@ -148,7 +148,7 @@ fun MainScreen(userName: String, onLogout: () -> Unit) {
                         is Screen.Home -> HomeScreen(theme, sound, userName, onNavigate = { navigateTo(it) })
                         is Screen.Learn -> LearnScreen(theme, sound, onBack = { navigateTo(Screen.Home) })
                         is Screen.Books -> BooksScreen(theme, sound, onBack = { navigateTo(Screen.Home) }, onBookClick = { screen = Screen.BookReader(it) })
-                        is Screen.Tests -> TestsScreen(theme, sound, filter = "all", title = "All Exams", onBack = { navigateTo(Screen.Home) }, onStartExam = { screen = Screen.ExamEntry(it) })
+                        is Screen.Tests -> TestsScreen(theme, sound, filter = "all", title = "All Exams", onBack = { navigateTo(Screen.Home) }, onStartExam = { screen = Screen.ExamEntry(it) }, onOpenPackages = { screen = Screen.Bundles })
                         is Screen.Videos -> VideosScreen(theme, sound, onBack = { navigateTo(Screen.Home) })
                         is Screen.Profile -> ProfileScreen(theme, sound, userName, onBack = { navigateTo(Screen.Home) }, onLogout = onLogout)
                         is Screen.LiveRoom -> LiveRoomScreen(theme, onBack = { navigateTo(Screen.Home) })
@@ -156,17 +156,17 @@ fun MainScreen(userName: String, onLogout: () -> Unit) {
                         is Screen.ExamEntry -> ExamEntryScreen(theme, sound, testId = s.testId, onStart = { screen = Screen.Exam(s.testId) }, onBack = { navigateTo(Screen.Home) })
                         is Screen.Exam -> ExamScreen(theme, testId = s.testId, onExit = { navigateTo(Screen.Home) })
                         is Screen.BookReader -> BookReaderScreen(theme, sound, s.book, onBack = { screen = Screen.Books })
-                        is Screen.UbtTest -> TestsScreen(theme, sound, filter = "exam", title = "UBT Exams", onBack = { navigateTo(Screen.Home) }, onStartExam = { screen = Screen.ExamEntry(it) })
-                        is Screen.FreeExam -> TestsScreen(theme, sound, filter = "demo", title = "Demo Exams", onBack = { navigateTo(Screen.Home) }, onStartExam = { screen = Screen.ExamEntry(it) })
-                        is Screen.Batch -> TestsScreen(theme, sound, filter = "batch", title = "Batch Exams", onBack = { navigateTo(Screen.Home) }, onStartExam = { screen = Screen.ExamEntry(it) })
+                        is Screen.UbtTest -> TestsScreen(theme, sound, filter = "exam", title = "UBT Exams", onBack = { navigateTo(Screen.Home) }, onStartExam = { screen = Screen.ExamEntry(it) }, onOpenPackages = { screen = Screen.Bundles })
+                        is Screen.FreeExam -> TestsScreen(theme, sound, filter = "demo", title = "Demo Exams", onBack = { navigateTo(Screen.Home) }, onStartExam = { screen = Screen.ExamEntry(it) }, onOpenPackages = { screen = Screen.Bundles })
+                        is Screen.Batch -> TestsScreen(theme, sound, filter = "batch", title = "Batch Exams", onBack = { navigateTo(Screen.Home) }, onStartExam = { screen = Screen.ExamEntry(it) }, onOpenPackages = { screen = Screen.Bundles })
                         is Screen.Results -> ResultsScreen(theme, sound, onBack = { navigateTo(Screen.Home) })
-                        is Screen.QuestionBank -> QuestionBankScreen(theme, sound, onBack = { navigateTo(Screen.Home) }, onStartExam = { screen = Screen.ExamEntry(it) })
+                        is Screen.QuestionBank -> QuestionBankScreen(theme, sound, onBack = { navigateTo(Screen.Home) }, onStartExam = { screen = Screen.ExamEntry(it) }, onOpenPackages = { screen = Screen.Bundles })
                         is Screen.AudioLessons -> LearnScreen(theme, sound, onBack = { navigateTo(Screen.Home) })
                         is Screen.Classroom -> LiveRoomScreen(theme, onBack = { navigateTo(Screen.Home) })
                         is Screen.RecordedVideo -> VideosScreen(theme, sound, onBack = { navigateTo(Screen.Home) })
                         is Screen.ClassResult -> ResultsScreen(theme, sound, onBack = { navigateTo(Screen.Home) })
                         is Screen.CourseVideo -> VideosScreen(theme, sound, onBack = { navigateTo(Screen.Home) })
-                        is Screen.TestList -> TestsScreen(theme, sound, filter = s.filter, title = s.title, onBack = { navigateTo(Screen.Home) }, onStartExam = { screen = Screen.ExamEntry(it) })
+                        is Screen.TestList -> TestsScreen(theme, sound, filter = s.filter, title = s.title, onBack = { navigateTo(Screen.Home) }, onStartExam = { screen = Screen.ExamEntry(it) }, onOpenPackages = { screen = Screen.Bundles })
                         is Screen.Join -> JoinScreen(theme, sound, onBack = { navigateTo(Screen.Home) })
                         is Screen.EyeVision -> EyeVisionScreen(theme, sound, onBack = { navigateTo(Screen.Home) })
                         is Screen.Bundles -> BundlesScreen(theme, sound, onBack = { navigateTo(Screen.Home) }, onOpenBundle = { id, title -> screen = Screen.BundleDetail(id, title) }, onOpenTest = { screen = Screen.ExamEntry(it) })
@@ -728,7 +728,7 @@ fun BooksScreen(theme: AppTheme, sound: SoundManager, onBack: () -> Unit, onBook
 
 // ─── Tests Screen ─────────────────────────────────────────────────────────────
 @Composable
-fun TestsScreen(theme: AppTheme, sound: SoundManager, filter: String = "all", title: String = "All Exams", onBack: () -> Unit, onStartExam: (String) -> Unit) {
+fun TestsScreen(theme: AppTheme, sound: SoundManager, filter: String = "all", title: String = "All Exams", onBack: () -> Unit, onStartExam: (String) -> Unit, onOpenPackages: () -> Unit = {}) {
     // Local filter state — allows in-screen filtering via tabs
     var activeFilter by remember { mutableStateOf(filter) }
     var tests by remember {
@@ -790,15 +790,16 @@ fun TestsScreen(theme: AppTheme, sound: SoundManager, filter: String = "all", ti
             }
         }
 
-        // Filter tabs — only show when initial filter="all" (i.e., from bottom nav Exams tab)
+        // Filter tabs + Packages button — only show when initial filter="all"
         if (filter == "all") {
             item {
-                val filters = listOf("all" to "All", "exam" to "UBT", "demo" to "Demo", "batch" to "Batch", "chapter" to "Chapter", "question_bank" to "Q Bank")
-                LazyRow(
+                Row(
                     modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    items(filters) { (key, label) ->
+                    val filters = listOf("all" to "All", "exam" to "UBT", "demo" to "Demo", "batch" to "Batch", "chapter" to "Chapter", "question_bank" to "Q Bank")
+                    filters.forEach { (key, label) ->
                         val isActive = activeFilter == key
                         Surface(
                             color = if (isActive) NavyBlue else CardWhite,
@@ -814,6 +815,20 @@ fun TestsScreen(theme: AppTheme, sound: SoundManager, filter: String = "all", ti
                                 fontWeight = if (isActive) FontWeight.SemiBold else FontWeight.Normal,
                                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
                             )
+                        }
+                    }
+                    Spacer(Modifier.weight(1f))
+                    // Packages button — always visible
+                    Surface(
+                        color = Color(0xFF6A1B9A),
+                        shape = RoundedCornerShape(20.dp),
+                        modifier = Modifier.clickable { sound.click(); onOpenPackages() },
+                        shadowElevation = 2.dp
+                    ) {
+                        Row(modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Default.Package, null, tint = Color.White, modifier = Modifier.size(14.dp))
+                            Spacer(Modifier.width(4.dp))
+                            Text("Packages", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
                         }
                     }
                 }

@@ -246,16 +246,11 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
     } else {
         ExamAnswerScreen(
             theme = theme, sound = sound, test = t, answers = answers,
-            currentIdx = currentIdx, questionFeedback = questionFeedback,
+            currentIdx = currentIdx, questionFeedback = null, // NEVER show feedback during exam
             timeLeft = timeLeft, submitting = submitting,
             onAnswer = { qid, ans ->
                 answers[qid] = ans
-                val q = t.items.find { it.question.id == qid }?.question
-                if (q != null) {
-                    val ci = q.correctOption
-                    val ok = when { q.answerType == "text" || q.answerType == "choose" -> q.options?.getOrNull(ci) == ans; q.answerType == "image" -> q.optionImages.getOrNull(ci) == ans; q.answerType == "audio" -> q.optionAudios.getOrNull(ci) == ans; else -> false }
-                    questionFeedback = QuestionFeedback(ok, "")
-                }
+                // Do NOT check correctness during the exam — only after submit
             },
             onNext = { if (currentIdx < t.items.size - 1) { currentIdx++; questionFeedback = null } },
             onPrev = { if (currentIdx > 0) { currentIdx--; questionFeedback = null } },
