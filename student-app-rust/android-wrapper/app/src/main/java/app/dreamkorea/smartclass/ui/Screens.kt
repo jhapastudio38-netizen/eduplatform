@@ -826,7 +826,7 @@ fun TestsScreen(theme: AppTheme, sound: SoundManager, filter: String = "all", ti
                         shadowElevation = 2.dp
                     ) {
                         Row(modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Default.Package, null, tint = Color.White, modifier = Modifier.size(14.dp))
+                            Icon(Icons.Default.Inventory2, null, tint = Color.White, modifier = Modifier.size(14.dp))
                             Spacer(Modifier.width(4.dp))
                             Text("Packages", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
                         }
