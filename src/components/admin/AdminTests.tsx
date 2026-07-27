@@ -96,6 +96,8 @@ interface QuestionData {
   setNumber?: number;
   title: string; // per-question title shown to students at top of question
   isFree: boolean; // free (demo) questions show at the top of QBank/Batch
+  audioLoop: number; // 1=play once, 2=play twice, N=play N times (audio questions only)
+  audioLoopDelay: number; // delay between loops in seconds
   stem: string;
   descType: "none" | "text" | "image" | "audio";
   descText: string;
@@ -121,6 +123,8 @@ function emptyQuestion(blockType: "text" | "audio", blockNumber: number): Questi
     setNumber: 1,
     title: "",
     isFree: false,
+    audioLoop: 1,
+    audioLoopDelay: 0,
     stem: "",
     descType: "none",
     descText: "",
@@ -917,6 +921,8 @@ function ExamEditor({ test, testCategory, onClose }: { test: Test; testCategory:
         setNumber: q.setNumber ?? activeSet,
         title: q.title || "",
         isFree: q.isFree || false,
+        audioLoop: q.audioLoop || 1,
+        audioLoopDelay: q.audioLoopDelay || 0,
         stem: q.stem,
         descType: q.descType,
         descText: q.descText || "",
@@ -1739,6 +1745,36 @@ function QuestionEditor({ question, onChange, blockLabel, isAudioBlock }: {
               onClear={() => onChange({ ...question, mediaAudioUrl: "" })}
               type="audio"
             />
+          )}
+          {/* Audio play count — how many times the audio plays when student taps play */}
+          {question.mediaType === "audio" && (
+            <div className="flex items-center gap-3 p-3 rounded-lg border bg-blue-50">
+              <div className="flex-1">
+                <Label className="text-sm font-semibold">Audio Play Count</Label>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  How many times the audio plays when the student taps the play button.
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => onChange({ ...question, audioLoop: Math.max(1, (question.audioLoop || 1) - 1) })}
+                >
+                  −
+                </Button>
+                <span className="text-lg font-bold w-12 text-center">{question.audioLoop || 1}</span>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => onChange({ ...question, audioLoop: Math.min(100, (question.audioLoop || 1) + 1) })}
+                >
+                  +
+                </Button>
+              </div>
+            </div>
           )}
         </div>
 
