@@ -1,5 +1,7 @@
 package app.dreamkorea.smartclass.ui
 
+import android.app.Activity
+import android.content.pm.ActivityInfo
 import androidx.compose.animation.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -45,6 +47,7 @@ import kotlinx.coroutines.withTimeoutOrNull
 fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
     val sound = rememberSoundManager()
     val scope = rememberCoroutineScope()
+    val context = LocalContext.current
     var test by remember { mutableStateOf<TestDetail?>(null) }
     var loading by remember { mutableStateOf(true) }
     var error by remember { mutableStateOf("") }
@@ -56,6 +59,19 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
     var questionFeedback by remember { mutableStateOf<QuestionFeedback?>(null) }
     // Timer
     var timeLeft by remember { mutableStateOf(0) }
+
+    // ── PROGRAMMATIC ORIENTATION LOCK ──────────────────────────────────────
+    // Force the exam screen to landscape the moment it mounts. Restored to
+    // the user's preferred orientation on exit. This guarantees the exam
+    // layout (60/40 split, status bar, Nepali nav) renders correctly without
+    // the user having to manually rotate the device.
+    DisposableEffect(Unit) {
+        val activity = context as? Activity
+        activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
+        onDispose {
+            activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+        }
+    }
     // Retry trigger — increment to force reload
     var retryCount by remember { mutableStateOf(0) }
 
