@@ -308,7 +308,7 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
             Row(modifier = Modifier.fillMaxWidth().height(52.dp), verticalAlignment = Alignment.CenterVertically) {
                 // Section type
                 Box(modifier = Modifier.weight(1f).fillMaxHeight(), contentAlignment = Alignment.Center) {
-                    val sectionLabel = if (q.blockType == "audio") "🎧 Listening ($listeningCount)" else "📖 Reading ($readingCount)"
+                    val sectionLabel = if (q.blockType == "audio") "Listening ($listeningCount)" else "Reading ($readingCount)"
                     Text(sectionLabel, color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
                 }
                 Box(modifier = Modifier.width(1.dp).fillMaxHeight(0.6f).background(Color.White.copy(alpha = 0.3f)))
@@ -325,7 +325,7 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
                 // Timer
                 Box(modifier = Modifier.weight(1f).fillMaxHeight(), contentAlignment = Alignment.Center) {
                     val mm = timeLeft / 60; val ss = timeLeft % 60
-                    Text(String.format("⏱ %02d:%02d", mm, ss), color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                    Text(String.format("%02d:%02d", mm, ss), color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold)
                 }
             }
         }
@@ -508,12 +508,12 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
             Row(modifier = Modifier.fillMaxWidth().height(56.dp), verticalAlignment = Alignment.CenterVertically) {
                 // Previous (अघिल्लो)
                 Box(modifier = Modifier.weight(1f).fillMaxHeight().clickable { if (currentIdx > 0) { currentIdx--; sound.click() } }, contentAlignment = Alignment.Center) {
-                    Text("← अघिल्लो", color = if (currentIdx > 0) Color.White else Color.White.copy(alpha = 0.4f), fontSize = 13.sp, fontWeight = FontWeight.Medium)
+                    Text("अघिल्लो (Previous)", color = if (currentIdx > 0) Color.White else Color.White.copy(alpha = 0.4f), fontSize = 13.sp, fontWeight = FontWeight.Medium)
                 }
                 Box(modifier = Modifier.width(1.dp).fillMaxHeight(0.6f).background(Color.White.copy(alpha = 0.3f)))
                 // All questions (सबै प्रश्नहरू)
                 Box(modifier = Modifier.weight(1f).fillMaxHeight().clickable { sound.click(); showGrid = true }, contentAlignment = Alignment.Center) {
-                    Text("☰ सबै प्रश्नहरू", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Medium)
+                    Text("सबै प्रश्नहरू (All)", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Medium)
                 }
                 Box(modifier = Modifier.width(1.dp).fillMaxHeight(0.6f).background(Color.White.copy(alpha = 0.3f)))
                 // Next (अर्को) or Submit
@@ -522,8 +522,8 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
                     else { sound.swoosh(); submitting = true; scope.launch { try { submitResult = if (t.id == "qbank-combined" || t.id.startsWith("bundle-")) submitCombinedExamWithFallback(t, answers.toMap()) else AppState.api.submitTest(t.id, SubmitRequest(answers.toMap())); sound.success() } catch (e: Exception) { error = "Submit failed." }; submitting = false } }
                 }, contentAlignment = Alignment.Center) {
                     if (submitting) { CircularProgressIndicator(color = Color.White, modifier = Modifier.size(18.dp), strokeWidth = 2.dp) }
-                    else if (currentIdx < t.items.size - 1) { Text("अर्को →", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Medium) }
-                    else { Text("✓ सबमिट", color = Color(0xFF4CAF50), fontSize = 13.sp, fontWeight = FontWeight.Bold) }
+                    else if (currentIdx < t.items.size - 1) { Text("अर्को (Next)", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Medium) }
+                    else { Text("सबमिट (Submit)", color = Color(0xFF4CAF50), fontSize = 13.sp, fontWeight = FontWeight.Bold) }
                 }
             }
         }
@@ -616,7 +616,7 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
                         // Reading grid (LEFT)
                         if (readingList.isNotEmpty()) {
                             Column(modifier = Modifier.weight(1f).fillMaxHeight().verticalScroll(rememberScrollState())) {
-                                Text("📖 Reading", color = Color(0xFF003478), fontSize = 12.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(bottom = 2.dp))
+                                Text("Reading", color = Color(0xFF003478), fontSize = 12.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(bottom = 2.dp))
                                 QuestionGridSection(t, readingList, answers, currentIdx, tabFilter, sound) { idx ->
                                     currentIdx = idx; showGrid = false
                                 }
@@ -625,7 +625,7 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
                         // Listening grid (RIGHT)
                         if (listeningList.isNotEmpty()) {
                             Column(modifier = Modifier.weight(1f).fillMaxHeight().verticalScroll(rememberScrollState())) {
-                                Text("🎧 Listening", color = Color(0xFFEF6C00), fontSize = 12.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(bottom = 2.dp))
+                                Text("Listening", color = Color(0xFFEF6C00), fontSize = 12.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(bottom = 2.dp))
                                 QuestionGridSection(t, listeningList, answers, currentIdx, tabFilter, sound) { idx ->
                                     currentIdx = idx; showGrid = false
                                 }
@@ -779,9 +779,10 @@ private fun QuestionGridSection(
     onPick: (Int) -> Unit,
 ) {
     val globalIndices = items.mapNotNull { item -> test.items.indexOfFirst { it.question.id == item.question.id }.takeIf { it >= 0 } }
-    // 4 columns per grid (Reading left, Listening right — each has its own 4-col grid).
-    // Column-major: 1,2,3,4,5 down col 1; 6,7,8,9,10 down col 2; etc.
-    val cols = 4
+    // 5 columns × 4 rows = 20 questions per grid. If more than 20 questions,
+    // rows expand vertically (the grid scrolls). Column-major numbering:
+    // 1,2,3,4 down col 1; 5,6,7,8 down col 2; etc.
+    val cols = 5
     val rowsCount = (items.size + cols - 1) / cols
 
     Surface(
@@ -811,7 +812,7 @@ private fun QuestionGridSection(
                                 Box(
                                     modifier = Modifier
                                         .weight(1f)
-                                        .aspectRatio(1f) // perfect square — small boxes
+                                        .aspectRatio(0.9f) // slightly taller than wide
                                         .border(1.dp, Color.Black)
                                         .background(if (isAnswered) Color(0xFF003478) else Color.White)
                                         .clickable { sound.click(); onPick(globalIdx) },
@@ -820,15 +821,15 @@ private fun QuestionGridSection(
                                     Text(
                                         "${globalIdx + 1}",
                                         color = if (isAnswered) Color.White else Color(0xFF003478),
-                                        fontSize = 13.sp,
-                                        fontWeight = FontWeight.Bold, // BOLD numbers
+                                        fontSize = 18.sp, // BIG numbers — clearly visible
+                                        fontWeight = FontWeight.Bold,
                                     )
                                 }
                             } else {
-                                Spacer(modifier = Modifier.weight(1f).aspectRatio(1f))
+                                Spacer(modifier = Modifier.weight(1f).aspectRatio(0.9f))
                             }
                         } else {
-                            Spacer(modifier = Modifier.weight(1f).aspectRatio(1f))
+                            Spacer(modifier = Modifier.weight(1f).aspectRatio(0.9f))
                         }
                     }
                 }
