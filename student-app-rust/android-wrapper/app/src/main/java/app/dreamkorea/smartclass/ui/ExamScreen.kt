@@ -65,7 +65,7 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
         showExitDialog = true
     }
     if (showExitDialog) {
-        androidx.compose.ui.window.AlertDialog(
+        androidx.compose.material3.AlertDialog(
             onDismissRequest = { showExitDialog = false },
             title = { Text("Exit Exam?") },
             text = { Text("Your exam is in progress. Are you sure you want to exit? Your answers will be lost.") },
