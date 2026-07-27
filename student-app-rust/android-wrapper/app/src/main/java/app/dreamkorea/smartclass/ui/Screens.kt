@@ -73,6 +73,9 @@ sealed class Screen {
     object Join : Screen()
     object EyeVision : Screen()
     object Bundles : Screen()
+    object Dictionary : Screen()
+    object Grammar : Screen()
+    object Alarms : Screen()
     data class BundleList(val kind: String) : Screen()
     data class Exam(val testId: String) : Screen()
     data class ExamEntry(val testId: String) : Screen()
@@ -107,6 +110,15 @@ fun MainScreen(userName: String, onLogout: () -> Unit) {
             is Screen.Learn -> BottomTab.Tools
             else -> activeTab
         }
+    }
+
+    // ── System back button handler ──────────────────────────────────────
+    // When the user presses the hardware/gesture back button:
+    //   • If on a sub-screen → go to Home (not close the app)
+    //   • If on Home → let the system handle it (exit app)
+    //   • If in an exam → the ExamScreen has its own BackHandler (exit dialog)
+    androidx.activity.compose.BackHandler(enabled = screen !is Screen.Home && screen !is Screen.Exam && screen !is Screen.ExamEntry) {
+        navigateTo(Screen.Home)
     }
 
     Surface(modifier = Modifier.fillMaxSize(), color = BgGray) {
@@ -171,6 +183,9 @@ fun MainScreen(userName: String, onLogout: () -> Unit) {
                         is Screen.TestList -> TestsScreen(theme, sound, filter = s.filter, title = s.title, onBack = { navigateTo(Screen.Home) }, onStartExam = { screen = Screen.ExamEntry(it) }, onOpenPackages = { screen = Screen.Bundles })
                         is Screen.Join -> JoinScreen(theme, sound, onBack = { navigateTo(Screen.Home) })
                         is Screen.EyeVision -> EyeVisionScreen(theme, sound, onBack = { navigateTo(Screen.Home) })
+                        is Screen.Dictionary -> DictionaryScreen(theme, sound, onBack = { navigateTo(Screen.Home) })
+                        is Screen.Grammar -> GrammarScreen(theme, sound, onBack = { navigateTo(Screen.Home) })
+                        is Screen.Alarms -> AlarmsScreen(theme, sound, onBack = { navigateTo(Screen.Home) })
                         is Screen.Bundles -> BundlesScreen(theme, sound, onBack = { navigateTo(Screen.Home) }, onOpenBundle = { id, title -> screen = Screen.BundleDetail(id, title) }, onOpenTest = { screen = Screen.ExamEntry(it) })
                         is Screen.BundleList -> BundlesScreen(theme, sound, onBack = { navigateTo(Screen.Home) }, onOpenBundle = { id, title -> screen = Screen.BundleDetail(id, title) }, onOpenTest = { screen = Screen.ExamEntry(it) }, initialKind = s.kind)
                         is Screen.BundleDetail -> BundleDetailScreen(theme, sound, bundleId = s.bundleId, bundleTitle = s.bundleTitle, onBack = { screen = Screen.Bundles }, onOpenTest = { screen = Screen.ExamEntry(it) })                    }
@@ -380,6 +395,9 @@ fun HomeScreen(theme: AppTheme, sound: SoundManager, userName: String, onNavigat
             HomeCard(key = "results", title = "Results", section = "test", sortOrder = 5, route = "results", imageUrl = ""),
             HomeCard(key = "all_books", title = "Books", section = "resources", sortOrder = 0, route = "books", imageUrl = ""),
             HomeCard(key = "eye_vision", title = "Eye Vision", section = "resources", sortOrder = 2, route = "eyevision", imageUrl = ""),
+            HomeCard(key = "dictionary", title = "Dictionary", section = "resources", sortOrder = 4, route = "dictionary", imageUrl = ""),
+            HomeCard(key = "grammar", title = "Grammar", section = "resources", sortOrder = 5, route = "grammar", imageUrl = ""),
+            HomeCard(key = "alarms", title = "Alarms", section = "resources", sortOrder = 6, route = "alarms", imageUrl = ""),
             HomeCard(key = "join", title = "Join Live", section = "resources", sortOrder = 3, route = "join", imageUrl = "")
         )
     }
@@ -557,6 +575,9 @@ fun HomeScreen(theme: AppTheme, sound: SoundManager, userName: String, onNavigat
                                     "qbank_packages" -> Screen.QuestionBank
                                     "batch_packages" -> Screen.BundleList("batch")
                                     "eye_vision" -> Screen.EyeVision
+                                    "dictionary" -> Screen.Dictionary
+                                    "grammar" -> Screen.Grammar
+                                    "alarms" -> Screen.Alarms
                                     "join" -> Screen.Join
                                     "course_video" -> Screen.CourseVideo
                                     "audio_lessons" -> Screen.AudioLessons
@@ -568,6 +589,9 @@ fun HomeScreen(theme: AppTheme, sound: SoundManager, userName: String, onNavigat
                                         "learn" -> Screen.Learn
                                         "live" -> Screen.Join
                                         "eyevision" -> Screen.EyeVision
+                                        "dictionary" -> Screen.Dictionary
+                                        "grammar" -> Screen.Grammar
+                                        "alarms" -> Screen.Alarms
                                         "questionbank" -> Screen.QuestionBank
                                         "packages" -> Screen.Bundles
                                         "join" -> Screen.Join
