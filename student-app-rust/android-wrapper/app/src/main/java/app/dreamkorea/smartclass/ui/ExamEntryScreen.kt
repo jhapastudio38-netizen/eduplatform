@@ -52,12 +52,18 @@ fun ExamEntryScreen(theme: AppTheme, sound: SoundManager, testId: String, onStar
     LaunchedEffect(testId) {
         loading = true
         try {
-            val result = withTimeoutOrNull(15_000L) {
-                // Special case: qbank-combined fetches ALL QBank questions as one test
-                if (testId == "qbank-combined") {
-                    AppState.api.getQBankCombined().test
-                } else {
-                    AppState.api.getTestDetail(testId).test
+            val result = withTimeoutOrNull(20_000L) {
+                when {
+                    // Combined QBank exam — fetches ALL published question_bank tests as one test
+                    testId == "qbank-combined" -> AppState.api.getQBankCombined().test
+                    // Combined bundle exam — fetches ALL tests in a specific bundle (qbank/batch)
+                    // as one combined exam
+                    testId.startsWith("bundle-") -> {
+                        val bundleId = testId.removePrefix("bundle-")
+                        AppState.api.getBundleCombined(bundleId).test
+                    }
+                    // Normal test — fetch by ID
+                    else -> AppState.api.getTestDetail(testId).test
                 }
             }
             if (result != null) test = result

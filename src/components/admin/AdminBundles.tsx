@@ -390,14 +390,17 @@ function BundleEditor({ bundle, onOpenChange }: {
   }
   useEffect(loadItems, [bundle.id]);
 
-  // Debounced search across all tests (of any category)
+  // Debounced search across all tests.
+  // • Batch bundles: only show tests with testCategory="batch"
+  // • QBank bundles: show ALL tests (admin can pick from any category —
+  //   batch, exam, demo, chapter, question_bank, etc.)
   useEffect(() => {
     if (!search.trim()) { setSearchResults([]); return; }
     setSearching(true);
     const t = setTimeout(async () => {
       try {
-        // Reuse the existing admin tests endpoint, filtered by query param `q`
-        const res = await fetch(`/api/admin/tests?q=${encodeURIComponent(search)}`);
+        const categoryParam = bundle.kind === "batch" ? "&category=batch" : "";
+        const res = await fetch(`/api/admin/tests?q=${encodeURIComponent(search)}${categoryParam}`);
         const d = await res.json();
         setSearchResults(d.tests || []);
       } catch {
@@ -407,7 +410,7 @@ function BundleEditor({ bundle, onOpenChange }: {
       }
     }, 300);
     return () => clearTimeout(t);
-  }, [search]);
+  }, [search, bundle.kind]);
 
   async function addTest(testId: string) {
     setAddingId(testId);
@@ -453,7 +456,11 @@ function BundleEditor({ bundle, onOpenChange }: {
             {bundle.isPublished && <Badge className="bg-green-500">Live</Badge>}
           </DialogTitle>
           <DialogDescription>
-            Add tests to this package. Students see all tests in the order shown below.
+            Add tests to this package. {bundle.kind === "batch"
+              ? "Batch packages can ONLY contain batch-category exams. The student gets ONE combined exam with all questions extracted from these sets."
+              : bundle.kind === "qbank"
+                ? "Question Bank packages can contain tests from ANY category (batch, exam, demo, chapter, etc.). The student gets ONE combined exam with all questions extracted from these sets."
+                : "Students see all tests in the order shown below."}
           </DialogDescription>
         </DialogHeader>
 

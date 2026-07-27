@@ -166,7 +166,9 @@ data class SubmitResponse(
     val review: List<ReviewItem> = emptyList(),
     // Eye vision auto-trigger — server recommends eye vision tests based
     // on the student's mistake rate. The app reads this after submit.
-    val eyeVision: EyeVisionRecommendation = EyeVisionRecommendation()
+    val eyeVision: EyeVisionRecommendation = EyeVisionRecommendation(),
+    // Marks the exam as completed — used to show "Completed" badge on cards.
+    val completed: Boolean = false
 )
 
 data class Book(
@@ -314,7 +316,26 @@ interface DreamKoreaApi {
 
     @GET("api/student/qbank-combined")
     suspend fun getQBankCombined(): TestDetailResponse
+
+    @GET("api/student/bundles/{bundleId}/combined")
+    suspend fun getBundleCombined(@Path("bundleId") bundleId: String): TestDetailResponse
+
+    @GET("api/student/completed-tests")
+    suspend fun getCompletedTests(): CompletedTestsResponse
 }
+
+// ─── Completed Tests ──────────────────────────────────────────────────────────
+// Maps testId (including combined IDs like "qbank-combined" or "bundle-{id}")
+// to submission info, so the app can show a "Completed" badge.
+data class CompletedTestInfo(
+    val submittedAt: String = "",
+    val score: Int? = null,
+    val maxScore: Int? = null
+)
+data class CompletedTestsResponse(
+    val completed: Map<String, CompletedTestInfo> = emptyMap(),
+    val total: Int = 0
+)
 
 // ─── Notifications ────────────────────────────────────────────────────────────
 data class AppNotification(

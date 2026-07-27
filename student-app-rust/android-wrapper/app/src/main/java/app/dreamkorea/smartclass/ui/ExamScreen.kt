@@ -81,7 +81,17 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
         try {
             // 20-second timeout — if the API hangs, show a timeout error
             val result = withTimeoutOrNull(20_000L) {
-                AppState.api.getTestDetail(testId).test
+                when {
+                    // Combined QBank exam — fetches ALL published question_bank tests as one test
+                    testId == "qbank-combined" -> AppState.api.getQBankCombined().test
+                    // Combined bundle exam — fetches ALL tests in a specific bundle (qbank/batch)
+                    testId.startsWith("bundle-") -> {
+                        val bundleId = testId.removePrefix("bundle-")
+                        AppState.api.getBundleCombined(bundleId).test
+                    }
+                    // Normal test — fetch by ID
+                    else -> AppState.api.getTestDetail(testId).test
+                }
             }
             if (result != null) {
                 test = result
