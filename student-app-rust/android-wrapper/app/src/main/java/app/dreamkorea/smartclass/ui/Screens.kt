@@ -322,6 +322,14 @@ fun HomeScreen(theme: AppTheme, sound: SoundManager, userName: String, onNavigat
         mutableStateOf<List<HomeCard>>(AppState.getCachedNow<List<HomeCard>>(AppState.KEY_HOME_CARDS) ?: emptyList())
     }
     var loading by remember { mutableStateOf(homeCards.isEmpty()) }
+    val configuration = androidx.compose.ui.platform.LocalConfiguration.current
+    val isLandscape = configuration.screenWidthDp > configuration.screenHeightDp
+    // Adapt column count to orientation — 2 cols portrait, 3-4 cols landscape
+    val cardColumns = when {
+        isLandscape && configuration.screenWidthDp >= 900 -> 4
+        isLandscape -> 3
+        else -> 2
+    }
 
     LaunchedEffect(Unit) {
         if (homeCards.isNotEmpty()) loading = false
@@ -380,7 +388,7 @@ fun HomeScreen(theme: AppTheme, sound: SoundManager, userName: String, onNavigat
                 modifier = Modifier.fillMaxWidth().padding(16.dp),
                 shadowElevation = 6.dp,
             ) {
-                Box(modifier = Modifier.fillMaxWidth().height(160.dp)) {
+                Box(modifier = Modifier.fillMaxWidth().height(if (isLandscape) 120.dp else 160.dp)) {
                     // Tree image as background — Crop to fill the entire card
                     // so it blends with the gradient overlay nicely
                     Image(
@@ -430,12 +438,16 @@ fun HomeScreen(theme: AppTheme, sound: SoundManager, userName: String, onNavigat
         item {
             Row(
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
+                horizontalArrangement = Arrangement.SpaceEvenly,
             ) {
                 QuickAccessBtn("UBT", NavyBlue, Icons.Default.School) { onNavigate(Screen.UbtTest) }
                 QuickAccessBtn("Demo", SuccessGreen, Icons.Default.Quiz) { onNavigate(Screen.FreeExam) }
                 QuickAccessBtn("Books", WarningOrange, Icons.Default.Book) { onNavigate(Screen.Books) }
                 QuickAccessBtn("Eye Test", AccentPurple, Icons.Default.Visibility) { onNavigate(Screen.EyeVision) }
+                if (isLandscape) {
+                    QuickAccessBtn("QBank", AccentPink, Icons.Default.Quiz) { onNavigate(Screen.QuestionBank) }
+                    QuickAccessBtn("Batch", Color(0xFFEF6C00), Icons.Default.Layers) { onNavigate(Screen.BundleList("batch")) }
+                }
             }
         }
 
@@ -472,7 +484,7 @@ fun HomeScreen(theme: AppTheme, sound: SoundManager, userName: String, onNavigat
             item {
                 Text("Free Exams", color = TextDark, fontSize = 17.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
             }
-            val rows = testCards.chunked(2)
+            val rows = testCards.chunked(cardColumns)
             rows.forEach { rowCards ->
                 item {
                     Row(
@@ -500,7 +512,8 @@ fun HomeScreen(theme: AppTheme, sound: SoundManager, userName: String, onNavigat
                                 onNavigate(dest)
                             }
                         }
-                        if (rowCards.size == 1) Spacer(Modifier.weight(1f))
+                        // Fill empty slots so cards don't stretch
+                        repeat(cardColumns - rowCards.size) { Spacer(Modifier.weight(1f)) }
                     }
                 }
             }
@@ -513,7 +526,7 @@ fun HomeScreen(theme: AppTheme, sound: SoundManager, userName: String, onNavigat
                 Text("Tools & Resources", color = TextDark, fontSize = 17.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
             }
             // Grid of resource cards
-            val resRows = resourceCards.chunked(2)
+            val resRows = resourceCards.chunked(cardColumns)
             resRows.forEach { rowCards ->
                 item {
                     Row(
@@ -548,7 +561,8 @@ fun HomeScreen(theme: AppTheme, sound: SoundManager, userName: String, onNavigat
                                 onNavigate(dest)
                             }
                         }
-                        if (rowCards.size == 1) Spacer(Modifier.weight(1f))
+                        // Fill empty slots so cards don't stretch
+                        repeat(cardColumns - rowCards.size) { Spacer(Modifier.weight(1f)) }
                     }
                 }
             }
@@ -593,10 +607,14 @@ fun HomeCardItem(theme: AppTheme, sound: SoundManager, card: HomeCard, modifier:
         animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy),
         label = "cardScale"
     )
+    val configuration = androidx.compose.ui.platform.LocalConfiguration.current
+    val isLandscape = configuration.screenWidthDp > configuration.screenHeightDp
+    // In landscape, cards should be wider (less tall) so they don't get huge
+    val aspectRatio = if (isLandscape) 1.2f else 0.85f
     Surface(
         color = CardWhite,
         shape = RoundedCornerShape(16.dp),
-        modifier = modifier.fillMaxWidth().aspectRatio(0.85f).scale(scale),
+        modifier = modifier.fillMaxWidth().aspectRatio(aspectRatio).scale(scale),
         shadowElevation = 2.dp,
         border = androidx.compose.foundation.BorderStroke(1.dp, DividerColor),
     ) {
