@@ -3,11 +3,13 @@ package app.dreamkorea.smartclass.ui
 import android.app.Activity
 import android.content.pm.ActivityInfo
 import androidx.compose.animation.*
+import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -17,12 +19,15 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -274,7 +279,7 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
 
     // ─── Result screen ──────────────────────────────────────────────────────
     if (submitResult != null) {
-        ExamResultScreen(theme, submitResult!!, onExit, sound)
+        ExamResultScreen(theme, submitResult!!, onExit, sound, examTitle = t.title, examDescription = t.description)
         return
     }
 
@@ -740,14 +745,95 @@ fun AsyncImage(url: String, modifier: Modifier = Modifier) {
 
 // ─── Result screen ────────────────────────────────────────────────────────────
 @Composable
-fun ExamResultScreen(theme: AppTheme, result: SubmitResponse, onExit: () -> Unit, sound: SoundManager) {
+fun ExamResultScreen(
+    theme: AppTheme,
+    result: SubmitResponse,
+    onExit: () -> Unit,
+    sound: SoundManager,
+    examTitle: String = "Exam",
+    examDescription: String? = null,
+) {
     LaunchedEffect(Unit) { sound.success() }
+
+    // ── Animation states ──────────────────────────────────────────────────
+    var showScore by remember { mutableStateOf(false) }
+    var showStats by remember { mutableStateOf(false) }
+    var showReviewSection by remember { mutableStateOf(false) }
+    val animatedScore = animateFloatAsState(
+        targetValue = if (showScore && result.maxScore > 0) result.score.toFloat() / result.maxScore else 0f,
+        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessLow),
+        label = "scoreAnim",
+    )
+    val statsAlpha by animateFloatAsState(
+        targetValue = if (showStats) 1f else 0f,
+        animationSpec = tween(durationMillis = 600, delayMillis = 300),
+        label = "statsAlpha",
+    )
+    val reviewAlpha by animateFloatAsState(
+        targetValue = if (showReviewSection) 1f else 0f,
+        animationSpec = tween(durationMillis = 400),
+        label = "reviewAlpha",
+    )
+
+    LaunchedEffect(Unit) {
+        delay(200)
+        showScore = true
+        delay(400)
+        showStats = true
+    }
+
+    val pct = if (result.maxScore > 0) (result.score * 100 / result.maxScore) else 0
+    val passed = pct >= 40
+    val correctCount = result.review.count { it.isCorrect }
+    val incorrectCount = result.review.size - correctCount
+    val unansweredCount = result.review.count { it.userAnswer == null }
 
     LazyColumn(
         modifier = Modifier.fillMaxSize().background(theme.background).padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        // Score card
+        // ── Exam title + description ──────────────────────────────────────
+        item {
+            Surface(
+                color = theme.primary,
+                shape = RoundedCornerShape(16.dp),
+                modifier = Modifier.fillMaxWidth(),
+                shadowElevation = 4.dp
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Text(
+                        examTitle,
+                        color = Color.White,
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    if (!examDescription.isNullOrBlank()) {
+                        Spacer(Modifier.height(4.dp))
+                        Text(
+                            examDescription,
+                            color = Color.White.copy(alpha = 0.85f),
+                            fontSize = 12.sp,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                    Spacer(Modifier.height(6.dp))
+                    Surface(color = Color.White.copy(alpha = 0.2f), shape = RoundedCornerShape(6.dp)) {
+                        Text(
+                            "Exam Completed",
+                            color = Color.White,
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
+                        )
+                    }
+                }
+            }
+        }
+
+        // ── Score card (animated) ─────────────────────────────────────────
         item {
             Surface(
                 color = theme.cardBg,
@@ -756,12 +842,16 @@ fun ExamResultScreen(theme: AppTheme, result: SubmitResponse, onExit: () -> Unit
                 shadowElevation = 3.dp
             ) {
                 Column(modifier = Modifier.padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                    val pct = if (result.maxScore > 0) (result.score * 100 / result.maxScore) else 0
-                    val passed = pct >= 40
+                    // Pass/Fail icon (animated scale-in)
+                    val iconScale by animateFloatAsState(
+                        targetValue = if (showScore) 1f else 0f,
+                        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy),
+                        label = "iconScale",
+                    )
                     Surface(
                         color = if (passed) Color(0xFF4CAF50) else theme.errorRed,
                         shape = RoundedCornerShape(50),
-                        modifier = Modifier.size(80.dp)
+                        modifier = Modifier.size(80.dp).scale(iconScale)
                     ) {
                         Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
                             Icon(
@@ -780,34 +870,112 @@ fun ExamResultScreen(theme: AppTheme, result: SubmitResponse, onExit: () -> Unit
                         fontWeight = FontWeight.Bold
                     )
                     Spacer(Modifier.height(8.dp))
-                    Text("$pct%", color = if (passed) Color(0xFF4CAF50) else theme.errorRed, fontSize = 40.sp, fontWeight = FontWeight.Bold)
+                    // Animated percentage
+                    val animatedPct = (animatedScore.value * 100).toInt()
+                    Text(
+                        "$animatedPct%",
+                        color = if (passed) Color(0xFF4CAF50) else theme.errorRed,
+                        fontSize = 40.sp,
+                        fontWeight = FontWeight.Bold
+                    )
                     Text("${result.score} / ${result.maxScore} points", color = theme.subText, fontSize = 13.sp)
                     Spacer(Modifier.height(16.dp))
-                    Button(
-                        onClick = { sound.click(); onExit() },
-                        modifier = Modifier.fillMaxWidth().height(48.dp),
-                        shape = RoundedCornerShape(10.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = theme.primary)
+
+                    // ── Stats row (total marks, correct, incorrect, unanswered) ──
+                    Row(
+                        modifier = Modifier.fillMaxWidth().alpha(statsAlpha),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        Text("Back to tests", fontWeight = FontWeight.SemiBold)
+                        StatBox("Total", "${result.maxScore}", Color(0xFF6A1B9A), Modifier.weight(1f))
+                        StatBox("Correct", "$correctCount", Color(0xFF4CAF50), Modifier.weight(1f))
+                        StatBox("Wrong", "$incorrectCount", theme.errorRed, Modifier.weight(1f))
+                        StatBox("Skipped", "$unansweredCount", Color(0xFFFF9800), Modifier.weight(1f))
+                    }
+                    Spacer(Modifier.height(16.dp))
+
+                    // ── Action buttons ────────────────────────────────────────
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        OutlinedButton(
+                            onClick = { sound.click(); showReviewSection = !showReviewSection },
+                            modifier = Modifier.weight(1f).height(48.dp),
+                            shape = RoundedCornerShape(10.dp),
+                            colors = ButtonDefaults.outlinedButtonColors(contentColor = theme.primary),
+                            border = androidx.compose.foundation.BorderStroke(1.5.dp, theme.primary)
+                        ) {
+                            Icon(
+                                if (showReviewSection) Icons.Default.VisibilityOff else Icons.Default.Visibility,
+                                null,
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Spacer(Modifier.width(6.dp))
+                            Text(
+                                if (showReviewSection) "Hide Review" else "Review Exam",
+                                fontWeight = FontWeight.SemiBold,
+                                fontSize = 13.sp
+                            )
+                        }
+                        Button(
+                            onClick = { sound.click(); onExit() },
+                            modifier = Modifier.weight(1f).height(48.dp),
+                            shape = RoundedCornerShape(10.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = theme.primary)
+                        ) {
+                            Icon(Icons.Default.Home, null, modifier = Modifier.size(18.dp))
+                            Spacer(Modifier.width(6.dp))
+                            Text("Back to Tests", fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+                        }
                     }
                 }
             }
         }
 
-        // Per-question review
-        item {
-            Text("Review", color = theme.darkText, fontSize = 18.sp, fontWeight = FontWeight.Bold)
-        }
-
-        items(result.review) { review ->
-            ReviewCard(theme, review)
+        // ── Per-question review (collapsible) ─────────────────────────────
+        if (showReviewSection) {
+            item {
+                Row(
+                    modifier = Modifier.fillMaxWidth().alpha(reviewAlpha),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(Icons.Default.List, null, tint = theme.primary, modifier = Modifier.size(20.dp))
+                    Spacer(Modifier.width(6.dp))
+                    Text(
+                        "Question Review (${result.review.size})",
+                        color = theme.darkText,
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
+            itemsIndexed(result.review) { idx, review ->
+                ReviewCard(theme, review, idx + 1)
+            }
         }
     }
 }
 
 @Composable
-fun ReviewCard(theme: AppTheme, review: ReviewItem) {
+private fun StatBox(label: String, value: String, color: Color, modifier: Modifier = Modifier) {
+    Surface(
+        color = color.copy(alpha = 0.08f),
+        shape = RoundedCornerShape(10.dp),
+        border = androidx.compose.foundation.BorderStroke(1.dp, color.copy(alpha = 0.3f)),
+        modifier = modifier
+    ) {
+        Column(
+            modifier = Modifier.padding(vertical = 10.dp, horizontal = 6.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Text(value, color = color, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+            Text(label, color = theme.let { it.subText }, fontSize = 9.sp, fontWeight = FontWeight.Medium)
+        }
+    }
+}
+
+@Composable
+fun ReviewCard(theme: AppTheme, review: ReviewItem, questionNumber: Int = 0) {
     Surface(
         color = theme.cardBg,
         shape = RoundedCornerShape(12.dp),
@@ -815,24 +983,72 @@ fun ReviewCard(theme: AppTheme, review: ReviewItem) {
         shadowElevation = 1.dp
     ) {
         Column(modifier = Modifier.padding(14.dp)) {
+            // ── Header: question number + correct/incorrect badge ─────────
             Row(verticalAlignment = Alignment.CenterVertically) {
+                if (questionNumber > 0) {
+                    Surface(
+                        color = if (review.isCorrect) Color(0xFF4CAF50).copy(alpha = 0.15f) else theme.errorRed.copy(alpha = 0.15f),
+                        shape = RoundedCornerShape(6.dp)
+                    ) {
+                        Text(
+                            "Q$questionNumber",
+                            color = if (review.isCorrect) Color(0xFF4CAF50) else theme.errorRed,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                        )
+                    }
+                    Spacer(Modifier.width(8.dp))
+                }
                 Icon(
                     if (review.isCorrect) Icons.Default.CheckCircle else Icons.Default.Cancel,
                     null,
                     tint = if (review.isCorrect) Color(0xFF4CAF50) else theme.errorRed,
                     modifier = Modifier.size(20.dp)
                 )
-                Spacer(Modifier.width(8.dp))
+                Spacer(Modifier.width(6.dp))
                 Text(
                     if (review.isCorrect) "Correct" else "Incorrect",
                     color = if (review.isCorrect) Color(0xFF4CAF50) else theme.errorRed,
                     fontSize = 12.sp,
                     fontWeight = FontWeight.SemiBold
                 )
+                Spacer(Modifier.weight(1f))
+                if (review.userAnswer == null) {
+                    Surface(color = Color(0xFFFF9800).copy(alpha = 0.15f), shape = RoundedCornerShape(6.dp)) {
+                        Text(
+                            "Skipped",
+                            color = Color(0xFFFF9800),
+                            fontSize = 9.sp,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                        )
+                    }
+                }
             }
             Spacer(Modifier.height(8.dp))
-            Text(review.stem.take(200), color = theme.darkText, fontSize = 13.sp, fontWeight = FontWeight.Medium)
-            Spacer(Modifier.height(6.dp))
+
+            // ── Question stem ─────────────────────────────────────────────
+            Text(
+                review.stem.take(300),
+                color = theme.darkText,
+                fontSize = 13.sp,
+                fontWeight = FontWeight.Medium
+            )
+            // Image (if any)
+            if (!review.imageUrl.isNullOrBlank()) {
+                Spacer(Modifier.height(8.dp))
+                val imgAbs = review.imageUrl!!.toAbsoluteUrl()
+                coil.compose.AsyncImage(
+                    model = imgAbs,
+                    contentDescription = "Question image",
+                    modifier = Modifier.fillMaxWidth().heightIn(max = 180.dp).clip(RoundedCornerShape(8.dp)),
+                    contentScale = ContentScale.Fit,
+                )
+            }
+            Spacer(Modifier.height(8.dp))
+
+            // ── Options with correct/wrong highlighting ──────────────────
             review.options?.let { opts ->
                 opts.forEachIndexed { i, opt ->
                     val isUserAns = (review.userAnswer == opt) || ((review.userAnswer as? List<*>)?.contains(opt) == true)
@@ -842,26 +1058,93 @@ fun ReviewCard(theme: AppTheme, review: ReviewItem) {
                         isUserAns && !isCorrectAns -> Color(0xFFFFCDD2)
                         else -> Color.Transparent
                     }
-                    Surface(color = bg, shape = RoundedCornerShape(6.dp), modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp)) {
+                    val borderColor = when {
+                        isCorrectAns -> Color(0xFF28A745)
+                        isUserAns && !isCorrectAns -> theme.errorRed
+                        else -> Color(0xFFE0E0E0)
+                    }
+                    Surface(
+                        color = bg,
+                        shape = RoundedCornerShape(6.dp),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, borderColor),
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp)
+                    ) {
                         Row(modifier = Modifier.padding(8.dp), verticalAlignment = Alignment.CenterVertically) {
                             Text("${'A' + i}.", color = theme.subText, fontSize = 12.sp, fontWeight = FontWeight.Bold)
                             Spacer(Modifier.width(8.dp))
                             Text(opt, color = theme.darkText, fontSize = 13.sp, fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f))
-                            if (isCorrectAns) Icon(Icons.Default.Check, null, tint = Color(0xFF28A745), modifier = Modifier.size(14.dp))
+                            if (isCorrectAns) {
+                                Icon(Icons.Default.Check, null, tint = Color(0xFF28A745), modifier = Modifier.size(14.dp))
+                            } else if (isUserAns && !isCorrectAns) {
+                                Icon(Icons.Default.Close, null, tint = theme.errorRed, modifier = Modifier.size(14.dp))
+                            }
                         }
                     }
                 }
             }
+
+            // ── User answer vs correct answer summary ─────────────────────
+            Spacer(Modifier.height(8.dp))
+            Row(modifier = Modifier.fillMaxWidth()) {
+                Surface(
+                    color = theme.errorRed.copy(alpha = 0.05f),
+                    shape = RoundedCornerShape(6.dp),
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Column(modifier = Modifier.padding(8.dp)) {
+                        Text("Your Answer", color = theme.subText, fontSize = 9.sp, fontWeight = FontWeight.SemiBold)
+                        Text(
+                            formatAnswer(review.userAnswer) ?: "—",
+                            color = theme.darkText,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
+                }
+                Spacer(Modifier.width(6.dp))
+                Surface(
+                    color = Color(0xFF4CAF50).copy(alpha = 0.05f),
+                    shape = RoundedCornerShape(6.dp),
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Column(modifier = Modifier.padding(8.dp)) {
+                        Text("Correct Answer", color = Color(0xFF4CAF50), fontSize = 9.sp, fontWeight = FontWeight.SemiBold)
+                        Text(
+                            formatAnswer(review.correctAnswer) ?: "—",
+                            color = Color(0xFF28A745),
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
+            }
+
+            // ── Explanation ───────────────────────────────────────────────
             if (!review.explanation.isNullOrBlank()) {
                 Spacer(Modifier.height(8.dp))
                 Surface(color = theme.primary.copy(alpha = 0.05f), shape = RoundedCornerShape(6.dp)) {
                     Column(modifier = Modifier.padding(8.dp)) {
-                        Text("Explanation", color = theme.primary, fontSize = 10.sp, fontWeight = FontWeight.SemiBold)
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Default.Lightbulb, null, tint = theme.primary, modifier = Modifier.size(14.dp))
+                            Spacer(Modifier.width(4.dp))
+                            Text("Explanation", color = theme.primary, fontSize = 10.sp, fontWeight = FontWeight.SemiBold)
+                        }
+                        Spacer(Modifier.height(4.dp))
                         Text(review.explanation, color = theme.darkText, fontSize = 12.sp)
                     }
                 }
             }
         }
+    }
+}
+
+/** Formats an answer (String or List<String>) for display. */
+private fun formatAnswer(answer: Any?): String? {
+    if (answer == null) return null
+    return when (answer) {
+        is String -> answer
+        is List<*> -> answer.joinToString(", ")
+        else -> answer.toString()
     }
 }
 
