@@ -48,10 +48,10 @@ object AppState {
 
     // ─── In-memory cache (fixes back/forth reload storms) ──────────────────────
     // Each entry stores (data, timestamp). Cache is valid for CACHE_TTL_MS.
-    // Reduced from 2 min to 30 sec so the app picks up admin changes faster.
-    // For screens that need real-time data, use invalidateCache() before
-    // loading, or use cachedFresh() which always fetches.
-    private const val CACHE_TTL_MS = 30_000L // 30 seconds
+    // Reduced to 10 sec for near-real-time updates — admin changes show up
+    // in the app within 10 seconds without manual refresh.
+    // For screens that need INSTANT data, use cachedFresh() which always fetches.
+    private const val CACHE_TTL_MS = 10_000L // 10 seconds — near real-time
     private data class CacheEntry<T>(val data: T, val savedAt: Long)
     private val cache = ConcurrentHashMap<String, CacheEntry<*>>()
     private val cacheMutex = Mutex()
@@ -95,6 +95,13 @@ object AppState {
     /** Force-invalidate a cache key (call after a mutation or pull-to-refresh). */
     fun invalidateCache(key: String? = null) {
         if (key == null) cache.clear() else cache.remove(key)
+    }
+
+    /** Invalidate ALL cached data — use when the user navigates to a new
+     *  major section or manually refreshes. Ensures the next API call
+     *  fetches fresh data from the server. */
+    fun invalidateAll() {
+        cache.clear()
     }
 
     // ─── Cache keys (public, so screens can use getCachedNow) ──────────────────

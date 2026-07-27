@@ -331,13 +331,29 @@ fun HomeScreen(theme: AppTheme, sound: SoundManager, userName: String, onNavigat
         else -> 2
     }
 
-    LaunchedEffect(Unit) {
+    // Real-time refresh: load on mount, and refresh every time the screen
+    // becomes visible (e.g. when user navigates back from another screen).
+    val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
+    var refreshTrigger by remember { mutableStateOf(0) }
+    LaunchedEffect(refreshTrigger) {
         if (homeCards.isNotEmpty()) loading = false
         try {
-            homeCards = AppState.getCachedHomeCards()
+            homeCards = AppState.cachedFresh(AppState.KEY_HOME_CARDS) {
+                AppState.api.getHomeCards().cards
+            }
             stats = AppState.api.getStats().stats
         } catch (_: Exception) {}
         finally { loading = false }
+    }
+    // Refresh when the app comes to foreground (real-time updates)
+    DisposableEffect(lifecycleOwner) {
+        val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
+            if (event == androidx.lifecycle.Lifecycle.Event.ON_RESUME) {
+                refreshTrigger++ // triggers LaunchedEffect above to re-fetch
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
     val effectiveCards = remember(homeCards, loading) {

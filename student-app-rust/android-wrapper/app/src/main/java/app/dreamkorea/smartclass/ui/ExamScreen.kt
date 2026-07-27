@@ -70,12 +70,12 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
     // Timer
     var timeLeft by remember { mutableStateOf(0) }
 
-    // ── ORIENTATION ── allow the exam screen to rotate freely with the phone
-    // (FULL_SENSOR = both portrait and landscape, following the device sensor).
-    // Restored to the user's preferred orientation on exit.
+    // ── ORIENTATION ── don't force any orientation. The app renders in
+    // whatever orientation the user holds the phone. The exam UI adapts
+    // to both portrait and landscape using LocalConfiguration.
     DisposableEffect(Unit) {
         val activity = context as? Activity
-        activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_FULL_SENSOR
+        activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
         onDispose {
             activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
         }
@@ -299,30 +299,33 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
     // first. They tap a number → answer → return to grid → pick next → submit.
     var showGrid by remember { mutableStateOf(true) }
 
-    Column(modifier = Modifier.fillMaxSize().background(Color.White)) {
-        // ── 1. TOP STATUS HEADER ── 4 equal sections with vertical dividers
-        Surface(border = androidx.compose.foundation.BorderStroke(2.dp, Color.Black)) {
-            Row(modifier = Modifier.fillMaxWidth().height(48.dp), verticalAlignment = Alignment.CenterVertically) {
+    Column(modifier = Modifier.fillMaxSize().background(Color(0xFFF8FAFC))) {
+        // ── 1. TOP STATUS HEADER ── navy blue bar with 4 sections
+        Surface(
+            color = Color(0xFF003478),
+            shadowElevation = 4.dp,
+        ) {
+            Row(modifier = Modifier.fillMaxWidth().height(52.dp), verticalAlignment = Alignment.CenterVertically) {
                 // Section type
                 Box(modifier = Modifier.weight(1f).fillMaxHeight(), contentAlignment = Alignment.Center) {
-                    val sectionLabel = if (q.blockType == "audio") "Listening ($listeningCount que)" else "Reading ($readingCount que)"
-                    Text(sectionLabel, color = Color.Black, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                    val sectionLabel = if (q.blockType == "audio") "🎧 Listening ($listeningCount)" else "📖 Reading ($readingCount)"
+                    Text(sectionLabel, color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
                 }
-                Box(modifier = Modifier.width(1.dp).fillMaxHeight().background(Color.Black))
+                Box(modifier = Modifier.width(1.dp).fillMaxHeight(0.6f).background(Color.White.copy(alpha = 0.3f)))
                 // Total
                 Box(modifier = Modifier.weight(1f).fillMaxHeight(), contentAlignment = Alignment.Center) {
-                    Text("Total (${t.items.size})", color = Color.Black, fontSize = 11.sp)
+                    Text("Total: ${t.items.size}", color = Color.White, fontSize = 11.sp)
                 }
-                Box(modifier = Modifier.width(1.dp).fillMaxHeight().background(Color.Black))
+                Box(modifier = Modifier.width(1.dp).fillMaxHeight(0.6f).background(Color.White.copy(alpha = 0.3f)))
                 // Remaining
                 Box(modifier = Modifier.weight(1f).fillMaxHeight(), contentAlignment = Alignment.Center) {
-                    Text("Remaining ($remainingCount)", color = Color.Black, fontSize = 11.sp)
+                    Text("Left: $remainingCount", color = Color.White, fontSize = 11.sp)
                 }
-                Box(modifier = Modifier.width(1.dp).fillMaxHeight().background(Color.Black))
+                Box(modifier = Modifier.width(1.dp).fillMaxHeight(0.6f).background(Color.White.copy(alpha = 0.3f)))
                 // Timer
                 Box(modifier = Modifier.weight(1f).fillMaxHeight(), contentAlignment = Alignment.Center) {
                     val mm = timeLeft / 60; val ss = timeLeft % 60
-                    Text(String.format("%02d:%02d", mm, ss), color = Color.Black, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                    Text(String.format("⏱ %02d:%02d", mm, ss), color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold)
                 }
             }
         }
@@ -392,18 +395,20 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
                     }
                     Spacer(Modifier.height(6.dp))
                 }
-                // Question card (stem)
+                // Question card (stem) — white with subtle shadow
                 Surface(
-                    border = androidx.compose.foundation.BorderStroke(2.dp, Color.Black),
+                    color = Color.White,
                     shape = RoundedCornerShape(14.dp),
+                    shadowElevation = 2.dp,
+                    border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFE2E8F0)),
                     modifier = Modifier.fillMaxWidth(0.92f)
                 ) {
                     Text(
                         q.stem,
-                        color = Color.Black,
-                        fontSize = 13.sp,
+                        color = Color(0xFF1E293B),
+                        fontSize = 14.sp,
                         fontWeight = FontWeight.Medium,
-                        modifier = Modifier.padding(12.dp)
+                        modifier = Modifier.padding(14.dp)
                     )
                 }
                 Spacer(Modifier.height(6.dp))
@@ -495,27 +500,30 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
             } // end Row
         } // end Box (watermark background)
 
-        // ── 4. BOTTOM NAVIGATION ── Nepali labels + grid button
-        Surface(border = androidx.compose.foundation.BorderStroke(2.dp, Color.Black)) {
-            Row(modifier = Modifier.fillMaxWidth().height(52.dp), verticalAlignment = Alignment.CenterVertically) {
+        // ── 4. BOTTOM NAVIGATION ── navy blue bar with Nepali labels
+        Surface(
+            color = Color(0xFF003478),
+            shadowElevation = 4.dp,
+        ) {
+            Row(modifier = Modifier.fillMaxWidth().height(56.dp), verticalAlignment = Alignment.CenterVertically) {
                 // Previous (अघिल्लो)
                 Box(modifier = Modifier.weight(1f).fillMaxHeight().clickable { if (currentIdx > 0) { currentIdx--; sound.click() } }, contentAlignment = Alignment.Center) {
-                    Text("अघिल्लो (Previous)", color = if (currentIdx > 0) Color.Black else Color.Gray, fontSize = 13.sp, fontWeight = FontWeight.Medium)
+                    Text("← अघिल्लो", color = if (currentIdx > 0) Color.White else Color.White.copy(alpha = 0.4f), fontSize = 13.sp, fontWeight = FontWeight.Medium)
                 }
-                Box(modifier = Modifier.width(1.dp).fillMaxHeight().background(Color.Black))
+                Box(modifier = Modifier.width(1.dp).fillMaxHeight(0.6f).background(Color.White.copy(alpha = 0.3f)))
                 // All questions (सबै प्रश्नहरू)
                 Box(modifier = Modifier.weight(1f).fillMaxHeight().clickable { sound.click(); showGrid = true }, contentAlignment = Alignment.Center) {
-                    Text("सबै प्रश्नहरू (All)", color = Color.Black, fontSize = 13.sp, fontWeight = FontWeight.Medium)
+                    Text("☰ सबै प्रश्नहरू", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Medium)
                 }
-                Box(modifier = Modifier.width(1.dp).fillMaxHeight().background(Color.Black))
+                Box(modifier = Modifier.width(1.dp).fillMaxHeight(0.6f).background(Color.White.copy(alpha = 0.3f)))
                 // Next (अर्को) or Submit
                 Box(modifier = Modifier.weight(1f).fillMaxHeight().clickable {
                     if (currentIdx < t.items.size - 1) { currentIdx++; sound.click() }
                     else { sound.swoosh(); submitting = true; scope.launch { try { submitResult = if (t.id == "qbank-combined" || t.id.startsWith("bundle-")) submitCombinedExamWithFallback(t, answers.toMap()) else AppState.api.submitTest(t.id, SubmitRequest(answers.toMap())); sound.success() } catch (e: Exception) { error = "Submit failed." }; submitting = false } }
                 }, contentAlignment = Alignment.Center) {
-                    if (submitting) { CircularProgressIndicator(color = Color.Black, modifier = Modifier.size(18.dp), strokeWidth = 2.dp) }
-                    else if (currentIdx < t.items.size - 1) { Text("अर्को (Next)", color = Color.Black, fontSize = 13.sp, fontWeight = FontWeight.Medium) }
-                    else { Text("सबमिट (Submit)", color = Color.Black, fontSize = 13.sp, fontWeight = FontWeight.Bold) }
+                    if (submitting) { CircularProgressIndicator(color = Color.White, modifier = Modifier.size(18.dp), strokeWidth = 2.dp) }
+                    else if (currentIdx < t.items.size - 1) { Text("अर्को →", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Medium) }
+                    else { Text("✓ सबमिट", color = Color(0xFF4CAF50), fontSize = 13.sp, fontWeight = FontWeight.Bold) }
                 }
             }
         }

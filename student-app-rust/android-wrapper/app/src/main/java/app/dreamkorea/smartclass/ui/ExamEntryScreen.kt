@@ -55,12 +55,11 @@ fun ExamEntryScreen(theme: AppTheme, sound: SoundManager, testId: String, onStar
     var loading by remember { mutableStateOf(true) }
     var error by remember { mutableStateOf("") }
 
-    // ── FORCE LANDSCAPE FIRST — before any other UI ──────────────────────
-    // This ensures the screen is already landscape when the user enters,
-    // without any visible rotation flash.
+    // ── ORIENTATION ── don't force any orientation. The app renders in
+    // whatever orientation the user holds the phone.
     DisposableEffect(Unit) {
         val activity = context as? Activity
-        activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
+        activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
         onDispose {
             activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
         }
