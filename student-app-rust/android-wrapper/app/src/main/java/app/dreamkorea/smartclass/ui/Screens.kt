@@ -334,16 +334,25 @@ fun HomeScreen(theme: AppTheme, sound: SoundManager, userName: String, onNavigat
 
     val effectiveCards = remember(homeCards, loading) {
         if (loading) emptyList()
-        else if (homeCards.isNotEmpty()) homeCards
-        else listOf(
+        else if (homeCards.isNotEmpty()) {
+            // Merge server cards with guaranteed QBank + Batch package cards
+            // so they always appear even if admin didn't create them
+            val serverKeys = homeCards.map { it.key }.toSet()
+            val extras = mutableListOf<HomeCard>()
+            if (!serverKeys.contains("qbank_packages")) {
+                extras.add(HomeCard(key = "qbank_packages", title = "Question Bank", section = "test", sortOrder = 99, route = "qbank_packages", imageUrl = ""))
+            }
+            if (!serverKeys.contains("batch_packages")) {
+                extras.add(HomeCard(key = "batch_packages", title = "Batch", section = "test", sortOrder = 100, route = "batch_packages", imageUrl = ""))
+            }
+            homeCards + extras
+        } else listOf(
             HomeCard(key = "ubt_test", title = "UBT Test", section = "test", sortOrder = 0, route = "tests", imageUrl = ""),
             HomeCard(key = "demo_exam", title = "Demo Exam", section = "test", sortOrder = 1, route = "tests", imageUrl = ""),
             HomeCard(key = "qbank_packages", title = "Question Bank", section = "test", sortOrder = 2, route = "qbank_packages", imageUrl = ""),
             HomeCard(key = "batch_packages", title = "Batch", section = "test", sortOrder = 3, route = "batch_packages", imageUrl = ""),
-            HomeCard(key = "chapter_exam", title = "Chapter Exam", section = "test", sortOrder = 4, route = "tests", imageUrl = ""),
             HomeCard(key = "results", title = "Results", section = "test", sortOrder = 5, route = "results", imageUrl = ""),
             HomeCard(key = "all_books", title = "Books", section = "resources", sortOrder = 0, route = "books", imageUrl = ""),
-            HomeCard(key = "question_bank", title = "Question Bank", section = "resources", sortOrder = 1, route = "questionbank", imageUrl = ""),
             HomeCard(key = "eye_vision", title = "Eye Vision", section = "resources", sortOrder = 2, route = "eyevision", imageUrl = ""),
             HomeCard(key = "join", title = "Join Live", section = "resources", sortOrder = 3, route = "join", imageUrl = "")
         )
@@ -821,7 +830,7 @@ fun TestsScreen(theme: AppTheme, sound: SoundManager, filter: String = "all", ti
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    val filters = listOf("all" to "All", "exam" to "UBT", "demo" to "Demo", "batch" to "Batch", "chapter" to "Chapter", "question_bank" to "Q Bank")
+                    val filters = listOf("all" to "All", "exam" to "Exam", "demo" to "Demo")
                     filters.forEach { (key, label) ->
                         val isActive = activeFilter == key
                         Surface(
