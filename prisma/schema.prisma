@@ -41,6 +41,14 @@ model User {
   lastActiveAt DateTime?
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
+  // ─── Subscription ──────────────────────────────────────────────────────
+  // Subscribers get unlimited access to ALL exams, QBank, Batch packages.
+  // Non-subscribers: QBank + Batch = unlimited, but exams = 1 attempt only.
+  // Payment API will be integrated later — for now admin can manually
+  // subscribe users via the admin panel.
+  subscriptionType  String?  // "monthly" | "yearly" | "lifetime" | null
+  subscribedUntil   DateTime? // when the subscription expires (null = not subscribed)
+  subscriptionPrice Int?     // price paid in NPR (for records)
 
   // Relations
   sessions     Session[]
@@ -268,6 +276,7 @@ model Test {
   updatedAt   DateTime @updatedAt
   // ─── New exam fields ────────────────────────────────────────────────────
   price       Float?   // optional exam price
+  priceNpr    Int?     // price in NPR (Nepali Rupees) — non-subscribers pay this
   featuredImage String? // featured image URL
   category    String?  // admin-defined category (shows in app)
   // Audio settings — controls how exam audio plays

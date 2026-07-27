@@ -627,6 +627,7 @@ function CreateExamDialog({ open, testCategory, onOpenChange, onCreated }: {
     examType: "UBT",
     category: "",
     price: "",
+    priceNpr: "",
     featuredImage: "",
     audioPlayMode: "single" as "single" | "double",
     audioGapSec: 2,
@@ -656,6 +657,7 @@ function CreateExamDialog({ open, testCategory, onOpenChange, onCreated }: {
         testCategory,
         category: form.category || undefined,
         price: form.price ? parseFloat(form.price) : undefined,
+        priceNpr: form.priceNpr ? parseInt(form.priceNpr) : undefined,
         featuredImage: form.featuredImage || undefined,
         audioPlayMode: form.audioPlayMode,
         audioGapSec: form.audioGapSec,
@@ -716,8 +718,9 @@ function CreateExamDialog({ open, testCategory, onOpenChange, onCreated }: {
               <Input type="number" value={form.durationMin} onChange={(e) => setForm(f => ({ ...f, durationMin: parseInt(e.target.value) || 60 }))} min={1} />
             </div>
             <div>
-              <Label className="text-sm font-semibold">Price (optional)</Label>
-              <Input type="number" value={form.price} onChange={(e) => setForm(f => ({ ...f, price: e.target.value }))} placeholder="0 = free" min={0} />
+              <Label className="text-sm font-semibold">Price NPR (Rs.)</Label>
+              <Input type="number" value={form.priceNpr} onChange={(e) => setForm(f => ({ ...f, priceNpr: e.target.value }))} placeholder="0 = free" min={0} />
+              <p className="text-xs text-muted-foreground mt-1">Non-subscribers pay this. Subscribers get it free.</p>
             </div>
           </div>
 

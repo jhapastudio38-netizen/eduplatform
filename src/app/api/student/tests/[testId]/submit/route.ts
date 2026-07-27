@@ -43,6 +43,37 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ testId: st
   });
   if (!test) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
+  // ─── Attempt limit + subscription check ────────────────────────────────
+  // QBank + Batch packages = unlimited for everyone.
+  // Exams (exam/demo/batch/chapter) = 1 attempt for non-subscribers,
+  // unlimited for subscribers.
+  const isPracticeTest = test.testCategory === "question_bank" || testId.startsWith("bundle-");
+  if (!isPracticeTest) {
+    // Check if user already submitted this exam
+    const existingSubmission = await db.submission.findUnique({
+      where: { testId_userId: { testId, userId: user.id } },
+    });
+    if (existingSubmission && existingSubmission.submittedAt) {
+      // Check if user is a subscriber
+      const fullUser = await db.user.findUnique({
+        where: { id: user.id },
+        select: { subscribedUntil: true, subscriptionType: true },
+      });
+      const isSubscribed = fullUser?.subscribedUntil
+        ? fullUser.subscribedUntil > new Date()
+        : false;
+      if (!isSubscribed) {
+        return NextResponse.json(
+          {
+            error: "You have already completed this exam. Subscribers can retake exams unlimited times. Subscribe to unlock unlimited attempts.",
+            alreadyCompleted: true,
+          },
+          { status: 403 },
+        );
+      }
+    }
+  }
+
   // Check if exam is active (admin/teacher may have deactivated it)
   if (!test.isActive) {
     return NextResponse.json({ error: "This exam has been deactivated by the administrator." }, { status: 403 });
