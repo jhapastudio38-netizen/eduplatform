@@ -24,9 +24,9 @@ export async function GET(req: NextRequest) {
 
 const createSchema = z.object({
   key: z.string().trim().min(2).max(50).regex(/^[a-z0-9_-]+$/),
-  title: z.string().trim().min(2).max(100),
-  section: z.enum(["test", "resources", "premium"]).default("test"),
-  imageUrl: z.string().url().optional().or(z.literal("")),
+  title: z.string().trim().min(1).max(100),
+  section: z.string().max(50).default("test"),
+  imageUrl: z.string().optional().or(z.literal("")),
   sortOrder: z.number().int().min(0).max(100).default(0),
   isActive: z.boolean().default(true),
   route: z.string().trim().max(50).optional().or(z.literal("")),
