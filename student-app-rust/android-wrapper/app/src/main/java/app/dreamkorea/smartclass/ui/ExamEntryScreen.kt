@@ -24,6 +24,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.dreamkorea.smartclass.api.TestDetail
+import app.dreamkorea.smartclass.api.TestItemDetail
 import app.dreamkorea.smartclass.data.AppState
 import kotlinx.coroutines.withTimeoutOrNull
 
@@ -313,7 +314,7 @@ private fun StatChip(value: String, label: String, modifier: Modifier = Modifier
  * detail, and combines all items into ONE TestDetail. Used as a fallback
  * when /api/student/qbank-combined returns 404 (server not yet deployed).
  */
-private suspend fun buildQBankCombinedClientSide(): TestDetail {
+internal suspend fun buildQBankCombinedClientSide(): TestDetail {
     val tests = AppState.api.getTests(category = "question_bank").tests
     return combineTestsClientSide(
         testId = "qbank-combined",
@@ -329,7 +330,7 @@ private suspend fun buildQBankCombinedClientSide(): TestDetail {
  * full detail, and combines all items into ONE TestDetail. Used as a
  * fallback when /api/student/bundles/[id]/combined returns 404.
  */
-private suspend fun buildBundleCombinedClientSide(bundleId: String): TestDetail {
+internal suspend fun buildBundleCombinedClientSide(bundleId: String): TestDetail {
     val bundles = AppState.api.getStudentBundles().bundles
     val bundle = bundles.find { it.id == bundleId }
         ?: throw retrofit2.HttpException(
@@ -350,7 +351,7 @@ private suspend fun buildBundleCombinedClientSide(bundleId: String): TestDetail 
  * TestDetail. Each item keeps its real question ID so the submit endpoint
  * can grade it correctly.
  */
-private suspend fun combineTestsClientSide(
+internal suspend fun combineTestsClientSide(
     testId: String,
     title: String,
     description: String,
