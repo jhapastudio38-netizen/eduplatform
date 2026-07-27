@@ -27,6 +27,7 @@ const questionSchema = z.object({
   blockType: z.enum(["text", "audio"]),
   blockNumber: z.number().int().min(1).max(100),
   setNumber: z.number().int().min(1).max(100).optional().default(1),
+  title: z.string().max(200).optional().or(z.literal("")).default(""),
   stem: z.string().min(1).max(2000),
   descType: z.enum(["none", "text", "image", "audio"]).default("none"),
   descText: z.string().optional().or(z.literal("")),
@@ -63,6 +64,7 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ testId: str
       blockType: i.question.blockType,
       blockNumber: i.question.blockNumber,
       setNumber: i.question.setNumber ?? 1,
+      title: i.question.title || "",
       stem: i.question.stem,
       descType: i.question.descType,
       descText: i.question.descText,
@@ -139,6 +141,7 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ testId: st
         where: { id: existingItem.questionId },
         data: {
           type: questionType,
+          title: d.title || null,
           stem: d.stem,
           options: optionsJson,
           correctAnswer,
@@ -168,6 +171,7 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ testId: st
         data: {
           type: questionType,
           difficulty: "MEDIUM",
+          title: d.title || null,
           stem: d.stem,
           options: optionsJson,
           correctAnswer,

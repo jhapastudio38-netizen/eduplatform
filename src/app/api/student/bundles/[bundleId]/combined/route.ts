@@ -94,6 +94,7 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ bundleId: s
         type: x.item.question.type,
         difficulty: x.item.question.difficulty,
         stem: x.item.question.stem,
+        title: x.item.question.title || "",
         options: x.item.question.options ? JSON.parse(x.item.question.options) : null,
         optionBlanks: x.item.question.optionBlanks ? JSON.parse(x.item.question.optionBlanks) : [],
         imageUrl: x.item.question.imageUrl || null,

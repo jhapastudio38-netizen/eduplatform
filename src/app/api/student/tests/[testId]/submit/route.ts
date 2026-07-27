@@ -156,6 +156,7 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ testId: st
     return {
       questionId: q.id,
       stem: q.stem,
+      title: q.title || "",
       type: q.type,
       options: q.options ? JSON.parse(q.options) : null,
       imageUrl: q.imageUrl,
@@ -270,6 +271,7 @@ async function handleCombinedSubmit(
     review.push({
       questionId: q.id,
       stem: q.stem,
+      title: q.title || "",
       type: q.type,
       options: q.options ? JSON.parse(q.options) : null,
       imageUrl: q.imageUrl,

@@ -94,6 +94,7 @@ interface QuestionData {
   blockType: "text" | "audio";
   blockNumber: number;
   setNumber?: number;
+  title: string; // per-question title shown to students at top of question
   stem: string;
   descType: "none" | "text" | "image" | "audio";
   descText: string;
@@ -117,6 +118,7 @@ function emptyQuestion(blockType: "text" | "audio", blockNumber: number): Questi
     blockType,
     blockNumber,
     setNumber: 1,
+    title: "",
     stem: "",
     descType: "none",
     descText: "",
@@ -911,6 +913,7 @@ function ExamEditor({ test, testCategory, onClose }: { test: Test; testCategory:
         blockType: q.blockType,
         blockNumber: q.blockNumber,
         setNumber: q.setNumber ?? activeSet,
+        title: q.title || "",
         stem: q.stem,
         descType: q.descType,
         descText: q.descText || "",
@@ -1038,6 +1041,7 @@ function ExamEditor({ test, testCategory, onClose }: { test: Test; testCategory:
           blockType: q.blockType,
           blockNumber: q.blockNumber,
           setNumber: q.setNumber ?? activeSet,
+          title: q.title || "",
           stem: q.stem,
           descType: q.descType,
           descText: q.descText || "",
@@ -1645,6 +1649,18 @@ function QuestionEditor({ question, onChange, blockLabel, isAudioBlock }: {
               type="audio"
             />
           )}
+
+          {/* Question title (optional — shown at top of each question in exam UI) */}
+          <div className="space-y-1">
+            <Label className="text-sm font-semibold">Question Title <span className="text-muted-foreground font-normal">(optional — shown at the top of this question in the exam)</span></Label>
+            <Input
+              value={question.title || ""}
+              onChange={(e) => onChange({ ...question, title: e.target.value })}
+              placeholder="e.g. Question 1 — Vocabulary, or 어휘 (Vocabulary)"
+              className="text-base"
+              maxLength={200}
+            />
+          </div>
 
           {/* Question text */}
           <div className="space-y-1">

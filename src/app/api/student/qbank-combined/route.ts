@@ -58,6 +58,7 @@ export async function GET(req: NextRequest) {
         type: item.question.type,
         difficulty: item.question.difficulty,
         stem: item.question.stem,
+        title: item.question.title || "",
         options: item.question.options ? JSON.parse(item.question.options) : null,
         optionBlanks: item.question.optionBlanks ? JSON.parse(item.question.optionBlanks) : [],
         imageUrl: item.question.imageUrl || null,
