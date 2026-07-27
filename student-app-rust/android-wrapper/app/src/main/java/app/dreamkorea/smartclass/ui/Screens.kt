@@ -128,7 +128,7 @@ fun MainScreen(userName: String, onLogout: () -> Unit) {
                     painter = painterResource(id = app.dreamkorea.smartclass.R.drawable.app_bg),
                     contentDescription = null,
                     modifier = Modifier.fillMaxSize(),
-                    contentScale = ContentScale.Crop
+                    contentScale = ContentScale.Fit
                 )
                 Box(modifier = Modifier.fillMaxSize().background(BgGray.copy(alpha = 0.92f)))
                 AnimatedContent(
@@ -308,7 +308,7 @@ fun AsyncImageLoader(url: String, modifier: Modifier = Modifier) {
         }
         return
     }
-    coil.compose.AsyncImage(model = absoluteUrl, contentDescription = null, modifier = modifier, contentScale = ContentScale.Crop)
+    coil.compose.AsyncImage(model = absoluteUrl, contentDescription = null, modifier = modifier, contentScale = ContentScale.Fit)
 }
 
 // ─── HOME SCREEN — Professional EdTech design ─────────────────────────────────
@@ -371,7 +371,7 @@ fun HomeScreen(theme: AppTheme, sound: SoundManager, userName: String, onNavigat
                         painter = painterResource(id = app.dreamkorea.smartclass.R.drawable.hero_bg),
                         contentDescription = null,
                         modifier = Modifier.fillMaxSize(),
-                        contentScale = ContentScale.Crop
+                        contentScale = ContentScale.Fit
                     )
                     // Gradient overlay — pink/magenta to match the tree image
                     Box(
