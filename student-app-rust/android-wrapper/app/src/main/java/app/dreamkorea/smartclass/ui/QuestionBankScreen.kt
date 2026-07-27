@@ -1,13 +1,7 @@
 package app.dreamkorea.smartclass.ui
 
-import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
@@ -15,12 +9,9 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.scale
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.dreamkorea.smartclass.api.TestItem
@@ -28,44 +19,29 @@ import app.dreamkorea.smartclass.data.AppState
 import kotlinx.coroutines.withTimeoutOrNull
 
 /**
- * Question Bank Screen — now lists QBank TESTS (created in admin under
- * "Question Bank" with testCategory="question_bank") instead of standalone
- * practice questions.
+ * Question Bank Screen — combines ALL questions from ALL published QBank tests
+ * into ONE big exam. User taps "Start" and solves everything at once.
  *
- * This matches what the admin sees: every QBank test created in the admin
- * panel shows up here. Tapping a test opens ExamEntryScreen → the same
- * auto-landscape + block-grid flow as a regular exam, but QBank tests have
- * no timer pressure (the time limit is just informational).
- *
- * Why this changed:
- *  Previously the student QBank API read from Question.inQuestionBank=true,
- *  but admin never set that flag — admin created QBank TESTS instead. So
- *  the two sides never matched. Now both read from the same source: tests
- *  with testCategory="question_bank".
+ * This is NOT a list of tests. It's a single combined exam.
  */
 @Composable
 fun QuestionBankScreen(theme: AppTheme, sound: SoundManager, onBack: () -> Unit, onStartExam: (String) -> Unit, onOpenPackages: () -> Unit = {}) {
-    var tests by remember { mutableStateOf<List<TestItem>>(emptyList()) }
     var loading by remember { mutableStateOf(true) }
     var error by remember { mutableStateOf("") }
-    var retryCount by remember { mutableStateOf(0) }
+    var questionCount by remember { mutableStateOf(0) }
+    var setCount by remember { mutableStateOf(0) }
 
-    LaunchedEffect(retryCount) {
+    LaunchedEffect(Unit) {
         loading = true
         error = ""
         try {
-            // Always fetch fresh — admin may have just published a new QBank test
+            // Fetch all QBank tests to show the count
             AppState.invalidateCache(AppState.keyTests("question_bank"))
-            val result = withTimeoutOrNull(20_000L) { AppState.getCachedTests("question_bank") }
-            if (result != null) tests = result
-            else error = "The request timed out. Check your internet and try again."
-        } catch (e: retrofit2.HttpException) {
-            error = when (e.code()) {
-                401 -> "Your session has expired. Please log in again."
-                else -> "Could not load question bank (HTTP ${e.code()})."
+            val tests = withTimeoutOrNull(20_000L) { AppState.getCachedTests("question_bank") }
+            if (tests != null) {
+                questionCount = tests.sumOf { it.questionCount }
+                setCount = tests.size
             }
-        } catch (e: java.io.IOException) {
-            error = "No internet connection."
         } catch (e: Exception) {
             error = "Could not load question bank."
         } finally {
@@ -74,15 +50,11 @@ fun QuestionBankScreen(theme: AppTheme, sound: SoundManager, onBack: () -> Unit,
     }
 
     Column(modifier = Modifier.fillMaxSize().background(theme.background)) {
+        ScreenHeader(theme, sound, "Question Bank", "All questions combined", onBack)
+
         if (loading) {
-            Column(Modifier.fillMaxSize()) {
-                LinearProgressIndicator(
-                    modifier = Modifier.fillMaxWidth(),
-                    color = theme.primary,
-                    trackColor = theme.primary.copy(alpha = 0.1f),
-                )
-                ScreenHeader(theme, sound, "Question Bank", "Loading practice tests...", onBack)
-                SkeletonListScreen(theme, itemCount = 5)
+            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                CircularProgressIndicator(color = theme.primary)
             }
             return
         }
@@ -93,102 +65,85 @@ fun QuestionBankScreen(theme: AppTheme, sound: SoundManager, onBack: () -> Unit,
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Center
             ) {
-                Icon(Icons.Default.CloudOff, null, tint = theme.errorRed.copy(alpha = 0.7f), modifier = Modifier.size(56.dp))
+                Icon(Icons.Default.CloudOff, null, tint = theme.errorRed, modifier = Modifier.size(48.dp))
+                Spacer(Modifier.height(12.dp))
+                Text(error, color = theme.subText, fontSize = 13.sp, textAlign = TextAlign.Center)
                 Spacer(Modifier.height(16.dp))
-                Text("Couldn't load", color = theme.darkText, fontSize = 18.sp, fontWeight = FontWeight.Bold)
-                Spacer(Modifier.height(8.dp))
-                Text(error, color = theme.subText, fontSize = 13.sp, textAlign = TextAlign.Center, modifier = Modifier.padding(horizontal = 16.dp))
-                Spacer(Modifier.height(24.dp))
-                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    OutlinedButton(onClick = onBack, shape = RoundedCornerShape(10.dp)) { Text("Go back") }
-                    Button(
-                        onClick = { sound.click(); retryCount++ },
-                        colors = ButtonDefaults.buttonColors(containerColor = theme.primary),
-                        shape = RoundedCornerShape(10.dp)
-                    ) {
-                        Icon(Icons.Default.Refresh, null, modifier = Modifier.size(18.dp))
-                        Spacer(Modifier.width(6.dp))
-                        Text("Retry")
-                    }
-                }
+                Button(onClick = onBack, colors = ButtonDefaults.buttonColors(containerColor = theme.primary)) { Text("Go back") }
             }
             return
         }
 
-        LazyColumn(
-            modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(bottom = 100.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp)
-        ) {
-            item {
-                Column(modifier = Modifier.fillMaxWidth().padding(top = 16.dp)) {
-                    ScreenHeader(theme, sound, "Question Bank", if (tests.isEmpty()) "No practice tests yet." else "${tests.size} practice tests · tap one to start", onBack)
-                }
+        if (questionCount == 0) {
+            Column(
+                Modifier.fillMaxSize().padding(32.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center
+            ) {
+                Icon(Icons.Default.Quiz, null, tint = theme.subText, modifier = Modifier.size(48.dp))
+                Spacer(Modifier.height(12.dp))
+                Text("No questions yet", color = theme.darkText, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+                Text("Your teacher will add questions here soon.", color = theme.subText, fontSize = 13.sp, textAlign = TextAlign.Center)
             }
-
-            if (tests.isEmpty()) {
-                item { EmptyState(theme, "No question bank tests yet", "Your teacher will publish practice tests here soon.", Icons.Default.Quiz) }
-            } else {
-                itemsIndexed(tests) { i, t ->
-                    AnimatedListItem(index = i, theme = theme) {
-                        QBankTestCard(theme, sound, t, onClick = { onStartExam(t.id) })
-                    }
-                }
-            }
+            return
         }
-    }
-}
 
-@Composable
-private fun QBankTestCard(theme: AppTheme, sound: SoundManager, t: TestItem, onClick: () -> Unit) {
-    var pressed by remember { mutableStateOf(false) }
-    val scale by animateFloatAsState(
-        targetValue = if (pressed) 0.97f else 1f,
-        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy),
-        label = "qbankScale"
-    )
-    Surface(
-        color = theme.cardBg,
-        shape = RoundedCornerShape(16.dp),
-        modifier = Modifier.fillMaxWidth().scale(scale).clickable { sound.click(); pressed = true; onClick() },
-        shadowElevation = 2.dp,
-    ) {
-        Row(modifier = Modifier.fillMaxWidth()) {
-            Box(
-                modifier = Modifier.width(6.dp).height(100.dp).background(
-                    Brush.verticalGradient(listOf(theme.primary, theme.primary.copy(alpha = 0.4f)))
-                )
-            )
-            Column(modifier = Modifier.padding(16.dp).weight(1f)) {
-                Row(Modifier.fillMaxWidth(), Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        t.title,
-                        color = theme.darkText,
-                        fontSize = 17.sp,
-                        fontWeight = FontWeight.Bold,
-                        modifier = Modifier.weight(1f),
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                    Surface(color = theme.primary.copy(alpha = 0.15f), shape = RoundedCornerShape(6.dp)) {
-                        Text("PRACTICE", color = theme.primary, fontSize = 9.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp))
+        // Show combined QBank info + Start button
+        Column(
+            modifier = Modifier.fillMaxSize().padding(24.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
+        ) {
+            // Big icon
+            Surface(
+                color = theme.primary,
+                shape = RoundedCornerShape(20.dp),
+                modifier = Modifier.size(80.dp),
+                shadowElevation = 4.dp
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(Icons.Default.Quiz, null, tint = Color.White, modifier = Modifier.size(40.dp))
+                }
+            }
+            Spacer(Modifier.height(16.dp))
+
+            Text("Question Bank", color = theme.darkText, fontSize = 22.sp, fontWeight = FontWeight.Bold)
+            Spacer(Modifier.height(8.dp))
+            Text("$questionCount questions from $setCount sets", color = theme.subText, fontSize = 14.sp)
+            Text("All combined into one exam", color = theme.subText, fontSize = 12.sp)
+            Spacer(Modifier.height(24.dp))
+
+            // Stats
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                Surface(color = theme.cardBg, shape = RoundedCornerShape(12.dp), shadowElevation = 2.dp) {
+                    Column(modifier = Modifier.padding(16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text("$questionCount", color = theme.primary, fontSize = 24.sp, fontWeight = FontWeight.Bold)
+                        Text("Questions", color = theme.subText, fontSize = 11.sp)
                     }
                 }
-                if (!t.description.isNullOrBlank()) {
-                    Spacer(Modifier.height(4.dp))
-                    Text(t.description!!, color = theme.subText, fontSize = 12.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                }
-                Spacer(Modifier.height(10.dp))
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    InfoChipWithIcon(theme, Icons.Default.Timer, "${t.durationMin} min", theme.primary); Spacer(Modifier.width(6.dp))
-                    if (t.questionCount > 0) {
-                        InfoChipWithIcon(theme, Icons.Default.Quiz, "${t.questionCount} Q", Color(0xFF6A1B9A))
-                        Spacer(Modifier.width(6.dp))
+                Surface(color = theme.cardBg, shape = RoundedCornerShape(12.dp), shadowElevation = 2.dp) {
+                    Column(modifier = Modifier.padding(16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text("$setCount", color = theme.primary, fontSize = 24.sp, fontWeight = FontWeight.Bold)
+                        Text("Sets", color = theme.subText, fontSize = 11.sp)
                     }
-                    InfoChipWithIcon(theme, Icons.Default.School, "Pass ${t.passScore}%", Color(0xFF00695C))
-                    Spacer(Modifier.weight(1f))
-                    Text("Start", color = theme.primary, fontSize = 13.sp, fontWeight = FontWeight.Bold)
                 }
+            }
+            Spacer(Modifier.height(32.dp))
+
+            // Start button — opens the combined exam
+            Button(
+                onClick = {
+                    sound.swoosh()
+                    // Use special ID "qbank-combined" — ExamEntryScreen will fetch from /api/student/qbank-combined
+                    onStartExam("qbank-combined")
+                },
+                modifier = Modifier.fillMaxWidth(0.7f).height(50.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = theme.primary),
+                shape = RoundedCornerShape(12.dp)
+            ) {
+                Icon(Icons.Default.PlayArrow, null, tint = Color.White, modifier = Modifier.size(20.dp))
+                Spacer(Modifier.width(8.dp))
+                Text("Start Solving", color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Bold)
             }
         }
     }

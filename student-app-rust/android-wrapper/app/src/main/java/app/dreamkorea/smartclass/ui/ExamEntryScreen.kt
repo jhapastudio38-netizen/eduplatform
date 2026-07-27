@@ -53,7 +53,12 @@ fun ExamEntryScreen(theme: AppTheme, sound: SoundManager, testId: String, onStar
         loading = true
         try {
             val result = withTimeoutOrNull(15_000L) {
-                AppState.api.getTestDetail(testId).test
+                // Special case: qbank-combined fetches ALL QBank questions as one test
+                if (testId == "qbank-combined") {
+                    AppState.api.getQBankCombined().test
+                } else {
+                    AppState.api.getTestDetail(testId).test
+                }
             }
             if (result != null) test = result
             else error = "Could not load the test. Check your connection."

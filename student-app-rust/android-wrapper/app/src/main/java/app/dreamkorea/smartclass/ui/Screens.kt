@@ -335,14 +335,16 @@ fun HomeScreen(theme: AppTheme, sound: SoundManager, userName: String, onNavigat
     val effectiveCards = remember(homeCards, loading) {
         if (loading) emptyList()
         else if (homeCards.isNotEmpty()) {
-            // Merge server cards with guaranteed QBank + Batch package cards
-            // so they always appear even if admin didn't create them
+            // Merge server cards with guaranteed QBank + Batch cards
             val serverKeys = homeCards.map { it.key }.toSet()
+            val serverRoutes = homeCards.map { it.route }.toSet()
             val extras = mutableListOf<HomeCard>()
-            if (!serverKeys.contains("qbank_packages")) {
+            // Only add QBank card if server doesn't have one (by key OR by route)
+            if (!serverKeys.contains("qbank_packages") && !serverRoutes.contains("questionbank")) {
                 extras.add(HomeCard(key = "qbank_packages", title = "Question Bank", section = "test", sortOrder = 99, route = "questionbank", imageUrl = ""))
             }
-            if (!serverKeys.contains("batch_packages")) {
+            // Only add Batch card if server doesn't have one (by key OR by route)
+            if (!serverKeys.contains("batch_packages") && !serverRoutes.contains("batch")) {
                 extras.add(HomeCard(key = "batch_packages", title = "Batch", section = "test", sortOrder = 100, route = "batch", imageUrl = ""))
             }
             homeCards + extras
