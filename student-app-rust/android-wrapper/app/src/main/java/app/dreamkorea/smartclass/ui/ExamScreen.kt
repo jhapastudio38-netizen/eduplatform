@@ -17,6 +17,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -219,187 +220,206 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
         return
     }
 
-    // ─── Question screen ────────────────────────────────────────────────────
-    Column(modifier = Modifier.fillMaxSize().background(theme.background)) {
-        // Header with timer + progress
-        Surface(color = theme.primary, shape = RoundedCornerShape(0.dp)) {
-            Column(modifier = Modifier.padding(16.dp)) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    IconButton(onClick = onExit) {
-                        Icon(Icons.Default.Close, null, tint = Color.White)
-                    }
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text("Question ${currentIdx + 1} of ${t.items.size}", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
-                        val progress = if (t.items.size > 0) (currentIdx + 1f) / t.items.size else 0f
-                        LinearProgressIndicator(
-                            progress = { progress.coerceIn(0f, 1f) },
-                            color = Color.White,
-                            trackColor = Color.White.copy(alpha = 0.3f),
-                            modifier = Modifier.width(120.dp).padding(top = 4.dp)
-                        )
-                    }
-                    // Timer
-                    Surface(color = Color.White.copy(alpha = 0.2f), shape = RoundedCornerShape(8.dp)) {
-                        Row(
-                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Icon(Icons.Default.Timer, null, tint = Color.White, modifier = Modifier.size(14.dp))
-                            Spacer(Modifier.width(4.dp))
-                            val mm = timeLeft / 60
-                            val ss = timeLeft % 60
-                            Text(String.format("%02d:%02d", mm, ss), color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold)
-                        }
-                    }
-                }
-                Spacer(Modifier.height(8.dp))
-                Text(t.title, color = Color.White.copy(alpha = 0.85f), fontSize = 12.sp)
-            }
-        }
+    // ─── TWO-VIEW EXAM (landscape) ────────────────────────────────────────
+    // View 1: Grid overview (Reading + Listening grids + sidebar)
+    // View 2: Full-screen question (no grid, just title+timer+question+options+Next)
+    var examView by remember { mutableStateOf("grid") }
 
-        // Question content
-        if (currentQuestion == null) {
-            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Text("No questions in this test", color = theme.subText)
-            }
-            return
-        }
-
-        val q = currentQuestion.question
-        LazyColumn(
-            modifier = Modifier.weight(1f).fillMaxWidth().padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            // Question stem
-            item {
-                Surface(color = theme.cardBg, shape = RoundedCornerShape(14.dp), modifier = Modifier.fillMaxWidth(), shadowElevation = 2.dp) {
-                    Column(modifier = Modifier.padding(16.dp)) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Surface(color = theme.primary, shape = RoundedCornerShape(6.dp), modifier = Modifier.size(30.dp)) {
-                                Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
-                                    Text("${currentIdx + 1}", color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Bold)
-                                }
-                            }
-                            Spacer(Modifier.width(8.dp))
-                            Text(q.difficulty, color = theme.subText, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
-                            Spacer(Modifier.weight(1f))
-                            Text("${currentQuestion.points} pts", color = theme.primary, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                        }
-                        Spacer(Modifier.height(12.dp))
-                        Text(q.stem, color = theme.darkText, fontSize = 17.sp, fontWeight = FontWeight.Bold)
-                    }
-                }
-            }
-
-            // Image (if present)
-            q.imageUrl?.let { url ->
-                item {
-                    Surface(color = theme.cardBg, shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth(), shadowElevation = 1.dp) {
-                        AsyncImage(url = url, modifier = Modifier.fillMaxWidth().heightIn(max = 240.dp).clip(RoundedCornerShape(12.dp)))
-                    }
-                }
-            }
-
-            // Audio player (if present, with loop)
-            q.audioUrl?.let { url ->
-                item {
-                    AudioPlayerCard(
-                        theme = theme,
-                        url = url,
-                        loopCount = q.audioLoop,
-                        loopDelaySec = q.audioLoopDelay,
-                        sound = sound
-                    )
-                }
-            }
-
-            // Answer input
-            item {
-                AnswerInput(
-                    theme = theme,
-                    question = q,
-                    userAnswer = answers[q.id],
-                    feedback = questionFeedback,
-                    onAnswer = { ans ->
-                        sound.click()
-                        answers[q.id] = ans
-                    }
-                )
-            }
-        }
-
-        // Bottom navigation buttons
-        Surface(color = theme.white, shadowElevation = 4.dp) {
-            Row(
-                modifier = Modifier.fillMaxWidth().padding(16.dp),
-                horizontalArrangement = Arrangement.SpaceBetween
+    if (examView == "grid") {
+        // ═══ VIEW 1: GRID OVERVIEW ═══
+        Row(modifier = Modifier.fillMaxSize().background(theme.background)) {
+            // LEFT: Submit button (vertical, like reference) + grids
+            Column(
+                modifier = Modifier.weight(1f).fillMaxHeight().padding(6.dp).verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(6.dp)
             ) {
-                OutlinedButton(
+                // Reading grid
+                val textItems = t.items.filter { it.question.blockType == "text" }
+                val audioItems = t.items.filter { it.question.blockType == "audio" }
+                val readingItems = if (textItems.isNotEmpty()) textItems else t.items
+                val listeningItems = if (textItems.isNotEmpty()) audioItems else emptyList()
+
+                if (readingItems.isNotEmpty()) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text("Reading", color = theme.darkText, fontSize = 12.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(end = 8.dp))
+                        // Grid with black border (like reference)
+                        Surface(border = androidx.compose.foundation.BorderStroke(1.dp, Color.Black), shape = RoundedCornerShape(6.dp)) {
+                            GridBlocks(theme, sound, readingItems, 0, answers) { idx ->
+                                currentIdx = idx; questionFeedback = null; examView = "question"
+                            }
+                        }
+                    }
+                }
+                if (listeningItems.isNotEmpty()) {
+                    Spacer(Modifier.height(6.dp))
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text("Listening", color = theme.darkText, fontSize = 12.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(end = 8.dp))
+                        Surface(border = androidx.compose.foundation.BorderStroke(1.dp, Color.Black), shape = RoundedCornerShape(6.dp)) {
+                            GridBlocks(theme, sound, listeningItems, readingItems.size, answers) { idx ->
+                                currentIdx = idx; questionFeedback = null; examView = "question"
+                            }
+                        }
+                    }
+                }
+                // Submit button (like reference — at the bottom)
+                Spacer(Modifier.height(8.dp))
+                Button(
                     onClick = {
-                        sound.click()
-                        if (currentIdx > 0) {
-                            currentIdx--
-                            questionFeedback = null
+                        sound.swoosh(); submitting = true
+                        scope.launch {
+                            try { submitResult = AppState.api.submitTest(t.id, SubmitRequest(answers.toMap())); sound.success() }
+                            catch (e: Exception) { error = "Could not submit." }
+                            submitting = false
                         }
                     },
-                    enabled = currentIdx > 0,
-                    shape = RoundedCornerShape(10.dp)
+                    modifier = Modifier.fillMaxWidth().height(38.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = theme.primary),
+                    shape = RoundedCornerShape(6.dp),
+                    enabled = !submitting
                 ) {
-                    Icon(Icons.Default.ArrowBack, null, modifier = Modifier.size(16.dp))
-                    Spacer(Modifier.width(4.dp))
-                    Text("Prev")
+                    if (submitting) { CircularProgressIndicator(color = Color.White, modifier = Modifier.size(14.dp), strokeWidth = 2.dp) }
+                    else { Text("Submit and Finish Exam", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold) }
                 }
+            }
 
-                if (currentIdx < t.items.size - 1) {
-                    Button(
-                        onClick = {
-                            sound.swoosh()
-                            currentIdx++
-                            questionFeedback = null
-                        },
-                        shape = RoundedCornerShape(10.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = theme.primary)
-                    ) {
-                        Text("Next")
-                        Spacer(Modifier.width(4.dp))
-                        Icon(Icons.Default.ArrowForward, null, modifier = Modifier.size(16.dp))
+            // RIGHT: Sidebar (logo, timer, filters, progress)
+            Surface(color = theme.cardBg, modifier = Modifier.width(120.dp).fillMaxHeight(), shadowElevation = 3.dp) {
+                Column(modifier = Modifier.fillMaxSize().padding(6.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.SpaceBetween) {
+                    // DK logo
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Box(modifier = Modifier.size(32.dp).clip(RoundedCornerShape(6.dp)).background(theme.primary), contentAlignment = Alignment.Center) {
+                            Text("DK", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                        }
+                        Text(t.title.take(15), color = theme.subText, fontSize = 7.sp, maxLines = 2, textAlign = TextAlign.Center)
                     }
-                } else {
-                    Button(
-                        onClick = {
-                            sound.swoosh()
-                            submitting = true
-                            scope.launch {
-                                try {
-                                    submitResult = AppState.api.submitTest(t.id, SubmitRequest(answers.toMap()))
-                                    sound.success()
-                                } catch (e: java.net.UnknownHostException) {
-                                    error = "No internet connection. Please check your network."
-                                } catch (e: java.io.IOException) {
-                                    error = "Could not connect to server. Please check your internet."
-                                } catch (e: Exception) {
-                                    error = "Could not submit exam. Please try again."
-                                }
-                                submitting = false
-                            }
-                        },
-                        shape = RoundedCornerShape(10.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = theme.accent),
-                        enabled = !submitting
-                    ) {
-                        if (submitting) {
-                            CircularProgressIndicator(color = Color.White, modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
-                        } else {
-                            Icon(Icons.Default.Check, null, modifier = Modifier.size(16.dp))
-                            Spacer(Modifier.width(4.dp))
-                            Text("Submit")
+                    // Timer + progress
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        val mm = timeLeft / 60; val ss = timeLeft % 60
+                        Text(String.format("%02d:%02d", mm, ss), color = theme.primary, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                        Text("time left", color = theme.subText, fontSize = 7.sp)
+                        Spacer(Modifier.height(4.dp))
+                        Text("${answers.size}/${t.items.size}", color = theme.darkText, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                        Text("answered", color = theme.subText, fontSize = 7.sp)
+                    }
+                    // Exit
+                    OutlinedButton(onClick = onExit, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(4.dp), contentPadding = PaddingValues(vertical = 2.dp)) {
+                        Text("Exit", fontSize = 9.sp)
+                    }
+                }
+            }
+        }
+    } else {
+        // ═══ VIEW 2: FULL-SCREEN QUESTION ═══
+        // NO grid, NO numbers, NO Reading/Listening. Just title, timer, question, options, Next.
+        val item = t.items.getOrNull(currentIdx) ?: return
+        val q = item.question
+
+        Column(modifier = Modifier.fillMaxSize().background(theme.background)) {
+            // Thin header: Grid button + title (left) | timer (right) — small, doesn't affect main content
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 6.dp, vertical = 2.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    IconButton(onClick = { examView = "grid" }, modifier = Modifier.size(24.dp)) {
+                        Icon(Icons.Default.GridView, null, tint = theme.primary, modifier = Modifier.size(14.dp))
+                    }
+                    Text(t.title.take(25), color = theme.subText, fontSize = 10.sp, maxLines = 1)
+                }
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    val mm = timeLeft / 60; val ss = timeLeft % 60
+                    Text(String.format("%02d:%02d", mm, ss), color = theme.subText, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                }
+            }
+
+            // Main content: question (left) + options (right) — small text, optimized for landscape
+            Row(modifier = Modifier.weight(1f).fillMaxWidth().padding(6.dp)) {
+                // LEFT: Question + media
+                LazyColumn(modifier = Modifier.weight(1f).padding(end = 4.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    item {
+                        Surface(color = theme.cardBg, shape = RoundedCornerShape(6.dp), modifier = Modifier.fillMaxWidth(), shadowElevation = 1.dp) {
+                            Text(q.stem, color = theme.darkText, fontSize = 12.sp, fontWeight = FontWeight.Medium, modifier = Modifier.padding(8.dp))
+                        }
+                    }
+                    if (q.descType == "image" && !q.descImageUrl.isNullOrBlank()) {
+                        item { AsyncImage(url = q.descImageUrl!!.toAbsoluteUrl(), modifier = Modifier.fillMaxWidth().heightIn(max = 80.dp).clip(RoundedCornerShape(4.dp))) }
+                    }
+                    val mediaImgUrl = (q.mediaImageUrl ?: q.imageUrl)?.toAbsoluteUrl()
+                    if (!mediaImgUrl.isNullOrBlank()) {
+                        item { AsyncImage(url = mediaImgUrl, modifier = Modifier.fillMaxWidth().heightIn(max = 100.dp).clip(RoundedCornerShape(4.dp))) }
+                    }
+                    val mediaAudUrl = (q.mediaAudioUrl ?: q.audioUrl)?.toAbsoluteUrl()
+                    if (!mediaAudUrl.isNullOrBlank()) {
+                        item { AudioPlayerCard(theme = theme, url = mediaAudUrl, loopCount = q.audioLoop, loopDelaySec = q.audioLoopDelay, sound = sound) }
+                    }
+                }
+                // RIGHT: Options
+                LazyColumn(modifier = Modifier.weight(1f).padding(start = 4.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    item { AnswerInputBlock(theme, q, answers[q.id], questionFeedback, sound) { ans ->
+                        answers[q.id] = ans
+                        val correctIdx = q.correctOption
+                        val isCorrect = when {
+                            q.answerType == "text" || q.answerType == "choose" -> q.options?.getOrNull(correctIdx) == ans
+                            q.answerType == "image" -> q.optionImages.getOrNull(correctIdx) == ans
+                            q.answerType == "audio" -> q.optionAudios.getOrNull(correctIdx) == ans
+                            else -> false
+                        }
+                        questionFeedback = QuestionFeedback(isCorrect, "")
+                    }}
+                }
+            }
+
+            // Bottom: Prev / Next — always visible, compact
+            Surface(color = theme.cardBg, shadowElevation = 2.dp) {
+                Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 3.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                    OutlinedButton(onClick = { if (currentIdx > 0) { currentIdx--; questionFeedback = null } }, enabled = currentIdx > 0, shape = RoundedCornerShape(6.dp), contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp)) {
+                        Icon(Icons.Default.ArrowBack, null, modifier = Modifier.size(12.dp)); Spacer(Modifier.width(2.dp)); Text("Prev", fontSize = 11.sp)
+                    }
+                    Text("${currentIdx + 1}/${t.items.size}", color = theme.subText, fontSize = 10.sp)
+                    if (currentIdx < t.items.size - 1) {
+                        Button(onClick = { currentIdx++; questionFeedback = null }, shape = RoundedCornerShape(6.dp), colors = ButtonDefaults.buttonColors(containerColor = theme.primary), contentPadding = PaddingValues(horizontal = 20.dp, vertical = 4.dp)) {
+                            Text("Next", fontSize = 11.sp, fontWeight = FontWeight.Bold); Spacer(Modifier.width(2.dp)); Icon(Icons.Default.ArrowForward, null, modifier = Modifier.size(12.dp))
+                        }
+                    } else {
+                        Button(onClick = {
+                            sound.swoosh(); submitting = true
+                            scope.launch { try { submitResult = AppState.api.submitTest(t.id, SubmitRequest(answers.toMap())); sound.success() } catch (e: Exception) { error = "Submit failed." }; submitting = false }
+                        }, shape = RoundedCornerShape(6.dp), colors = ButtonDefaults.buttonColors(containerColor = theme.accent), enabled = !submitting, contentPadding = PaddingValues(horizontal = 20.dp, vertical = 4.dp)) {
+                            if (submitting) { CircularProgressIndicator(color = Color.White, modifier = Modifier.size(12.dp), strokeWidth = 2.dp) }
+                            else { Icon(Icons.Default.Check, null, modifier = Modifier.size(12.dp)); Spacer(Modifier.width(2.dp)); Text("Submit", fontSize = 11.sp, fontWeight = FontWeight.Bold) }
                         }
                     }
                 }
+            }
+        }
+    }
+}
+
+// ─── Grid Blocks — 4 columns of numbered cells with borders ──────────────────
+@Composable
+private fun GridBlocks(
+    theme: AppTheme, sound: SoundManager,
+    items: List<TestItemDetail>, startIndex: Int,
+    answers: androidx.compose.runtime.snapshots.SnapshotStateMap<String, Any>,
+    onTap: (Int) -> Unit,
+) {
+    val rows = items.mapIndexed { i, item -> Triple(startIndex + i, item, answers.containsKey(item.question.id)) }.chunked(4)
+    Column {
+        rows.forEach { row ->
+            Row {
+                row.forEach { (idx, _, answered) ->
+                    Surface(
+                        color = if (answered) Color(0xFF4CAF50) else Color.White,
+                        border = androidx.compose.foundation.BorderStroke(1.dp, Color.Black),
+                        modifier = Modifier.size(28.dp).clickable { sound.click(); onTap(idx) }
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Text("${idx + 1}", color = if (answered) Color.White else Color.Black, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                        }
+                    }
+                }
+                repeat(4 - row.size) { Spacer(Modifier.size(28.dp)) }
             }
         }
     }
@@ -759,4 +779,148 @@ fun ReviewCard(theme: AppTheme, review: ReviewItem) {
             }
         }
     }
+}
+
+@Composable
+fun AnswerInputBlock(
+    theme: AppTheme,
+    question: QuestionDetail,
+    userAnswer: Any?,
+    feedback: QuestionFeedback?,
+    sound: SoundManager,
+    onAnswer: (Any) -> Unit
+) {
+    val options = question.options ?: emptyList()
+    val optionImgs = question.optionImages
+    val optionAuds = question.optionAudios
+
+    when (question.answerType) {
+        "text", "choose" -> {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                options.forEachIndexed { i, opt ->
+                    val selected = userAnswer == opt
+                    val isCorrectFeedback = feedback?.let { i == question.correctOption }
+                    val isWrongSelected = feedback != null && selected && !feedback.isCorrect
+                    val bgColor = when {
+                        isCorrectFeedback == true -> Color(0xFFD4EDDA)
+                        isWrongSelected -> Color(0xFFFFCDD2)
+                        selected -> theme.primary.copy(alpha = 0.1f)
+                        else -> theme.cardBg
+                    }
+                    val borderColor = when {
+                        isCorrectFeedback == true -> Color(0xFF28A745)
+                        isWrongSelected -> theme.errorRed
+                        selected -> theme.primary
+                        else -> theme.divider
+                    }
+                    Surface(
+                        color = bgColor,
+                        shape = RoundedCornerShape(10.dp),
+                        border = androidx.compose.foundation.BorderStroke(1.5.dp, borderColor),
+                        modifier = Modifier.fillMaxWidth().clickable {
+                            if (feedback == null) { sound.click(); onAnswer(opt) }
+                        }
+                    ) {
+                        Row(modifier = Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Surface(color = if (selected) theme.primary else Color.Transparent, shape = RoundedCornerShape(50), modifier = Modifier.size(20.dp)) {
+                                if (selected) { Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) { Icon(Icons.Default.Check, null, tint = Color.White, modifier = Modifier.size(14.dp)) } }
+                            }
+                            Spacer(Modifier.width(12.dp))
+                            Text(opt, color = theme.darkText, fontSize = 15.sp, fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f))
+                        }
+                    }
+                }
+            }
+        }
+        "image" -> {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                optionImgs.forEachIndexed { i, imgUrl ->
+                    if (imgUrl.isBlank()) return@forEachIndexed
+                    val selected = userAnswer == imgUrl
+                    val isCorrectFeedback = feedback?.let { i == question.correctOption }
+                    val isWrongSelected = feedback != null && selected && !feedback.isCorrect
+                    val borderColor = when {
+                        isCorrectFeedback == true -> Color(0xFF28A745)
+                        isWrongSelected -> theme.errorRed
+                        selected -> theme.primary
+                        else -> theme.divider
+                    }
+                    Surface(
+                        color = if (selected) theme.primary.copy(alpha = 0.05f) else theme.cardBg,
+                        shape = RoundedCornerShape(12.dp),
+                        border = androidx.compose.foundation.BorderStroke(2.dp, borderColor),
+                        modifier = Modifier.fillMaxWidth().clickable {
+                            if (feedback == null) { sound.click(); onAnswer(imgUrl) }
+                        }
+                    ) {
+                        Row(modifier = Modifier.padding(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                            coil.compose.AsyncImage(
+                                model = imgUrl.toAbsoluteUrl(),
+                                contentDescription = null,
+                                modifier = Modifier.size(72.dp).clip(RoundedCornerShape(8.dp)),
+                                contentScale = ContentScale.Crop
+                            )
+                            Spacer(Modifier.width(12.dp))
+                            Text(question.options?.getOrNull(i) ?: "Option ${'A' + i}", color = theme.darkText, fontSize = 14.sp, fontWeight = FontWeight.Medium)
+                            Spacer(Modifier.weight(1f))
+                            if (selected) { Icon(Icons.Default.CheckCircle, null, tint = theme.primary, modifier = Modifier.size(20.dp)) }
+                        }
+                    }
+                }
+            }
+        }
+        "audio" -> {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                optionAuds.forEachIndexed { i, audUrl ->
+                    if (audUrl.isBlank()) return@forEachIndexed
+                    val selected = userAnswer == audUrl
+                    val isCorrectFeedback = feedback?.let { i == question.correctOption }
+                    val isWrongSelected = feedback != null && selected && !feedback.isCorrect
+                    val borderColor = when {
+                        isCorrectFeedback == true -> Color(0xFF28A745)
+                        isWrongSelected -> theme.errorRed
+                        selected -> theme.primary
+                        else -> theme.divider
+                    }
+                    Surface(
+                        color = if (selected) theme.primary.copy(alpha = 0.05f) else theme.cardBg,
+                        shape = RoundedCornerShape(10.dp),
+                        border = androidx.compose.foundation.BorderStroke(1.5.dp, borderColor),
+                        modifier = Modifier.fillMaxWidth().clickable {
+                            if (feedback == null) { sound.click(); onAnswer(audUrl) }
+                        }
+                    ) {
+                        Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Text(question.options?.getOrNull(i) ?: "Audio ${'A' + i}", color = theme.darkText, fontSize = 14.sp, fontWeight = FontWeight.Medium)
+                            Spacer(Modifier.weight(1f))
+                            if (selected) { Icon(Icons.Default.CheckCircle, null, tint = theme.primary, modifier = Modifier.size(20.dp)) }
+                        }
+                    }
+                }
+            }
+        }
+        else -> {
+            // Fallback: text options
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                options.forEachIndexed { i, opt ->
+                    val selected = userAnswer == opt
+                    Surface(
+                        color = if (selected) theme.primary.copy(alpha = 0.1f) else theme.cardBg,
+                        shape = RoundedCornerShape(10.dp),
+                        border = androidx.compose.foundation.BorderStroke(1.5.dp, if (selected) theme.primary else theme.divider),
+                        modifier = Modifier.fillMaxWidth().clickable { if (feedback == null) { sound.click(); onAnswer(opt) } }
+                    ) {
+                        Row(modifier = Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Text(opt, color = theme.darkText, fontSize = 15.sp, fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f))
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+fun String.toAbsoluteUrl(): String {
+    if (this.startsWith("http://") || this.startsWith("https://")) return this
+    return "https://my-project-five-sepia.vercel.app" + (if (this.startsWith("/")) this else "/$this")
 }

@@ -11,12 +11,16 @@ export async function GET(req: NextRequest) {
   }
   const url = new URL(req.url);
   const category = url.searchParams.get("category"); // exam | demo | batch | chapter | question_bank
+  const q = url.searchParams.get("q")?.trim() || ""; // free-text title search
   const where: Record<string, unknown> = {};
   if (
     category &&
     ["exam", "demo", "batch", "chapter", "question_bank"].includes(category)
   ) {
     where.testCategory = category;
+  }
+  if (q) {
+    where.title = { contains: q, mode: "insensitive" };
   }
   const tests = await db.test.findMany({
     where,
@@ -44,6 +48,9 @@ const testSchema = z.object({
   audioGapSec: z.number().int().min(0).max(60).default(2),
   textBlockCount: z.number().int().min(0).max(100).default(20),
   audioBlockCount: z.number().int().min(0).max(100).default(20),
+  // Per-block enable/disable — admin can hide the audio or text section.
+  textBlockEnabled: z.boolean().optional().default(true),
+  audioBlockEnabled: z.boolean().optional().default(true),
 });
 
 export async function POST(req: NextRequest) {
@@ -77,6 +84,8 @@ export async function POST(req: NextRequest) {
         audioGapSec: d.audioGapSec,
         textBlockCount: d.textBlockCount,
         audioBlockCount: d.audioBlockCount,
+        textBlockEnabled: d.textBlockEnabled ?? true,
+        audioBlockEnabled: d.audioBlockEnabled ?? true,
       },
     });
     await audit({ actorId: user.id, action: "create_test", entity: "Test", entityId: test.id });

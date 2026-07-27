@@ -37,6 +37,7 @@ object AppState {
     private const val KEY_THEME_COLOR = "theme_color"
     private const val KEY_DARK_MODE = "dark_mode"
     private const val KEY_TEXT_SIZE = "text_size"
+    private const val KEY_EXAM_HORIZONTAL = "exam_horizontal_mode"
     private const val KEY_ANIMATIONS = "animations_enabled"
     private const val KEY_NOTIFICATIONS = "notifications_enabled"
 
@@ -47,7 +48,10 @@ object AppState {
 
     // ─── In-memory cache (fixes back/forth reload storms) ──────────────────────
     // Each entry stores (data, timestamp). Cache is valid for CACHE_TTL_MS.
-    private const val CACHE_TTL_MS = 120_000L // 2 minutes
+    // Reduced from 2 min to 30 sec so the app picks up admin changes faster.
+    // For screens that need real-time data, use invalidateCache() before
+    // loading, or use cachedFresh() which always fetches.
+    private const val CACHE_TTL_MS = 30_000L // 30 seconds
     private data class CacheEntry<T>(val data: T, val savedAt: Long)
     private val cache = ConcurrentHashMap<String, CacheEntry<*>>()
     private val cacheMutex = Mutex()
@@ -59,6 +63,18 @@ object AppState {
         if (hit != null && now - hit.savedAt < CACHE_TTL_MS) {
             return hit.data
         }
+        val fresh = loader()
+        cache[key] = CacheEntry(fresh, System.currentTimeMillis())
+        return fresh
+    }
+
+    /**
+     * Always fetches fresh data from the network — bypasses the cache entirely.
+     * Use this on screens where real-time data matters (Books, Exams, QBank,
+     * Packages). Updates the cache as a side-effect so subsequent calls to
+     * getCachedNow() return the fresh data.
+     */
+    suspend fun <T> cachedFresh(key: String, loader: suspend () -> T): T {
         val fresh = loader()
         cache[key] = CacheEntry(fresh, System.currentTimeMillis())
         return fresh
@@ -94,7 +110,7 @@ object AppState {
         AppState.api.getHomeCards().cards
     }
     suspend fun getCachedTests(filter: String) = cached(keyTests(filter)) {
-        AppState.api.getTests(filter).tests
+        AppState.api.getTests(category = filter).tests
     }
     suspend fun getCachedBooks() = cached(KEY_BOOKS) {
         AppState.api.getBooks().books
@@ -247,6 +263,17 @@ object AppState {
     fun getTextSizeMultiplier(): Float = settingsPrefs.getFloat(KEY_TEXT_SIZE, 1.0f)
     fun setTextSizeMultiplier(value: Float) {
         settingsPrefs.edit().putFloat(KEY_TEXT_SIZE, value).apply()
+    }
+
+    /**
+     * Exam layout mode — independent of text size.
+     *  • false (default) = Vertical (question on top, options below) — best for phones
+     *  • true            = Horizontal (question on left, options on right) — best for tablets
+     *                      and landscape phones where you want to see both at once
+     */
+    fun isExamHorizontalMode(): Boolean = settingsPrefs.getBoolean(KEY_EXAM_HORIZONTAL, false)
+    fun setExamHorizontalMode(value: Boolean) {
+        settingsPrefs.edit().putBoolean(KEY_EXAM_HORIZONTAL, value).apply()
     }
 
     fun areAnimationsEnabled(): Boolean = settingsPrefs.getBoolean(KEY_ANIMATIONS, true)
