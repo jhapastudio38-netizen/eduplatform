@@ -565,11 +565,11 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
             }
 
             // ── MAIN FRAME ── white with 3px black border, contains the grid ──
+            // NO padding around the grid — boxes fill edge-to-edge with no space.
             Box(
                 modifier = Modifier
                     .weight(1f)
                     .fillMaxWidth()
-                    .padding(6.dp)
                     .border(3.dp, Color.Black)
             ) {
                 if (t.items.isEmpty()) {
@@ -577,64 +577,36 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
                         Text("No questions in this exam", color = Color.Black, fontSize = 14.sp)
                     }
                 } else {
-                    // Grid — 8 columns. Numbers go right-to-left column-wise:
-                    //   rightmost col = 1-10, next = 11-20, ..., leftmost = 71-80
-                    // We build rows of 8, where row r contains numbers:
-                    //   (80-r*8), (80-r*8-1), ... actually simpler: build a list
-                    //   of question indices in display order (left-to-right, top-to-bottom)
-                    //   where leftmost column has the highest numbers.
-                    //
-                    // For 80 questions in 8 cols × 10 rows:
-                    //   row 0 (top):    72, 64, 56, 48, 40, 32, 24, 16, 8, 1 ... wait
-                    // Actually per spec: rightmost = 1-10 (top→bottom), so:
-                    //   col 7 (rightmost): rows 0-9 = Q1, Q2, ..., Q10
-                    //   col 6: rows 0-9 = Q11, Q12, ..., Q20
-                    //   ...
-                    //   col 0 (leftmost): rows 0-9 = Q71, Q72, ..., Q80
-                    //
-                    // Display order (left-to-right, top-to-bottom):
-                    //   row 0: Q71, Q61, Q51, Q41, Q31, Q21, Q11, Q1
-                    //   row 1: Q72, Q62, Q52, Q42, Q32, Q22, Q12, Q2
-                    //   ...
-                    // But we have a variable number of questions (not always 80).
-                    // So we compute: for each cell (row, col), the question index is:
-                    //   totalQuestions - col*rowsPerCol - row - 1 ... but we want 1-based.
-                    // Simpler: build the display order list directly.
-
+                    // Grid — 8 columns, NO spacing between boxes (edge-to-edge).
+                    // Numbers go right-to-left column-wise:
+                    //   rightmost col = 1-10 (top→bottom), next = 11-20, ..., leftmost = highest
+                    // So question index for cell (row, col) = (cols-1-col) * rowsCount + row
+                    // Empty cells (when totalQ < 80) are placed on the LEFT so the
+                    // filled boxes start from the RIGHT with no space.
                     val totalQ = t.items.size
                     val cols = 8
                     val rowsCount = (totalQ + cols - 1) / cols // ceiling division
-                    // Build display order: for each column from right to left,
-                    //   for each row from top to bottom, push the question index.
-                    // Column c (0=leftmost, 7=rightmost) contains questions:
-                    //   (cols - 1 - c) * rowsCount + row  → but we want rightmost col = 1-10
-                    // Actually: rightmost col (c=7) = Q1..Q10 (indices 0..9)
-                    //           next col (c=6) = Q11..Q20 (indices 10..19)
-                    // So question index for cell (row, col) = (cols-1-col) * rowsCount + row
-                    // But we need to skip indices >= totalQ (for non-full grids).
 
                     LazyColumn(
-                        modifier = Modifier.fillMaxSize().padding(8.dp),
-                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                        modifier = Modifier.fillMaxSize(),
+                        verticalArrangement = Arrangement.spacedBy(0.dp)
                     ) {
                         items(rowsCount) { rowIdx ->
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                horizontalArrangement = Arrangement.spacedBy(0.dp)
                             ) {
                                 for (colIdx in 0 until cols) {
-                                    // Question index for this cell
+                                    // Question index for this cell — rightmost col = lowest numbers
                                     val qIdx = (cols - 1 - colIdx) * rowsCount + rowIdx
                                     if (qIdx < totalQ) {
                                         val isAnswered = answers.containsKey(t.items[qIdx].question.id)
                                         val isCurrent = qIdx == currentIdx
-                                        // Flat B&W: answered or current = black fill + white text;
-                                        // not answered = white fill + black text
                                         val isHighlighted = isAnswered || isCurrent
                                         Box(
                                             modifier = Modifier
                                                 .weight(1f)
-                                                .aspectRatio(0.72f) // slightly taller than wide, matches spec 73×102
+                                                .aspectRatio(0.72f) // matches spec 73×102px
                                                 .border(3.dp, Color.Black)
                                                 .background(if (isHighlighted) Color.Black else Color.White)
                                                 .clickable {
@@ -652,7 +624,8 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
                                             )
                                         }
                                     } else {
-                                        // Empty cell — just a spacer to keep the grid aligned
+                                        // Empty cell — INVISIBLE (no border, no background) so the
+                                        // filled boxes on the right have no gap on their left.
                                         Spacer(modifier = Modifier.weight(1f).aspectRatio(0.72f))
                                     }
                                 }
