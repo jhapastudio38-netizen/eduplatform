@@ -820,6 +820,7 @@ fun ReviewCard(theme: AppTheme, review: ReviewItem) {
             }
         }
     }
+@Composable
 }
 fun AnswerInputBlock(
     theme: AppTheme,
