@@ -31,9 +31,10 @@ import kotlinx.coroutines.withTimeoutOrNull
  * questions from those tests and combines them into ONE big exam the student
  * can solve.
  *
- * UI per bundle card:
- *   • Cover image (or icon placeholder)
- *   • Title + description
+ * UI per bundle card (horizontal layout — image on the left, content on the
+ * right — so images get more screen space):
+ *   • Cover image (left, 140dp wide × full card height)
+ *   • Title + description (right)
  *   • "View All Questions" button → opens the combined exam
  *   • "Completed" badge if the student has already submitted this combined exam
  */
@@ -134,7 +135,7 @@ fun QuestionBankScreen(
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
             contentPadding = PaddingValues(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+            verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
             items(bundles) { bundle ->
                 QBankBundleCard(
@@ -168,43 +169,57 @@ private fun QBankBundleCard(
         color = theme.cardBg,
         shape = RoundedCornerShape(16.dp),
         modifier = Modifier.fillMaxWidth(),
-        shadowElevation = 2.dp
+        shadowElevation = 3.dp
     ) {
-        Column {
-            // Cover image
-            if (!bundle.coverUrl.isNullOrBlank()) {
-                val absUrl = if (bundle.coverUrl!!.startsWith("http")) bundle.coverUrl else "https://my-project-five-sepia.vercel.app${bundle.coverUrl}"
-                Box(
-                    modifier = Modifier.fillMaxWidth().height(120.dp).background(theme.background),
-                    contentAlignment = Alignment.Center
-                ) {
+        // Horizontal layout — image on the LEFT (large), content on the RIGHT
+        Row(modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min)) {
+            // ── LEFT: Cover image — wider so images are clearly visible ─────
+            Box(
+                modifier = Modifier
+                    .width(140.dp)
+                    .fillMaxHeight()
+                    .background(theme.background),
+                contentAlignment = Alignment.Center
+            ) {
+                if (!bundle.coverUrl.isNullOrBlank()) {
+                    val absUrl = if (bundle.coverUrl!!.startsWith("http")) bundle.coverUrl else "https://my-project-five-sepia.vercel.app${bundle.coverUrl}"
                     coil.compose.AsyncImage(
                         model = absUrl,
-                        contentDescription = null,
+                        contentDescription = bundle.title,
                         modifier = Modifier.fillMaxSize(),
                         contentScale = ContentScale.Crop
                     )
-                    // Completed badge overlay
-                    if (isCompleted) {
-                        Surface(
-                            color = Color(0xFF22C55E),
-                            shape = RoundedCornerShape(8.dp),
-                            modifier = Modifier.align(Alignment.TopEnd).padding(8.dp)
+                } else {
+                    // Icon placeholder when no image
+                    Icon(
+                        Icons.Default.Quiz,
+                        null,
+                        tint = theme.primary,
+                        modifier = Modifier.size(48.dp)
+                    )
+                }
+                // Completed badge overlay (top-left of image)
+                if (isCompleted) {
+                    Surface(
+                        color = Color(0xFF22C55E),
+                        shape = RoundedCornerShape(8.dp),
+                        modifier = Modifier.align(Alignment.TopStart).padding(6.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Row(
-                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Icon(Icons.Default.CheckCircle, null, tint = Color.White, modifier = Modifier.size(14.dp))
-                                Spacer(Modifier.width(4.dp))
-                                Text("Completed", color = Color.White, fontSize = 10.sp, fontWeight = FontWeight.Bold)
-                            }
+                            Icon(Icons.Default.CheckCircle, null, tint = Color.White, modifier = Modifier.size(12.dp))
+                            Spacer(Modifier.width(3.dp))
+                            Text("Done", color = Color.White, fontSize = 9.sp, fontWeight = FontWeight.Bold)
                         }
                     }
                 }
             }
 
-            Column(modifier = Modifier.padding(16.dp)) {
+            // ── RIGHT: Content ─────────────────────────────────────────────
+            Column(modifier = Modifier.weight(1f).padding(14.dp)) {
+                // Top row: kind badge + score
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -228,8 +243,9 @@ private fun QBankBundleCard(
                         )
                     }
                 }
-                Spacer(Modifier.height(8.dp))
+                Spacer(Modifier.height(6.dp))
 
+                // Title
                 Text(
                     bundle.title,
                     color = theme.darkText,
@@ -238,6 +254,7 @@ private fun QBankBundleCard(
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis
                 )
+                // Description
                 if (!bundle.description.isNullOrBlank()) {
                     Spacer(Modifier.height(4.dp))
                     Text(
@@ -248,9 +265,9 @@ private fun QBankBundleCard(
                         overflow = TextOverflow.Ellipsis
                     )
                 }
-                Spacer(Modifier.height(12.dp))
+                Spacer(Modifier.height(10.dp))
 
-                // Stats row
+                // Stats row: set count + price
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Surface(color = Color(0xFF6A1B9A).copy(alpha = 0.12f), shape = RoundedCornerShape(6.dp)) {
                         Row(
@@ -259,7 +276,7 @@ private fun QBankBundleCard(
                         ) {
                             Icon(Icons.Default.Layers, null, tint = Color(0xFF6A1B9A), modifier = Modifier.size(12.dp))
                             Spacer(Modifier.width(4.dp))
-                            Text("$totalSets sets", color = Color(0xFF6A1B9A), fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                            Text("$totalSets sets combined", color = Color(0xFF6A1B9A), fontSize = 10.sp, fontWeight = FontWeight.Bold)
                         }
                     }
                     Spacer(Modifier.width(8.dp))

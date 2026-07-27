@@ -27,8 +27,9 @@ import kotlinx.coroutines.withTimeoutOrNull
  * BundlesScreen — lists all published packages of a given kind (qbank / batch).
  *
  * The student sees each package as a card with:
- *   • Cover image (or icon placeholder)
- *   • Title + description
+ *   • Cover image on the LEFT (140dp wide × full card height — so images are
+ *     clearly visible and not tiny)
+ *   • Title + description on the right
  *   • Set count
  *   • "View All Questions" button → opens the combined exam (extracts all
  *     questions from all sets in the package and combines them into ONE exam)
@@ -143,7 +144,7 @@ fun BundlesScreen(
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
             contentPadding = PaddingValues(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+            verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
             items(bundles) { bundle ->
                 BundleCardCombined(
@@ -190,19 +191,23 @@ private fun BundleCardCombined(
         color = theme.cardBg,
         shape = RoundedCornerShape(16.dp),
         modifier = Modifier.fillMaxWidth(),
-        shadowElevation = 2.dp
+        shadowElevation = 3.dp
     ) {
-        Column {
-            // Cover image
+        // Horizontal layout — image LEFT (large), content RIGHT
+        Row(modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min)) {
+            // ── LEFT: Cover image — wider so images are clearly visible ─────
             Box(
-                modifier = Modifier.fillMaxWidth().height(120.dp).background(theme.background),
+                modifier = Modifier
+                    .width(140.dp)
+                    .fillMaxHeight()
+                    .background(theme.background),
                 contentAlignment = Alignment.Center
             ) {
                 if (!bundle.coverUrl.isNullOrBlank()) {
                     val absUrl = if (bundle.coverUrl!!.startsWith("http")) bundle.coverUrl else "https://my-project-five-sepia.vercel.app${bundle.coverUrl}"
                     coil.compose.AsyncImage(
                         model = absUrl,
-                        contentDescription = null,
+                        contentDescription = bundle.title,
                         modifier = Modifier.fillMaxSize(),
                         contentScale = ContentScale.Crop
                     )
@@ -214,26 +219,28 @@ private fun BundleCardCombined(
                         modifier = Modifier.size(48.dp)
                     )
                 }
-                // Completed badge overlay
+                // Completed badge overlay (top-left of image)
                 if (isCompleted) {
                     Surface(
                         color = Color(0xFF22C55E),
                         shape = RoundedCornerShape(8.dp),
-                        modifier = Modifier.align(Alignment.TopEnd).padding(8.dp)
+                        modifier = Modifier.align(Alignment.TopStart).padding(6.dp)
                     ) {
                         Row(
-                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Icon(Icons.Default.CheckCircle, null, tint = Color.White, modifier = Modifier.size(14.dp))
-                            Spacer(Modifier.width(4.dp))
-                            Text("Completed", color = Color.White, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                            Icon(Icons.Default.CheckCircle, null, tint = Color.White, modifier = Modifier.size(12.dp))
+                            Spacer(Modifier.width(3.dp))
+                            Text("Done", color = Color.White, fontSize = 9.sp, fontWeight = FontWeight.Bold)
                         }
                     }
                 }
             }
 
-            Column(modifier = Modifier.padding(16.dp)) {
+            // ── RIGHT: Content ─────────────────────────────────────────────
+            Column(modifier = Modifier.weight(1f).padding(14.dp)) {
+                // Top row: kind badge + score
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -261,8 +268,9 @@ private fun BundleCardCombined(
                         Text("Free", color = theme.subText, fontSize = 10.sp)
                     }
                 }
-                Spacer(Modifier.height(8.dp))
+                Spacer(Modifier.height(6.dp))
 
+                // Title
                 Text(
                     bundle.title,
                     color = theme.darkText,
@@ -271,6 +279,7 @@ private fun BundleCardCombined(
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis
                 )
+                // Description
                 if (!bundle.description.isNullOrBlank()) {
                     Spacer(Modifier.height(4.dp))
                     Text(
@@ -281,9 +290,9 @@ private fun BundleCardCombined(
                         overflow = TextOverflow.Ellipsis
                     )
                 }
-                Spacer(Modifier.height(12.dp))
+                Spacer(Modifier.height(10.dp))
 
-                // Set count
+                // Stats row: set count
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Surface(color = Color(0xFF6A1B9A).copy(alpha = 0.12f), shape = RoundedCornerShape(6.dp)) {
                         Row(

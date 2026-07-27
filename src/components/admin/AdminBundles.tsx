@@ -32,7 +32,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import {
-  Package, Plus, Trash2, Search, X, CheckCircle2, Loader2, Layers,
+  Package, Plus, Trash2, Search, X, CheckCircle2, Loader2, Layers, AlertCircle,
 } from "lucide-react";
 import { toast } from "sonner";
 import { FastImageUpload } from "./FastImageUpload";
@@ -199,6 +199,18 @@ export function AdminBundles({ initialKind = "qbank" }: { initialKind?: Kind }) 
                     <Badge variant="outline">Free</Badge>
                   )}
                 </div>
+                {(b._count?.items ?? 0) === 0 && (
+                  <div className="mt-2 px-2 py-1.5 rounded-md bg-amber-50 border border-amber-200 text-amber-700 text-xs flex items-center gap-1.5">
+                    <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                    <span>Add tests to this package — students can't solve an empty package.</span>
+                  </div>
+                )}
+                {(b._count?.items ?? 0) === 0 && b.isPublished && (
+                  <div className="mt-1 px-2 py-1.5 rounded-md bg-rose-50 border border-rose-200 text-rose-700 text-xs flex items-center gap-1.5">
+                    <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                    <span>Published but empty — students will see "no questions" error.</span>
+                  </div>
+                )}
                 <div className="flex gap-2 pt-2 border-t" onClick={(e) => e.stopPropagation()}>
                   <Button
                     size="sm"
