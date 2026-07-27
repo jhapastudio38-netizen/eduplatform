@@ -1,7 +1,11 @@
 package app.dreamkorea.smartclass.ui
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
@@ -9,39 +13,78 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import app.dreamkorea.smartclass.api.TestItem
+import app.dreamkorea.smartclass.api.BundleSummary
+import app.dreamkorea.smartclass.api.CompletedTestInfo
 import app.dreamkorea.smartclass.data.AppState
 import kotlinx.coroutines.withTimeoutOrNull
 
 /**
- * Question Bank Screen — combines ALL questions from ALL published QBank tests
- * into ONE big exam. User taps "Start" and solves everything at once.
+ * Question Bank Screen — shows admin-created QBank bundles.
  *
- * This is NOT a list of tests. It's a single combined exam.
+ * Each QBank bundle is a curated set of tests (the admin can pick tests from
+ * ANY category: batch, exam, demo, chapter, etc.). The system extracts all
+ * questions from those tests and combines them into ONE big exam the student
+ * can solve.
+ *
+ * UI per bundle card:
+ *   • Cover image (or icon placeholder)
+ *   • Title + description
+ *   • "View All Questions" button → opens the combined exam
+ *   • "Completed" badge if the student has already submitted this combined exam
  */
 @Composable
-fun QuestionBankScreen(theme: AppTheme, sound: SoundManager, onBack: () -> Unit, onStartExam: (String) -> Unit, onOpenPackages: () -> Unit = {}) {
+fun QuestionBankScreen(
+    theme: AppTheme,
+    sound: SoundManager,
+    onBack: () -> Unit,
+    onStartExam: (String) -> Unit,
+    onOpenPackages: () -> Unit = {}
+) {
+    var bundles by remember { mutableStateOf<List<BundleSummary>>(emptyList()) }
+    var completedMap by remember { mutableStateOf<Map<String, CompletedTestInfo>>(emptyMap()) }
     var loading by remember { mutableStateOf(true) }
     var error by remember { mutableStateOf("") }
-    var questionCount by remember { mutableStateOf(0) }
-    var setCount by remember { mutableStateOf(0) }
+    var retryCount by remember { mutableStateOf(0) }
 
-    LaunchedEffect(Unit) {
+    LaunchedEffect(retryCount) {
         loading = true
         error = ""
         try {
-            // Fetch all QBank tests to show the count
-            AppState.invalidateCache(AppState.keyTests("question_bank"))
-            val tests = withTimeoutOrNull(20_000L) { AppState.getCachedTests("question_bank") }
-            if (tests != null) {
-                questionCount = tests.sumOf { it.questionCount }
-                setCount = tests.size
+            // Fetch QBank bundles (admin-created) — these contain tests the
+            // admin chose from any category. Each bundle becomes ONE combined
+            // exam on the student side.
+            val bundlesResult = withTimeoutOrNull(20_000L) {
+                AppState.cachedFresh("bundles_qbank") {
+                    AppState.api.getStudentBundles("qbank").bundles
+                }
             }
+
+            // Fetch completed tests to mark bundles as "Completed"
+            val completedResult = try {
+                withTimeoutOrNull(10_000L) { AppState.api.getCompletedTests() }
+            } catch (_: Exception) { null }
+
+            if (bundlesResult != null) {
+                bundles = bundlesResult
+                completedMap = completedResult?.completed ?: emptyMap()
+            } else {
+                error = "Could not load question bank. Check your connection."
+            }
+        } catch (e: retrofit2.HttpException) {
+            error = when (e.code()) {
+                401 -> "Your session has expired. Please log in again."
+                else -> "Could not load (HTTP ${e.code()})."
+            }
+        } catch (e: java.io.IOException) {
+            error = "No internet connection."
         } catch (e: Exception) {
             error = "Could not load question bank."
         } finally {
@@ -50,7 +93,7 @@ fun QuestionBankScreen(theme: AppTheme, sound: SoundManager, onBack: () -> Unit,
     }
 
     Column(modifier = Modifier.fillMaxSize().background(theme.background)) {
-        ScreenHeader(theme, sound, "Question Bank", "All questions combined", onBack)
+        ScreenHeader(theme, sound, "Question Bank", "Pick a set and start solving", onBack)
 
         if (loading) {
             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -69,12 +112,15 @@ fun QuestionBankScreen(theme: AppTheme, sound: SoundManager, onBack: () -> Unit,
                 Spacer(Modifier.height(12.dp))
                 Text(error, color = theme.subText, fontSize = 13.sp, textAlign = TextAlign.Center)
                 Spacer(Modifier.height(16.dp))
-                Button(onClick = onBack, colors = ButtonDefaults.buttonColors(containerColor = theme.primary)) { Text("Go back") }
+                Button(
+                    onClick = { sound.click(); retryCount++ },
+                    colors = ButtonDefaults.buttonColors(containerColor = theme.primary)
+                ) { Text("Retry") }
             }
             return
         }
 
-        if (questionCount == 0) {
+        if (bundles.isEmpty()) {
             Column(
                 Modifier.fillMaxSize().padding(32.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
@@ -82,68 +128,169 @@ fun QuestionBankScreen(theme: AppTheme, sound: SoundManager, onBack: () -> Unit,
             ) {
                 Icon(Icons.Default.Quiz, null, tint = theme.subText, modifier = Modifier.size(48.dp))
                 Spacer(Modifier.height(12.dp))
-                Text("No questions yet", color = theme.darkText, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
-                Text("Your teacher will add questions here soon.", color = theme.subText, fontSize = 13.sp, textAlign = TextAlign.Center)
+                Text("No question banks yet", color = theme.darkText, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+                Text("Your teacher will publish question banks here soon.", color = theme.subText, fontSize = 13.sp, textAlign = TextAlign.Center)
             }
             return
         }
 
-        // Show combined QBank info + Start button
-        Column(
-            modifier = Modifier.fillMaxSize().padding(24.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center
+        LazyColumn(
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            // Big icon
-            Surface(
-                color = theme.primary,
-                shape = RoundedCornerShape(20.dp),
-                modifier = Modifier.size(80.dp),
-                shadowElevation = 4.dp
-            ) {
-                Box(contentAlignment = Alignment.Center) {
-                    Icon(Icons.Default.Quiz, null, tint = Color.White, modifier = Modifier.size(40.dp))
-                }
+            items(bundles) { bundle ->
+                QBankBundleCard(
+                    theme = theme,
+                    sound = sound,
+                    bundle = bundle,
+                    isCompleted = completedMap.containsKey("bundle-${bundle.id}"),
+                    completedInfo = completedMap["bundle-${bundle.id}"],
+                    onStart = {
+                        sound.swoosh()
+                        onStartExam("bundle-${bundle.id}")
+                    }
+                )
             }
-            Spacer(Modifier.height(16.dp))
+        }
+    }
+}
 
-            Text("Question Bank", color = theme.darkText, fontSize = 22.sp, fontWeight = FontWeight.Bold)
-            Spacer(Modifier.height(8.dp))
-            Text("$questionCount questions from $setCount sets", color = theme.subText, fontSize = 14.sp)
-            Text("All combined into one exam", color = theme.subText, fontSize = 12.sp)
-            Spacer(Modifier.height(24.dp))
+@Composable
+private fun QBankBundleCard(
+    theme: AppTheme,
+    sound: SoundManager,
+    bundle: BundleSummary,
+    isCompleted: Boolean,
+    completedInfo: CompletedTestInfo?,
+    onStart: () -> Unit
+) {
+    val totalQuestions = bundle.items.sumOf { it.test.let { _ -> 0 } } // we don't have Q counts on summary, show set count instead
+    val totalSets = bundle.items.size
 
-            // Stats
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                Surface(color = theme.cardBg, shape = RoundedCornerShape(12.dp), shadowElevation = 2.dp) {
-                    Column(modifier = Modifier.padding(16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text("$questionCount", color = theme.primary, fontSize = 24.sp, fontWeight = FontWeight.Bold)
-                        Text("Questions", color = theme.subText, fontSize = 11.sp)
+    Surface(
+        color = theme.cardBg,
+        shape = RoundedCornerShape(16.dp),
+        modifier = Modifier.fillMaxWidth(),
+        shadowElevation = 2.dp
+    ) {
+        Column {
+            // Cover image
+            if (!bundle.coverUrl.isNullOrBlank()) {
+                val absUrl = if (bundle.coverUrl!!.startsWith("http")) bundle.coverUrl else "https://my-project-five-sepia.vercel.app${bundle.coverUrl}"
+                Box(
+                    modifier = Modifier.fillMaxWidth().height(120.dp).background(theme.background),
+                    contentAlignment = Alignment.Center
+                ) {
+                    coil.compose.AsyncImage(
+                        model = absUrl,
+                        contentDescription = null,
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Crop
+                    )
+                    // Completed badge overlay
+                    if (isCompleted) {
+                        Surface(
+                            color = Color(0xFF22C55E),
+                            shape = RoundedCornerShape(8.dp),
+                            modifier = Modifier.align(Alignment.TopEnd).padding(8.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(Icons.Default.CheckCircle, null, tint = Color.White, modifier = Modifier.size(14.dp))
+                                Spacer(Modifier.width(4.dp))
+                                Text("Completed", color = Color.White, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                            }
+                        }
                     }
                 }
-                Surface(color = theme.cardBg, shape = RoundedCornerShape(12.dp), shadowElevation = 2.dp) {
-                    Column(modifier = Modifier.padding(16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text("$setCount", color = theme.primary, fontSize = 24.sp, fontWeight = FontWeight.Bold)
-                        Text("Sets", color = theme.subText, fontSize = 11.sp)
+            }
+
+            Column(modifier = Modifier.padding(16.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Surface(color = theme.primary.copy(alpha = 0.12f), shape = RoundedCornerShape(6.dp)) {
+                        Text(
+                            "Question Bank",
+                            color = theme.primary,
+                            fontSize = 9.sp,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                        )
+                    }
+                    if (isCompleted && completedInfo?.score != null && completedInfo.maxScore != null) {
+                        Text(
+                            "Score: ${completedInfo.score}/${completedInfo.maxScore}",
+                            color = Color(0xFF22C55E),
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.SemiBold
+                        )
                     }
                 }
-            }
-            Spacer(Modifier.height(32.dp))
+                Spacer(Modifier.height(8.dp))
 
-            // Start button — opens the combined exam
-            Button(
-                onClick = {
-                    sound.swoosh()
-                    // Use special ID "qbank-combined" — ExamEntryScreen will fetch from /api/student/qbank-combined
-                    onStartExam("qbank-combined")
-                },
-                modifier = Modifier.fillMaxWidth(0.7f).height(50.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = theme.primary),
-                shape = RoundedCornerShape(12.dp)
-            ) {
-                Icon(Icons.Default.PlayArrow, null, tint = Color.White, modifier = Modifier.size(20.dp))
-                Spacer(Modifier.width(8.dp))
-                Text("Start Solving", color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                Text(
+                    bundle.title,
+                    color = theme.darkText,
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
+                )
+                if (!bundle.description.isNullOrBlank()) {
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        bundle.description!!,
+                        color = theme.subText,
+                        fontSize = 12.sp,
+                        maxLines = 3,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+                Spacer(Modifier.height(12.dp))
+
+                // Stats row
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Surface(color = Color(0xFF6A1B9A).copy(alpha = 0.12f), shape = RoundedCornerShape(6.dp)) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(Icons.Default.Layers, null, tint = Color(0xFF6A1B9A), modifier = Modifier.size(12.dp))
+                            Spacer(Modifier.width(4.dp))
+                            Text("$totalSets sets", color = Color(0xFF6A1B9A), fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                        }
+                    }
+                    Spacer(Modifier.width(8.dp))
+                    if (bundle.price > 0) {
+                        Text("₩${bundle.price}", color = theme.darkText, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                    } else {
+                        Text("Free", color = theme.subText, fontSize = 10.sp)
+                    }
+                }
+                Spacer(Modifier.height(12.dp))
+
+                // "View All Questions" button — opens the combined exam
+                Button(
+                    onClick = onStart,
+                    modifier = Modifier.fillMaxWidth().height(46.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = theme.primary),
+                    shape = RoundedCornerShape(10.dp)
+                ) {
+                    Icon(Icons.Default.PlayArrow, null, tint = Color.White, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        if (isCompleted) "Solve Again" else "View All Questions",
+                        color = Color.White,
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
             }
         }
     }

@@ -2,8 +2,14 @@
  * POST /api/admin/bundles/[bundleId]/items
  *   Body: { testId, sortOrder? }
  *
- * Adds a Test (any testCategory) to a QuestionBundle. The relation is unique
- * (bundleId+testId) so adding the same test twice is idempotent.
+ * Adds a Test to a QuestionBundle. Rules enforced by bundle kind:
+ *   • "batch"  — only tests with testCategory="batch" can be added
+ *   • "qbank"  — any test category can be added (admin chooses from anywhere)
+ *   • "exam"   — any test category can be added
+ *   • "chapter"— any test category can be added
+ *
+ * The relation is unique (bundleId+testId) so adding the same test twice is
+ * idempotent.
  */
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
@@ -21,11 +27,21 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ bundleId: 
 
   // Verify the bundle and the test both exist
   const [bundle, test] = await Promise.all([
-    db.questionBundle.findUnique({ where: { id: bundleId }, select: { id: true } }),
-    db.test.findUnique({ where: { id: testId }, select: { id: true, title: true } }),
+    db.questionBundle.findUnique({ where: { id: bundleId }, select: { id: true, kind: true } }),
+    db.test.findUnique({ where: { id: testId }, select: { id: true, title: true, testCategory: true } }),
   ]);
   if (!bundle) return NextResponse.json({ error: "Bundle not found" }, { status: 404 });
   if (!test) return NextResponse.json({ error: "Test not found" }, { status: 404 });
+
+  // Enforce category restriction for batch bundles
+  if (bundle.kind === "batch" && test.testCategory !== "batch") {
+    return NextResponse.json(
+      {
+        error: `Batch packages can only contain batch exams. This test is a "${test.testCategory || "exam"}" test.`,
+      },
+      { status: 400 },
+    );
+  }
 
   // Figure out the next sort order
   const maxOrder = await db.questionBundleItem.aggregate({

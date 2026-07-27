@@ -485,11 +485,15 @@ fun HomeScreen(theme: AppTheme, sound: SoundManager, userName: String, onNavigat
                                     "ubt_test" -> Screen.UbtTest
                                     "demo_exam" -> Screen.FreeExam
                                     "batch" -> Screen.Batch
+                                    "batch_packages" -> Screen.BundleList("batch")
+                                    "qbank_packages" -> Screen.QuestionBank
                                     "chapter_exam" -> Screen.TestList("chapter", "Chapter Exams")
                                     "results" -> Screen.Results
                                     else -> when (card.route) {
                                         "tests" -> Screen.Tests
                                         "results" -> Screen.Results
+                                        "batch" -> Screen.BundleList("batch")
+                                        "questionbank" -> Screen.QuestionBank
                                         else -> Screen.Tests
                                     }
                                 }
@@ -521,6 +525,8 @@ fun HomeScreen(theme: AppTheme, sound: SoundManager, userName: String, onNavigat
                                 val dest = when (card.key) {
                                     "all_books" -> Screen.Books
                                     "question_bank" -> Screen.QuestionBank
+                                    "qbank_packages" -> Screen.QuestionBank
+                                    "batch_packages" -> Screen.BundleList("batch")
                                     "eye_vision" -> Screen.EyeVision
                                     "join" -> Screen.Join
                                     "course_video" -> Screen.CourseVideo
