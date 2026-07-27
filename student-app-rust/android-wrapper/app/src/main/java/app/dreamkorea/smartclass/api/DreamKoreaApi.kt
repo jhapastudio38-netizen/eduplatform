@@ -91,6 +91,7 @@ data class QuestionDetail(
     val difficulty: String,
     val stem: String,
     val title: String? = null, // optional per-question title shown at top of question
+    val isFree: Boolean = false, // free questions show at top of QBank/Batch
     val options: List<String>?,
     // Legacy fields
     val imageUrl: String?,

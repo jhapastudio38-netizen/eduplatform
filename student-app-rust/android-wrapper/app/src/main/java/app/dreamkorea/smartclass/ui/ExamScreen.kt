@@ -334,13 +334,26 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
             }
         }
 
-        // ── 2. INSTRUCTION ROW ── question number + title/stem + divider
+        // ── 2. INSTRUCTION ROW ── question number + title/stem + FREE badge + divider
         Surface(modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text("${currentIdx + 1}. ", color = Color.Black, fontSize = 14.sp, fontWeight = FontWeight.Bold)
                 // Show title if present, otherwise show stem preview
                 val displayText = if (!q.title.isNullOrBlank()) q.title else q.stem.take(80)
-                Text(displayText, color = Color.Black, fontSize = 13.sp, fontWeight = FontWeight.Bold, maxLines = 2)
+                Text(displayText, color = Color.Black, fontSize = 13.sp, fontWeight = FontWeight.Bold, maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
+                // FREE badge for free/demo questions
+                if (q.isFree) {
+                    Spacer(Modifier.width(6.dp))
+                    Surface(color = Color(0xFF22C55E), shape = RoundedCornerShape(4.dp)) {
+                        Text(
+                            "FREE",
+                            color = Color.White,
+                            fontSize = 9.sp,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp),
+                        )
+                    }
+                }
                 Spacer(Modifier.weight(1f))
                 IconButton(onClick = { showGrid = true }, modifier = Modifier.size(28.dp)) {
                     Icon(Icons.Default.GridView, null, tint = Color.Black, modifier = Modifier.size(16.dp))
