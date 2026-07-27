@@ -1100,6 +1100,21 @@ fun ExamResultScreen(
 ) {
     LaunchedEffect(Unit) { sound.success() }
 
+    // ── MARKS CALCULATION ──────────────────────────────────────────────
+    // Each question = 2.5 marks. Total marks = questionCount × 2.5.
+    // Example: 40 questions = 100 marks total.
+    // The server returns score = number of correct answers, so we convert
+    // to marks by multiplying by 2.5.
+    val MARKS_PER_QUESTION = 2.5
+    val correctCount = result.review.count { it.isCorrect }
+    val incorrectCount = result.review.size - correctCount
+    val unansweredCount = result.review.count { it.userAnswer == null }
+    val totalQuestions = result.review.size
+    val totalMarks = totalQuestions * MARKS_PER_QUESTION
+    val obtainedMarks = correctCount * MARKS_PER_QUESTION
+    val pct = if (totalMarks > 0) (obtainedMarks / totalMarks * 100).toInt() else 0
+    val passed = pct >= 40
+
     // ── Animation states ──────────────────────────────────────────────────
     var showScore by remember { mutableStateOf(false) }
     var showStats by remember { mutableStateOf(false) }
@@ -1126,21 +1141,6 @@ fun ExamResultScreen(
         delay(400)
         showStats = true
     }
-
-    // ── MARKS CALCULATION ──────────────────────────────────────────────
-    // Each question = 2.5 marks. Total marks = questionCount × 2.5.
-    // Example: 40 questions = 100 marks total.
-    // The server returns score = number of correct answers, so we convert
-    // to marks by multiplying by 2.5.
-    val MARKS_PER_QUESTION = 2.5
-    val correctCount = result.review.count { it.isCorrect }
-    val incorrectCount = result.review.size - correctCount
-    val unansweredCount = result.review.count { it.userAnswer == null }
-    val totalQuestions = result.review.size
-    val totalMarks = totalQuestions * MARKS_PER_QUESTION
-    val obtainedMarks = correctCount * MARKS_PER_QUESTION
-    val pct = if (totalMarks > 0) (obtainedMarks / totalMarks * 100).toInt() else 0
-    val passed = pct >= 40
 
     LazyColumn(
         modifier = Modifier.fillMaxSize().background(theme.background).padding(16.dp),
