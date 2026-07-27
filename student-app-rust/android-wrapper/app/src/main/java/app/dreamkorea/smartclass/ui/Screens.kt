@@ -333,7 +333,7 @@ fun HomeScreen(theme: AppTheme, sound: SoundManager, userName: String, onNavigat
 
     // Real-time refresh: load on mount, and refresh every time the screen
     // becomes visible (e.g. when user navigates back from another screen).
-    val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
+    val lifecycleOwner = androidx.compose.ui.platform.LocalLifecycleOwner.current
     var refreshTrigger by remember { mutableStateOf(0) }
     LaunchedEffect(refreshTrigger) {
         if (homeCards.isNotEmpty()) loading = false
