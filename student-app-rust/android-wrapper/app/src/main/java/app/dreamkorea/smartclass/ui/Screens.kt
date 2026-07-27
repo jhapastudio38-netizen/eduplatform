@@ -73,6 +73,7 @@ sealed class Screen {
     object Join : Screen()
     object EyeVision : Screen()
     object Bundles : Screen()
+    data class BundleList(val kind: String) : Screen()
     data class Exam(val testId: String) : Screen()
     data class ExamEntry(val testId: String) : Screen()
     data class BookReader(val book: Book) : Screen()
@@ -171,8 +172,8 @@ fun MainScreen(userName: String, onLogout: () -> Unit) {
                         is Screen.Join -> JoinScreen(theme, sound, onBack = { navigateTo(Screen.Home) })
                         is Screen.EyeVision -> EyeVisionScreen(theme, sound, onBack = { navigateTo(Screen.Home) })
                         is Screen.Bundles -> BundlesScreen(theme, sound, onBack = { navigateTo(Screen.Home) }, onOpenBundle = { id, title -> screen = Screen.BundleDetail(id, title) }, onOpenTest = { screen = Screen.ExamEntry(it) })
-                        is Screen.BundleDetail -> BundleDetailScreen(theme, sound, bundleId = s.bundleId, bundleTitle = s.bundleTitle, onBack = { screen = Screen.Bundles }, onOpenTest = { screen = Screen.ExamEntry(it) })
-                    }
+                        is Screen.BundleList -> BundlesScreen(theme, sound, onBack = { navigateTo(Screen.Home) }, onOpenBundle = { id, title -> screen = Screen.BundleDetail(id, title) }, onOpenTest = { screen = Screen.ExamEntry(it) }, initialKind = s.kind)
+                        is Screen.BundleDetail -> BundleDetailScreen(theme, sound, bundleId = s.bundleId, bundleTitle = s.bundleTitle, onBack = { screen = Screen.Bundles }, onOpenTest = { screen = Screen.ExamEntry(it) })                    }
                 }
             }
 
@@ -337,9 +338,10 @@ fun HomeScreen(theme: AppTheme, sound: SoundManager, userName: String, onNavigat
         else listOf(
             HomeCard(key = "ubt_test", title = "UBT Test", section = "test", sortOrder = 0, route = "tests", imageUrl = ""),
             HomeCard(key = "demo_exam", title = "Demo Exam", section = "test", sortOrder = 1, route = "tests", imageUrl = ""),
-            HomeCard(key = "batch", title = "Batch Exam", section = "test", sortOrder = 2, route = "tests", imageUrl = ""),
-            HomeCard(key = "chapter_exam", title = "Chapter Exam", section = "test", sortOrder = 3, route = "tests", imageUrl = ""),
-            HomeCard(key = "results", title = "Results", section = "test", sortOrder = 4, route = "results", imageUrl = ""),
+            HomeCard(key = "qbank_packages", title = "Question Bank", section = "test", sortOrder = 2, route = "qbank_packages", imageUrl = ""),
+            HomeCard(key = "batch_packages", title = "Batch", section = "test", sortOrder = 3, route = "batch_packages", imageUrl = ""),
+            HomeCard(key = "chapter_exam", title = "Chapter Exam", section = "test", sortOrder = 4, route = "tests", imageUrl = ""),
+            HomeCard(key = "results", title = "Results", section = "test", sortOrder = 5, route = "results", imageUrl = ""),
             HomeCard(key = "all_books", title = "Books", section = "resources", sortOrder = 0, route = "books", imageUrl = ""),
             HomeCard(key = "question_bank", title = "Question Bank", section = "resources", sortOrder = 1, route = "questionbank", imageUrl = ""),
             HomeCard(key = "eye_vision", title = "Eye Vision", section = "resources", sortOrder = 2, route = "eyevision", imageUrl = ""),
@@ -514,6 +516,8 @@ fun HomeScreen(theme: AppTheme, sound: SoundManager, userName: String, onNavigat
                                     "audio_lessons" -> Screen.AudioLessons
                                     "recorded_video" -> Screen.RecordedVideo
                                     "packages" -> Screen.Bundles
+                                    "qbank_packages" -> Screen.BundleList("qbank")
+                                    "batch_packages" -> Screen.BundleList("batch")
                                     else -> when (card.route) {
                                         "books" -> Screen.Books
                                         "videos" -> Screen.Videos
@@ -522,6 +526,8 @@ fun HomeScreen(theme: AppTheme, sound: SoundManager, userName: String, onNavigat
                                         "eyevision" -> Screen.EyeVision
                                         "questionbank" -> Screen.QuestionBank
                                         "packages" -> Screen.Bundles
+                                        "qbank_packages" -> Screen.BundleList("qbank")
+                                        "batch_packages" -> Screen.BundleList("batch")
                                         "join" -> Screen.Join
                                         else -> Screen.Tests
                                     }

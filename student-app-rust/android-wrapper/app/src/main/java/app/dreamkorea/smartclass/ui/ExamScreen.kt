@@ -223,8 +223,14 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
 
     val currentQuestion = t.items.getOrNull(currentIdx)
 
-    // ─── Result screen ──────────────────────────────────────────────────────
+    // ─── Result screen — show in PORTRAIT (not landscape) ──────────────────
     if (submitResult != null) {
+        // Restore portrait for the result screen — user sees results vertically
+        DisposableEffect(Unit) {
+            val activity = context as? android.app.Activity
+            activity?.requestedOrientation = android.content.pm.ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+            onDispose { }
+        }
         ExamResultScreen(theme, submitResult!!, onExit, sound)
         return
     }
