@@ -37,6 +37,15 @@ export async function GET(req: NextRequest) {
     }
   }
 
+  // Sort: FREE questions first (so students can try before paying), then
+  // paid questions in their original order.
+  allItems.sort((a, b) => {
+    const aFree = (a.question?.isFree ? 1 : 0);
+    const bFree = (b.question?.isFree ? 1 : 0);
+    if (aFree !== bFree) return bFree - aFree; // free first
+    return 0; // preserve original order within same tier
+  });
+
   // Build a virtual test response (same shape as /api/student/tests/[testId])
   const combinedTest = {
     id: "qbank-combined",
@@ -59,6 +68,7 @@ export async function GET(req: NextRequest) {
         difficulty: item.question.difficulty,
         stem: item.question.stem,
         title: item.question.title || "",
+        isFree: item.question.isFree || false,
         options: item.question.options ? JSON.parse(item.question.options) : null,
         optionBlanks: item.question.optionBlanks ? JSON.parse(item.question.optionBlanks) : [],
         imageUrl: item.question.imageUrl || null,

@@ -95,6 +95,7 @@ interface QuestionData {
   blockNumber: number;
   setNumber?: number;
   title: string; // per-question title shown to students at top of question
+  isFree: boolean; // free (demo) questions show at the top of QBank/Batch
   stem: string;
   descType: "none" | "text" | "image" | "audio";
   descText: string;
@@ -119,6 +120,7 @@ function emptyQuestion(blockType: "text" | "audio", blockNumber: number): Questi
     blockNumber,
     setNumber: 1,
     title: "",
+    isFree: false,
     stem: "",
     descType: "none",
     descText: "",
@@ -914,6 +916,7 @@ function ExamEditor({ test, testCategory, onClose }: { test: Test; testCategory:
         blockNumber: q.blockNumber,
         setNumber: q.setNumber ?? activeSet,
         title: q.title || "",
+        isFree: q.isFree || false,
         stem: q.stem,
         descType: q.descType,
         descText: q.descText || "",
@@ -1042,6 +1045,7 @@ function ExamEditor({ test, testCategory, onClose }: { test: Test; testCategory:
           blockNumber: q.blockNumber,
           setNumber: q.setNumber ?? activeSet,
           title: q.title || "",
+          isFree: q.isFree || false,
           stem: q.stem,
           descType: q.descType,
           descText: q.descText || "",
@@ -1660,6 +1664,28 @@ function QuestionEditor({ question, onChange, blockLabel, isAudioBlock }: {
               className="text-base"
               maxLength={200}
             />
+          </div>
+
+          {/* Free / Paid toggle — free questions show at the top of QBank + Batch packages */}
+          <div className="flex items-center gap-3 p-3 rounded-lg border bg-slate-50">
+            <input
+              type="checkbox"
+              id="isFree"
+              checked={question.isFree || false}
+              onChange={(e) => onChange({ ...question, isFree: e.target.checked })}
+              className="w-5 h-5 rounded accent-emerald-600 cursor-pointer"
+            />
+            <div className="flex-1">
+              <Label htmlFor="isFree" className="text-sm font-semibold cursor-pointer flex items-center gap-2">
+                Free / Demo Question
+                {(question.isFree) && (
+                  <Badge className="bg-emerald-500 text-white text-[10px]">FREE</Badge>
+                )}
+              </Label>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Free questions appear at the TOP of Question Bank + Batch packages so students can try them before paying.
+              </p>
+            </div>
           </div>
 
           {/* Question text */}

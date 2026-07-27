@@ -185,6 +185,9 @@ model Question {
   difficulty  Difficulty @default(MEDIUM)
   title       String?    // per-question title (admin/teacher sets this; shown
                         // at the top of each question in the exam UI)
+  isFree      Boolean  @default(false) // free (demo) questions show at the top
+                        // of batch + QBank packages so students can try before
+                        // paying. Paid questions come after free ones.
   stem        String // question text (markdown)
   options     String? // JSON array for MCQ
   correctAnswer String? // JSON: string | string[] | {match: ...}

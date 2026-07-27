@@ -68,6 +68,15 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ bundleId: s
     }
   }
 
+  // Sort: FREE questions first (so students can try before paying), then
+  // paid questions in their original order.
+  allItems.sort((a, b) => {
+    const aFree = (a.item?.question?.isFree ? 1 : 0);
+    const bFree = (b.item?.question?.isFree ? 1 : 0);
+    if (aFree !== bFree) return bFree - aFree; // free first
+    return 0; // preserve original order within same tier
+  });
+
   // Build a virtual test response (same shape as /api/student/tests/[testId])
   const combinedTestId = `bundle-${bundle.id}`;
   const combinedTest = {
@@ -95,6 +104,7 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ bundleId: s
         difficulty: x.item.question.difficulty,
         stem: x.item.question.stem,
         title: x.item.question.title || "",
+        isFree: x.item.question.isFree || false,
         options: x.item.question.options ? JSON.parse(x.item.question.options) : null,
         optionBlanks: x.item.question.optionBlanks ? JSON.parse(x.item.question.optionBlanks) : [],
         imageUrl: x.item.question.imageUrl || null,
