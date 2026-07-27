@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
+import { FastImageUpload } from "./FastImageUpload";
 import {
   Dialog,
   DialogContent,
@@ -304,43 +305,16 @@ function CreateBookDialog({ open, onOpenChange, onCreated }: {
             />
           </div>
 
-          {/* Cover Image Upload */}
+          {/* Cover Image Upload — drag & drop with instant preview */}
           <div className="space-y-2">
             <Label className="text-sm font-semibold">Cover Image</Label>
-            {form.coverUrl ? (
-              <div className="relative w-40 h-52 rounded-lg overflow-hidden border">
-                <img src={form.coverUrl} alt="Cover" className="w-full h-full object-cover" />
-                <Button
-                  size="icon"
-                  variant="destructive"
-                  className="absolute top-1 right-1 h-7 w-7"
-                  onClick={() => setForm((f) => ({ ...f, coverUrl: "" }))}
-                >
-                  <X className="h-3 w-3" />
-                </Button>
-              </div>
-            ) : null}
-            <input
-              ref={coverRef}
-              type="file"
-              accept="image/*"
-              className="hidden"
-              onChange={pickCover}
+            <FastImageUpload
+              url={form.coverUrl}
+              onUpload={(url) => setForm((f) => ({ ...f, coverUrl: url }))}
+              onClear={() => setForm((f) => ({ ...f, coverUrl: "" }))}
+              folder="covers"
+              previewClassName="w-32 h-44"
             />
-            <Button
-              type="button"
-              variant="outline"
-              size="lg"
-              onClick={() => coverRef.current?.click()}
-              disabled={uploadingCover}
-            >
-              {uploadingCover ? (
-                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-              ) : (
-                <Upload className="w-4 h-4 mr-2" />
-              )}
-              {uploadingCover ? "Uploading…" : "📁 Upload Cover Image"}
-            </Button>
           </div>
 
           {/* PDF Upload */}

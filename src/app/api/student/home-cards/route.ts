@@ -1,9 +1,8 @@
 /**
  * GET /api/student/home-cards
- * Returns all active home cards for the student app, grouped by section.
- * Public (requires auth but any logged-in user can fetch).
+ * Returns all active home cards for the student app.
  */
-import { NextResponse } from "next/server";
+import { NextResponse, NextRequest } from "next/server";
 import { db } from "@/lib/db";
 import { getCurrentUser } from "@/lib/session";
 
@@ -16,12 +15,16 @@ export async function GET(req: NextRequest) {
     orderBy: [{ section: "asc" }, { sortOrder: "asc" }],
   });
 
-  // Group by section
-  const sections: Record<string, typeof cards> = {};
-  for (const c of cards) {
-    if (!sections[c.section]) sections[c.section] = [];
-    sections[c.section].push(c);
-  }
-
-  return NextResponse.json({ sections, cards });
+  return NextResponse.json({
+    cards: cards.map(c => ({
+      id: c.id,
+      key: c.key,
+      title: c.title,
+      section: c.section,
+      imageUrl: c.imageUrl || null,
+      sortOrder: c.sortOrder,
+      isActive: c.isActive,
+      route: c.route || null,
+    })),
+  });
 }

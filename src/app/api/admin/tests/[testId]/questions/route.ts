@@ -26,6 +26,7 @@ import { QuestionType as QType } from "@prisma/client";
 const questionSchema = z.object({
   blockType: z.enum(["text", "audio"]),
   blockNumber: z.number().int().min(1).max(100),
+  setNumber: z.number().int().min(1).max(100).optional().default(1),
   stem: z.string().min(1).max(2000),
   descType: z.enum(["none", "text", "image", "audio"]).default("none"),
   descText: z.string().optional().or(z.literal("")),
@@ -39,6 +40,7 @@ const questionSchema = z.object({
   options: z.array(z.string()).optional().default([]),
   optionImages: z.array(z.string()).optional().default([]),
   optionAudios: z.array(z.string()).optional().default([]),
+  optionBlanks: z.array(z.string()).optional().default([]),
   correctOption: z.number().int().min(0).max(3).default(0),
   explanation: z.string().optional().or(z.literal("")),
 });
@@ -60,6 +62,7 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ testId: str
       testItemId: i.id,
       blockType: i.question.blockType,
       blockNumber: i.question.blockNumber,
+      setNumber: i.question.setNumber ?? 1,
       stem: i.question.stem,
       descType: i.question.descType,
       descText: i.question.descText,
@@ -73,6 +76,7 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ testId: str
       options: i.question.options ? JSON.parse(i.question.options) : [],
       optionImages: i.question.optionImages ? JSON.parse(i.question.optionImages) : [],
       optionAudios: i.question.optionAudios ? JSON.parse(i.question.optionAudios) : [],
+      optionBlanks: i.question.optionBlanks ? JSON.parse(i.question.optionBlanks) : [],
       correctOption: i.question.correctOption,
       explanation: i.question.explanation,
       points: i.points,
@@ -142,6 +146,7 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ testId: st
           imageUrl: d.mediaType === "image" ? d.mediaImageUrl : null,
           audioUrl: d.mediaType === "audio" ? d.mediaAudioUrl : null,
           audioLoop: d.blockType === "audio" ? 1 : 0,
+          setNumber: d.setNumber,
           descType: d.descType,
           descText: d.descText || null,
           descImageUrl: d.descImageUrl || null,
@@ -153,6 +158,7 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ testId: st
           answerType: d.answerType,
           optionImages: d.optionImages.length > 0 ? JSON.stringify(d.optionImages) : null,
           optionAudios: d.optionAudios.length > 0 ? JSON.stringify(d.optionAudios) : null,
+          optionBlanks: d.optionBlanks.length > 0 ? JSON.stringify(d.optionBlanks) : null,
           correctOption: d.correctOption,
         },
       });
@@ -172,6 +178,7 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ testId: st
           audioLoopDelay: 0,
           blockType: d.blockType,
           blockNumber: d.blockNumber,
+          setNumber: d.setNumber,
           descType: d.descType,
           descText: d.descText || null,
           descImageUrl: d.descImageUrl || null,
@@ -183,6 +190,7 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ testId: st
           answerType: d.answerType,
           optionImages: d.optionImages.length > 0 ? JSON.stringify(d.optionImages) : null,
           optionAudios: d.optionAudios.length > 0 ? JSON.stringify(d.optionAudios) : null,
+          optionBlanks: d.optionBlanks.length > 0 ? JSON.stringify(d.optionBlanks) : null,
           correctOption: d.correctOption,
         },
       });
