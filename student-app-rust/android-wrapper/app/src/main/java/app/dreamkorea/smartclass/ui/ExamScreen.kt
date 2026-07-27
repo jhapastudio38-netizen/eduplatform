@@ -17,6 +17,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -819,4 +820,146 @@ fun ReviewCard(theme: AppTheme, review: ReviewItem) {
             }
         }
     }
+}
+fun AnswerInputBlock(
+    theme: AppTheme,
+    question: QuestionDetail,
+    userAnswer: Any?,
+    feedback: QuestionFeedback?,
+    sound: SoundManager,
+    onAnswer: (Any) -> Unit
+) {
+    val options = question.options ?: emptyList()
+    val optionImgs = question.optionImages
+    val optionAuds = question.optionAudios
+
+    when (question.answerType) {
+        "text", "choose" -> {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                options.forEachIndexed { i, opt ->
+                    val selected = userAnswer == opt
+                    val isCorrectFeedback = feedback?.let { i == question.correctOption }
+                    val isWrongSelected = feedback != null && selected && !feedback.isCorrect
+                    val bgColor = when {
+                        isCorrectFeedback == true -> Color(0xFFD4EDDA)
+                        isWrongSelected -> Color(0xFFFFCDD2)
+                        selected -> theme.primary.copy(alpha = 0.1f)
+                        else -> theme.cardBg
+                    }
+                    val borderColor = when {
+                        isCorrectFeedback == true -> Color(0xFF28A745)
+                        isWrongSelected -> theme.errorRed
+                        selected -> theme.primary
+                        else -> theme.divider
+                    }
+                    Surface(
+                        color = bgColor,
+                        shape = RoundedCornerShape(10.dp),
+                        border = androidx.compose.foundation.BorderStroke(1.5.dp, borderColor),
+                        modifier = Modifier.fillMaxWidth().clickable {
+                            if (feedback == null) { sound.click(); onAnswer(opt) }
+                        }
+                    ) {
+                        Row(modifier = Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Surface(color = if (selected) theme.primary else Color.Transparent, shape = RoundedCornerShape(50), modifier = Modifier.size(20.dp)) {
+                                if (selected) { Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) { Icon(Icons.Default.Check, null, tint = Color.White, modifier = Modifier.size(14.dp)) } }
+                            }
+                            Spacer(Modifier.width(12.dp))
+                            Text(opt, color = theme.darkText, fontSize = 15.sp, fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f))
+                        }
+                    }
+                }
+            }
+        }
+        "image" -> {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                optionImgs.forEachIndexed { i, imgUrl ->
+                    if (imgUrl.isBlank()) return@forEachIndexed
+                    val selected = userAnswer == imgUrl
+                    val isCorrectFeedback = feedback?.let { i == question.correctOption }
+                    val isWrongSelected = feedback != null && selected && !feedback.isCorrect
+                    val borderColor = when {
+                        isCorrectFeedback == true -> Color(0xFF28A745)
+                        isWrongSelected -> theme.errorRed
+                        selected -> theme.primary
+                        else -> theme.divider
+                    }
+                    Surface(
+                        color = if (selected) theme.primary.copy(alpha = 0.05f) else theme.cardBg,
+                        shape = RoundedCornerShape(12.dp),
+                        border = androidx.compose.foundation.BorderStroke(2.dp, borderColor),
+                        modifier = Modifier.fillMaxWidth().clickable {
+                            if (feedback == null) { sound.click(); onAnswer(imgUrl) }
+                        }
+                    ) {
+                        Row(modifier = Modifier.padding(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                            coil.compose.AsyncImage(
+                                model = imgUrl.toAbsoluteUrl(),
+                                contentDescription = null,
+                                modifier = Modifier.size(72.dp).clip(RoundedCornerShape(8.dp)),
+                                contentScale = ContentScale.Fit
+                            )
+                            Spacer(Modifier.width(12.dp))
+                            Text(question.options?.getOrNull(i) ?: "Option ${'A' + i}", color = theme.darkText, fontSize = 14.sp, fontWeight = FontWeight.Medium)
+                            Spacer(Modifier.weight(1f))
+                            if (selected) { Icon(Icons.Default.CheckCircle, null, tint = theme.primary, modifier = Modifier.size(20.dp)) }
+                        }
+                    }
+                }
+            }
+        }
+        "audio" -> {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                optionAuds.forEachIndexed { i, audUrl ->
+                    if (audUrl.isBlank()) return@forEachIndexed
+                    val selected = userAnswer == audUrl
+                    val isCorrectFeedback = feedback?.let { i == question.correctOption }
+                    val isWrongSelected = feedback != null && selected && !feedback.isCorrect
+                    val borderColor = when {
+                        isCorrectFeedback == true -> Color(0xFF28A745)
+                        isWrongSelected -> theme.errorRed
+                        selected -> theme.primary
+                        else -> theme.divider
+                    }
+                    Surface(
+                        color = if (selected) theme.primary.copy(alpha = 0.05f) else theme.cardBg,
+                        shape = RoundedCornerShape(10.dp),
+                        border = androidx.compose.foundation.BorderStroke(1.5.dp, borderColor),
+                        modifier = Modifier.fillMaxWidth().clickable {
+                            if (feedback == null) { sound.click(); onAnswer(audUrl) }
+                        }
+                    ) {
+                        Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Text(question.options?.getOrNull(i) ?: "Audio ${'A' + i}", color = theme.darkText, fontSize = 14.sp, fontWeight = FontWeight.Medium)
+                            Spacer(Modifier.weight(1f))
+                            if (selected) { Icon(Icons.Default.CheckCircle, null, tint = theme.primary, modifier = Modifier.size(20.dp)) }
+                        }
+                    }
+                }
+            }
+        }
+        else -> {
+            // Fallback: text options
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                options.forEachIndexed { i, opt ->
+                    val selected = userAnswer == opt
+                    Surface(
+                        color = if (selected) theme.primary.copy(alpha = 0.1f) else theme.cardBg,
+                        shape = RoundedCornerShape(10.dp),
+                        border = androidx.compose.foundation.BorderStroke(1.5.dp, if (selected) theme.primary else theme.divider),
+                        modifier = Modifier.fillMaxWidth().clickable { if (feedback == null) { sound.click(); onAnswer(opt) } }
+                    ) {
+                        Row(modifier = Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Text(opt, color = theme.darkText, fontSize = 15.sp, fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f))
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+fun String.toAbsoluteUrl(): String {
+    if (this.startsWith("http://") || this.startsWith("https://")) return this
+    return "https://my-project-five-sepia.vercel.app" + (if (this.startsWith("/")) this else "/$this")
 }
