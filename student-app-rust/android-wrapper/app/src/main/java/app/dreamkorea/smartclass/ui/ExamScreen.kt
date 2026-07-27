@@ -574,71 +574,90 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
             )
 
             if (isLandscape) {
-                // ── LANDSCAPE LAYOUT ── Submit bar | Grids | Sidebar ──────────
+                // ── LANDSCAPE LAYOUT ── Grids (with Submit at end) | Sidebar ──
                 Row(modifier = Modifier.fillMaxSize()) {
-                    // LEFT: Vertical Submit bar
-                    if (answeredCount > 0) {
-                        Box(
-                            modifier = Modifier
-                                .width(50.dp)
-                                .fillMaxHeight()
-                                .background(Color(0xFF003478))
-                                .clickable {
-                                    if (!submitting) {
-                                        sound.swoosh()
-                                        submitting = true
-                                        scope.launch {
-                                            try {
-                                                submitResult = if (t.id == "qbank-combined" || t.id.startsWith("bundle-")) {
-                                                    submitCombinedExamWithFallback(t, answers.toMap())
-                                                } else {
-                                                    AppState.api.submitTest(t.id, SubmitRequest(answers.toMap()))
-                                                }
-                                                sound.success()
-                                            } catch (e: Exception) {
-                                                error = "Submit failed: ${e.message ?: "unknown error"}"
-                                            }
-                                            submitting = false
-                                        }
-                                    }
-                                },
-                            contentAlignment = Alignment.Center
-                        ) {
-                            if (submitting) {
-                                CircularProgressIndicator(color = Color.White, modifier = Modifier.size(24.dp), strokeWidth = 3.dp)
-                            } else {
-                                Text(
-                                    "Submit and Finish Exam",
-                                    color = Color.White,
-                                    fontSize = 14.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    modifier = Modifier.rotate(-90f),
-                                )
-                            }
-                        }
-                    }
-
-                    // CENTER: Reading (LEFT) + Listening (RIGHT) — side by side, both fit on one screen
-                    Row(
-                        modifier = Modifier.weight(1f).fillMaxHeight().padding(4.dp),
-                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    // CENTER: Reading (LEFT) + Listening (RIGHT) + Submit at the bottom
+                    Column(
+                        modifier = Modifier.weight(1f).fillMaxHeight().padding(4.dp).verticalScroll(rememberScrollState()),
+                        verticalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
-                        // Reading grid (LEFT)
-                        if (readingList.isNotEmpty()) {
-                            Column(modifier = Modifier.weight(1f).fillMaxHeight().verticalScroll(rememberScrollState())) {
-                                Text("Reading", color = Color(0xFF003478), fontSize = 12.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(bottom = 2.dp))
-                                QuestionGridSection(t, readingList, answers, currentIdx, tabFilter, sound) { idx ->
-                                    currentIdx = idx; showGrid = false
+                        Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                            // Reading grid (LEFT)
+                            if (readingList.isNotEmpty()) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text("Reading", color = Color(0xFF003478), fontSize = 12.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(bottom = 2.dp))
+                                    QuestionGridSection(t, readingList, answers, currentIdx, tabFilter, sound) { idx ->
+                                        currentIdx = idx; showGrid = false
+                                    }
+                                }
+                            }
+                            // Listening grid (RIGHT)
+                            if (listeningList.isNotEmpty()) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text("Listening", color = Color(0xFFEF6C00), fontSize = 12.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(bottom = 2.dp))
+                                    QuestionGridSection(t, listeningList, answers, currentIdx, tabFilter, sound) { idx ->
+                                        currentIdx = idx; showGrid = false
+                                    }
                                 }
                             }
                         }
-                        // Listening grid (RIGHT)
-                        if (listeningList.isNotEmpty()) {
-                            Column(modifier = Modifier.weight(1f).fillMaxHeight().verticalScroll(rememberScrollState())) {
-                                Text("Listening", color = Color(0xFFEF6C00), fontSize = 12.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(bottom = 2.dp))
-                                QuestionGridSection(t, listeningList, answers, currentIdx, tabFilter, sound) { idx ->
-                                    currentIdx = idx; showGrid = false
+
+                        // ── SUBMIT BUTTON ── at the END of the question grid, after all blocks
+                        // Only shows if user has answered at least 1 question
+                        if (answeredCount > 0) {
+                            Spacer(Modifier.height(8.dp))
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(56.dp)
+                                    .background(Color(0xFF003478))
+                                    .clickable {
+                                        if (!submitting) {
+                                            sound.swoosh()
+                                            submitting = true
+                                            scope.launch {
+                                                try {
+                                                    submitResult = if (t.id == "qbank-combined" || t.id.startsWith("bundle-")) {
+                                                        submitCombinedExamWithFallback(t, answers.toMap())
+                                                    } else {
+                                                        AppState.api.submitTest(t.id, SubmitRequest(answers.toMap()))
+                                                    }
+                                                    sound.success()
+                                                } catch (e: Exception) {
+                                                    error = "Submit failed: ${e.message ?: "unknown error"}"
+                                                }
+                                                submitting = false
+                                            }
+                                        }
+                                    },
+                                contentAlignment = Alignment.Center
+                            ) {
+                                if (submitting) {
+                                    CircularProgressIndicator(color = Color.White, modifier = Modifier.size(24.dp), strokeWidth = 3.dp)
+                                } else {
+                                    Text(
+                                        "Submit and Finish Exam ($answeredCount answered)",
+                                        color = Color.White,
+                                        fontSize = 16.sp,
+                                        fontWeight = FontWeight.Bold,
+                                    )
                                 }
+                            }
+                        } else {
+                            // No questions answered — show hint
+                            Spacer(Modifier.height(8.dp))
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(48.dp)
+                                    .border(2.dp, Color(0xFFCCCCCC)),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    "Tap a question number above to start answering",
+                                    color = Color.Gray,
+                                    fontSize = 13.sp,
+                                )
                             }
                         }
                     }
@@ -739,16 +758,15 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
                             currentIdx = idx; showGrid = false
                         } }
                     }
-                    // Submit + Exit
+                    // Submit button at the END of the grid — full width, prominent
                     item {
-                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        if (answeredCount > 0) {
                             Box(
-                                modifier = Modifier.weight(1f).height(48.dp).border(2.dp, Color.Black).background(Color.White).clickable { sound.click(); onExit() },
-                                contentAlignment = Alignment.Center
-                            ) { Text("Exit", color = Color.Black, fontSize = 14.sp, fontWeight = FontWeight.Bold) }
-                            if (answeredCount > 0) {
-                                Box(
-                                    modifier = Modifier.weight(2f).height(48.dp).background(Color(0xFF003478)).clickable {
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(56.dp)
+                                    .background(Color(0xFF003478))
+                                    .clickable {
                                         if (!submitting) {
                                             sound.swoosh(); submitting = true
                                             scope.launch {
@@ -760,13 +778,26 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
                                             }
                                         }
                                     },
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    if (submitting) { CircularProgressIndicator(color = Color.White, modifier = Modifier.size(20.dp), strokeWidth = 3.dp) }
-                                    else { Text("Submit ($answeredCount)", color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Bold) }
-                                }
+                                contentAlignment = Alignment.Center
+                            ) {
+                                if (submitting) { CircularProgressIndicator(color = Color.White, modifier = Modifier.size(24.dp), strokeWidth = 3.dp) }
+                                else { Text("Submit and Finish Exam ($answeredCount answered)", color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Bold) }
+                            }
+                        } else {
+                            Box(
+                                modifier = Modifier.fillMaxWidth().height(48.dp).border(2.dp, Color(0xFFCCCCCC)),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text("Tap a question number above to start answering", color = Color.Gray, fontSize = 13.sp)
                             }
                         }
+                    }
+                    // Exit button
+                    item {
+                        Box(
+                            modifier = Modifier.fillMaxWidth().height(44.dp).border(2.dp, Color.Black).background(Color.White).clickable { sound.click(); onExit() },
+                            contentAlignment = Alignment.Center
+                        ) { Text("Exit", color = Color.Black, fontSize = 14.sp, fontWeight = FontWeight.Bold) }
                     }
                 }
             }
