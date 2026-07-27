@@ -37,51 +37,49 @@ jobs:
       - name: Rename APK with version
         run: |
           mv student-app-rust/android-wrapper/app/build/outputs/apk/debug/app-debug.apk \
-             student-app-rust/android-wrapper/app/build/outputs/apk/debug/dreamkorea-v4.1.0-debug.apk
+             student-app-rust/android-wrapper/app/build/outputs/apk/debug/dreamkorea-v4.3.0-debug.apk
       # Upload as a GitHub Release asset — Releases storage is UNLIMITED for
-      # public repos and doesn't count against the Actions artifact quota
-      # (which we've already hit).
+      # public repos and doesn't count against the Actions artifact quota.
       - name: Create or update release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v4.1.0-${{ github.run_number }}
-          name: DreamKorea v4.1.0 (Build ${{ github.run_number }})
+          tag_name: v4.3.0-${{ github.run_number }}
+          name: DreamKorea v4.3.0 (Build ${{ github.run_number }})
           body: |
-            ## What's fixed in v4.1.0
+            ## What's new in v4.3.0
 
-            ### Real-time data
-            - App now fetches fresh data on every screen open (Books, Exams, QBank,
-              Packages) — no more 2-minute stale cache. Books published in admin
-              appear in the app immediately on next screen open.
-            - Cache TTL reduced from 2 min to 30 sec, and screens invalidate cache
-              before loading so admin changes show up instantly.
+            ### Bundle-combined exams (QBank + Batch packages)
+            - Admin can now create a Question Bank bundle and pick tests from
+              ANY category (batch, exam, demo, chapter, etc.). The system
+              extracts all questions from those tests and combines them into
+              ONE combined exam the student solves like a normal exam.
+            - Admin can create a Batch bundle that ONLY accepts batch-category
+              tests. Same combined-exam flow.
+            - Student opens Question Bank or Batch Packages from home → sees
+              bundle cards with title + description + "View All Questions"
+              button → opens the combined exam.
+            - Tapping "View All Questions" loads the combined exam in the
+              standard exam-taking screen (landscape mode, status bar,
+              Nepali nav, etc.).
 
-            ### Login
-            - Sign Up tab: name + email + phone + password (NO OTP step).
-              Password is set immediately on signup, no second OTP screen.
-            - Sign In tab: email + password.
-            - Forgot Password tab: enter email → get 6-digit code → reset password.
+            ### Completed exam tracking
+            - After the student submits any exam (including combined exams),
+              it's marked as completed.
+            - The bundle card shows a green "Completed" badge with the score
+              once the student has submitted.
+            - The "View All Questions" button changes to "Solve Again" if
+              completed, so the student can re-attempt.
 
-            ### Duplicate button (admin)
-            - Every exam/demo/batch/chapter/qbank card has a "Duplicate" button
-              (was "Copy"). Click it → opens a proper dialog with:
-                • Editable new title (default "{Original} (Copy)")
-                • Target category dropdown (exam/demo/batch/chapter/qbank)
-                • Optional package dropdown — duplicated test auto-added to the
-                  selected package
-              Questions, blocks, audio settings, and all other content stay the same.
-
-            ### Copy All / Paste All (admin)
-            - New "Copy All" button in the exam editor — copies ALL questions
-              in the current test into a single bulk code (DK-ALL-XXXX-YYYY).
-            - Paste button now detects single vs. bulk codes automatically:
-                • Single code (DK-TEXT-1-XXXX) → pastes one question
-                • Bulk code (DK-ALL-XXXX-YYYY) → pastes ALL questions with new
-                  block numbers so they append without overwriting
-            - Codes are stored in localStorage and can be shared between tests.
+            ### Bug fixes
+            - Submitting a combined exam (qbank-combined or bundle-{id}) no
+              longer fails with a 500 error. The submit endpoint now handles
+              synthetic test IDs by looking up questions directly.
+            - A virtual Test row is created on first combined-exam submission
+              to satisfy the Submission.testId FK constraint.
+            - SubmitResponse now includes a `completed: Boolean` flag.
 
             SHA: ${{ github.sha }}
           files: |
-            student-app-rust/android-wrapper/app/build/outputs/apk/debug/dreamkorea-v4.1.0-debug.apk
+            student-app-rust/android-wrapper/app/build/outputs/apk/debug/dreamkorea-v4.3.0-debug.apk
           draft: false
           prerelease: false
