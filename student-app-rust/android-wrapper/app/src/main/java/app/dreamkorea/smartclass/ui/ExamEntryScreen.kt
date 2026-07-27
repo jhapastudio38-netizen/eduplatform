@@ -65,15 +65,33 @@ fun ExamEntryScreen(theme: AppTheme, sound: SoundManager, testId: String, onStar
     LaunchedEffect(testId) {
         loading = true
         try {
-            val result = withTimeoutOrNull(20_000L) {
+            val result = withTimeoutOrNull(30_000L) {
                 when {
                     // Combined QBank exam — fetches ALL published question_bank tests as one test
-                    testId == "qbank-combined" -> AppState.api.getQBankCombined().test
+                    testId == "qbank-combined" -> {
+                        try {
+                            AppState.api.getQBankCombined().test
+                        } catch (e: retrofit2.HttpException) {
+                            if (e.code() == 404) {
+                                // Fallback: server doesn't have /qbank-combined yet —
+                                // build the combined exam client-side from individual tests
+                                buildQBankCombinedClientSide()
+                            } else throw e
+                        }
+                    }
                     // Combined bundle exam — fetches ALL tests in a specific bundle (qbank/batch)
                     // as one combined exam
                     testId.startsWith("bundle-") -> {
                         val bundleId = testId.removePrefix("bundle-")
-                        AppState.api.getBundleCombined(bundleId).test
+                        try {
+                            AppState.api.getBundleCombined(bundleId).test
+                        } catch (e: retrofit2.HttpException) {
+                            if (e.code() == 404) {
+                                // Fallback: server doesn't have /bundles/[id]/combined yet —
+                                // build the combined exam client-side from individual tests
+                                buildBundleCombinedClientSide(bundleId)
+                            } else throw e
+                        }
                     }
                     // Normal test — fetch by ID
                     else -> AppState.api.getTestDetail(testId).test
@@ -283,4 +301,98 @@ private fun StatChip(value: String, label: String, modifier: Modifier = Modifier
             Text(label, color = Color.Gray, fontSize = 9.sp)
         }
     }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// CLIENT-SIDE FALLBACK — build a combined exam from individual test details
+// when the server's /bundles/[id]/combined endpoint isn't deployed yet.
+// ═══════════════════════════════════════════════════════════════════════════
+
+/**
+ * Fetches all published question_bank tests, then fetches each test's full
+ * detail, and combines all items into ONE TestDetail. Used as a fallback
+ * when /api/student/qbank-combined returns 404 (server not yet deployed).
+ */
+private suspend fun buildQBankCombinedClientSide(): TestDetail {
+    val tests = AppState.api.getTests(category = "question_bank").tests
+    return combineTestsClientSide(
+        testId = "qbank-combined",
+        title = "Question Bank — All Questions",
+        description = "${tests.size} sets combined",
+        testIds = tests.map { it.id },
+        durationMin = tests.sumOf { it.durationMin }.coerceAtLeast(60),
+    )
+}
+
+/**
+ * Fetches the bundle list, finds the bundle by ID, then fetches each test's
+ * full detail, and combines all items into ONE TestDetail. Used as a
+ * fallback when /api/student/bundles/[id]/combined returns 404.
+ */
+private suspend fun buildBundleCombinedClientSide(bundleId: String): TestDetail {
+    val bundles = AppState.api.getStudentBundles().bundles
+    val bundle = bundles.find { it.id == bundleId }
+        ?: throw retrofit2.HttpException(
+            retrofit2.Response.error<Any>(404, okhttp3.ResponseBody.create(null, "Bundle not found"))
+        )
+    val testIds = bundle.items.map { it.test.id }
+    return combineTestsClientSide(
+        testId = "bundle-$bundleId",
+        title = bundle.title,
+        description = bundle.description ?: "${testIds.size} sets combined",
+        testIds = testIds,
+        durationMin = bundle.items.sumOf { it.test.durationMin }.coerceAtLeast(60),
+    )
+}
+
+/**
+ * Helper — fetches each test detail and combines all items into ONE
+ * TestDetail. Each item keeps its real question ID so the submit endpoint
+ * can grade it correctly.
+ */
+private suspend fun combineTestsClientSide(
+    testId: String,
+    title: String,
+    description: String,
+    testIds: List<String>,
+    durationMin: Int,
+): TestDetail {
+    val allItems = mutableListOf<TestItemDetail>()
+    var textCount = 0
+    var audioCount = 0
+    var order = 1
+
+    for (tid in testIds) {
+        try {
+            val detail = AppState.api.getTestDetail(tid).test
+            for (item in detail.items) {
+                allItems.add(
+                    TestItemDetail(
+                        id = "${testId}-item-${order}",
+                        order = order,
+                        points = item.points,
+                        question = item.question,
+                    )
+                )
+                if (item.question.blockType == "text") textCount++ else audioCount++
+                order++
+            }
+        } catch (_: Exception) {
+            // Skip tests that fail to load — don't break the whole combined exam
+        }
+    }
+
+    return TestDetail(
+        id = testId,
+        title = title,
+        description = description,
+        durationMin = durationMin,
+        isExam = false,
+        passScore = 0,
+        textBlockCount = textCount,
+        audioBlockCount = audioCount,
+        textBlockEnabled = true,
+        audioBlockEnabled = true,
+        items = allItems,
+    )
 }

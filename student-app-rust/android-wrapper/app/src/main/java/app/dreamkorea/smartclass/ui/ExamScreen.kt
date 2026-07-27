@@ -95,15 +95,27 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
         loading = true
         error = ""
         try {
-            // 20-second timeout — if the API hangs, show a timeout error
-            val result = withTimeoutOrNull(20_000L) {
+            // 30-second timeout — combined exams may need multiple requests
+            val result = withTimeoutOrNull(30_000L) {
                 when {
                     // Combined QBank exam — fetches ALL published question_bank tests as one test
-                    testId == "qbank-combined" -> AppState.api.getQBankCombined().test
+                    testId == "qbank-combined" -> {
+                        try {
+                            AppState.api.getQBankCombined().test
+                        } catch (e: retrofit2.HttpException) {
+                            if (e.code() == 404) buildQBankCombinedClientSide()
+                            else throw e
+                        }
+                    }
                     // Combined bundle exam — fetches ALL tests in a specific bundle (qbank/batch)
                     testId.startsWith("bundle-") -> {
                         val bundleId = testId.removePrefix("bundle-")
-                        AppState.api.getBundleCombined(bundleId).test
+                        try {
+                            AppState.api.getBundleCombined(bundleId).test
+                        } catch (e: retrofit2.HttpException) {
+                            if (e.code() == 404) buildBundleCombinedClientSide(bundleId)
+                            else throw e
+                        }
                     }
                     // Normal test — fetch by ID
                     else -> AppState.api.getTestDetail(testId).test
@@ -152,7 +164,12 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
                 submitting = true
                 sound.swoosh()
                 try {
-                    submitResult = AppState.api.submitTest(currentTest.id, SubmitRequest(answers.toMap()))
+                    // Use fallback for combined exams (qbank-combined / bundle-{id})
+                    submitResult = if (currentTest.id == "qbank-combined" || currentTest.id.startsWith("bundle-")) {
+                        submitCombinedExamWithFallback(currentTest, answers.toMap())
+                    } else {
+                        AppState.api.submitTest(currentTest.id, SubmitRequest(answers.toMap()))
+                    }
                     sound.success()
                 } catch (e: java.net.UnknownHostException) {
                     error = "No internet connection. Could not submit your answers."
@@ -439,7 +456,7 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
                 // Next (अर्को) or Submit
                 Box(modifier = Modifier.weight(1f).fillMaxHeight().clickable {
                     if (currentIdx < t.items.size - 1) { currentIdx++; sound.click() }
-                    else { sound.swoosh(); submitting = true; scope.launch { try { submitResult = AppState.api.submitTest(t.id, SubmitRequest(answers.toMap())); sound.success() } catch (e: Exception) { error = "Submit failed." }; submitting = false } }
+                    else { sound.swoosh(); submitting = true; scope.launch { try { submitResult = if (t.id == "qbank-combined" || t.id.startsWith("bundle-")) submitCombinedExamWithFallback(t, answers.toMap()) else AppState.api.submitTest(t.id, SubmitRequest(answers.toMap())); sound.success() } catch (e: Exception) { error = "Submit failed." }; submitting = false } }
                 }, contentAlignment = Alignment.Center) {
                     if (submitting) { CircularProgressIndicator(color = Color.Black, modifier = Modifier.size(18.dp), strokeWidth = 2.dp) }
                     else if (currentIdx < t.items.size - 1) { Text("अर्को (Next)", color = Color.Black, fontSize = 13.sp, fontWeight = FontWeight.Medium) }
@@ -483,7 +500,7 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
                     // Submit button
                     Spacer(Modifier.height(8.dp))
                     Button(
-                        onClick = { showGrid = false; sound.swoosh(); submitting = true; scope.launch { try { submitResult = AppState.api.submitTest(t.id, SubmitRequest(answers.toMap())); sound.success() } catch (e: Exception) { error = "Submit failed." }; submitting = false } },
+                        onClick = { showGrid = false; sound.swoosh(); submitting = true; scope.launch { try { submitResult = if (t.id == "qbank-combined" || t.id.startsWith("bundle-")) submitCombinedExamWithFallback(t, answers.toMap()) else AppState.api.submitTest(t.id, SubmitRequest(answers.toMap())); sound.success() } catch (e: Exception) { error = "Submit failed." }; submitting = false } },
                         modifier = Modifier.fillMaxWidth().height(40.dp), colors = ButtonDefaults.buttonColors(containerColor = theme.primary), shape = RoundedCornerShape(8.dp)
                     ) { Text("Submit and Finish", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold) }
                 }
@@ -990,4 +1007,127 @@ fun AnswerInputBlock(
 fun String.toAbsoluteUrl(): String {
     if (this.startsWith("http://") || this.startsWith("https://")) return this
     return "https://my-project-five-sepia.vercel.app" + (if (this.startsWith("/")) this else "/$this")
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// CLIENT-SIDE SUBMIT FALLBACK — when the server's submit endpoint doesn't
+// know how to handle combined exam IDs (qbank-combined / bundle-{id}), we
+// grade the exam locally using the question data we already have loaded.
+// ═══════════════════════════════════════════════════════════════════════════
+
+/**
+ * Grades a combined exam client-side. Used as a fallback when
+ * /api/student/tests/[testId]/submit returns 404 for combined exam IDs.
+ *
+ * Grades SINGLE_CHOICE, TRUE_FALSE, ONE_WORD, FILL_BLANK, MULTIPLE_CHOICE.
+ * Subjective types (SHORT_ANSWER, LONG_ANSWER, MATCHING) are marked as
+ * incorrect (the student would need a teacher to review them).
+ */
+private fun gradeCombinedExamClientSide(
+    test: TestDetail,
+    answers: Map<String, Any>,
+): SubmitResponse {
+    var score = 0
+    val review = mutableListOf<ReviewItem>()
+
+    for (item in test.items) {
+        val q = item.question
+        val ans = answers[q.id]
+        var isCorrect = false
+
+        when (q.type) {
+            "SINGLE_CHOICE", "TRUE_FALSE", "ONE_WORD", "FILL_BLANK" -> {
+                val correctIdx = q.correctOption
+                val correctAns = q.options?.getOrNull(correctIdx)
+                    ?: q.options?.getOrNull(0)
+                    ?: ""
+                if (ans is String && correctAns.isNotEmpty() &&
+                    ans.trim().equals(correctAns.trim(), ignoreCase = true)) {
+                    isCorrect = true
+                    score++
+                }
+            }
+            "MULTIPLE_CHOICE" -> {
+                // For multiple choice, compare selected indices
+                val correctIdx = q.correctOption
+                if (ans is String && ans.toIntOrNull() == correctIdx) {
+                    isCorrect = true
+                    score++
+                }
+            }
+        }
+
+        review.add(
+            ReviewItem(
+                questionId = q.id,
+                stem = q.stem,
+                type = q.type,
+                options = q.options,
+                imageUrl = q.imageUrl,
+                audioUrl = q.audioUrl,
+                audioLoop = q.audioLoop,
+                audioLoopDelay = q.audioLoopDelay,
+                userAnswer = ans,
+                correctAnswer = q.options?.getOrNull(q.correctOption),
+                explanation = q.explanation,
+                isCorrect = isCorrect,
+            )
+        )
+    }
+
+    val maxScore = test.items.size
+    val pct = if (maxScore > 0) (score.toDouble() / maxScore) * 100 else 0.0
+
+    // Eye vision recommendation — same logic as server
+    val eyeVision = if (maxScore > 0) {
+        val mistakesPct = 100 - pct
+        when {
+            mistakesPct > 30 -> {
+                val count = if (mistakesPct >= 70) 5 else if (mistakesPct >= 50) 4 else 3
+                EyeVisionRecommendation(
+                    show = true,
+                    count = count,
+                    reason = "You made ${Math.round(mistakesPct)}% mistakes. Let's check your eye vision with $count quick tests.",
+                )
+            }
+            mistakesPct >= 15 -> {
+                EyeVisionRecommendation(
+                    show = true,
+                    count = 2,
+                    reason = "You made ${Math.round(mistakesPct)}% mistakes. A quick eye vision check is recommended.",
+                )
+            }
+            else -> EyeVisionRecommendation()
+        }
+    } else EyeVisionRecommendation()
+
+    return SubmitResponse(
+        score = score,
+        maxScore = maxScore,
+        graded = true,
+        submissionId = "client-graded-${System.currentTimeMillis()}",
+        review = review,
+        eyeVision = eyeVision,
+        completed = true,
+    )
+}
+
+/**
+ * Submits a combined exam with fallback: tries the server first, and if the
+ * server returns 404 (endpoint not deployed for combined IDs), grades the
+ * exam client-side instead.
+ */
+private suspend fun submitCombinedExamWithFallback(
+    test: TestDetail,
+    answers: Map<String, Any>,
+): SubmitResponse {
+    return try {
+        AppState.api.submitTest(test.id, SubmitRequest(answers))
+    } catch (e: retrofit2.HttpException) {
+        if (e.code() == 404 || e.code() == 500) {
+            // Server doesn't know how to handle this combined exam ID —
+            // grade it client-side as a fallback
+            gradeCombinedExamClientSide(test, answers)
+        } else throw e
+    }
 }
