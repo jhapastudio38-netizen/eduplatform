@@ -23,6 +23,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
@@ -68,14 +69,12 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
     // Timer
     var timeLeft by remember { mutableStateOf(0) }
 
-    // ── PROGRAMMATIC ORIENTATION LOCK ──────────────────────────────────────
-    // Force the exam screen to landscape the moment it mounts. Restored to
-    // the user's preferred orientation on exit. This guarantees the exam
-    // layout (60/40 split, status bar, Nepali nav) renders correctly without
-    // the user having to manually rotate the device.
+    // ── ORIENTATION ── allow the exam screen to rotate freely with the phone
+    // (FULL_SENSOR = both portrait and landscape, following the device sensor).
+    // Restored to the user's preferred orientation on exit.
     DisposableEffect(Unit) {
         val activity = context as? Activity
-        activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
+        activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_FULL_SENSOR
         onDispose {
             activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
         }
@@ -521,150 +520,50 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
         }
     }
 
-    // ── QUESTION GRID PAGE ── flat B&W block picker. Shown FIRST when the exam
-    // starts (showGrid starts true). Student picks a question number → answers
-    // it → returns to grid → picks next → taps Submit when done.
-    //
-    // Design spec:
-    //   • Top bar: solid black, thin
-    //   • Main frame: white with 3px black border
-    //   • 8-column grid of square boxes with 3px black borders, no rounded corners
-    //   • Numbers 1-80: rightmost column = 1-10 (top→bottom), next = 11-20, etc.
-    //   • Answered = black fill / white text; not answered = white fill / black text
-    //   • No icons, no labels, no decorative elements — just question numbers
-    //   • Scrollable if more boxes than fit on screen
-    //   • Submit button only shows if user has answered at least 1 question
+    // ── QUESTION GRID PAGE ── matches reference design. Shown FIRST when the
+    // exam starts. Layout (landscape):
+    //   • LEFT: vertical blue "Submit and Finish Exam" bar
+    //   • CENTER: watermark logo (faint) + two grids (Reading 1-20, Listening 21-40)
+    //     each grid = 4 columns, column-major (1-5 down col 1, 6-10 down col 2, ...)
+    //   • RIGHT: sidebar with exam title, All/Solved/Unsolved tabs, timer
+    // Portrait: same layout but stacked vertically.
     if (showGrid) {
-        Column(
+        val configuration = androidx.compose.ui.platform.LocalConfiguration.current
+        val isLandscape = configuration.screenWidthDp > configuration.screenHeightDp
+        val totalQ = t.items.size
+        // Split questions into Reading (text block) and Listening (audio block)
+        val readingItems = t.items.filter { it.question.blockType != "audio" }
+        val listeningItems = t.items.filter { it.question.blockType == "audio" }
+        // If no block type info, just split in half
+        val readingList = if (readingItems.isNotEmpty()) readingItems else t.items.take((totalQ + 1) / 2)
+        val listeningList = if (listeningItems.isNotEmpty()) listeningItems else t.items.drop((totalQ + 1) / 2)
+
+        // Tab filter state
+        var tabFilter by remember { mutableStateOf(0) } // 0=All, 1=Solved, 2=Unsolved
+
+        Box(
             modifier = Modifier
                 .fillMaxSize()
                 .background(Color.White)
         ) {
-            // ── TOP BAR ── solid black, thin, with question count ──────────
-            Surface(
-                color = Color.Black,
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        "${t.items.size} Questions",
-                        color = Color.White,
-                        fontSize = 13.sp,
-                        fontWeight = FontWeight.Bold,
-                    )
-                    Text(
-                        "$answeredCount answered",
-                        color = Color.White,
-                        fontSize = 12.sp,
-                    )
-                }
-            }
+            // ── Watermark logo at center (faint) ────────────────────────────
+            Image(
+                painter = painterResource(id = app.dreamkorea.smartclass.R.drawable.dreamkorea_logo),
+                contentDescription = null,
+                modifier = Modifier.align(Alignment.Center).size(200.dp).alpha(0.06f),
+                contentScale = ContentScale.Fit
+            )
 
-            // ── MAIN FRAME ── white with 3px black border, contains the grid ──
-            // NO padding around the grid — boxes fill edge-to-edge with no space.
-            Box(
-                modifier = Modifier
-                    .weight(1f)
-                    .fillMaxWidth()
-                    .border(3.dp, Color.Black)
-            ) {
-                if (t.items.isEmpty()) {
-                    Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
-                        Text("No questions in this exam", color = Color.Black, fontSize = 14.sp)
-                    }
-                } else {
-                    // Grid — 8 columns, NO spacing between boxes (edge-to-edge).
-                    // Numbers go right-to-left column-wise:
-                    //   rightmost col = 1-10 (top→bottom), next = 11-20, ..., leftmost = highest
-                    // So question index for cell (row, col) = (cols-1-col) * rowsCount + row
-                    // Empty cells (when totalQ < 80) are placed on the LEFT so the
-                    // filled boxes start from the RIGHT with no space.
-                    val totalQ = t.items.size
-                    val cols = 8
-                    val rowsCount = (totalQ + cols - 1) / cols // ceiling division
-
-                    LazyColumn(
-                        modifier = Modifier.fillMaxSize(),
-                        verticalArrangement = Arrangement.spacedBy(0.dp)
-                    ) {
-                        items(rowsCount) { rowIdx ->
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(0.dp)
-                            ) {
-                                for (colIdx in 0 until cols) {
-                                    // Question index for this cell — rightmost col = lowest numbers
-                                    val qIdx = (cols - 1 - colIdx) * rowsCount + rowIdx
-                                    if (qIdx < totalQ) {
-                                        val isAnswered = answers.containsKey(t.items[qIdx].question.id)
-                                        val isCurrent = qIdx == currentIdx
-                                        val isHighlighted = isAnswered || isCurrent
-                                        Box(
-                                            modifier = Modifier
-                                                .weight(1f)
-                                                .aspectRatio(0.72f) // matches spec 73×102px
-                                                .border(3.dp, Color.Black)
-                                                .background(if (isHighlighted) Color.Black else Color.White)
-                                                .clickable {
-                                                    sound.click()
-                                                    currentIdx = qIdx
-                                                    showGrid = false
-                                                },
-                                            contentAlignment = Alignment.Center
-                                        ) {
-                                            Text(
-                                                "${qIdx + 1}",
-                                                color = if (isHighlighted) Color.White else Color.Black,
-                                                fontSize = 18.sp,
-                                                fontWeight = FontWeight.Normal,
-                                            )
-                                        }
-                                    } else {
-                                        // Empty cell — INVISIBLE (no border, no background) so the
-                                        // filled boxes on the right have no gap on their left.
-                                        Spacer(modifier = Modifier.weight(1f).aspectRatio(0.72f))
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-
-            // ── BOTTOM BAR ── Exit + Submit (Submit only if ≥1 answered) ────
-            Surface(
-                color = Color.White,
-                border = androidx.compose.foundation.BorderStroke(3.dp, Color.Black),
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth().padding(12.dp),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    // Exit button — always shown
-                    Box(
-                        modifier = Modifier
-                            .weight(1f)
-                            .height(48.dp)
-                            .border(3.dp, Color.Black)
-                            .background(Color.White)
-                            .clickable { sound.click(); onExit() },
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text("Exit", color = Color.Black, fontSize = 14.sp, fontWeight = FontWeight.Bold)
-                    }
-                    // Submit button — only shown if user has answered at least 1 question
+            if (isLandscape) {
+                // ── LANDSCAPE LAYOUT ── Submit bar | Grids | Sidebar ──────────
+                Row(modifier = Modifier.fillMaxSize()) {
+                    // LEFT: Vertical Submit bar
                     if (answeredCount > 0) {
                         Box(
                             modifier = Modifier
-                                .weight(2f)
-                                .height(48.dp)
-                                .border(3.dp, Color.Black)
-                                .background(Color.Black)
+                                .width(50.dp)
+                                .fillMaxHeight()
+                                .background(Color(0xFF003478))
                                 .clickable {
                                     if (!submitting) {
                                         sound.swoosh()
@@ -687,38 +586,263 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
                             contentAlignment = Alignment.Center
                         ) {
                             if (submitting) {
-                                CircularProgressIndicator(color = Color.White, modifier = Modifier.size(20.dp), strokeWidth = 3.dp)
+                                CircularProgressIndicator(color = Color.White, modifier = Modifier.size(24.dp), strokeWidth = 3.dp)
                             } else {
                                 Text(
-                                    "Submit ($answeredCount)",
+                                    "Submit and Finish Exam",
                                     color = Color.White,
                                     fontSize = 14.sp,
                                     fontWeight = FontWeight.Bold,
+                                    modifier = Modifier.rotate(-90f),
                                 )
                             }
                         }
-                    } else {
-                        // No questions answered yet — show a hint instead of Submit
+                    }
+
+                    // CENTER: Grids (Reading + Listening) — scrollable
+                    LazyColumn(
+                        modifier = Modifier.weight(1f).fillMaxHeight().padding(8.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        // Reading grid
+                        if (readingList.isNotEmpty()) {
+                            item {
+                                Text("Reading", color = Color.Black, fontSize = 14.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(bottom = 4.dp))
+                            }
+                            item { QuestionGridSection(t, readingList, answers, currentIdx, tabFilter, sound) { idx ->
+                                currentIdx = idx; showGrid = false
+                            } }
+                        }
+                        // Listening grid
+                        if (listeningList.isNotEmpty()) {
+                            item {
+                                Spacer(Modifier.height(8.dp))
+                                Text("Listening", color = Color.Black, fontSize = 14.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(bottom = 4.dp))
+                            }
+                            item { QuestionGridSection(t, listeningList, answers, currentIdx, tabFilter, sound) { idx ->
+                                currentIdx = idx; showGrid = false
+                            } }
+                        }
+                    }
+
+                    // RIGHT: Sidebar
+                    Column(
+                        modifier = Modifier
+                            .width(140.dp)
+                            .fillMaxHeight()
+                            .padding(8.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        // Exam title
+                        Text(
+                            t.title.take(30),
+                            color = Color.Black,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                        // Student name
+                        Text(
+                            AppState.getUserName(),
+                            color = Color.Gray,
+                            fontSize = 10.sp,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                        Spacer(Modifier.height(4.dp))
+                        // Timer
+                        val mm = timeLeft / 60; val ss = timeLeft % 60
+                        Text(
+                            String.format("%02d:%02d", mm, ss),
+                            color = Color(0xFF003478),
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.Bold,
+                        )
+                        Spacer(Modifier.height(4.dp))
+                        // Tabs: All / Solved / Unsolved
+                        TabButton("All", tabFilter == 0) { tabFilter = 0 }
+                        TabButton("Solved", tabFilter == 1) { tabFilter = 1 }
+                        TabButton("Unsolved", tabFilter == 2) { tabFilter = 2 }
+                        Spacer(Modifier.height(4.dp))
+                        Text("$answeredCount / $totalQ", color = Color.Black, fontSize = 11.sp, fontWeight = FontWeight.Medium)
+                        // Exit button at bottom
+                        Spacer(Modifier.weight(1f))
                         Box(
                             modifier = Modifier
-                                .weight(2f)
-                                .height(48.dp)
-                                .border(3.dp, Color.Black)
-                                .background(Color.White),
+                                .fillMaxWidth()
+                                .height(40.dp)
+                                .border(2.dp, Color.Black)
+                                .background(Color.White)
+                                .clickable { sound.click(); onExit() },
                             contentAlignment = Alignment.Center
                         ) {
-                            Text(
-                                "Tap a number to start",
-                                color = Color.Black,
-                                fontSize = 13.sp,
-                                fontWeight = FontWeight.Normal,
-                            )
+                            Text("Exit", color = Color.Black, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                        }
+                    }
+                }
+            } else {
+                // ── PORTRAIT LAYOUT ── grids on top, sidebar below ───────────
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize().padding(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    // Top bar with title + timer
+                    item {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(t.title.take(25), color = Color.Black, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                            val mm = timeLeft / 60; val ss = timeLeft % 60
+                            Text(String.format("%02d:%02d", mm, ss), color = Color(0xFF003478), fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                        }
+                    }
+                    // Tabs
+                    item {
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            TabButton("All", tabFilter == 0) { tabFilter = 0 }
+                            TabButton("Solved", tabFilter == 1) { tabFilter = 1 }
+                            TabButton("Unsolved", tabFilter == 2) { tabFilter = 2 }
+                        }
+                    }
+                    // Reading grid
+                    if (readingList.isNotEmpty()) {
+                        item { Text("Reading", color = Color.Black, fontSize = 14.sp, fontWeight = FontWeight.Bold) }
+                        item { QuestionGridSection(t, readingList, answers, currentIdx, tabFilter, sound) { idx ->
+                            currentIdx = idx; showGrid = false
+                        } }
+                    }
+                    // Listening grid
+                    if (listeningList.isNotEmpty()) {
+                        item { Text("Listening", color = Color.Black, fontSize = 14.sp, fontWeight = FontWeight.Bold) }
+                        item { QuestionGridSection(t, listeningList, answers, currentIdx, tabFilter, sound) { idx ->
+                            currentIdx = idx; showGrid = false
+                        } }
+                    }
+                    // Submit + Exit
+                    item {
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Box(
+                                modifier = Modifier.weight(1f).height(48.dp).border(2.dp, Color.Black).background(Color.White).clickable { sound.click(); onExit() },
+                                contentAlignment = Alignment.Center
+                            ) { Text("Exit", color = Color.Black, fontSize = 14.sp, fontWeight = FontWeight.Bold) }
+                            if (answeredCount > 0) {
+                                Box(
+                                    modifier = Modifier.weight(2f).height(48.dp).background(Color(0xFF003478)).clickable {
+                                        if (!submitting) {
+                                            sound.swoosh(); submitting = true
+                                            scope.launch {
+                                                try {
+                                                    submitResult = if (t.id == "qbank-combined" || t.id.startsWith("bundle-")) submitCombinedExamWithFallback(t, answers.toMap()) else AppState.api.submitTest(t.id, SubmitRequest(answers.toMap()))
+                                                    sound.success()
+                                                } catch (e: Exception) { error = "Submit failed: ${e.message ?: "unknown error"}" }
+                                                submitting = false
+                                            }
+                                        }
+                                    },
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    if (submitting) { CircularProgressIndicator(color = Color.White, modifier = Modifier.size(20.dp), strokeWidth = 3.dp) }
+                                    else { Text("Submit ($answeredCount)", color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Bold) }
+                                }
+                            }
                         }
                     }
                 }
             }
         }
         return
+    }
+}
+
+/// Renders a 4-column grid of square question boxes with column-major
+/// numbering (1-5 down col 1, 6-10 down col 2, ...). Applies the tab filter
+/// (All / Solved / Unsolved) and highlights answered/current questions.
+@Composable
+private fun QuestionGridSection(
+    test: TestDetail,
+    items: List<TestItemDetail>,
+    answers: SnapshotStateMap<String, Any>,
+    currentIdx: Int,
+    tabFilter: Int,
+    sound: SoundManager,
+    onPick: (Int) -> Unit,
+) {
+    val globalIndices = items.mapNotNull { item -> test.items.indexOfFirst { it.question.id == item.question.id }.takeIf { it >= 0 } }
+    val cols = 4
+    val rowsCount = (items.size + cols - 1) / cols
+
+    Surface(
+        color = Color.White,
+        border = androidx.compose.foundation.BorderStroke(2.dp, Color.Black),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Column(modifier = Modifier.padding(4.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            for (rowIdx in 0 until rowsCount) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(2.dp)
+                ) {
+                    for (colIdx in 0 until cols) {
+                        val localIdx = colIdx * rowsCount + rowIdx
+                        if (localIdx < items.size) {
+                            val globalIdx = globalIndices[localIdx]
+                            val isAnswered = answers.containsKey(items[localIdx].question.id)
+                            val isCurrent = globalIdx == currentIdx
+                            val visible = when (tabFilter) {
+                                1 -> isAnswered
+                                2 -> !isAnswered
+                                else -> true
+                            }
+                            if (visible) {
+                                Box(
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .aspectRatio(1f)
+                                        .border(2.dp, Color.Black)
+                                        .background(if (isAnswered) Color.Black else Color.White)
+                                        .clickable { sound.click(); onPick(globalIdx) },
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        "${globalIdx + 1}",
+                                        color = if (isAnswered) Color.White else Color.Black,
+                                        fontSize = 14.sp,
+                                        fontWeight = FontWeight.Normal,
+                                    )
+                                }
+                            } else {
+                                Spacer(modifier = Modifier.weight(1f).aspectRatio(1f))
+                            }
+                        } else {
+                            Spacer(modifier = Modifier.weight(1f).aspectRatio(1f))
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun TabButton(label: String, selected: Boolean, onClick: () -> Unit) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(32.dp)
+            .border(1.5.dp, Color.Black)
+            .background(if (selected) Color(0xFF003478) else Color.White)
+            .clickable { onClick() },
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            label,
+            color = if (selected) Color.White else Color.Black,
+            fontSize = 11.sp,
+            fontWeight = FontWeight.Bold,
+        )
     }
 }
 
