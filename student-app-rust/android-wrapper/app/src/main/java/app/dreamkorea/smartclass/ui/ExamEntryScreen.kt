@@ -194,9 +194,9 @@ fun ExamEntryScreen(theme: AppTheme, sound: SoundManager, testId: String, onStar
             modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            StatChip("${t.durationMin} min", "Time")
-            StatChip("${t.items.size}", "Questions")
-            StatChip("${t.passScore}%", "Pass")
+            StatChip("${t.durationMin} min", "Time", Modifier.weight(1f))
+            StatChip("${t.items.size}", "Questions", Modifier.weight(1f))
+            StatChip("${t.passScore}%", "Pass", Modifier.weight(1f))
         }
 
         Spacer(Modifier.height(20.dp))
@@ -229,12 +229,12 @@ fun ExamEntryScreen(theme: AppTheme, sound: SoundManager, testId: String, onStar
 }
 
 @Composable
-private fun StatChip(value: String, label: String) {
+private fun StatChip(value: String, label: String, modifier: Modifier = Modifier) {
     Surface(
         color = Color.White,
         border = BorderStroke(1.dp, Color(0xFFCCCCCC)),
         shape = RoundedCornerShape(6.dp),
-        modifier = Modifier.weight(1f)
+        modifier = modifier
     ) {
         Column(
             modifier = Modifier.padding(vertical = 6.dp, horizontal = 8.dp),
