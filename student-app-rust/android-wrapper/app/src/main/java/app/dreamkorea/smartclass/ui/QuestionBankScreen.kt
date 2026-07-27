@@ -44,7 +44,7 @@ import kotlinx.coroutines.withTimeoutOrNull
  *  with testCategory="question_bank".
  */
 @Composable
-fun QuestionBankScreen(theme: AppTheme, sound: SoundManager, onBack: () -> Unit, onStartExam: (String) -> Unit) {
+fun QuestionBankScreen(theme: AppTheme, sound: SoundManager, onBack: () -> Unit, onStartExam: (String) -> Unit, onOpenPackages: () -> Unit = {}) {
     var tests by remember { mutableStateOf<List<TestItem>>(emptyList()) }
     var loading by remember { mutableStateOf(true) }
     var error by remember { mutableStateOf("") }
