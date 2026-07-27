@@ -859,13 +859,19 @@ private fun LegendItem(color: Color, label: String) {
 }
 
 // ─── Audio player with loop support ───────────────────────────────────────────
+// loopCount = total number of times to play the audio:
+//   0 or 1 = plays once
+//   2 = plays twice
+//   N = plays N times
+//  -1 = infinite loop
 @Composable
 fun AudioPlayerCard(theme: AppTheme, url: String, loopCount: Int, loopDelaySec: Int, sound: SoundManager) {
     val context = LocalContext.current
     var mediaPlayer by remember { mutableStateOf<android.media.MediaPlayer?>(null) }
     var isPlaying by remember { mutableStateOf(false) }
     var playCount by remember { mutableStateOf(0) }
-    val totalPlays = if (loopCount == -1) "∞" else (loopCount + 1).toString()
+    // Total plays = loopCount (clamped to at least 1). -1 = infinite.
+    val totalPlays = if (loopCount == -1) "∞" else loopCount.coerceAtLeast(1).toString()
     val scope = rememberCoroutineScope()
 
     DisposableEffect(url) {
@@ -888,8 +894,8 @@ fun AudioPlayerCard(theme: AppTheme, url: String, loopCount: Int, loopDelaySec: 
                     Text("Audio question", color = theme.darkText, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
                     Text(
                         if (loopCount == -1) "Loops continuously"
-                        else if (loopCount == 0) "Plays once"
-                        else "Plays ${loopCount + 1} times • ${loopDelaySec}s delay",
+                        else if (loopCount <= 1) "Plays once"
+                        else "Plays $loopCount times" + if (loopDelaySec > 0) " • ${loopDelaySec}s delay" else "",
                         color = theme.subText, fontSize = 11.sp
                     )
                 }
@@ -899,9 +905,9 @@ fun AudioPlayerCard(theme: AppTheme, url: String, loopCount: Int, loopDelaySec: 
                         mediaPlayer?.pause()
                         isPlaying = false
                     } else {
-                        // Play with looping
                         try {
                             mediaPlayer?.release()
+                            val maxPlays = loopCount.coerceAtLeast(1)
                             val mp = android.media.MediaPlayer().apply {
                                 setDataSource(url)
                                 setOnPreparedListener {
@@ -910,11 +916,10 @@ fun AudioPlayerCard(theme: AppTheme, url: String, loopCount: Int, loopDelaySec: 
                                     playCount = 1
                                 }
                                 setOnCompletionListener {
-                                    if (loopCount == -1 || playCount < loopCount + 1) {
-                                        // Schedule next play (with delay if set)
+                                    if (loopCount == -1 || playCount < maxPlays) {
                                         scope.launch {
                                             if (loopDelaySec > 0) delay(loopDelaySec * 1000L)
-                                            if (loopCount == -1 || playCount < loopCount + 1) {
+                                            if (loopCount == -1 || playCount < maxPlays) {
                                                 playCount++
                                                 start()
                                             } else {
@@ -945,7 +950,7 @@ fun AudioPlayerCard(theme: AppTheme, url: String, loopCount: Int, loopDelaySec: 
                     )
                 }
             }
-            if (loopCount > 0 || loopCount == -1) {
+            if (loopCount > 1 || loopCount == -1) {
                 Spacer(Modifier.height(6.dp))
                 Text("Play $playCount / $totalPlays", color = theme.subText, fontSize = 10.sp)
             }
