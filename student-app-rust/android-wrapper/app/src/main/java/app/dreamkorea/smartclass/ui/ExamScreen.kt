@@ -488,10 +488,11 @@ private fun ExamAnswerScreen(
                 Spacer(Modifier.height(6.dp))
                 // Media images — scale to FIT (not crop), so nothing gets cut
                 if (q.descType == "image" && !q.descImageUrl.isNullOrBlank()) {
+                    val descUrl = q.descImageUrl!!.toAbsoluteUrl()
                     coil.compose.AsyncImage(
-                        model = q.descImageUrl!!.toAbsoluteUrl(),
+                        model = descUrl,
                         contentDescription = null,
-                        modifier = Modifier.fillMaxWidth(0.9f).heightIn(max = 120.dp).clip(RoundedCornerShape(6.dp)),
+                        modifier = Modifier.fillMaxWidth(0.9f).heightIn(max = 120.dp).clip(RoundedCornerShape(6.dp)).clickable { FullScreenImageViewer.show(descUrl) },
                         contentScale = ContentScale.Fit
                     )
                 }
@@ -500,7 +501,7 @@ private fun ExamAnswerScreen(
                     coil.compose.AsyncImage(
                         model = mediaImgUrl,
                         contentDescription = null,
-                        modifier = Modifier.fillMaxWidth(0.9f).heightIn(max = 140.dp).clip(RoundedCornerShape(6.dp)),
+                        modifier = Modifier.fillMaxWidth(0.9f).heightIn(max = 140.dp).clip(RoundedCornerShape(6.dp)).clickable { FullScreenImageViewer.show(mediaImgUrl) },
                         contentScale = ContentScale.Fit
                     )
                 }
@@ -513,43 +514,93 @@ private fun ExamAnswerScreen(
             // Vertical divider
             Box(modifier = Modifier.width(2.dp).fillMaxHeight().background(Color.Black))
 
-            // RIGHT: Answer panel (40%)
+            // RIGHT: Answer panel (40%) — handles text, image, and audio options
             Column(
                 modifier = Modifier.weight(0.4f).fillMaxHeight().padding(6.dp),
                 verticalArrangement = Arrangement.Center
             ) {
-                // 4 answer options with number circles
-                (0 until minOf(4, options.size)).forEach { i ->
-                    val isSelected = answers[q.id] == options.getOrNull(i)
-                    Row(
-                        modifier = Modifier.fillMaxWidth().padding(vertical = 3.dp).clickable { sound.click(); onAnswer(q.id, options.getOrNull(i) ?: "") },
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        // Number circle
-                        Surface(
-                            color = if (isSelected) theme.primary else Color.White,
-                            border = androidx.compose.foundation.BorderStroke(2.dp, Color.Black),
-                            shape = androidx.compose.foundation.shape.CircleShape,
-                            modifier = Modifier.size(28.dp)
-                        ) {
-                            Box(contentAlignment = Alignment.Center) {
-                                Text("${i + 1}", color = if (isSelected) Color.White else Color.Black, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                when (q.answerType) {
+                    "text", "choose" -> {
+                        // Text options with number circles
+                        (0 until minOf(4, options.size)).forEach { i ->
+                            val isSelected = answers[q.id] == options.getOrNull(i)
+                            Row(
+                                modifier = Modifier.fillMaxWidth().padding(vertical = 3.dp).clickable { sound.click(); onAnswer(q.id, options.getOrNull(i) ?: "") },
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Surface(
+                                    color = if (isSelected) theme.primary else Color.White,
+                                    border = androidx.compose.foundation.BorderStroke(2.dp, Color.Black),
+                                    shape = androidx.compose.foundation.shape.CircleShape,
+                                    modifier = Modifier.size(28.dp)
+                                ) {
+                                    Box(contentAlignment = Alignment.Center) {
+                                        Text("${i + 1}", color = if (isSelected) Color.White else Color.Black, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                    }
+                                }
+                                Spacer(Modifier.width(6.dp))
+                                Text(options.getOrNull(i) ?: "", color = Color.Black, fontSize = 11.sp, modifier = Modifier.weight(1f))
                             }
                         }
-                        Spacer(Modifier.width(6.dp))
-                        // Answer text
-                        Text(options.getOrNull(i) ?: "", color = Color.Black, fontSize = 11.sp, modifier = Modifier.weight(1f))
                     }
-                }
-                // Feedback
-                questionFeedback?.let { fb ->
-                    Spacer(Modifier.height(4.dp))
-                    Text(
-                        if (fb.isCorrect) "✓ Correct" else "✗ Wrong",
-                        color = if (fb.isCorrect) Color(0xFF4CAF50) else Color.Red,
-                        fontSize = 10.sp,
-                        fontWeight = FontWeight.Bold
-                    )
+                    "image" -> {
+                        // Image options — show as thumbnails, tap to select + tap image to zoom
+                        (0 until minOf(4, q.optionImages.size)).forEach { i ->
+                            val imgUrl = q.optionImages[i]
+                            if (imgUrl.isBlank()) return@forEach
+                            val absUrl = imgUrl.toAbsoluteUrl()
+                            val isSelected = answers[q.id] == absUrl
+                            Row(
+                                modifier = Modifier.fillMaxWidth().padding(vertical = 3.dp).clickable { sound.click(); onAnswer(q.id, absUrl) },
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Surface(
+                                    color = if (isSelected) theme.primary else Color.White,
+                                    border = androidx.compose.foundation.BorderStroke(2.dp, Color.Black),
+                                    shape = androidx.compose.foundation.shape.CircleShape,
+                                    modifier = Modifier.size(24.dp)
+                                ) {
+                                    Box(contentAlignment = Alignment.Center) {
+                                        Text("${i + 1}", color = if (isSelected) Color.White else Color.Black, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                                    }
+                                }
+                                Spacer(Modifier.width(4.dp))
+                                // Image thumbnail — tap to open full-screen viewer
+                                coil.compose.AsyncImage(
+                                    model = absUrl,
+                                    contentDescription = "Option ${i + 1}",
+                                    modifier = Modifier.size(50.dp).clip(RoundedCornerShape(4.dp)).clickable { FullScreenImageViewer.show(absUrl) },
+                                    contentScale = ContentScale.Fit
+                                )
+                            }
+                        }
+                    }
+                    "audio" -> {
+                        // Audio options — play button + select
+                        (0 until minOf(4, q.optionAudios.size)).forEach { i ->
+                            val audUrl = q.optionAudios[i]
+                            if (audUrl.isBlank()) return@forEach
+                            val absUrl = audUrl.toAbsoluteUrl()
+                            val isSelected = answers[q.id] == absUrl
+                            Row(
+                                modifier = Modifier.fillMaxWidth().padding(vertical = 3.dp).clickable { sound.click(); onAnswer(q.id, absUrl) },
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Surface(
+                                    color = if (isSelected) theme.primary else Color.White,
+                                    border = androidx.compose.foundation.BorderStroke(2.dp, Color.Black),
+                                    shape = androidx.compose.foundation.shape.CircleShape,
+                                    modifier = Modifier.size(24.dp)
+                                ) {
+                                    Box(contentAlignment = Alignment.Center) {
+                                        Text("${i + 1}", color = if (isSelected) Color.White else Color.Black, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                                    }
+                                }
+                                Spacer(Modifier.width(4.dp))
+                                AudioPlayerCard(theme = theme, url = absUrl, loopCount = 1, loopDelaySec = 0, sound = sound)
+                            }
+                        }
+                    }
                 }
             }
         }
