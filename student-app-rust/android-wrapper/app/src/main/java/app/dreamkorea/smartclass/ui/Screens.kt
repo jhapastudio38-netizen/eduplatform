@@ -340,17 +340,17 @@ fun HomeScreen(theme: AppTheme, sound: SoundManager, userName: String, onNavigat
             val serverKeys = homeCards.map { it.key }.toSet()
             val extras = mutableListOf<HomeCard>()
             if (!serverKeys.contains("qbank_packages")) {
-                extras.add(HomeCard(key = "qbank_packages", title = "Question Bank", section = "test", sortOrder = 99, route = "qbank_packages", imageUrl = ""))
+                extras.add(HomeCard(key = "qbank_packages", title = "Question Bank", section = "test", sortOrder = 99, route = "questionbank", imageUrl = ""))
             }
             if (!serverKeys.contains("batch_packages")) {
-                extras.add(HomeCard(key = "batch_packages", title = "Batch", section = "test", sortOrder = 100, route = "batch_packages", imageUrl = ""))
+                extras.add(HomeCard(key = "batch_packages", title = "Batch", section = "test", sortOrder = 100, route = "batch", imageUrl = ""))
             }
             homeCards + extras
         } else listOf(
             HomeCard(key = "ubt_test", title = "UBT Test", section = "test", sortOrder = 0, route = "tests", imageUrl = ""),
             HomeCard(key = "demo_exam", title = "Demo Exam", section = "test", sortOrder = 1, route = "tests", imageUrl = ""),
-            HomeCard(key = "qbank_packages", title = "Question Bank", section = "test", sortOrder = 2, route = "qbank_packages", imageUrl = ""),
-            HomeCard(key = "batch_packages", title = "Batch", section = "test", sortOrder = 3, route = "batch_packages", imageUrl = ""),
+            HomeCard(key = "qbank_packages", title = "Question Bank", section = "test", sortOrder = 2, route = "questionbank", imageUrl = ""),
+            HomeCard(key = "batch_packages", title = "Batch", section = "test", sortOrder = 3, route = "batch", imageUrl = ""),
             HomeCard(key = "results", title = "Results", section = "test", sortOrder = 5, route = "results", imageUrl = ""),
             HomeCard(key = "all_books", title = "Books", section = "resources", sortOrder = 0, route = "books", imageUrl = ""),
             HomeCard(key = "eye_vision", title = "Eye Vision", section = "resources", sortOrder = 2, route = "eyevision", imageUrl = ""),
@@ -525,8 +525,6 @@ fun HomeScreen(theme: AppTheme, sound: SoundManager, userName: String, onNavigat
                                     "audio_lessons" -> Screen.AudioLessons
                                     "recorded_video" -> Screen.RecordedVideo
                                     "packages" -> Screen.Bundles
-                                    "qbank_packages" -> Screen.BundleList("qbank")
-                                    "batch_packages" -> Screen.BundleList("batch")
                                     else -> when (card.route) {
                                         "books" -> Screen.Books
                                         "videos" -> Screen.Videos
@@ -535,8 +533,6 @@ fun HomeScreen(theme: AppTheme, sound: SoundManager, userName: String, onNavigat
                                         "eyevision" -> Screen.EyeVision
                                         "questionbank" -> Screen.QuestionBank
                                         "packages" -> Screen.Bundles
-                                        "qbank_packages" -> Screen.BundleList("qbank")
-                                        "batch_packages" -> Screen.BundleList("batch")
                                         "join" -> Screen.Join
                                         else -> Screen.Tests
                                     }
@@ -847,20 +843,6 @@ fun TestsScreen(theme: AppTheme, sound: SoundManager, filter: String = "all", ti
                                 fontWeight = if (isActive) FontWeight.SemiBold else FontWeight.Normal,
                                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
                             )
-                        }
-                    }
-                    Spacer(Modifier.weight(1f))
-                    // Packages button — always visible
-                    Surface(
-                        color = Color(0xFF6A1B9A),
-                        shape = RoundedCornerShape(20.dp),
-                        modifier = Modifier.clickable { sound.click(); onOpenPackages() },
-                        shadowElevation = 2.dp
-                    ) {
-                        Row(modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Default.Inventory2, null, tint = Color.White, modifier = Modifier.size(14.dp))
-                            Spacer(Modifier.width(4.dp))
-                            Text("Packages", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
                         }
                     }
                 }
