@@ -37,17 +37,17 @@ jobs:
       - name: Rename APK with version
         run: |
           mv student-app-rust/android-wrapper/app/build/outputs/apk/debug/app-debug.apk \
-             student-app-rust/android-wrapper/app/build/outputs/apk/debug/dreamkorea-v3.6.1-debug.apk
+             student-app-rust/android-wrapper/app/build/outputs/apk/debug/dreamkorea-v3.8.0-debug.apk
       # Upload as a GitHub Release asset — Releases storage is UNLIMITED for
       # public repos and doesn't count against the Actions artifact quota
       # (which we've already hit).
       - name: Create or update release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v3.6.1-${{ github.run_number }}
-          name: DreamKorea v3.6.1 (Build ${{ github.run_number }})
+          tag_name: v3.8.0-${{ github.run_number }}
+          name: DreamKorea v3.8.0 (Build ${{ github.run_number }})
           body: |
-            ## What's fixed in v3.6.1
+            ## What's fixed in v3.8.0
 
             ### Real-time data
             - App now fetches fresh data on every screen open (Books, Exams, QBank,
@@ -82,6 +82,6 @@ jobs:
 
             SHA: ${{ github.sha }}
           files: |
-            student-app-rust/android-wrapper/app/build/outputs/apk/debug/dreamkorea-v3.6.1-debug.apk
+            student-app-rust/android-wrapper/app/build/outputs/apk/debug/dreamkorea-v3.8.0-debug.apk
           draft: false
           prerelease: false
