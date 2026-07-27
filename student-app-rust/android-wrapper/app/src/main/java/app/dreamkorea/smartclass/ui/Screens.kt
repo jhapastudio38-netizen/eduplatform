@@ -366,12 +366,13 @@ fun HomeScreen(theme: AppTheme, sound: SoundManager, userName: String, onNavigat
                 shadowElevation = 6.dp,
             ) {
                 Box(modifier = Modifier.fillMaxWidth().height(160.dp)) {
-                    // Tree image as background
+                    // Tree image as background — Crop to fill the entire card
+                    // so it blends with the gradient overlay nicely
                     Image(
                         painter = painterResource(id = app.dreamkorea.smartclass.R.drawable.hero_bg),
                         contentDescription = null,
                         modifier = Modifier.fillMaxSize(),
-                        contentScale = ContentScale.Fit
+                        contentScale = ContentScale.Crop
                     )
                     // Gradient overlay — pink/magenta to match the tree image
                     Box(
@@ -700,11 +701,21 @@ fun BooksScreen(theme: AppTheme, sound: SoundManager, onBack: () -> Unit, onBook
         } else {
             itemsIndexed(books) { i, b ->
                 AnimatedListItem(index = i, theme = theme) {
-                    Surface(color = CardWhite, shape = RoundedCornerShape(14.dp), modifier = Modifier.fillMaxWidth(), shadowElevation = 2.dp) {
+                    Surface(color = CardWhite, shape = RoundedCornerShape(14.dp), modifier = Modifier.fillMaxWidth().clickable { onBookClick(b) }, shadowElevation = 2.dp) {
                         Row(modifier = Modifier.padding(12.dp)) {
+                            // Cover image (or fallback icon)
                             Surface(color = NavyBlue, shape = RoundedCornerShape(8.dp), modifier = Modifier.size(54.dp, 72.dp)) {
-                                Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
-                                    Icon(Icons.Default.Book, null, tint = Color.White, modifier = Modifier.size(24.dp))
+                                if (!b.coverUrl.isNullOrBlank()) {
+                                    coil.compose.AsyncImage(
+                                        model = b.coverUrl,
+                                        contentDescription = b.title,
+                                        modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(8.dp)),
+                                        contentScale = ContentScale.Fit
+                                    )
+                                } else {
+                                    Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
+                                        Icon(Icons.Default.Book, null, tint = Color.White, modifier = Modifier.size(24.dp))
+                                    }
                                 }
                             }
                             Spacer(Modifier.width(12.dp))
@@ -716,6 +727,10 @@ fun BooksScreen(theme: AppTheme, sound: SoundManager, onBack: () -> Unit, onBook
                                     if (!b.category.isNullOrBlank()) { InfoChip(theme, b.category, NavyBlue); Spacer(Modifier.width(6.dp)) }
                                     if (!b.level.isNullOrBlank()) { InfoChip(theme, b.level, AccentPurple); Spacer(Modifier.width(6.dp)) }
                                     if (b.pageCount != null) InfoChip(theme, "${b.pageCount}p", TextMid)
+                                }
+                                if (!b.description.isNullOrBlank()) {
+                                    Spacer(Modifier.height(4.dp))
+                                    Text(b.description!!, color = TextMid, fontSize = 10.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
                                 }
                             }
                         }
