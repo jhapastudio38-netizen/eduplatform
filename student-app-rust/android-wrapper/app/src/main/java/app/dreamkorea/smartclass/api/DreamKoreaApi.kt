@@ -311,6 +311,9 @@ interface DreamKoreaApi {
 
     @GET("api/student/bundles")
     suspend fun getStudentBundles(@Query("kind") kind: String? = null): BundlesResponse
+
+    @GET("api/student/qbank-combined")
+    suspend fun getQBankCombined(): TestDetailResponse
 }
 
 // ─── Notifications ────────────────────────────────────────────────────────────

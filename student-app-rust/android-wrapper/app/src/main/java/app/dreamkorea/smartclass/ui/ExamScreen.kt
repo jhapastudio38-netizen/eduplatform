@@ -75,7 +75,11 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
         error = ""
         try {
             val result = withTimeoutOrNull(20_000L) {
-                AppState.api.getTestDetail(testId).test
+                if (testId == "qbank-combined") {
+                    AppState.api.getQBankCombined().test
+                } else {
+                    AppState.api.getTestDetail(testId).test
+                }
             }
             if (result != null) {
                 test = result
