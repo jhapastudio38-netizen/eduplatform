@@ -1842,6 +1842,20 @@ function QuestionEditor({ question, onChange, blockLabel, isAudioBlock }: {
                         placeholder="word to underline (optional)"
                         className="h-7 text-xs flex-1 border-dashed border-slate-300"
                       />
+                      {/* Live preview of the underlined option */}
+                      {question.optionBlanks[i] && question.options[i] && (
+                        <span className="text-xs text-slate-500 whitespace-nowrap">
+                          Preview:{" "}
+                          <span
+                            dangerouslySetInnerHTML={{
+                              __html: question.options[i].replace(
+                                new RegExp(`(${question.optionBlanks[i].replace(/[.*+?^${}()|[\]\\]/g, "\\$&")})`, "i"),
+                                "<u>$1</u>"
+                              ),
+                            }}
+                          />
+                        </span>
+                      )}
                     </div>
                   </div>
                 ))}
