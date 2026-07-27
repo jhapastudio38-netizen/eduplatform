@@ -608,24 +608,27 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
                         }
                     }
 
-                    // CENTER: Grids (Reading + Listening) — scrollable, both fit on one screen
-                    Column(
-                        modifier = Modifier.weight(1f).fillMaxHeight().padding(6.dp).verticalScroll(rememberScrollState()),
-                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                    // CENTER: Reading (LEFT) + Listening (RIGHT) — side by side, both fit on one screen
+                    Row(
+                        modifier = Modifier.weight(1f).fillMaxHeight().padding(4.dp),
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
-                        // Reading grid
+                        // Reading grid (LEFT)
                         if (readingList.isNotEmpty()) {
-                            Text("Reading", color = Color.Black, fontSize = 13.sp, fontWeight = FontWeight.Bold)
-                            QuestionGridSection(t, readingList, answers, currentIdx, tabFilter, sound) { idx ->
-                                currentIdx = idx; showGrid = false
+                            Column(modifier = Modifier.weight(1f).fillMaxHeight().verticalScroll(rememberScrollState())) {
+                                Text("📖 Reading", color = Color(0xFF003478), fontSize = 12.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(bottom = 2.dp))
+                                QuestionGridSection(t, readingList, answers, currentIdx, tabFilter, sound) { idx ->
+                                    currentIdx = idx; showGrid = false
+                                }
                             }
                         }
-                        // Listening grid
+                        // Listening grid (RIGHT)
                         if (listeningList.isNotEmpty()) {
-                            Spacer(Modifier.height(4.dp))
-                            Text("Listening", color = Color.Black, fontSize = 13.sp, fontWeight = FontWeight.Bold)
-                            QuestionGridSection(t, listeningList, answers, currentIdx, tabFilter, sound) { idx ->
-                                currentIdx = idx; showGrid = false
+                            Column(modifier = Modifier.weight(1f).fillMaxHeight().verticalScroll(rememberScrollState())) {
+                                Text("🎧 Listening", color = Color(0xFFEF6C00), fontSize = 12.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(bottom = 2.dp))
+                                QuestionGridSection(t, listeningList, answers, currentIdx, tabFilter, sound) { idx ->
+                                    currentIdx = idx; showGrid = false
+                                }
                             }
                         }
                     }
@@ -776,21 +779,22 @@ private fun QuestionGridSection(
     onPick: (Int) -> Unit,
 ) {
     val globalIndices = items.mapNotNull { item -> test.items.indexOfFirst { it.question.id == item.question.id }.takeIf { it >= 0 } }
-    // 5 columns so both Reading + Listening fit on one screen (landscape).
-    // Column-major: 1,2,3,4 down col 1; 5,6,7,8 down col 2; etc.
-    val cols = 5
+    // 4 columns per grid (Reading left, Listening right — each has its own 4-col grid).
+    // Column-major: 1,2,3,4,5 down col 1; 6,7,8,9,10 down col 2; etc.
+    val cols = 4
     val rowsCount = (items.size + cols - 1) / cols
 
     Surface(
         color = Color.White,
-        border = androidx.compose.foundation.BorderStroke(2.dp, Color.Black),
+        border = androidx.compose.foundation.BorderStroke(1.5.dp, Color.Black),
+        shape = RoundedCornerShape(6.dp),
         modifier = Modifier.fillMaxWidth()
     ) {
-        Column(modifier = Modifier.padding(3.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        Column(modifier = Modifier.padding(2.dp), verticalArrangement = Arrangement.spacedBy(1.dp)) {
             for (rowIdx in 0 until rowsCount) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(2.dp)
+                    horizontalArrangement = Arrangement.spacedBy(1.dp)
                 ) {
                     for (colIdx in 0 until cols) {
                         val localIdx = colIdx * rowsCount + rowIdx
@@ -807,24 +811,24 @@ private fun QuestionGridSection(
                                 Box(
                                     modifier = Modifier
                                         .weight(1f)
-                                        .aspectRatio(1.1f) // slightly wider than tall, smaller boxes
-                                        .border(1.5.dp, Color.Black)
-                                        .background(if (isAnswered) Color.Black else Color.White)
+                                        .aspectRatio(1f) // perfect square — small boxes
+                                        .border(1.dp, Color.Black)
+                                        .background(if (isAnswered) Color(0xFF003478) else Color.White)
                                         .clickable { sound.click(); onPick(globalIdx) },
                                     contentAlignment = Alignment.Center
                                 ) {
                                     Text(
                                         "${globalIdx + 1}",
-                                        color = if (isAnswered) Color.White else Color.Black,
-                                        fontSize = 12.sp,
-                                        fontWeight = FontWeight.Normal,
+                                        color = if (isAnswered) Color.White else Color(0xFF003478),
+                                        fontSize = 13.sp,
+                                        fontWeight = FontWeight.Bold, // BOLD numbers
                                     )
                                 }
                             } else {
-                                Spacer(modifier = Modifier.weight(1f).aspectRatio(1.1f))
+                                Spacer(modifier = Modifier.weight(1f).aspectRatio(1f))
                             }
                         } else {
-                            Spacer(modifier = Modifier.weight(1f).aspectRatio(1.1f))
+                            Spacer(modifier = Modifier.weight(1f).aspectRatio(1f))
                         }
                     }
                 }
