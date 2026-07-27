@@ -1105,7 +1105,7 @@ fun ExamResultScreen(
     var showStats by remember { mutableStateOf(false) }
     var showReviewSection by remember { mutableStateOf(false) }
     val animatedScore = animateFloatAsState(
-        targetValue = if (showScore && result.maxScore > 0) result.score.toFloat() / result.maxScore else 0f,
+        targetValue = if (showScore && totalMarks > 0) (obtainedMarks / totalMarks).toFloat() else 0f,
         animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessLow),
         label = "scoreAnim",
     )
@@ -1127,11 +1127,20 @@ fun ExamResultScreen(
         showStats = true
     }
 
-    val pct = if (result.maxScore > 0) (result.score * 100 / result.maxScore) else 0
-    val passed = pct >= 40
+    // ── MARKS CALCULATION ──────────────────────────────────────────────
+    // Each question = 2.5 marks. Total marks = questionCount × 2.5.
+    // Example: 40 questions = 100 marks total.
+    // The server returns score = number of correct answers, so we convert
+    // to marks by multiplying by 2.5.
+    val MARKS_PER_QUESTION = 2.5
     val correctCount = result.review.count { it.isCorrect }
     val incorrectCount = result.review.size - correctCount
     val unansweredCount = result.review.count { it.userAnswer == null }
+    val totalQuestions = result.review.size
+    val totalMarks = totalQuestions * MARKS_PER_QUESTION
+    val obtainedMarks = correctCount * MARKS_PER_QUESTION
+    val pct = if (totalMarks > 0) (obtainedMarks / totalMarks * 100).toInt() else 0
+    val passed = pct >= 40
 
     LazyColumn(
         modifier = Modifier.fillMaxSize().background(theme.background).padding(16.dp),
@@ -1249,7 +1258,7 @@ fun ExamResultScreen(
                         fontSize = 40.sp,
                         fontWeight = FontWeight.Bold
                     )
-                    Text("${result.score} / ${result.maxScore} points", color = theme.subText, fontSize = 13.sp)
+                    Text("${obtainedMarks} / $totalMarks marks", color = theme.subText, fontSize = 13.sp)
                     Spacer(Modifier.height(16.dp))
 
                     // ── Stats row (total marks, correct, incorrect, unanswered) ──
@@ -1257,8 +1266,8 @@ fun ExamResultScreen(
                         modifier = Modifier.fillMaxWidth().alpha(statsAlpha),
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        StatBox("Total", "${result.maxScore}", Color(0xFF6A1B9A), Modifier.weight(1f))
-                        StatBox("Correct", "$correctCount", Color(0xFF4CAF50), Modifier.weight(1f))
+                        StatBox("Total", "$totalMarks", Color(0xFF6A1B9A), Modifier.weight(1f))
+                        StatBox("Obtained", "$obtainedMarks", Color(0xFF4CAF50), Modifier.weight(1f))
                         StatBox("Wrong", "$incorrectCount", theme.errorRed, Modifier.weight(1f))
                         StatBox("Skipped", "$unansweredCount", Color(0xFFFF9800), Modifier.weight(1f))
                     }

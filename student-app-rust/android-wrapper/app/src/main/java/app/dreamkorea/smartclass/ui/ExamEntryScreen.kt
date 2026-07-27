@@ -281,7 +281,7 @@ fun ExamEntryScreen(theme: AppTheme, sound: SoundManager, testId: String, onStar
                 ) {
                     StatChip("${t.durationMin} min", "Time", Modifier.weight(1f))
                     StatChip("${t.items.size}", "Questions", Modifier.weight(1f))
-                    StatChip("${t.passScore}%", "Pass", Modifier.weight(1f))
+                    StatChip("${t.items.size * 2.5}", "Marks", Modifier.weight(1f))
                 }
 
                 Spacer(Modifier.height(12.dp))
