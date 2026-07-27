@@ -969,7 +969,7 @@ private fun StatBox(label: String, value: String, color: Color, modifier: Modifi
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Text(value, color = color, fontSize = 18.sp, fontWeight = FontWeight.Bold)
-            Text(label, color = theme.let { it.subText }, fontSize = 9.sp, fontWeight = FontWeight.Medium)
+            Text(label, color = Color(0xFF64748B), fontSize = 9.sp, fontWeight = FontWeight.Medium)
         }
     }
 }
