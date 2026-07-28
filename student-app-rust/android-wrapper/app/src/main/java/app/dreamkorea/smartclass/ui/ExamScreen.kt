@@ -1799,17 +1799,29 @@ private fun gradeCombinedExamClientSide(
     var score = 0
     val review = mutableListOf<ReviewItem>()
 
+    // Normalize URL — strip origin so /api/files/... matches https://.../api/files/...
+    fun normalizeUrl(val_: Any?): Any? {
+        if (val_ is String) {
+            return try {
+                if (val_.startsWith("http://") || val_.startsWith("https://")) {
+                    java.net.URI(val_).path
+                } else val_
+            } catch (_: Exception) { val_ }
+        }
+        return val_
+    }
+
     for (item in test.items) {
         val q = item.question
-        val ans = answers[q.id]
+        val ans = normalizeUrl(answers[q.id])
         var isCorrect = false
 
         when (q.type) {
             "SINGLE_CHOICE", "TRUE_FALSE", "ONE_WORD", "FILL_BLANK" -> {
                 val correctIdx = q.correctOption
-                val correctAns = q.options?.getOrNull(correctIdx)
+                val correctAns = normalizeUrl(q.options?.getOrNull(correctIdx)
                     ?: q.options?.getOrNull(0)
-                    ?: ""
+                    ?: "") as? String ?: ""
                 if (ans is String && correctAns.isNotEmpty() &&
                     ans.trim().equals(correctAns.trim(), ignoreCase = true)) {
                     isCorrect = true
@@ -1817,7 +1829,6 @@ private fun gradeCombinedExamClientSide(
                 }
             }
             "MULTIPLE_CHOICE" -> {
-                // For multiple choice, compare selected indices
                 val correctIdx = q.correctOption
                 if (ans is String && ans.toIntOrNull() == correctIdx) {
                     isCorrect = true
