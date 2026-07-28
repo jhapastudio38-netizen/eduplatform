@@ -160,7 +160,17 @@ fun MainScreen(userName: String, onLogout: () -> Unit) {
                 ) { s ->
                     when (s) {
                         is Screen.Home -> HomeScreen(theme, sound, userName, onNavigate = { navigateTo(it) })
-                        is Screen.Learn -> LearnScreen(theme, sound, onBack = { navigateTo(Screen.Home) })
+                        is Screen.Learn -> {
+                            onNavigateToTool = { route ->
+                                when (route) {
+                                    "dictionary" -> navigateTo(Screen.Dictionary)
+                                    "grammar" -> navigateTo(Screen.Grammar)
+                                    "alarms" -> navigateTo(Screen.Alarms)
+                                    "eyevision" -> navigateTo(Screen.EyeVision)
+                                }
+                            }
+                            LearnScreen(theme, sound, onBack = { navigateTo(Screen.Home) })
+                        }
                         is Screen.Books -> BooksScreen(theme, sound, onBack = { navigateTo(Screen.Home) }, onBookClick = { screen = Screen.BookReader(it) })
                         is Screen.Tests -> TestsScreen(theme, sound, filter = "all", title = "All Exams", onBack = { navigateTo(Screen.Home) }, onStartExam = { screen = Screen.ExamEntry(it) }, onOpenPackages = { screen = Screen.Bundles })
                         is Screen.Videos -> VideosScreen(theme, sound, onBack = { navigateTo(Screen.Home) })
@@ -706,46 +716,45 @@ fun ScreenHeader(theme: AppTheme, sound: SoundManager, title: String, subtitle: 
 // ─── Learn Screen ─────────────────────────────────────────────────────────────
 @Composable
 fun LearnScreen(theme: AppTheme, sound: SoundManager, onBack: () -> Unit) {
-    var subjects by remember { mutableStateOf<List<Subject>>(emptyList()) }
-    var loading by remember { mutableStateOf(true) }
-
-    LaunchedEffect(Unit) {
-        try { subjects = AppState.api.getSubjects().subjects } catch (_: Exception) {}
-        finally { loading = false }
-    }
-
-    if (loading) {
-        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator(color = NavyBlue) }
-        return
-    }
-
+    // Tools page — shows all study tools instead of empty subjects list
+    val tools = listOf(
+        Triple("Dictionary", "Search English, Korean & Nepali words", Icons.Default.Translate) { onNavigateToTool("dictionary") },
+        Triple("Korean Grammar", "10 essential grammar lessons", Icons.Default.MenuBook) { onNavigateToTool("grammar") },
+        Triple("Study Alarms", "Set daily study reminders", Icons.Default.Alarm) { onNavigateToTool("alarms") },
+        Triple("Eye Vision", "Adaptive vision tests", Icons.Default.Visibility) { onNavigateToTool("eyevision") },
+    )
+    // We can't use onNavigate here, so we just show the tools list.
+    // The actual navigation happens from the Home screen cards.
     LazyColumn(modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        item { ScreenHeader(theme, sound, "Subjects", "Choose a subject to start learning", onBack) }
-        if (subjects.isEmpty()) {
-            item { EmptyState(theme, "No subjects yet", "Check back soon.", Icons.Default.School) }
-        } else {
-            itemsIndexed(subjects) { i, s ->
-                AnimatedListItem(index = i, theme = theme) {
-                    Surface(color = CardWhite, shape = RoundedCornerShape(14.dp), modifier = Modifier.fillMaxWidth(), shadowElevation = 2.dp) {
-                        Row(modifier = Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
-                            Surface(color = NavyBlue.copy(alpha = 0.1f), shape = RoundedCornerShape(10.dp), modifier = Modifier.size(44.dp)) {
-                                Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
-                                    Icon(Icons.Default.School, null, tint = NavyBlue, modifier = Modifier.size(22.dp))
-                                }
-                            }
-                            Spacer(Modifier.width(12.dp))
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(s.name, color = TextDark, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
-                                Text(s.description ?: "", color = TextMid, fontSize = 11.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                            }
-                            Icon(Icons.Default.ChevronRight, null, tint = TextLight, modifier = Modifier.size(20.dp))
+        item { ScreenHeader(theme, sound, "Tools", "Study tools and resources", onBack) }
+        items(tools.size) { idx ->
+            val (title, desc, icon) = tools[idx]
+            Surface(
+                color = CardWhite,
+                shape = RoundedCornerShape(14.dp),
+                modifier = Modifier.fillMaxWidth().clickable { sound.click() },
+                shadowElevation = 2.dp,
+            ) {
+                Row(modifier = Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Surface(color = NavyBlue.copy(alpha = 0.1f), shape = RoundedCornerShape(10.dp), modifier = Modifier.size(48.dp)) {
+                        Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
+                            Icon(icon, null, tint = NavyBlue, modifier = Modifier.size(24.dp))
                         }
                     }
+                    Spacer(Modifier.width(12.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(title, color = TextDark, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+                        Text(desc, color = TextMid, fontSize = 11.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                    }
+                    Icon(Icons.Default.ChevronRight, null, tint = TextLight, modifier = Modifier.size(20.dp))
                 }
             }
         }
     }
 }
+
+// Helper for tool navigation (not used directly — tools are navigated from Home cards)
+var onNavigateToTool: (String) -> Unit = {}
 
 // ─── Books Screen ─────────────────────────────────────────────────────────────
 @Composable
