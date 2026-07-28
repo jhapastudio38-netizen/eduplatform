@@ -31,7 +31,9 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.layout
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -542,40 +544,74 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
         val listeningItems = t.items.filter { it.question.blockType == "audio" }
         var showSubmitDialog by remember { mutableStateOf(false) }
         val gridScrollState = rememberScrollState()
+        val haptic = LocalHapticFeedback.current
+        // Filter: null = all, true = answered only, false = unsolved only
+        var filterMode by remember { mutableStateOf<Boolean?>(null) }
 
         // Count answered for live progress
         val readingAnswered = readingItems.count { answers.containsKey(it.question.id) }
         val listeningAnswered = listeningItems.count { answers.containsKey(it.question.id) }
         val totalAnswered = readingAnswered + listeningAnswered
         val totalQuestions = t.items.size
+        val totalUnsolved = totalQuestions - totalAnswered
+        // Timer chip color: red pulse when < 5 min
+        val mm = timeLeft / 60; val ss = timeLeft % 60
+        val timeStr = String.format("%02d:%02d", mm, ss)
+        val isLowTime = timeLeft in 1..300
+        val timerColor = if (isLowTime) Color(0xFFDC2626) else Color(0xFF003F73)
 
         Column(modifier = Modifier.fillMaxSize().background(Color(0xFFF7F9FC))) {
-            // ── HEADER: logo LEFT | title CENTER | user RIGHT ────────────
+            // ── HEADER: logo LEFT | title CENTER | timer + user RIGHT ────
             Surface(color = Color.White, shadowElevation = 2.dp) {
                 Row(
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Image(
                         painter = painterResource(id = app.dreamkorea.smartclass.R.drawable.dreamkorea_logo),
                         contentDescription = "DreamKorea",
-                        modifier = Modifier.size(36.dp),
+                        modifier = Modifier.size(32.dp),
                         contentScale = ContentScale.Fit
                     )
-                    Spacer(Modifier.weight(1f))
+                    Spacer(Modifier.width(8.dp))
                     Text(
-                        t.title.take(30),
+                        t.title.take(24),
                         color = Color(0xFF111111),
-                        fontSize = 13.sp,
+                        fontSize = 12.sp,
                         fontWeight = FontWeight.Bold,
                         maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f)
                     )
-                    Spacer(Modifier.weight(1f))
+                    // Timer chip
+                    Surface(
+                        color = timerColor.copy(alpha = 0.10f),
+                        shape = RoundedCornerShape(8.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                Icons.Default.Schedule,
+                                contentDescription = "Time",
+                                tint = timerColor,
+                                modifier = Modifier.size(13.dp)
+                            )
+                            Spacer(Modifier.width(4.dp))
+                            Text(
+                                timeStr,
+                                color = timerColor,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
+                    Spacer(Modifier.width(6.dp))
                     Text(
-                        AppState.getUserName().take(15),
-                        color = Color(0xFF111111),
-                        fontSize = 11.sp,
+                        AppState.getUserName().take(12),
+                        color = Color(0xFF64748B),
+                        fontSize = 10.sp,
                         fontWeight = FontWeight.SemiBold,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
@@ -628,18 +664,66 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
                 }
             }
 
-            // ── LEGEND ROW ───────────────────────────────────────────────
+            // ── LEGEND + FILTER ROW ─────────────────────────────────────
             Surface(color = Color.White) {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 6.dp),
-                    horizontalArrangement = Arrangement.spacedBy(16.dp),
+                        .padding(horizontal = 12.dp, vertical = 6.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     LegendDot(Color(0xFF003F73), "Answered")
                     LegendDot(Color(0xFFF59E0B), "Current")
                     LegendDot(Color.White, "Unsolved", borderColor = Color(0xFF94A3B8))
+                    Spacer(Modifier.weight(1f))
+                    // Filter chips: All / Unsolved
+                    FilterChip(
+                        label = "All",
+                        selected = filterMode == null,
+                        onClick = { filterMode = null }
+                    )
+                    FilterChip(
+                        label = "Unsolved ($totalUnsolved)",
+                        selected = filterMode == false,
+                        onClick = { filterMode = false }
+                    )
+                }
+            }
+
+            // ── RESUME BAR ───────────────────────────────────────────────
+            // Quick-jump back to the current question
+            Surface(color = Color.White) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 12.dp, vertical = 6.dp)
+                ) {
+                    OutlinedButton(
+                        onClick = {
+                            sound.click()
+                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                            showGrid = false
+                        },
+                        modifier = Modifier.fillMaxWidth().height(38.dp),
+                        shape = RoundedCornerShape(8.dp),
+                        border = androidx.compose.foundation.BorderStroke(1.5.dp, Color(0xFF003F73)),
+                        colors = ButtonDefaults.outlinedButtonColors(containerColor = Color(0xFF003F73).copy(alpha = 0.06f))
+                    ) {
+                        Icon(
+                            Icons.Default.PlayArrow,
+                            contentDescription = null,
+                            tint = Color(0xFF003F73),
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(Modifier.width(6.dp))
+                        Text(
+                            "Resume question #${currentIdx + 1}",
+                            color = Color(0xFF003F73),
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
                 }
             }
 
@@ -664,7 +748,9 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
                                 items = readingItems,
                                 answers = answers,
                                 currentIdx = currentIdx,
-                                sound = sound
+                                sound = sound,
+                                haptic = haptic,
+                                filterMode = filterMode
                             ) { idx ->
                                 currentIdx = idx
                                 showGrid = false
@@ -684,7 +770,9 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
                                 items = listeningItems,
                                 answers = answers,
                                 currentIdx = currentIdx,
-                                sound = sound
+                                sound = sound,
+                                haptic = haptic,
+                                filterMode = filterMode
                             ) { idx ->
                                 currentIdx = idx
                                 showGrid = false
@@ -757,10 +845,27 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
 
         // Submit confirmation dialog
         if (showSubmitDialog) {
+            val warning = when {
+                totalUnsolved == 0 -> "You answered all $totalQuestions questions. Ready to submit!"
+                totalUnsolved <= 5 -> "You have $totalUnsolved unanswered question(s). Submit anyway?"
+                else -> "Warning: $totalUnsolved questions are still unanswered! Submit anyway?"
+            }
+            val warningColor = when {
+                totalUnsolved == 0 -> Color(0xFF16A34A)
+                totalUnsolved <= 5 -> Color(0xFFD97706)
+                else -> Color(0xFFDC2626)
+            }
             AlertDialog(
                 onDismissRequest = { showSubmitDialog = false },
                 title = { Text("Submit Exam?") },
-                text = { Text("You answered $totalAnswered out of $totalQuestions questions. Are you sure?") },
+                text = {
+                    Column {
+                        Text(warning, color = warningColor, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                        Spacer(Modifier.height(6.dp))
+                        Text("Reading: $readingAnswered/${readingItems.size} • Listening: $listeningAnswered/${listeningItems.size}",
+                            color = Color(0xFF64748B), fontSize = 11.sp)
+                    }
+                },
                 confirmButton = {
                     Button(
                         onClick = {
@@ -865,8 +970,31 @@ private fun LegendDot(color: Color, label: String, borderColor: Color? = null) {
     }
 }
 
+/// Pill-shaped filter chip used to toggle between All / Unsolved / Answered views.
+@Composable
+private fun FilterChip(label: String, selected: Boolean, onClick: () -> Unit) {
+    val bg = if (selected) Color(0xFF003F73) else Color(0xFFF1F5F9)
+    val fg = if (selected) Color.White else Color(0xFF475569)
+    Box(
+        modifier = Modifier
+            .clip(RoundedCornerShape(12.dp))
+            .background(bg)
+            .clickable { onClick() }
+            .padding(horizontal = 10.dp, vertical = 4.dp)
+    ) {
+        Text(
+            label,
+            color = fg,
+            fontSize = 10.sp,
+            fontWeight = FontWeight.SemiBold,
+            maxLines = 1
+        )
+    }
+}
+
 /// 5×4 grid of question buttons. Left-to-right numbering (1-20 or 21-40).
 /// Answered = dark blue bg + white text. Current = amber border. Empty = light gray border.
+/// filterMode: null = all, true = answered only, false = unsolved only (others dimmed)
 @Composable
 private fun QuestionGridSection(
     test: TestDetail,
@@ -874,6 +1002,8 @@ private fun QuestionGridSection(
     answers: SnapshotStateMap<String, Any>,
     currentIdx: Int,
     sound: SoundManager,
+    haptic: androidx.compose.ui.hapticfeedback.HapticFeedback,
+    filterMode: Boolean?,
     onPick: (Int) -> Unit,
 ) {
     val globalIndices = items.mapNotNull { item -> test.items.indexOfFirst { it.question.id == item.question.id }.takeIf { it >= 0 } }
@@ -893,6 +1023,12 @@ private fun QuestionGridSection(
                         val globalIdx = globalIndices[localIdx]
                         val isAnswered = answers.containsKey(items[localIdx].question.id)
                         val isCurrent = globalIdx == currentIdx
+                        // Dim the box if filter excludes it
+                        val isFilteredOut = when (filterMode) {
+                            true -> !isAnswered
+                            false -> isAnswered
+                            null -> false
+                        }
                         Box(
                             modifier = Modifier
                                 .weight(1f)
@@ -916,7 +1052,12 @@ private fun QuestionGridSection(
                                         else -> Color.White
                                     }
                                 )
-                                .clickable { sound.click(); onPick(globalIdx) },
+                                .alpha(if (isFilteredOut) 0.25f else 1f)
+                                .clickable(enabled = !isFilteredOut) {
+                                    sound.click()
+                                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                    onPick(globalIdx)
+                                },
                             contentAlignment = Alignment.Center
                         ) {
                             Text(
