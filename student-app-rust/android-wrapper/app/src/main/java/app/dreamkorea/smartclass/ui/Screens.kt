@@ -98,6 +98,7 @@ fun MainScreen(userName: String, onLogout: () -> Unit) {
     val sound = rememberSoundManager()
     var screen by remember { mutableStateOf<Screen>(Screen.Home) }
     var activeTab by remember { mutableStateOf(BottomTab.Home) }
+    var hideBottomBar by remember { mutableStateOf(false) }
 
     fun navigateTo(s: Screen) {
         screen = s
@@ -173,7 +174,7 @@ fun MainScreen(userName: String, onLogout: () -> Unit) {
                         }
                         is Screen.Books -> BooksScreen(theme, sound, onBack = { navigateTo(Screen.Home) }, onBookClick = { screen = Screen.BookReader(it) })
                         is Screen.Tests -> TestsScreen(theme, sound, filter = "all", title = "All Exams", onBack = { navigateTo(Screen.Home) }, onStartExam = { screen = Screen.ExamEntry(it) }, onOpenPackages = { screen = Screen.Bundles })
-                        is Screen.Videos -> VideosScreen(theme, sound, onBack = { navigateTo(Screen.Home) })
+                        is Screen.Videos -> VideosScreen(theme, sound, onBack = { navigateTo(Screen.Home) }, onHideBottomBar = { hide -> hideBottomBar = hide })
                         is Screen.Profile -> ProfileScreen(theme, sound, userName, onBack = { navigateTo(Screen.Home) }, onLogout = onLogout)
                         is Screen.LiveRoom -> LiveRoomScreen(theme, onBack = { navigateTo(Screen.Home) })
                         is Screen.Settings -> SettingsScreen(theme, sound, onBack = { navigateTo(Screen.Home) })
@@ -209,7 +210,7 @@ fun MainScreen(userName: String, onLogout: () -> Unit) {
                 is Screen.BookReader -> false
                 is Screen.BundleDetail -> false
                 is Screen.Settings -> false
-                else -> true
+                else -> !hideBottomBar
             }
             if (showBottomBar) {
                 BottomNavBar(activeTab = activeTab, onTabClick = { tab ->
@@ -967,10 +968,15 @@ fun TestCard(theme: AppTheme, sound: SoundManager, t: TestItem, onClick: () -> U
 
 // ─── Videos Screen ────────────────────────────────────────────────────────────
 @Composable
-fun VideosScreen(theme: AppTheme, sound: SoundManager, onBack: () -> Unit) {
+fun VideosScreen(theme: AppTheme, sound: SoundManager, onBack: () -> Unit, onHideBottomBar: (Boolean) -> Unit = {}) {
     var videos by remember { mutableStateOf<List<VideoLesson>>(AppState.getCachedNow<List<VideoLesson>>(AppState.KEY_VIDEOS) ?: emptyList()) }
     var loading by remember { mutableStateOf(videos.isEmpty()) }
     var playingVideo by remember { mutableStateOf<VideoLesson?>(null) }
+
+    // Hide bottom bar when video is playing
+    LaunchedEffect(playingVideo) {
+        onHideBottomBar(playingVideo != null)
+    }
 
     LaunchedEffect(Unit) {
         try { videos = AppState.cachedFresh(AppState.KEY_VIDEOS) { AppState.api.getVideoLessons().videos } } catch (_: Exception) {}
@@ -980,64 +986,82 @@ fun VideosScreen(theme: AppTheme, sound: SoundManager, onBack: () -> Unit) {
     // ── Full-screen video player overlay — only video + close button ─────
     if (playingVideo != null) {
         val v = playingVideo!!
-        val context = LocalContext.current
+        var isLoading by remember { mutableStateOf(true) }
 
-        // For YouTube videos: open in YouTube app or browser (fastest, smoothest)
-        // For uploaded videos: use Android's native VideoView
-        if (v.youtubeId.isNotBlank()) {
-            // Launch YouTube app intent
-            LaunchedEffect(Unit) {
-                try {
-                    val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse("vnd.youtube:${v.youtubeId}"))
-                    intent.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
-                    context.startActivity(intent)
-                } catch (e: Exception) {
-                    // YouTube app not installed — open in browser
-                    try {
-                        val browserIntent = android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse("https://www.youtube.com/watch?v=${v.youtubeId}"))
-                        browserIntent.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
-                        context.startActivity(browserIntent)
-                    } catch (e2: Exception) {
-                        // Last resort — try webview
-                    }
-                }
-                // Close the overlay after launching (video plays in external app/browser)
-                playingVideo = null
-            }
-            // Show a brief loading message while launching
-            Box(
-                modifier = Modifier.fillMaxSize().background(Color.Black),
-                contentAlignment = Alignment.Center,
-            ) {
-                CircularProgressIndicator(color = Color.White)
-            }
-            return
-        }
-
-        // For uploaded videos — use Android's native VideoView (smooth, hardware-accelerated)
         Box(
             modifier = Modifier
                 .fillMaxSize()
                 .background(Color.Black)
         ) {
+            // ── In-app browser (WebView) — renders video directly, no browser UI ──
             AndroidView(
                 factory = { ctx ->
-                    android.widget.VideoView(ctx).apply {
-                        val abs = if (v.videoUrl!!.startsWith("http")) v.videoUrl else "https://my-project-five-sepia.vercel.app${v.videoUrl}"
-                        setVideoURI(android.net.Uri.parse(abs))
-                        setOnPreparedListener { mp ->
-                            mp.isLooping = false
-                            start()
+                    android.webkit.WebView(ctx).apply {
+                        // ── Enable all features for smooth video playback ──
+                        settings.javaScriptEnabled = true
+                        settings.domStorageEnabled = true
+                        settings.databaseEnabled = true
+                        settings.mediaPlaybackRequiresUserGesture = false
+                        settings.loadWithOverviewMode = true
+                        settings.useWideViewPort = true
+                        settings.cacheMode = android.webkit.WebSettings.LOAD_NO_CACHE
+                        settings.pluginState = android.webkit.WebSettings.PluginState.ON
+                        settings.setSupportZoom(false)
+                        settings.builtInZoomControls = false
+                        settings.mixedContentMode = android.webkit.WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
+                        settings.userAgentString = settings.userAgentString.replace("; wv", "")
+                        // Hardware acceleration for smooth video
+                        setLayerType(android.view.View.LAYER_TYPE_HARDWARE, null)
+                        // Track page loading
+                        webViewClient = object : android.webkit.WebViewClient() {
+                            override fun onPageFinished(view: android.webkit.WebView?, url: String?) {
+                                super.onPageFinished(view, url)
+                                isLoading = false
+                            }
                         }
-                        setOnErrorListener { _, _, _ ->
-                            true
+                        webChromeClient = object : android.webkit.WebChromeClient() {}
+
+                        val html = if (v.videoSource == "upload" && !v.videoUrl.isNullOrBlank()) {
+                            val abs = if (v.videoUrl!!.startsWith("http")) v.videoUrl else "https://my-project-five-sepia.vercel.app${v.videoUrl}"
+                            """<html>
+                            <head><meta name='viewport' content='width=device-width, initial-scale=1.0, maximum-scale=1.0'>
+                            <style>body{margin:0;padding:0;background:#000;overflow:hidden;width:100vw;height:100vh;}
+                            video{width:100%;height:100%;object-fit:contain;}</style></head>
+                            <body><video src='$abs' controls autoplay playsinline webkit-playsinline></video></body>
+                            </html>"""
+                        } else if (v.youtubeId.isNotBlank()) {
+                            """<html>
+                            <head><meta name='viewport' content='width=device-width, initial-scale=1.0'>
+                            <style>body{margin:0;padding:0;background:#000;overflow:hidden;width:100vw;height:100vh;}</style></head>
+                            <body>
+                            <iframe id='player' width='100%' height='100%'
+                            src='https://www.youtube.com/embed/${v.youtubeId}?autoplay=1&controls=1&rel=0&modestbranding=1&playsinline=1&fs=1&enablejsapi=1'
+                            frameborder='0'
+                            allow='accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen'
+                            allowfullscreen></iframe>
+                            </body>
+                            </html>"""
+                        } else {
+                            "<html><body style='margin:0;padding:0;background:#000;color:#fff;display:flex;align-items:center;justify-content:center;height:100vh;font-size:18px;'>No video source</body></html>"
                         }
+                        // Use https://www.youtube.com as base URL so YouTube accepts the embed
+                        loadDataWithBaseURL("https://www.youtube.com", html, "text/html", "UTF-8", null)
                     }
                 },
                 modifier = Modifier.fillMaxSize()
             )
 
-            // Close button — floats on top-right
+            // Loading indicator while page loads
+            if (isLoading) {
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    CircularProgressIndicator(color = Color.White)
+                }
+            }
+
+            // Close button — floats on top-right corner
             Surface(
                 color = Color.Black.copy(alpha = 0.6f),
                 shape = androidx.compose.foundation.shape.CircleShape,
