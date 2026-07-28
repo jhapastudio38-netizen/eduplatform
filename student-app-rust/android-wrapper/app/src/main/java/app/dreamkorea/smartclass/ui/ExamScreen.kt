@@ -1492,6 +1492,7 @@ fun ReviewCard(theme: AppTheme, review: ReviewItem, questionNumber: Int = 0) {
             Spacer(Modifier.height(8.dp))
 
             // ── Options with correct/wrong highlighting ──────────────────
+            // If option is an image URL, render as image; otherwise render as text.
             review.options?.let { opts ->
                 opts.forEachIndexed { i, opt ->
                     val isUserAns = (review.userAnswer == opt) || ((review.userAnswer as? List<*>)?.contains(opt) == true)
@@ -1506,6 +1507,9 @@ fun ReviewCard(theme: AppTheme, review: ReviewItem, questionNumber: Int = 0) {
                         isUserAns && !isCorrectAns -> theme.errorRed
                         else -> Color(0xFFE0E0E0)
                     }
+                    // Check if this option is an image URL
+                    val optImg = review.optionImages.getOrNull(i)?.takeIf { it.isNotBlank() }
+                    val isImageUrl = optImg != null || opt.startsWith("http") || opt.startsWith("/api/files") || opt.startsWith("/uploads")
                     Surface(
                         color = bg,
                         shape = RoundedCornerShape(6.dp),
@@ -1515,7 +1519,19 @@ fun ReviewCard(theme: AppTheme, review: ReviewItem, questionNumber: Int = 0) {
                         Row(modifier = Modifier.padding(8.dp), verticalAlignment = Alignment.CenterVertically) {
                             Text("${'A' + i}.", color = theme.subText, fontSize = 12.sp, fontWeight = FontWeight.Bold)
                             Spacer(Modifier.width(8.dp))
-                            Text(opt, color = theme.darkText, fontSize = 13.sp, fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f))
+                            if (isImageUrl) {
+                                // Render as image — use optionImages if available, otherwise the option text IS the URL
+                                val imgUrl = (optImg ?: opt).toAbsoluteUrl()
+                                coil.compose.AsyncImage(
+                                    model = imgUrl,
+                                    contentDescription = "Option ${'A' + i}",
+                                    modifier = Modifier.weight(1f).heightIn(max = 120.dp).clip(RoundedCornerShape(6.dp)),
+                                    contentScale = ContentScale.Fit,
+                                )
+                            } else {
+                                // Render as text
+                                Text(opt, color = theme.darkText, fontSize = 13.sp, fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f))
+                            }
                             if (isCorrectAns) {
                                 Icon(Icons.Default.Check, null, tint = Color(0xFF28A745), modifier = Modifier.size(14.dp))
                             } else if (isUserAns && !isCorrectAns) {
@@ -1808,6 +1824,8 @@ private fun gradeCombinedExamClientSide(
                 title = q.title,
                 type = q.type,
                 options = q.options,
+                optionImages = q.optionImages,
+                optionAudios = q.optionAudios,
                 imageUrl = q.imageUrl,
                 audioUrl = q.audioUrl,
                 audioLoop = q.audioLoop,
