@@ -281,25 +281,8 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
 
     val currentQuestion = t.items.getOrNull(currentIdx)
 
-    // ─── Eye Test trigger ──────────────────────────────────────────────────
-    // Count skipped (unanswered) questions
-    val skippedCount = t.items.count { !answers.containsKey(it.question.id) }
-    // Show eye test if user skipped 2+ questions AND the result has eye vision recommendation
-    var showEyeTest by remember { mutableStateOf(false) }
-
     // ─── Result screen ──────────────────────────────────────────────────────
     if (submitResult != null) {
-        // If user skipped 2+ questions, show eye test BEFORE the result
-        if (skippedCount >= 2 && !showEyeTest && submitResult!!.eyeVision.show) {
-            EyeTestGateScreen(
-                theme = theme,
-                sound = sound,
-                count = submitResult!!.eyeVision.count,
-                reason = submitResult!!.eyeVision.reason,
-                onContinue = { showEyeTest = true },
-            )
-            return
-        }
         ExamResultScreen(theme, submitResult!!, onExit, sound, examTitle = t.title, examDescription = t.description)
         return
     }
