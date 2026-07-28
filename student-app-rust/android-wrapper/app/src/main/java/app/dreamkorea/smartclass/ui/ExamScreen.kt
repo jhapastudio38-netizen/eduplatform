@@ -620,51 +620,6 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
                 }
             }
 
-            // ── PROGRESS BAR ─────────────────────────────────────────────
-            Surface(color = Color.White) {
-                Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            "Progress",
-                            color = Color(0xFF555555),
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.SemiBold
-                        )
-                        Spacer(Modifier.weight(1f))
-                        Text(
-                            "$totalAnswered / $totalQuestions answered",
-                            color = Color(0xFF003F73),
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
-                    Spacer(Modifier.height(6.dp))
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(6.dp)
-                            .clip(RoundedCornerShape(3.dp))
-                            .background(Color(0xFFE2E8F0))
-                    ) {
-                        val pct = if (totalQuestions > 0) totalAnswered.toFloat() / totalQuestions else 0f
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth(pct)
-                                .fillMaxHeight()
-                                .clip(RoundedCornerShape(3.dp))
-                                .background(
-                                    Brush.horizontalGradient(
-                                        listOf(Color(0xFF003F73), Color(0xFF1E88E5))
-                                    )
-                                )
-                        )
-                    }
-                }
-            }
-
             // ── LEGEND + FILTER ROW ─────────────────────────────────────
             Surface(color = Color.White) {
                 Row(
@@ -689,42 +644,6 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
                         selected = filterMode == false,
                         onClick = { filterMode = false }
                     )
-                }
-            }
-
-            // ── RESUME BAR ───────────────────────────────────────────────
-            // Quick-jump back to the current question
-            Surface(color = Color.White) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 12.dp, vertical = 6.dp)
-                ) {
-                    OutlinedButton(
-                        onClick = {
-                            sound.click()
-                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                            showGrid = false
-                        },
-                        modifier = Modifier.fillMaxWidth().height(38.dp),
-                        shape = RoundedCornerShape(8.dp),
-                        border = androidx.compose.foundation.BorderStroke(1.5.dp, Color(0xFF003F73)),
-                        colors = ButtonDefaults.outlinedButtonColors(containerColor = Color(0xFF003F73).copy(alpha = 0.06f))
-                    ) {
-                        Icon(
-                            Icons.Default.PlayArrow,
-                            contentDescription = null,
-                            tint = Color(0xFF003F73),
-                            modifier = Modifier.size(16.dp)
-                        )
-                        Spacer(Modifier.width(6.dp))
-                        Text(
-                            "Resume question #${currentIdx + 1}",
-                            color = Color(0xFF003F73),
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
                 }
             }
 
@@ -1012,11 +931,11 @@ private fun QuestionGridSection(
     val totalBoxes = 20
     val rowsCount = 4
 
-    Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(5.dp)) {
         for (rowIdx in 0 until rowsCount) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                horizontalArrangement = Arrangement.spacedBy(5.dp)
             ) {
                 for (colIdx in 0 until cols) {
                     val localIdx = rowIdx * cols + colIdx
@@ -1033,16 +952,16 @@ private fun QuestionGridSection(
                         Box(
                             modifier = Modifier
                                 .weight(1f)
-                                .aspectRatio(1.15f)
-                                .clip(RoundedCornerShape(8.dp))
+                                .aspectRatio(1.0f)
+                                .clip(RoundedCornerShape(6.dp))
                                 .border(
-                                    width = if (isCurrent) 2.5.dp else 1.5.dp,
+                                    width = if (isCurrent) 2.dp else 1.dp,
                                     color = when {
                                         isCurrent -> Color(0xFFF59E0B)
                                         isAnswered -> Color(0xFF003F73)
                                         else -> Color(0xFFCBD5E1)
                                     },
-                                    shape = RoundedCornerShape(8.dp)
+                                    shape = RoundedCornerShape(6.dp)
                                 )
                                 .background(
                                     when {
@@ -1068,7 +987,7 @@ private fun QuestionGridSection(
                                     isCurrent -> Color(0xFF92400E)
                                     else -> Color(0xFF334155)
                                 },
-                                fontSize = 15.sp,
+                                fontSize = 13.sp,
                                 fontWeight = FontWeight.Bold,
                             )
                         }
@@ -1079,16 +998,16 @@ private fun QuestionGridSection(
                         Box(
                             modifier = Modifier
                                 .weight(1f)
-                                .aspectRatio(1.15f)
-                                .clip(RoundedCornerShape(8.dp))
-                                .border(1.5.dp, Color(0xFFE2E8F0), RoundedCornerShape(8.dp))
+                                .aspectRatio(1.0f)
+                                .clip(RoundedCornerShape(6.dp))
+                                .border(1.dp, Color(0xFFE2E8F0), RoundedCornerShape(6.dp))
                                 .background(Color(0xFFF8FAFC)),
                             contentAlignment = Alignment.Center
                         ) {
                             Text(
                                 "$displayNum",
                                 color = Color(0xFFCBD5E1),
-                                fontSize = 14.sp,
+                                fontSize = 12.sp,
                                 fontWeight = FontWeight.Bold,
                             )
                         }
