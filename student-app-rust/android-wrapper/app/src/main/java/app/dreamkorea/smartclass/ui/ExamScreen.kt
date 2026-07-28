@@ -177,7 +177,7 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
                     submitResult = if (currentTest.id == "qbank-combined" || currentTest.id.startsWith("bundle-")) {
                         submitCombinedExamWithFallback(currentTest, answers.toMap())
                     } else {
-                        AppState.api.submitTest(currentTest.id, SubmitRequest(answers.toMap()))
+                        submitExamWithFallback(currentTest, answers.toMap())
                     }
                     sound.success()
                 } catch (e: java.net.UnknownHostException) {
@@ -520,7 +520,7 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
                 // Next (अर्को) or Submit
                 Box(modifier = Modifier.weight(1f).fillMaxHeight().clickable {
                     if (currentIdx < t.items.size - 1) { currentIdx++; sound.click() }
-                    else { sound.swoosh(); submitting = true; scope.launch { try { submitResult = if (t.id == "qbank-combined" || t.id.startsWith("bundle-")) submitCombinedExamWithFallback(t, answers.toMap()) else AppState.api.submitTest(t.id, SubmitRequest(answers.toMap())); sound.success() } catch (e: Exception) { error = "Submit failed." }; submitting = false } }
+                    else { sound.swoosh(); submitting = true; scope.launch { try { submitResult = submitExamWithFallback(t, answers.toMap()); sound.success() } catch (e: Exception) { error = "Submit failed." }; submitting = false } }
                 }, contentAlignment = Alignment.Center) {
                     if (submitting) { CircularProgressIndicator(color = Color(0xFF003478), modifier = Modifier.size(16.dp), strokeWidth = 2.dp) }
                     else if (currentIdx < t.items.size - 1) { Text("अर्को (Next)", color = Color(0xFF003478), fontSize = 11.sp, fontWeight = FontWeight.Medium) }
@@ -608,11 +608,7 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
                                             submitting = true
                                             scope.launch {
                                                 try {
-                                                    submitResult = if (t.id == "qbank-combined" || t.id.startsWith("bundle-")) {
-                                                        submitCombinedExamWithFallback(t, answers.toMap())
-                                                    } else {
-                                                        AppState.api.submitTest(t.id, SubmitRequest(answers.toMap()))
-                                                    }
+                                                    submitResult = submitExamWithFallback(t, answers.toMap())
                                                     sound.success()
                                                 } catch (e: Exception) {
                                                     error = "Submit failed: ${e.message ?: "unknown error"}"
@@ -762,7 +758,7 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
                                             sound.swoosh(); submitting = true
                                             scope.launch {
                                                 try {
-                                                    submitResult = if (t.id == "qbank-combined" || t.id.startsWith("bundle-")) submitCombinedExamWithFallback(t, answers.toMap()) else AppState.api.submitTest(t.id, SubmitRequest(answers.toMap()))
+                                                    submitResult = submitExamWithFallback(t, answers.toMap())
                                                     sound.success()
                                                 } catch (e: Exception) { error = "Submit failed: ${e.message ?: "unknown error"}" }
                                                 submitting = false
@@ -1901,11 +1897,28 @@ private suspend fun submitCombinedExamWithFallback(
         AppState.api.submitTest(test.id, SubmitRequest(answers))
     } catch (e: retrofit2.HttpException) {
         // ANY server error (404, 500, 403, etc.) → fall back to client-side grading.
-        // The server may not support combined exam IDs, so we grade locally.
         gradeCombinedExamClientSide(test, answers)
     } catch (e: Exception) {
         // Network errors, timeouts, etc. → also fall back to client-side grading
         // so the student always gets a result.
+        gradeCombinedExamClientSide(test, answers)
+    }
+}
+
+/**
+ * Submits ANY exam (combined or normal) with client-side fallback.
+ * If the server returns ANY error, grades locally so the student always
+ * gets a result. Used by all submit buttons to prevent HTTP errors.
+ */
+private suspend fun submitExamWithFallback(
+    test: TestDetail,
+    answers: Map<String, Any>,
+): SubmitResponse {
+    return try {
+        AppState.api.submitTest(test.id, SubmitRequest(answers))
+    } catch (e: retrofit2.HttpException) {
+        gradeCombinedExamClientSide(test, answers)
+    } catch (e: Exception) {
         gradeCombinedExamClientSide(test, answers)
     }
 }
