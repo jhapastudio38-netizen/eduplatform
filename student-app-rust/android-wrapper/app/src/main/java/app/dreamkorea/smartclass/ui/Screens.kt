@@ -983,98 +983,27 @@ fun VideosScreen(theme: AppTheme, sound: SoundManager, onBack: () -> Unit, onHid
         finally { loading = false }
     }
 
-    // ── Full-screen video player overlay — only video + close button ─────
+    // ── Video click → open in external browser/YouTube app ─────────────
+    // Simple, reliable approach: just launch the URL externally
+    val context = LocalContext.current
     if (playingVideo != null) {
         val v = playingVideo!!
-        var isLoading by remember { mutableStateOf(true) }
-
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(Color.Black)
-        ) {
-            // ── In-app browser (WebView) — renders video directly, no browser UI ──
-            AndroidView(
-                factory = { ctx ->
-                    android.webkit.WebView(ctx).apply {
-                        // ── Enable all features for smooth video playback ──
-                        settings.javaScriptEnabled = true
-                        settings.domStorageEnabled = true
-                        settings.databaseEnabled = true
-                        settings.mediaPlaybackRequiresUserGesture = false
-                        settings.loadWithOverviewMode = true
-                        settings.useWideViewPort = true
-                        settings.cacheMode = android.webkit.WebSettings.LOAD_NO_CACHE
-                        settings.pluginState = android.webkit.WebSettings.PluginState.ON
-                        settings.setSupportZoom(false)
-                        settings.builtInZoomControls = false
-                        settings.mixedContentMode = android.webkit.WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
-                        settings.userAgentString = settings.userAgentString.replace("; wv", "")
-                        // Hardware acceleration for smooth video
-                        setLayerType(android.view.View.LAYER_TYPE_HARDWARE, null)
-                        // Track page loading
-                        webViewClient = object : android.webkit.WebViewClient() {
-                            override fun onPageFinished(view: android.webkit.WebView?, url: String?) {
-                                super.onPageFinished(view, url)
-                                isLoading = false
-                            }
-                        }
-                        webChromeClient = object : android.webkit.WebChromeClient() {}
-
-                        val html = if (v.videoSource == "upload" && !v.videoUrl.isNullOrBlank()) {
-                            val abs = if (v.videoUrl!!.startsWith("http")) v.videoUrl else "https://my-project-five-sepia.vercel.app${v.videoUrl}"
-                            """<html>
-                            <head><meta name='viewport' content='width=device-width, initial-scale=1.0, maximum-scale=1.0'>
-                            <style>body{margin:0;padding:0;background:#000;overflow:hidden;width:100vw;height:100vh;}
-                            video{width:100%;height:100%;object-fit:contain;}</style></head>
-                            <body><video src='$abs' controls autoplay playsinline webkit-playsinline></video></body>
-                            </html>"""
-                        } else if (v.youtubeId.isNotBlank()) {
-                            """<html>
-                            <head><meta name='viewport' content='width=device-width, initial-scale=1.0'>
-                            <style>body{margin:0;padding:0;background:#000;overflow:hidden;width:100vw;height:100vh;}</style></head>
-                            <body>
-                            <iframe id='player' width='100%' height='100%'
-                            src='https://www.youtube.com/embed/${v.youtubeId}?autoplay=1&controls=1&rel=0&modestbranding=1&playsinline=1&fs=1&enablejsapi=1'
-                            frameborder='0'
-                            allow='accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen'
-                            allowfullscreen></iframe>
-                            </body>
-                            </html>"""
-                        } else {
-                            "<html><body style='margin:0;padding:0;background:#000;color:#fff;display:flex;align-items:center;justify-content:center;height:100vh;font-size:18px;'>No video source</body></html>"
-                        }
-                        // Use https://www.youtube.com as base URL so YouTube accepts the embed
-                        loadDataWithBaseURL("https://www.youtube.com", html, "text/html", "UTF-8", null)
-                    }
-                },
-                modifier = Modifier.fillMaxSize()
-            )
-
-            // Loading indicator while page loads
-            if (isLoading) {
-                Box(
-                    modifier = Modifier.fillMaxSize(),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    CircularProgressIndicator(color = Color.White)
-                }
+        LaunchedEffect(v.id) {
+            val url = if (v.videoSource == "upload" && !v.videoUrl.isNullOrBlank()) {
+                if (v.videoUrl!!.startsWith("http")) v.videoUrl else "https://my-project-five-sepia.vercel.app${v.videoUrl}"
+            } else if (v.youtubeId.isNotBlank()) {
+                "https://www.youtube.com/watch?v=${v.youtubeId}"
+            } else {
+                null
             }
-
-            // Close button — floats on top-right corner
-            Surface(
-                color = Color.Black.copy(alpha = 0.6f),
-                shape = androidx.compose.foundation.shape.CircleShape,
-                modifier = Modifier
-                    .align(Alignment.TopEnd)
-                    .padding(12.dp)
-                    .size(44.dp)
-                    .clickable { playingVideo = null }
-            ) {
-                Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
-                    Icon(Icons.Default.Close, "Close", tint = Color.White, modifier = Modifier.size(24.dp))
-                }
+            if (url != null) {
+                try {
+                    val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(url))
+                    intent.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+                    context.startActivity(intent)
+                } catch (_: Exception) {}
             }
+            playingVideo = null
         }
         return
     }
