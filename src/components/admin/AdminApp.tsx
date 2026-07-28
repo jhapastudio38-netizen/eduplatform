@@ -85,6 +85,8 @@ const NAV_SECTIONS: NavSection[] = [
       { id: "home-cards", label: "Home Cards", icon: LayoutGrid, hasAdd: true },
       { id: "eye-vision", label: "Eye Vision", icon: Eye, hasAdd: true },
       { id: "books", label: "Books", icon: BookMarked, hasAdd: true },
+      { id: "video-lessons", label: "Video Lessons", icon: Video, hasAdd: true },
+      { id: "audio-lessons", label: "Audio Lessons", icon: Headphones, hasAdd: true },
     ],
   },
   {
@@ -133,11 +135,17 @@ export function AdminApp() {
     ? NAV_SECTIONS
     : NAV_SECTIONS
         .filter((s) => s.title !== "Communication") // no Push Notifications for teachers
-        .filter((s) => s.title !== "Content")        // no Home Cards / Eye Vision / Books for teachers
         .map((s) => {
+          if (s.title === "Content") {
+            // Teachers see only Video Lessons + Audio Lessons (not Home Cards, Eye Vision, Books)
+            return {
+              ...s,
+              items: s.items.filter(
+                (it) => it.id === "video-lessons" || it.id === "audio-lessons",
+              ),
+            };
+          }
           if (s.title === "Management") {
-            // Teachers see only Live Sessions, Student Results, Students
-            // (no Teachers, no Teacher Invites — those are admin-only)
             return {
               ...s,
               items: s.items.filter(
