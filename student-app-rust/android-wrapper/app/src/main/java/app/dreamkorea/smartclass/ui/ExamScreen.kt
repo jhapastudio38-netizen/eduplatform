@@ -930,12 +930,18 @@ private fun QuestionGridSection(
     val cols = 5
     val totalBoxes = 20
     val rowsCount = 4
+    // Fixed small square size — width = height, perfectly square
+    val boxSize = 38.dp
 
-    Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(5.dp)) {
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(6.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
         for (rowIdx in 0 until rowsCount) {
             Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(5.dp)
+                modifier = Modifier,
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
             ) {
                 for (colIdx in 0 until cols) {
                     val localIdx = rowIdx * cols + colIdx
@@ -951,23 +957,20 @@ private fun QuestionGridSection(
                         }
                         Box(
                             modifier = Modifier
-                                .weight(1f)
-                                .aspectRatio(1.0f)
+                                .size(boxSize)
                                 .clip(RoundedCornerShape(6.dp))
                                 .border(
-                                    width = if (isCurrent) 2.dp else 1.dp,
+                                    width = if (isCurrent) 2.5.dp else 1.dp,
                                     color = when {
                                         isCurrent -> Color(0xFFF59E0B)
                                         isAnswered -> Color(0xFF003F73)
-                                        else -> Color(0xFFCBD5E1)
+                                        else -> Color(0xFF94A3B8)
                                     },
                                     shape = RoundedCornerShape(6.dp)
                                 )
                                 .background(
                                     when {
-                                        isAnswered -> Brush.verticalGradient(
-                                            listOf(Color(0xFF003F73), Color(0xFF1E88E5))
-                                        )
+                                        isAnswered -> SolidColor(Color(0xFF003F73))
                                         isCurrent -> SolidColor(Color(0xFFFEF3C7))
                                         else -> SolidColor(Color.White)
                                     }
@@ -984,11 +987,11 @@ private fun QuestionGridSection(
                                 "${globalIdx + 1}",
                                 color = when {
                                     isAnswered -> Color.White
-                                    isCurrent -> Color(0xFF92400E)
-                                    else -> Color(0xFF334155)
+                                    isCurrent -> Color(0xFF7C2D12)
+                                    else -> Color(0xFF0F172A)  // very dark, almost black
                                 },
-                                fontSize = 13.sp,
-                                fontWeight = FontWeight.Bold,
+                                fontSize = 15.sp,
+                                fontWeight = FontWeight.Black,
                             )
                         }
                     } else {
@@ -997,8 +1000,7 @@ private fun QuestionGridSection(
                         // Empty box — show number, not clickable, light gray
                         Box(
                             modifier = Modifier
-                                .weight(1f)
-                                .aspectRatio(1.0f)
+                                .size(boxSize)
                                 .clip(RoundedCornerShape(6.dp))
                                 .border(1.dp, Color(0xFFE2E8F0), RoundedCornerShape(6.dp))
                                 .background(Color(0xFFF8FAFC)),
@@ -1007,7 +1009,7 @@ private fun QuestionGridSection(
                             Text(
                                 "$displayNum",
                                 color = Color(0xFFCBD5E1),
-                                fontSize = 12.sp,
+                                fontSize = 13.sp,
                                 fontWeight = FontWeight.Bold,
                             )
                         }
