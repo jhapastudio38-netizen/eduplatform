@@ -328,7 +328,30 @@ interface DreamKoreaApi {
 
     @GET("api/student/completed-tests")
     suspend fun getCompletedTests(): CompletedTestsResponse
+
+    @GET("api/student/tests/{id}/completion-status")
+    suspend fun getCompletionStatus(@Path("id") id: String): CompletionStatusResponse
+
+    @GET("api/student/subscription")
+    suspend fun getSubscriptionStatus(): SubscriptionStatusResponse
 }
+
+// ─── Subscription ─────────────────────────────────────────────────────────────
+data class SubscriptionStatusResponse(
+    val isSubscribed: Boolean = false,
+    val subscriptionType: String? = null,
+    val subscribedUntil: String? = null,
+)
+
+// ─── Completion Status ────────────────────────────────────────────────────────
+data class CompletionStatusResponse(
+    val completed: Boolean = false,
+    val canRetake: Boolean = true,
+    val isSubscribed: Boolean = false,
+    val submittedAt: String? = null,
+    val score: Int? = null,
+    val maxScore: Int? = null,
+)
 
 // ─── Completed Tests ──────────────────────────────────────────────────────────
 // Maps testId (including combined IDs like "qbank-combined" or "bundle-{id}")

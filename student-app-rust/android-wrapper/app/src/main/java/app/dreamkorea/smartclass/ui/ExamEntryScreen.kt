@@ -54,6 +54,8 @@ fun ExamEntryScreen(theme: AppTheme, sound: SoundManager, testId: String, onStar
     var test by remember { mutableStateOf<TestDetail?>(null) }
     var loading by remember { mutableStateOf(true) }
     var error by remember { mutableStateOf("") }
+    var alreadyCompleted by remember { mutableStateOf(false) }
+    var isSubscribed by remember { mutableStateOf(false) }
 
     // ── ORIENTATION ── FORCE LANDSCAPE for the exam overview. The phone
     // auto-rotates to landscape when the overview opens, and restores on exit.
@@ -101,11 +103,25 @@ fun ExamEntryScreen(theme: AppTheme, sound: SoundManager, testId: String, onStar
                 }
             }
             if (result != null) {
-                // Check if the test has no questions — show a friendly error
                 if (result.items.isEmpty()) {
-                    error = "This exam has no questions yet. Please ask your teacher to add questions to this package."
+                    error = "This exam has no questions yet."
                 } else {
                     test = result
+                    // Check completion status (for non-practice exams only)
+                    if (testId != "qbank-combined" && !testId.startsWith("bundle-")) {
+                        try {
+                            val status = AppState.api.getCompletionStatus(testId)
+                            alreadyCompleted = status.completed
+                            isSubscribed = status.isSubscribed
+                        } catch (_: Exception) {
+                            // If the endpoint fails, just skip the check
+                        }
+                    }
+                    // Also try to get subscription status
+                    try {
+                        val sub = AppState.api.getSubscriptionStatus()
+                        isSubscribed = sub.isSubscribed
+                    } catch (_: Exception) {}
                 }
             } else {
                 error = "Could not load the test. Check your connection."
@@ -364,16 +380,44 @@ fun ExamEntryScreen(theme: AppTheme, sound: SoundManager, testId: String, onStar
                     }
                 }
 
-                Spacer(Modifier.height(20.dp))
+                Spacer(Modifier.height(12.dp))
 
-                // Get Started button
+                // ── Already completed warning (non-subscribers can only take once) ──
+                if (alreadyCompleted && !isSubscribed) {
+                    Surface(
+                        color = Color(0xFFFFF3CD),
+                        shape = RoundedCornerShape(8.dp),
+                        border = BorderStroke(1.dp, Color(0xFFFFC107)),
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)
+                    ) {
+                        Column(modifier = Modifier.padding(10.dp)) {
+                            Text("Already Completed", color = Color(0xFF856404), fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                            Text("You've already taken this exam. Subscribe to unlock unlimited retakes.", color = Color(0xFF856404), fontSize = 10.sp)
+                        }
+                    }
+                    Spacer(Modifier.height(8.dp))
+                }
+
+                // Subscriber badge
+                if (isSubscribed) {
+                    Surface(color = Color(0xFF8B5CF6), shape = RoundedCornerShape(8.dp)) {
+                        Text("SUBSCRIBER — Unlimited Access", color = Color.White, fontSize = 10.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp))
+                    }
+                    Spacer(Modifier.height(8.dp))
+                }
+
+                // Get Started button (or "Retake" if already completed)
                 Button(
                     onClick = { sound.swoosh(); onStart() },
                     modifier = Modifier.fillMaxWidth(0.7f).height(44.dp),
                     colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF003478)),
-                    shape = RoundedCornerShape(10.dp)
+                    shape = RoundedCornerShape(10.dp),
+                    enabled = !(alreadyCompleted && !isSubscribed)
                 ) {
-                    Text("Get Started", color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                    Text(
+                        if (alreadyCompleted && !isSubscribed) "Already Completed" else if (alreadyCompleted) "Retake Exam" else "Get Started",
+                        color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Bold
+                    )
                 }
 
                 Spacer(Modifier.height(8.dp))
