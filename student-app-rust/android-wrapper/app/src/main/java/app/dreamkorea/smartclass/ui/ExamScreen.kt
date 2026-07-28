@@ -628,9 +628,9 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
                             modifier = Modifier.fillMaxWidth().height(32.dp),
                             contentAlignment = Alignment.Center
                         ) {
-                            Box(modifier = Modifier.fillMaxWidth().height(1.dp).align(Alignment.Top).background(Color(0xFFCCCCCC)))
+                            Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(Color(0xFFCCCCCC)))
                             Text("Reading", color = Color(0xFF111111), fontSize = 11.sp, fontWeight = FontWeight.Medium)
-                            Box(modifier = Modifier.fillMaxWidth().height(1.dp).align(Alignment.Bottom).background(Color(0xFFCCCCCC)))
+                            Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(Color(0xFFCCCCCC)))
                         }
                         Spacer(Modifier.height(4.dp))
                         // Reading grid — 5 cols × 4 rows, 1-20
@@ -646,9 +646,9 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
                             modifier = Modifier.fillMaxWidth().height(32.dp),
                             contentAlignment = Alignment.Center
                         ) {
-                            Box(modifier = Modifier.fillMaxWidth().height(1.dp).align(Alignment.Top).background(Color(0xFFCCCCCC)))
+                            Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(Color(0xFFCCCCCC)))
                             Text("Listening", color = Color(0xFF111111), fontSize = 11.sp, fontWeight = FontWeight.Medium)
-                            Box(modifier = Modifier.fillMaxWidth().height(1.dp).align(Alignment.Bottom).background(Color(0xFFCCCCCC)))
+                            Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(Color(0xFFCCCCCC)))
                         }
                         Spacer(Modifier.height(4.dp))
                         // Listening grid — 5 cols × 4 rows, 21-40
