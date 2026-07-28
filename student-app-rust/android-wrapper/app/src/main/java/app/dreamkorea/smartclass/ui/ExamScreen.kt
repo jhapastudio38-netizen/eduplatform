@@ -72,18 +72,15 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
     // Timer
     var timeLeft by remember { mutableStateOf(0) }
 
-    // ── ORIENTATION ── FORCE LANDSCAPE for the exam. NEVER portrait.
-    // Uses BOTH DisposableEffect (immediate) AND LaunchedEffect (after
-    // composition) to ensure landscape wins over MainScreen's portrait lock.
+    // ── ORIENTATION ── FORCE LANDSCAPE. No onDispose PORTRAIT —
+    // MainScreen handles portrait when screen changes to non-exam.
     DisposableEffect(Unit) {
         val activity = context as? Activity
         activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
-        onDispose {
-            activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
-        }
+        onDispose { }
     }
-    // Re-enforce landscape after composition (wins over parent's LaunchedEffect)
     LaunchedEffect(Unit) {
+        kotlinx.coroutines.delay(100)
         val activity = context as? Activity
         activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
     }
@@ -1012,9 +1009,12 @@ fun ExamResultScreen(
     DisposableEffect(Unit) {
         val activity = context as? Activity
         activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
-        onDispose {
-            activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
-        }
+        onDispose { }
+    }
+    LaunchedEffect(Unit) {
+        kotlinx.coroutines.delay(100)
+        val activity = context as? Activity
+        activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
     }
 
     LaunchedEffect(Unit) { sound.success() }

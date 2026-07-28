@@ -65,16 +65,15 @@ fun ExamEntryScreen(theme: AppTheme, sound: SoundManager, testId: String, onStar
         showRotateHint = false
     }
 
-    // ── ORIENTATION ── FORCE LANDSCAPE for the exam overview. NEVER portrait.
-    // Uses BOTH DisposableEffect AND LaunchedEffect to ensure landscape wins.
+    // ── ORIENTATION ── FORCE LANDSCAPE. No onDispose PORTRAIT —
+    // MainScreen handles portrait when screen changes to non-exam.
     DisposableEffect(Unit) {
         val activity = context as? Activity
         activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
-        onDispose {
-            activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
-        }
+        onDispose { }
     }
     LaunchedEffect(Unit) {
+        kotlinx.coroutines.delay(100)
         val activity = context as? Activity
         activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
     }
