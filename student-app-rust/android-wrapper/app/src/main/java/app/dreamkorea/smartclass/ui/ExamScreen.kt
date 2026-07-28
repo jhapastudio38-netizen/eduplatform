@@ -677,6 +677,8 @@ private fun QuestionGridSection(
                             )
                         }
                     } else {
+                        val baseNum = if (globalIndices.isNotEmpty()) globalIndices[0] else 0
+                        val displayNum = baseNum + localIdx + 1
                         // Empty box — show number, not clickable, gray
                         Box(
                             modifier = Modifier
@@ -686,7 +688,7 @@ private fun QuestionGridSection(
                             contentAlignment = Alignment.Center
                         ) {
                             Text(
-                                "${localIdx + 1}",
+                                "$displayNum",
                                 color = Color(0xFFCCCCCC),
                                 fontSize = 14.sp,
                                 fontWeight = FontWeight.Bold,
