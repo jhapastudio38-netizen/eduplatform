@@ -94,23 +94,41 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ testId: st
     const ans = answers[q.id];
     const correct = q.correctAnswer ? JSON.parse(q.correctAnswer) : null;
 
+    // ── Normalize URLs for image/audio answers ──────────────────────────
+    // User's answer may be a full URL (https://my-project.../api/files/...)
+    // while the correct answer is a relative path (/api/files/...).
+    // Strip the origin so both are compared as pathname-only.
+    const normalizeUrl = (val: unknown): unknown => {
+      if (typeof val === "string") {
+        try {
+          // If it's a URL, extract just the pathname
+          if (val.startsWith("http://") || val.startsWith("https://")) {
+            return new URL(val).pathname;
+          }
+          return val;
+        } catch { return val; }
+      }
+      if (Array.isArray(val)) return val.map(normalizeUrl);
+      return val;
+    };
+    const normAns = normalizeUrl(ans);
+    const normCorrect = normalizeUrl(correct);
+
     if (q.type === "SINGLE_CHOICE" || q.type === "TRUE_FALSE" || q.type === "ONE_WORD" || q.type === "FILL_BLANK") {
-      if (typeof ans === "string" && correct && String(ans).trim().toLowerCase() === String(correct).trim().toLowerCase()) {
+      if (typeof normAns === "string" && normCorrect && String(normAns).trim().toLowerCase() === String(normCorrect).trim().toLowerCase()) {
         score += item.points;
-      } else if (ans && test.negativeMarking > 0) {
-        // Wrong answer with negative marking
+      } else if (normAns && test.negativeMarking > 0) {
         score -= test.negativeMarking;
       }
     } else if (q.type === "MULTIPLE_CHOICE") {
-      const selected = Array.isArray(ans) ? (ans as string[]).slice().sort() : [];
-      const correctArr = Array.isArray(correct) ? (correct as string[]).slice().sort() : [];
+      const selected = Array.isArray(normAns) ? (normAns as string[]).slice().sort() : [];
+      const correctArr = Array.isArray(normCorrect) ? (normCorrect as string[]).slice().sort() : [];
       if (selected.length === correctArr.length && selected.every((v, i) => v === correctArr[i])) {
         score += item.points;
       } else if (selected.length > 0 && test.negativeMarking > 0) {
         score -= test.negativeMarking;
       }
     } else {
-      // SHORT_ANSWER / LONG_ANSWER / MATCHING — needs human review
       needsManualGrading = true;
     }
   }
@@ -174,13 +192,27 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ testId: st
     const correct = q.correctAnswer ? JSON.parse(q.correctAnswer) : null;
     let isCorrect = false;
 
+    // Normalize URLs for image/audio answer comparison
+    const normalizeUrl = (val: unknown): unknown => {
+      if (typeof val === "string") {
+        try {
+          if (val.startsWith("http://") || val.startsWith("https://")) return new URL(val).pathname;
+          return val;
+        } catch { return val; }
+      }
+      if (Array.isArray(val)) return val.map(normalizeUrl as (v: unknown) => unknown);
+      return val;
+    };
+    const normAns = normalizeUrl(ans);
+    const normCorrect = normalizeUrl(correct);
+
     if (q.type === "SINGLE_CHOICE" || q.type === "TRUE_FALSE" || q.type === "ONE_WORD" || q.type === "FILL_BLANK") {
-      if (typeof ans === "string" && correct && String(ans).trim().toLowerCase() === String(correct).trim().toLowerCase()) {
+      if (typeof normAns === "string" && normCorrect && String(normAns).trim().toLowerCase() === String(normCorrect).trim().toLowerCase()) {
         isCorrect = true;
       }
     } else if (q.type === "MULTIPLE_CHOICE") {
-      const selected = Array.isArray(ans) ? (ans as string[]).slice().sort() : [];
-      const correctArr = Array.isArray(correct) ? (correct as string[]).slice().sort() : [];
+      const selected = Array.isArray(normAns) ? (normAns as string[]).slice().sort() : [];
+      const correctArr = Array.isArray(normCorrect) ? (normCorrect as string[]).slice().sort() : [];
       isCorrect = selected.length === correctArr.length && selected.every((v, i) => v === correctArr[i]);
     }
 
@@ -285,14 +317,28 @@ async function handleCombinedSubmit(
     const correct = q.correctAnswer ? JSON.parse(q.correctAnswer) : null;
     let isCorrect = false;
 
+    // Normalize URLs for image/audio answer comparison
+    const normalizeUrl = (val: unknown): unknown => {
+      if (typeof val === "string") {
+        try {
+          if (val.startsWith("http://") || val.startsWith("https://")) return new URL(val).pathname;
+          return val;
+        } catch { return val; }
+      }
+      if (Array.isArray(val)) return val.map(normalizeUrl as (v: unknown) => unknown);
+      return val;
+    };
+    const normAns = normalizeUrl(ans);
+    const normCorrect = normalizeUrl(correct);
+
     if (q.type === "SINGLE_CHOICE" || q.type === "TRUE_FALSE" || q.type === "ONE_WORD" || q.type === "FILL_BLANK") {
-      if (typeof ans === "string" && correct && String(ans).trim().toLowerCase() === String(correct).trim().toLowerCase()) {
+      if (typeof normAns === "string" && normCorrect && String(normAns).trim().toLowerCase() === String(normCorrect).trim().toLowerCase()) {
         isCorrect = true;
         score += points;
       }
     } else if (q.type === "MULTIPLE_CHOICE") {
-      const selected = Array.isArray(ans) ? (ans as string[]).slice().sort() : [];
-      const correctArr = Array.isArray(correct) ? (correct as string[]).slice().sort() : [];
+      const selected = Array.isArray(normAns) ? (normAns as string[]).slice().sort() : [];
+      const correctArr = Array.isArray(normCorrect) ? (normCorrect as string[]).slice().sort() : [];
       if (selected.length === correctArr.length && selected.every((v, i) => v === correctArr[i])) {
         isCorrect = true;
         score += points;
