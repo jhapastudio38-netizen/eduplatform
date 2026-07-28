@@ -977,63 +977,64 @@ fun VideosScreen(theme: AppTheme, sound: SoundManager, onBack: () -> Unit) {
         finally { loading = false }
     }
 
-    // ── Full-screen video player overlay ──────────────────────────────
+    // ── Full-screen video player overlay — only video + close button ─────
     if (playingVideo != null) {
         val v = playingVideo!!
+        // Full screen black background — hides everything (nav, header, etc.)
         Box(
             modifier = Modifier
                 .fillMaxSize()
                 .background(Color.Black)
         ) {
-            // Close button
-            IconButton(
-                onClick = { playingVideo = null },
-                modifier = Modifier
-                    .align(Alignment.TopStart)
-                    .padding(8.dp)
-                    .size(40.dp)
-            ) {
-                Icon(Icons.Default.Close, "Close", tint = Color.White, modifier = Modifier.size(24.dp))
-            }
-
-            // Title
-            Text(
-                v.title,
-                color = Color.White,
-                fontSize = 14.sp,
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier
-                    .align(Alignment.TopCenter)
-                    .padding(top = 12.dp, start = 56.dp, end = 56.dp),
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-
-            // Video player
+            // Video player fills the entire screen
             AndroidView(
                 factory = { ctx ->
                     android.webkit.WebView(ctx).apply {
+                        // ── Enable all features needed for YouTube + HTML5 video ──
                         settings.javaScriptEnabled = true
                         settings.domStorageEnabled = true
+                        settings.databaseEnabled = true
                         settings.mediaPlaybackRequiresUserGesture = false
+                        settings.loadWithOverviewMode = true
+                        settings.useWideViewPort = true
+                        settings.cacheMode = android.webkit.WebSettings.LOAD_DEFAULT
+                        settings.pluginState = android.webkit.WebSettings.PluginState.ON
+                        settings.setSupportZoom(false)
+                        // Allow mixed content (YouTube uses both http and https)
+                        settings.mixedContentMode = android.webkit.WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
+                        // Enable hardware acceleration
+                        setLayerType(android.view.View.LAYER_TYPE_HARDWARE, null)
                         webViewClient = android.webkit.WebViewClient()
-                        val videoUrl = if (v.videoSource == "upload" && !v.videoUrl.isNullOrBlank()) {
+                        webChromeClient = object : android.webkit.WebChromeClient() {}
+
+                        val htmlContent = if (v.videoSource == "upload" && !v.videoUrl.isNullOrBlank()) {
                             val abs = if (v.videoUrl!!.startsWith("http")) v.videoUrl else "https://my-project-five-sepia.vercel.app${v.videoUrl}"
-                            // HTML5 video player for uploaded videos
-                            "<html><body style='margin:0;padding:0;background:#000;display:flex;align-items:center;justify-content:center;height:100vh;'><video src='$abs' controls autoplay playsinline style='max-width:100%;max-height:100%;'></video></body></html>"
+                            "<html><head><meta name='viewport' content='width=device-width, initial-scale=1.0, maximum-scale=1.0'></head><body style='margin:0;padding:0;background:#000;overflow:hidden;'><video src='$abs' controls autoplay playsinline webkit-playsinline style='width:100vw;height:100vh;object-fit:contain;'></video></body></html>"
                         } else if (v.youtubeId.isNotBlank()) {
-                            // YouTube embed — ad-free, autoplay, fullscreen
-                            "<html><body style='margin:0;padding:0;background:#000;'><iframe width='100%' height='100%' src='https://www.youtube.com/embed/${v.youtubeId}?autoplay=1&rel=0&modestbranding=1&playsinline=1' frameborder='0' allow='accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture' allowfullscreen></iframe></body></html>"
+                            "<html><head><meta name='viewport' content='width=device-width, initial-scale=1.0'></head><body style='margin:0;padding:0;background:#000;overflow:hidden;'><iframe width='100%' height='100%' src='https://www.youtube.com/embed/${v.youtubeId}?autoplay=1&rel=0&modestbranding=1&playsinline=1&fs=1' frameborder='0' allow='accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen' allowfullscreen></iframe></body></html>"
                         } else {
-                            "<html><body style='margin:0;padding:0;background:#000;display:flex;align-items:center;justify-content:center;height:100vh;color:#fff;'>No video source available</body></html>"
+                            "<html><body style='margin:0;padding:0;background:#000;display:flex;align-items:center;justify-content:center;height:100vh;color:#fff;font-size:18px;'>No video source</body></html>"
                         }
-                        loadDataWithBaseURL(null, videoUrl, "text/html", "UTF-8", null)
+                        loadDataWithBaseURL("https://www.youtube.com", htmlContent, "text/html", "UTF-8", null)
                     }
                 },
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(top = 56.dp)
+                modifier = Modifier.fillMaxSize()
             )
+
+            // Close button — floats on top of the video, top-right corner
+            Surface(
+                color = Color.Black.copy(alpha = 0.6f),
+                shape = androidx.compose.foundation.shape.CircleShape,
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(12.dp)
+                    .size(44.dp)
+                    .clickable { playingVideo = null }
+            ) {
+                Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
+                    Icon(Icons.Default.Close, "Close", tint = Color.White, modifier = Modifier.size(24.dp))
+                }
+            }
         }
         return
     }

@@ -281,8 +281,25 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
 
     val currentQuestion = t.items.getOrNull(currentIdx)
 
+    // ─── Eye Test trigger ──────────────────────────────────────────────────
+    // Count skipped (unanswered) questions
+    val skippedCount = t.items.count { !answers.containsKey(it.question.id) }
+    // Show eye test if user skipped 2+ questions AND the result has eye vision recommendation
+    var showEyeTest by remember { mutableStateOf(false) }
+
     // ─── Result screen ──────────────────────────────────────────────────────
     if (submitResult != null) {
+        // If user skipped 2+ questions, show eye test BEFORE the result
+        if (skippedCount >= 2 && !showEyeTest && submitResult!!.eyeVision.show) {
+            EyeTestGateScreen(
+                theme = theme,
+                sound = sound,
+                count = submitResult!!.eyeVision.count,
+                reason = submitResult!!.eyeVision.reason,
+                onContinue = { showEyeTest = true },
+            )
+            return
+        }
         ExamResultScreen(theme, submitResult!!, onExit, sound, examTitle = t.title, examDescription = t.description)
         return
     }
@@ -1931,5 +1948,178 @@ private suspend fun submitExamWithFallback(
         gradeCombinedExamClientSide(test, answers)
     } catch (e: Exception) {
         gradeCombinedExamClientSide(test, answers)
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// EYE TEST GATE — shows when user skips 2+ questions
+// Displays a number (0-9) in a gradient circle and asks the user to
+// identify it. Simple vision screening before showing results.
+// ═══════════════════════════════════════════════════════════════════════════
+
+@Composable
+fun EyeTestGateScreen(
+    theme: AppTheme,
+    sound: SoundManager,
+    count: Int,
+    reason: String,
+    onContinue: () -> Unit,
+) {
+    // Generate random numbers 0-9 for the test
+    var currentTestIdx by remember { mutableStateOf(0) }
+    var selectedNumber by remember { mutableStateOf<Int?>(null) }
+    var showResult by remember { mutableStateOf(false) }
+    val testNumbers = remember { (1..count).map { (0..9).random() } }
+
+    if (currentTestIdx >= testNumbers.size) {
+        // All tests done — continue to result
+        onContinue()
+        return
+    }
+
+    val currentNumber = testNumbers[currentTestIdx]
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color(0xFFF0F4FF)),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center,
+    ) {
+        // Header
+        Text(
+            "Eye Vision Check",
+            color = Color(0xFF003478),
+            fontSize = 22.sp,
+            fontWeight = FontWeight.Bold,
+        )
+        Spacer(Modifier.height(8.dp))
+        Text(
+            reason,
+            color = Color(0xFF64748B),
+            fontSize = 13.sp,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.padding(horizontal = 24.dp),
+        )
+        Spacer(Modifier.height(8.dp))
+        Text(
+            "Test ${currentTestIdx + 1} of ${testNumbers.size}",
+            color = Color(0xFF003478),
+            fontSize = 12.sp,
+            fontWeight = FontWeight.SemiBold,
+        )
+
+        Spacer(Modifier.height(24.dp))
+
+        // ── Number display circle ──────────────────────────────────────
+        // Gradient circle with the number — simulates an eye chart
+        Surface(
+            shape = RoundedCornerShape(50),
+            modifier = Modifier.size(200.dp),
+            shadowElevation = 4.dp,
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(
+                        androidx.compose.ui.graphics.Brush.radialGradient(
+                            listOf(Color(0xFF003478), Color(0xFF1E40AF), Color(0xFF3B82F6))
+                        )
+                    ),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    "$currentNumber",
+                    color = Color.White,
+                    fontSize = 80.sp,
+                    fontWeight = FontWeight.Bold,
+                )
+            }
+        }
+
+        Spacer(Modifier.height(24.dp))
+
+        Text(
+            "What number do you see?",
+            color = Color(0xFF1E293B),
+            fontSize = 16.sp,
+            fontWeight = FontWeight.SemiBold,
+        )
+
+        Spacer(Modifier.height(16.dp))
+
+        // ── Number selection grid 0-9 ──────────────────────────────────
+        // 5 columns × 2 rows = 10 buttons (0-9)
+        val numberRows = listOf(0, 1, 2, 3, 4).chunked(1) to listOf(5, 6, 7, 8, 9).chunked(1)
+        val allNumbers = (0..9).toList()
+        val rows = allNumbers.chunked(5)
+
+        rows.forEach { row ->
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                row.forEach { num ->
+                    val isSelected = selectedNumber == num
+                    Surface(
+                        color = if (isSelected) Color(0xFF003478) else Color.White,
+                        border = androidx.compose.foundation.BorderStroke(2.dp, Color(0xFF003478)),
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier
+                            .weight(1f)
+                            .aspectRatio(1f)
+                            .clickable {
+                                sound.click()
+                                selectedNumber = num
+                                // Auto-advance after selection
+                                if (num == currentNumber) {
+                                    sound.success()
+                                }
+                                // Move to next test after a short delay
+                                selectedNumber = num
+                            },
+                    ) {
+                        Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
+                            Text(
+                                "$num",
+                                color = if (isSelected) Color.White else Color(0xFF003478),
+                                fontSize = 24.sp,
+                                fontWeight = FontWeight.Bold,
+                            )
+                        }
+                    }
+                }
+            }
+            Spacer(Modifier.height(10.dp))
+        }
+
+        Spacer(Modifier.height(16.dp))
+
+        // ── Next / Skip button ─────────────────────────────────────────
+        Button(
+            onClick = {
+                sound.swoosh()
+                currentTestIdx++
+                selectedNumber = null
+            },
+            modifier = Modifier.fillMaxWidth(0.7f).height(48.dp),
+            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF003478)),
+            shape = RoundedCornerShape(12.dp),
+            enabled = selectedNumber != null,
+        ) {
+            Text(
+                if (currentTestIdx < testNumbers.size - 1) "Next" else "Finish",
+                color = Color.White,
+                fontSize = 16.sp,
+                fontWeight = FontWeight.Bold,
+            )
+        }
+
+        Spacer(Modifier.height(12.dp))
+
+        // Skip button
+        TextButton(onClick = { onContinue() }) {
+            Text("Skip eye test", color = Color(0xFF64748B), fontSize = 13.sp)
+        }
     }
 }
