@@ -796,6 +796,8 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
 /// Renders a 4-column grid of square question boxes with column-major
 /// numbering (1-5 down col 1, 6-10 down col 2, ...). Applies the tab filter
 /// (All / Solved / Unsolved) and highlights answered/current questions.
+/// Layout matches reference design: 5 columns × 4 rows, LEFT-TO-RIGHT numbering
+/// (1-5 row 1, 6-10 row 2, etc.), boxes wider than tall, black borders.
 @Composable
 private fun QuestionGridSection(
     test: TestDetail,
@@ -807,16 +809,13 @@ private fun QuestionGridSection(
     onPick: (Int) -> Unit,
 ) {
     val globalIndices = items.mapNotNull { item -> test.items.indexOfFirst { it.question.id == item.question.id }.takeIf { it >= 0 } }
-    // 5 columns × 4 rows = 20 questions per grid. If more than 20 questions,
-    // rows expand vertically (the grid scrolls). Column-major numbering:
-    // 1,2,3,4 down col 1; 5,6,7,8 down col 2; etc.
+    // 5 columns, LEFT-TO-RIGHT numbering (row-major): 1,2,3,4,5 in row 1; 6,7,8,9,10 in row 2
     val cols = 5
     val rowsCount = (items.size + cols - 1) / cols
 
     Surface(
         color = Color.White,
-        border = androidx.compose.foundation.BorderStroke(1.5.dp, Color.Black),
-        shape = RoundedCornerShape(6.dp),
+        border = androidx.compose.foundation.BorderStroke(1.dp, Color.Black),
         modifier = Modifier.fillMaxWidth()
     ) {
         Column(modifier = Modifier.padding(2.dp), verticalArrangement = Arrangement.spacedBy(1.dp)) {
@@ -826,7 +825,8 @@ private fun QuestionGridSection(
                     horizontalArrangement = Arrangement.spacedBy(1.dp)
                 ) {
                     for (colIdx in 0 until cols) {
-                        val localIdx = colIdx * rowsCount + rowIdx
+                        // LEFT-TO-RIGHT: row 0 = items 0,1,2,3,4; row 1 = items 5,6,7,8,9
+                        val localIdx = rowIdx * cols + colIdx
                         if (localIdx < items.size) {
                             val globalIdx = globalIndices[localIdx]
                             val isAnswered = answers.containsKey(items[localIdx].question.id)
@@ -840,7 +840,7 @@ private fun QuestionGridSection(
                                 Box(
                                     modifier = Modifier
                                         .weight(1f)
-                                        .aspectRatio(0.9f) // slightly taller than wide
+                                        .aspectRatio(1.3f) // wider than tall — matches reference
                                         .border(1.dp, Color.Black)
                                         .background(if (isAnswered) Color(0xFF003478) else Color.White)
                                         .clickable { sound.click(); onPick(globalIdx) },
@@ -848,16 +848,16 @@ private fun QuestionGridSection(
                                 ) {
                                     Text(
                                         "${globalIdx + 1}",
-                                        color = if (isAnswered) Color.White else Color(0xFF003478),
-                                        fontSize = 18.sp, // BIG numbers — clearly visible
+                                        color = if (isAnswered) Color.White else Color.Black,
+                                        fontSize = 16.sp,
                                         fontWeight = FontWeight.Bold,
                                     )
                                 }
                             } else {
-                                Spacer(modifier = Modifier.weight(1f).aspectRatio(0.9f))
+                                Spacer(modifier = Modifier.weight(1f).aspectRatio(1.3f))
                             }
                         } else {
-                            Spacer(modifier = Modifier.weight(1f).aspectRatio(0.9f))
+                            Spacer(modifier = Modifier.weight(1f).aspectRatio(1.3f))
                         }
                     }
                 }
