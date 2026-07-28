@@ -72,13 +72,14 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
     // Timer
     var timeLeft by remember { mutableStateOf(0) }
 
-    // ── ORIENTATION ── FORCE LANDSCAPE for the exam. The phone auto-rotates
-    // to landscape when the exam opens, and restores on exit.
+    // ── ORIENTATION ── FORCE LANDSCAPE for the exam. NEVER portrait.
+    // On exit, force back to PORTRAIT (not UNSPECIFIED — some devices
+    // ignore the manifest lock and stay in sensor mode).
     DisposableEffect(Unit) {
         val activity = context as? Activity
         activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
         onDispose {
-            activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+            activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
         }
     }
     // Retry trigger — increment to force reload
@@ -1003,13 +1004,11 @@ fun ExamResultScreen(
     val context = LocalContext.current
 
     // ── FORCE PORTRAIT for the result screen ────────────────────────────
-    // After the exam (landscape), rotate back to portrait so the result
-    // screen looks good in normal phone orientation.
     DisposableEffect(Unit) {
         val activity = context as? Activity
         activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
         onDispose {
-            activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+            activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
         }
     }
 

@@ -65,13 +65,13 @@ fun ExamEntryScreen(theme: AppTheme, sound: SoundManager, testId: String, onStar
         showRotateHint = false
     }
 
-    // ── ORIENTATION ── FORCE LANDSCAPE for the exam overview. The phone
-    // auto-rotates to landscape when the overview opens, and restores on exit.
+    // ── ORIENTATION ── FORCE LANDSCAPE for the exam overview. NEVER portrait.
+    // On exit, force back to PORTRAIT.
     DisposableEffect(Unit) {
         val activity = context as? Activity
         activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
         onDispose {
-            activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+            activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
         }
     }
 
