@@ -72,12 +72,11 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
     // Timer
     var timeLeft by remember { mutableStateOf(0) }
 
-    // ── ORIENTATION ── don't force any orientation. The app renders in
-    // whatever orientation the user holds the phone. The exam UI adapts
-    // to both portrait and landscape using LocalConfiguration.
+    // ── ORIENTATION ── FORCE LANDSCAPE for the exam. The phone auto-rotates
+    // to landscape when the exam opens, and restores on exit.
     DisposableEffect(Unit) {
         val activity = context as? Activity
-        activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+        activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
         onDispose {
             activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
         }
@@ -302,59 +301,51 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
     var showGrid by remember { mutableStateOf(true) }
 
     Column(modifier = Modifier.fillMaxSize().background(Color(0xFFF8FAFC))) {
-        // ── 1. TOP STATUS HEADER ── navy blue bar with 4 sections
+        // ── 1. TOP STATUS HEADER ── compact white bar with thin border
         Surface(
-            color = Color(0xFF003478),
-            shadowElevation = 4.dp,
+            color = Color.White,
+            border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFE2E8F0)),
         ) {
-            Row(modifier = Modifier.fillMaxWidth().height(52.dp), verticalAlignment = Alignment.CenterVertically) {
+            Row(modifier = Modifier.fillMaxWidth().height(36.dp), verticalAlignment = Alignment.CenterVertically) {
                 // Section type
                 Box(modifier = Modifier.weight(1f).fillMaxHeight(), contentAlignment = Alignment.Center) {
                     val sectionLabel = if (q.blockType == "audio") "Listening ($listeningCount)" else "Reading ($readingCount)"
-                    Text(sectionLabel, color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                    Text(sectionLabel, color = Color(0xFF003478), fontSize = 10.sp, fontWeight = FontWeight.Bold)
                 }
-                Box(modifier = Modifier.width(1.dp).fillMaxHeight(0.6f).background(Color.White.copy(alpha = 0.3f)))
+                Box(modifier = Modifier.width(1.dp).fillMaxHeight(0.6f).background(Color(0xFFE2E8F0)))
                 // Total
                 Box(modifier = Modifier.weight(1f).fillMaxHeight(), contentAlignment = Alignment.Center) {
-                    Text("Total: ${t.items.size}", color = Color.White, fontSize = 11.sp)
+                    Text("Total: ${t.items.size}", color = Color(0xFF64748B), fontSize = 10.sp)
                 }
-                Box(modifier = Modifier.width(1.dp).fillMaxHeight(0.6f).background(Color.White.copy(alpha = 0.3f)))
+                Box(modifier = Modifier.width(1.dp).fillMaxHeight(0.6f).background(Color(0xFFE2E8F0)))
                 // Remaining
                 Box(modifier = Modifier.weight(1f).fillMaxHeight(), contentAlignment = Alignment.Center) {
-                    Text("Left: $remainingCount", color = Color.White, fontSize = 11.sp)
+                    Text("Left: $remainingCount", color = Color(0xFF64748B), fontSize = 10.sp)
                 }
-                Box(modifier = Modifier.width(1.dp).fillMaxHeight(0.6f).background(Color.White.copy(alpha = 0.3f)))
+                Box(modifier = Modifier.width(1.dp).fillMaxHeight(0.6f).background(Color(0xFFE2E8F0)))
                 // Timer
                 Box(modifier = Modifier.weight(1f).fillMaxHeight(), contentAlignment = Alignment.Center) {
                     val mm = timeLeft / 60; val ss = timeLeft % 60
-                    Text(String.format("%02d:%02d", mm, ss), color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                    Text(String.format("%02d:%02d", mm, ss), color = Color(0xFF003478), fontSize = 12.sp, fontWeight = FontWeight.Bold)
                 }
             }
         }
 
-        // ── 2. INSTRUCTION ROW ── question number + title/stem + FREE badge + divider
-        Surface(modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp)) {
+        // ── 2. INSTRUCTION ROW ── compact question number + title + FREE badge
+        Surface(modifier = Modifier.fillMaxWidth().padding(horizontal = 6.dp, vertical = 2.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("${currentIdx + 1}. ", color = Color.Black, fontSize = 14.sp, fontWeight = FontWeight.Bold)
-                // Show title if present, otherwise show stem preview
+                Text("${currentIdx + 1}. ", color = Color(0xFF003478), fontSize = 12.sp, fontWeight = FontWeight.Bold)
                 val displayText = if (!q.title.isNullOrBlank()) q.title else q.stem.take(80)
-                Text(displayText, color = Color.Black, fontSize = 13.sp, fontWeight = FontWeight.Bold, maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
-                // FREE badge for free/demo questions
+                Text(displayText, color = Color(0xFF1E293B), fontSize = 11.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
                 if (q.isFree) {
-                    Spacer(Modifier.width(6.dp))
-                    Surface(color = Color(0xFF22C55E), shape = RoundedCornerShape(4.dp)) {
-                        Text(
-                            "FREE",
-                            color = Color.White,
-                            fontSize = 9.sp,
-                            fontWeight = FontWeight.Bold,
-                            modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp),
-                        )
+                    Spacer(Modifier.width(4.dp))
+                    Surface(color = Color(0xFF22C55E), shape = RoundedCornerShape(3.dp)) {
+                        Text("FREE", color = Color.White, fontSize = 8.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp))
                     }
                 }
                 Spacer(Modifier.weight(1f))
-                IconButton(onClick = { showGrid = true }, modifier = Modifier.size(28.dp)) {
-                    Icon(Icons.Default.GridView, null, tint = Color.Black, modifier = Modifier.size(16.dp))
+                IconButton(onClick = { showGrid = true }, modifier = Modifier.size(24.dp)) {
+                    Icon(Icons.Default.GridView, null, tint = Color(0xFF64748B), modifier = Modifier.size(14.dp))
                 }
             }
         }
@@ -510,30 +501,30 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
             } // end Row
         } // end Box (watermark background)
 
-        // ── 4. BOTTOM NAVIGATION ── navy blue bar with Nepali labels
+        // ── 4. BOTTOM NAVIGATION ── compact white bar with thin border
         Surface(
-            color = Color(0xFF003478),
-            shadowElevation = 4.dp,
+            color = Color.White,
+            border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFE2E8F0)),
         ) {
-            Row(modifier = Modifier.fillMaxWidth().height(56.dp), verticalAlignment = Alignment.CenterVertically) {
+            Row(modifier = Modifier.fillMaxWidth().height(40.dp), verticalAlignment = Alignment.CenterVertically) {
                 // Previous (अघिल्लो)
                 Box(modifier = Modifier.weight(1f).fillMaxHeight().clickable { if (currentIdx > 0) { currentIdx--; sound.click() } }, contentAlignment = Alignment.Center) {
-                    Text("अघिल्लो (Previous)", color = if (currentIdx > 0) Color.White else Color.White.copy(alpha = 0.4f), fontSize = 13.sp, fontWeight = FontWeight.Medium)
+                    Text("अघिल्लो (Prev)", color = if (currentIdx > 0) Color(0xFF003478) else Color(0xFFCBD5E1), fontSize = 11.sp, fontWeight = FontWeight.Medium)
                 }
-                Box(modifier = Modifier.width(1.dp).fillMaxHeight(0.6f).background(Color.White.copy(alpha = 0.3f)))
+                Box(modifier = Modifier.width(1.dp).fillMaxHeight(0.6f).background(Color(0xFFE2E8F0)))
                 // All questions (सबै प्रश्नहरू)
                 Box(modifier = Modifier.weight(1f).fillMaxHeight().clickable { sound.click(); showGrid = true }, contentAlignment = Alignment.Center) {
-                    Text("सबै प्रश्नहरू (All)", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Medium)
+                    Text("सबै प्रश्नहरू (All)", color = Color(0xFF003478), fontSize = 11.sp, fontWeight = FontWeight.Medium)
                 }
-                Box(modifier = Modifier.width(1.dp).fillMaxHeight(0.6f).background(Color.White.copy(alpha = 0.3f)))
+                Box(modifier = Modifier.width(1.dp).fillMaxHeight(0.6f).background(Color(0xFFE2E8F0)))
                 // Next (अर्को) or Submit
                 Box(modifier = Modifier.weight(1f).fillMaxHeight().clickable {
                     if (currentIdx < t.items.size - 1) { currentIdx++; sound.click() }
                     else { sound.swoosh(); submitting = true; scope.launch { try { submitResult = if (t.id == "qbank-combined" || t.id.startsWith("bundle-")) submitCombinedExamWithFallback(t, answers.toMap()) else AppState.api.submitTest(t.id, SubmitRequest(answers.toMap())); sound.success() } catch (e: Exception) { error = "Submit failed." }; submitting = false } }
                 }, contentAlignment = Alignment.Center) {
-                    if (submitting) { CircularProgressIndicator(color = Color.White, modifier = Modifier.size(18.dp), strokeWidth = 2.dp) }
-                    else if (currentIdx < t.items.size - 1) { Text("अर्को (Next)", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Medium) }
-                    else { Text("सबमिट (Submit)", color = Color(0xFF4CAF50), fontSize = 13.sp, fontWeight = FontWeight.Bold) }
+                    if (submitting) { CircularProgressIndicator(color = Color(0xFF003478), modifier = Modifier.size(16.dp), strokeWidth = 2.dp) }
+                    else if (currentIdx < t.items.size - 1) { Text("अर्को (Next)", color = Color(0xFF003478), fontSize = 11.sp, fontWeight = FontWeight.Medium) }
+                    else { Text("सबमिट (Submit)", color = Color(0xFF22C55E), fontSize = 11.sp, fontWeight = FontWeight.Bold) }
                 }
             }
         }
