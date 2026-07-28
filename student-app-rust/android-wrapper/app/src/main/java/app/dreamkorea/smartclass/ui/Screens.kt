@@ -973,7 +973,7 @@ fun VideosScreen(theme: AppTheme, sound: SoundManager, onBack: () -> Unit) {
     var playingVideo by remember { mutableStateOf<VideoLesson?>(null) }
 
     LaunchedEffect(Unit) {
-        try { videos = AppState.cachedFresh(AppState.KEY_VIDEOS) { AppState.api.getVideos().videos } } catch (_: Exception) {}
+        try { videos = AppState.cachedFresh(AppState.KEY_VIDEOS) { AppState.api.getVideoLessons().videos } } catch (_: Exception) {}
         finally { loading = false }
     }
 
