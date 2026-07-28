@@ -717,34 +717,33 @@ fun ScreenHeader(theme: AppTheme, sound: SoundManager, title: String, subtitle: 
 @Composable
 fun LearnScreen(theme: AppTheme, sound: SoundManager, onBack: () -> Unit) {
     // Tools page — shows all study tools instead of empty subjects list
+    data class Tool(val title: String, val desc: String, val icon: ImageVector, val route: String)
     val tools = listOf(
-        Triple("Dictionary", "Search English, Korean & Nepali words", Icons.Default.Translate) { onNavigateToTool("dictionary") },
-        Triple("Korean Grammar", "10 essential grammar lessons", Icons.Default.MenuBook) { onNavigateToTool("grammar") },
-        Triple("Study Alarms", "Set daily study reminders", Icons.Default.Alarm) { onNavigateToTool("alarms") },
-        Triple("Eye Vision", "Adaptive vision tests", Icons.Default.Visibility) { onNavigateToTool("eyevision") },
+        Tool("Dictionary", "Search English, Korean & Nepali words", Icons.Default.Translate, "dictionary"),
+        Tool("Korean Grammar", "10 essential grammar lessons", Icons.Default.MenuBook, "grammar"),
+        Tool("Study Alarms", "Set daily study reminders", Icons.Default.Alarm, "alarms"),
+        Tool("Eye Vision", "Adaptive vision tests", Icons.Default.Visibility, "eyevision"),
     )
-    // We can't use onNavigate here, so we just show the tools list.
-    // The actual navigation happens from the Home screen cards.
     LazyColumn(modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
         item { ScreenHeader(theme, sound, "Tools", "Study tools and resources", onBack) }
         items(tools.size) { idx ->
-            val (title, desc, icon) = tools[idx]
+            val tool = tools[idx]
             Surface(
                 color = CardWhite,
                 shape = RoundedCornerShape(14.dp),
-                modifier = Modifier.fillMaxWidth().clickable { sound.click() },
+                modifier = Modifier.fillMaxWidth().clickable { sound.click(); onNavigateToTool(tool.route) },
                 shadowElevation = 2.dp,
             ) {
                 Row(modifier = Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
                     Surface(color = NavyBlue.copy(alpha = 0.1f), shape = RoundedCornerShape(10.dp), modifier = Modifier.size(48.dp)) {
                         Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
-                            Icon(icon, null, tint = NavyBlue, modifier = Modifier.size(24.dp))
+                            Icon(tool.icon, null, tint = NavyBlue, modifier = Modifier.size(24.dp))
                         }
                     }
                     Spacer(Modifier.width(12.dp))
                     Column(modifier = Modifier.weight(1f)) {
-                        Text(title, color = TextDark, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
-                        Text(desc, color = TextMid, fontSize = 11.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                        Text(tool.title, color = TextDark, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+                        Text(tool.desc, color = TextMid, fontSize = 11.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
                     }
                     Icon(Icons.Default.ChevronRight, null, tint = TextLight, modifier = Modifier.size(20.dp))
                 }
