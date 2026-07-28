@@ -26,16 +26,27 @@ function extractYouTubeId(url: string): string {
 
 const schema = z.object({
   title: z.string().trim().min(2).max(200),
-  slug: z.string().trim().min(2).max(120).regex(/^[a-z0-9-]+$/),
+  slug: z.string().trim().max(120).optional(), // auto-generated if not provided
   description: z.string().max(2000).optional(),
-  youtubeUrl: z.string().url().optional().or(z.literal("")),
+  youtubeUrl: z.string().optional().or(z.literal("")),
   videoUrl: z.string().optional().or(z.literal("")),
   videoSource: z.enum(["youtube", "upload"]).default("youtube"),
   durationMin: z.number().int().min(1).max(300).default(10),
   level: z.string().max(50).optional(),
   category: z.string().max(50).optional(),
-  isPublished: z.boolean().default(false),
+  isPublished: z.boolean().default(true), // default to published
 });
+
+// Generate a unique slug from title
+async function uniqueSlug(base: string): Promise<string> {
+  let slug = base.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "video";
+  let n = 1;
+  while (await db.videoLesson.findUnique({ where: { slug } })) {
+    slug = `${base.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "")}-${++n}`;
+    if (slug.length > 120) { slug = `video-${Date.now()}`; break; }
+  }
+  return slug;
+}
 
 export async function POST(req: NextRequest) {
   const user = await getCurrentUser(req);
@@ -51,36 +62,38 @@ export async function POST(req: NextRequest) {
   let thumbnailUrl: string | null = null;
 
   if (d.videoSource === "upload" && d.videoUrl) {
-    // Uploaded video — no YouTube ID needed
     youtubeId = "";
     thumbnailUrl = null;
   } else if (d.youtubeUrl) {
     youtubeId = extractYouTubeId(d.youtubeUrl);
-    if (!youtubeId) return NextResponse.json({ error: "Invalid YouTube URL" }, { status: 400 });
+    if (!youtubeId) return NextResponse.json({ error: "Invalid YouTube URL — could not extract video ID" }, { status: 400 });
     thumbnailUrl = `https://img.youtube.com/vi/${youtubeId}/maxresdefault.jpg`;
   } else {
     return NextResponse.json({ error: "Either a YouTube URL or an uploaded video is required" }, { status: 400 });
   }
 
+  // Auto-generate unique slug
+  const slug = await uniqueSlug(d.slug || d.title);
+
   try {
     const video = await db.videoLesson.create({
       data: {
         title: d.title,
-        slug: d.slug,
-        description: d.description,
+        slug,
+        description: d.description || null,
         youtubeUrl: d.youtubeUrl || "",
         youtubeId,
         videoUrl: d.videoUrl || null,
         videoSource: d.videoSource,
         thumbnailUrl,
         durationMin: d.durationMin,
-        level: d.level,
-        category: d.category,
+        level: d.level || null,
+        category: d.category || null,
         isPublished: d.isPublished,
       },
     });
     return NextResponse.json({ video });
-  } catch {
-    return NextResponse.json({ error: "Slug already exists" }, { status: 409 });
+  } catch (e: any) {
+    return NextResponse.json({ error: e.message?.substring(0, 200) || "Failed to create video" }, { status: 500 });
   }
 }

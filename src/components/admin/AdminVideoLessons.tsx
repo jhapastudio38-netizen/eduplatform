@@ -19,6 +19,8 @@ interface VideoLesson {
   description?: string;
   youtubeUrl: string;
   youtubeId: string;
+  videoUrl?: string | null;
+  videoSource?: string;
   thumbnailUrl?: string;
   durationMin: number;
   level?: string;
@@ -204,19 +206,29 @@ export function AdminVideoLessons() {
         </DialogContent>
       </Dialog>
 
-      {/* Preview modal — plays YouTube embed */}
+      {/* Preview modal — plays YouTube embed or uploaded video */}
       {preview && (
         <Dialog open={!!preview} onOpenChange={() => setPreview(null)}>
           <DialogContent className="max-w-3xl">
             <DialogHeader><DialogTitle>{preview.title}</DialogTitle></DialogHeader>
-            <div className="aspect-video rounded-lg overflow-hidden">
-              <iframe
-                src={`https://www.youtube.com/embed/${preview.youtubeId}?rel=0`}
-                title={preview.title}
-                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                allowFullScreen
-                className="w-full h-full"
-              />
+            <div className="aspect-video rounded-lg overflow-hidden bg-black">
+              {preview.videoUrl ? (
+                <video
+                  src={preview.videoUrl.startsWith("http") ? preview.videoUrl : `https://my-project-five-sepia.vercel.app${preview.videoUrl}`}
+                  controls
+                  className="w-full h-full"
+                />
+              ) : preview.youtubeId ? (
+                <iframe
+                  src={`https://www.youtube-nocookie.com/embed/${preview.youtubeId}?rel=0&modestbranding=1&playsinline=1`}
+                  title={preview.title}
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                  allowFullScreen
+                  className="w-full h-full"
+                />
+              ) : (
+                <div className="w-full h-full grid place-items-center text-white/50">No video source</div>
+              )}
             </div>
             {preview.description && <p className="text-sm text-muted-foreground">{preview.description}</p>}
           </DialogContent>
