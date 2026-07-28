@@ -679,11 +679,6 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
     }
 }
 
-}
-
-/// Renders a 4-column grid of square question boxes with column-major
-/// numbering (1-5 down col 1, 6-10 down col 2, ...). Applies the tab filter
-/// Renders a 5×4 grid of question boxes. LEFT-TO-RIGHT numbering.
 /// Always shows 20 boxes (1-20 or 21-40) even if fewer questions exist.
 /// Empty boxes show the number but are not clickable.
 @Composable
