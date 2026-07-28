@@ -73,14 +73,19 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
     var timeLeft by remember { mutableStateOf(0) }
 
     // ── ORIENTATION ── FORCE LANDSCAPE for the exam. NEVER portrait.
-    // On exit, force back to PORTRAIT (not UNSPECIFIED — some devices
-    // ignore the manifest lock and stay in sensor mode).
+    // Uses BOTH DisposableEffect (immediate) AND LaunchedEffect (after
+    // composition) to ensure landscape wins over MainScreen's portrait lock.
     DisposableEffect(Unit) {
         val activity = context as? Activity
         activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
         onDispose {
             activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
         }
+    }
+    // Re-enforce landscape after composition (wins over parent's LaunchedEffect)
+    LaunchedEffect(Unit) {
+        val activity = context as? Activity
+        activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
     }
     // Retry trigger — increment to force reload
     var retryCount by remember { mutableStateOf(0) }

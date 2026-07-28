@@ -104,19 +104,20 @@ fun MainScreen(userName: String, onLogout: () -> Unit) {
 
     // ── ORIENTATION CONTROL ──────────────────────────────────────────────
     // Force PORTRAIT for all screens EXCEPT exam + exam entry (landscape).
-    // This runs whenever the screen changes.
-    androidx.compose.runtime.DisposableEffect(screen) {
+    // Uses LaunchedEffect (runs AFTER DisposableEffect) so it doesn't
+    // override the exam screen's own landscape lock.
+    androidx.compose.runtime.LaunchedEffect(screen) {
         val activity = context as? android.app.Activity
         when (screen) {
             is Screen.Exam, is Screen.ExamEntry -> {
                 // Exam screens handle their own orientation (landscape)
+                // Don't override — let ExamScreen/ExamEntryScreen set LANDSCAPE
             }
             else -> {
                 // Force portrait for ALL other screens (home, books, etc.)
                 activity?.requestedOrientation = android.content.pm.ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
             }
         }
-        onDispose { }
     }
 
     fun navigateTo(s: Screen) {
