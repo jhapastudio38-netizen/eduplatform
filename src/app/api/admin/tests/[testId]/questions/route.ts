@@ -31,7 +31,7 @@ const questionSchema = z.object({
   isFree: z.boolean().optional().default(false),
   audioLoop: z.number().int().min(0).max(100).optional().default(1), // 1=play once, 2=play twice, N=play N times
   audioLoopDelay: z.number().int().min(0).max(60).optional().default(0), // delay between loops in seconds
-  stem: z.string().min(1).max(2000),
+  stem: z.string().max(2000).optional().or(z.literal("")),
   descType: z.enum(["none", "text", "image", "audio"]).default("none"),
   descText: z.string().optional().or(z.literal("")),
   descImageUrl: z.string().optional().or(z.literal("")),

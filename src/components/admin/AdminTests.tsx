@@ -921,7 +921,11 @@ function ExamEditor({ test, testCategory, onClose }: { test: Test; testCategory:
       // Allow title-only questions (image-based questions where title is the question)
       q.stem = q.title;
     }
-    if (!q.stem.trim()) { toast.error("Question text or title required"); return; }
+    // Both title AND question text are optional — admin can add image/audio only
+    if (!q.stem.trim() && !q.title.trim() && q.mediaImageUrl.isBlank() && q.mediaAudioUrl.isBlank() && q.descImageUrl.isBlank()) {
+      toast.error("Add at least a title, question text, image, or audio");
+      return;
+    }
     setSaving(true);
     setJustSaved(false);
     try {
