@@ -450,9 +450,9 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
                                     color = if (isSelected) theme.primary else Color.White,
                                     border = androidx.compose.foundation.BorderStroke(2.dp, Color.Black),
                                     shape = androidx.compose.foundation.shape.CircleShape,
-                                    modifier = Modifier.size(36.dp)
+                                    modifier = Modifier.size(40.dp)
                                 ) {
-                                    Box(contentAlignment = Alignment.Center) { Text("${i+1}", color = if (isSelected) Color.White else Color.Black, fontSize = 13.sp, fontWeight = FontWeight.Bold) }
+                                    Box(contentAlignment = Alignment.Center) { Text("${i+1}", color = if (isSelected) Color.White else Color.Black, fontSize = 15.sp, fontWeight = FontWeight.Bold) }
                                 }
                                 Spacer(Modifier.width(8.dp))
                                 // Render option text with underlined blank word (if set by admin)
@@ -506,15 +506,15 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
             color = Color.White,
             border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFE2E8F0)),
         ) {
-            Row(modifier = Modifier.fillMaxWidth().height(40.dp), verticalAlignment = Alignment.CenterVertically) {
+            Row(modifier = Modifier.fillMaxWidth().height(48.dp), verticalAlignment = Alignment.CenterVertically) {
                 // Previous (अघिल्लो)
                 Box(modifier = Modifier.weight(1f).fillMaxHeight().clickable { if (currentIdx > 0) { currentIdx--; sound.click() } }, contentAlignment = Alignment.Center) {
-                    Text("अघिल्लो (Prev)", color = if (currentIdx > 0) Color(0xFF003478) else Color(0xFFCBD5E1), fontSize = 11.sp, fontWeight = FontWeight.Medium)
+                    Text("अघिल्लो (Prev)", color = if (currentIdx > 0) Color(0xFF003478) else Color(0xFFCBD5E1), fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
                 }
                 Box(modifier = Modifier.width(1.dp).fillMaxHeight(0.6f).background(Color(0xFFE2E8F0)))
                 // All questions (सबै प्रश्नहरू)
                 Box(modifier = Modifier.weight(1f).fillMaxHeight().clickable { sound.click(); showGrid = true }, contentAlignment = Alignment.Center) {
-                    Text("सबै प्रश्नहरू (All)", color = Color(0xFF003478), fontSize = 11.sp, fontWeight = FontWeight.Medium)
+                    Text("सबै प्रश्नहरू (All)", color = Color(0xFF003478), fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
                 }
                 Box(modifier = Modifier.width(1.dp).fillMaxHeight(0.6f).background(Color(0xFFE2E8F0)))
                 // Next (अर्को) or Submit
@@ -523,7 +523,7 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
                     else { sound.swoosh(); submitting = true; scope.launch { try { submitResult = submitExamWithFallback(t, answers.toMap()); sound.success() } catch (e: Exception) { error = "Submit failed." }; submitting = false } }
                 }, contentAlignment = Alignment.Center) {
                     if (submitting) { CircularProgressIndicator(color = Color(0xFF003478), modifier = Modifier.size(16.dp), strokeWidth = 2.dp) }
-                    else if (currentIdx < t.items.size - 1) { Text("अर्को (Next)", color = Color(0xFF003478), fontSize = 11.sp, fontWeight = FontWeight.Medium) }
+                    else if (currentIdx < t.items.size - 1) { Text("अर्को (Next)", color = Color(0xFF003478), fontSize = 13.sp, fontWeight = FontWeight.SemiBold) }
                     else { Text("सबमिट (Submit)", color = Color(0xFF22C55E), fontSize = 11.sp, fontWeight = FontWeight.Bold) }
                 }
             }
@@ -689,7 +689,7 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
                         TabButton("Solved", tabFilter == 1) { tabFilter = 1 }
                         TabButton("Unsolved", tabFilter == 2) { tabFilter = 2 }
                         Spacer(Modifier.height(4.dp))
-                        Text("$answeredCount / $totalQ", color = Color.Black, fontSize = 11.sp, fontWeight = FontWeight.Medium)
+                        Text("$answeredCount / $totalQ", color = Color.Black, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
                         // Exit button at bottom
                         Spacer(Modifier.weight(1f))
                         Box(
