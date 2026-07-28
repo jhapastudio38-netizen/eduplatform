@@ -1143,6 +1143,19 @@ fun ExamResultScreen(
     examTitle: String = "Exam",
     examDescription: String? = null,
 ) {
+    val context = LocalContext.current
+
+    // ── FORCE PORTRAIT for the result screen ────────────────────────────
+    // After the exam (landscape), rotate back to portrait so the result
+    // screen looks good in normal phone orientation.
+    DisposableEffect(Unit) {
+        val activity = context as? Activity
+        activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+        onDispose {
+            activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+        }
+    }
+
     LaunchedEffect(Unit) { sound.success() }
 
     // ── MARKS CALCULATION ──────────────────────────────────────────────
