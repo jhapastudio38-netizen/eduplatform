@@ -970,10 +970,72 @@ fun TestCard(theme: AppTheme, sound: SoundManager, t: TestItem, onClick: () -> U
 fun VideosScreen(theme: AppTheme, sound: SoundManager, onBack: () -> Unit) {
     var videos by remember { mutableStateOf<List<VideoLesson>>(AppState.getCachedNow<List<VideoLesson>>(AppState.KEY_VIDEOS) ?: emptyList()) }
     var loading by remember { mutableStateOf(videos.isEmpty()) }
+    var playingVideo by remember { mutableStateOf<VideoLesson?>(null) }
 
     LaunchedEffect(Unit) {
-        try { videos = AppState.getCachedVideos() } catch (_: Exception) {}
+        try { videos = AppState.cachedFresh(AppState.KEY_VIDEOS) { AppState.api.getVideos().videos } } catch (_: Exception) {}
         finally { loading = false }
+    }
+
+    // ── Full-screen video player overlay ──────────────────────────────
+    if (playingVideo != null) {
+        val v = playingVideo!!
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color.Black)
+        ) {
+            // Close button
+            IconButton(
+                onClick = { playingVideo = null },
+                modifier = Modifier
+                    .align(Alignment.TopStart)
+                    .padding(8.dp)
+                    .size(40.dp)
+            ) {
+                Icon(Icons.Default.Close, "Close", tint = Color.White, modifier = Modifier.size(24.dp))
+            }
+
+            // Title
+            Text(
+                v.title,
+                color = Color.White,
+                fontSize = 14.sp,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .padding(top = 12.dp, start = 56.dp, end = 56.dp),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+
+            // Video player
+            AndroidView(
+                factory = { ctx ->
+                    android.webkit.WebView(ctx).apply {
+                        settings.javaScriptEnabled = true
+                        settings.domStorageEnabled = true
+                        settings.mediaPlaybackRequiresUserGesture = false
+                        webViewClient = android.webkit.WebViewClient()
+                        val videoUrl = if (v.videoSource == "upload" && !v.videoUrl.isNullOrBlank()) {
+                            val abs = if (v.videoUrl!!.startsWith("http")) v.videoUrl else "https://my-project-five-sepia.vercel.app${v.videoUrl}"
+                            // HTML5 video player for uploaded videos
+                            "<html><body style='margin:0;padding:0;background:#000;display:flex;align-items:center;justify-content:center;height:100vh;'><video src='$abs' controls autoplay playsinline style='max-width:100%;max-height:100%;'></video></body></html>"
+                        } else if (v.youtubeId.isNotBlank()) {
+                            // YouTube embed — ad-free, autoplay, fullscreen
+                            "<html><body style='margin:0;padding:0;background:#000;'><iframe width='100%' height='100%' src='https://www.youtube.com/embed/${v.youtubeId}?autoplay=1&rel=0&modestbranding=1&playsinline=1' frameborder='0' allow='accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture' allowfullscreen></iframe></body></html>"
+                        } else {
+                            "<html><body style='margin:0;padding:0;background:#000;display:flex;align-items:center;justify-content:center;height:100vh;color:#fff;'>No video source available</body></html>"
+                        }
+                        loadDataWithBaseURL(null, videoUrl, "text/html", "UTF-8", null)
+                    }
+                },
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(top = 56.dp)
+            )
+        }
+        return
     }
 
     if (loading) {
@@ -988,13 +1050,34 @@ fun VideosScreen(theme: AppTheme, sound: SoundManager, onBack: () -> Unit) {
         } else {
             itemsIndexed(videos) { i, v ->
                 AnimatedListItem(index = i, theme = theme) {
-                    Surface(color = CardWhite, shape = RoundedCornerShape(14.dp), modifier = Modifier.fillMaxWidth(), shadowElevation = 2.dp) {
+                    Surface(
+                        color = CardWhite,
+                        shape = RoundedCornerShape(14.dp),
+                        modifier = Modifier.fillMaxWidth().clickable { sound.click(); playingVideo = v },
+                        shadowElevation = 2.dp,
+                    ) {
                         Column(modifier = Modifier.padding(12.dp)) {
-                            Surface(color = AccentPink, shape = RoundedCornerShape(10.dp), modifier = Modifier.fillMaxWidth().height(120.dp)) {
-                                Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) { Icon(Icons.Default.PlayCircle, null, tint = Color.White, modifier = Modifier.size(40.dp)) }
+                            // Thumbnail or placeholder
+                            Surface(color = Color.Black, shape = RoundedCornerShape(10.dp), modifier = Modifier.fillMaxWidth().height(160.dp)) {
+                                Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
+                                    if (!v.thumbnailUrl.isNullOrBlank()) {
+                                        val thumbUrl = if (v.thumbnailUrl!!.startsWith("http")) v.thumbnailUrl else "https://my-project-five-sepia.vercel.app${v.thumbnailUrl}"
+                                        coil.compose.AsyncImage(
+                                            model = thumbUrl,
+                                            contentDescription = v.title,
+                                            modifier = Modifier.fillMaxSize(),
+                                            contentScale = ContentScale.Crop,
+                                        )
+                                    }
+                                    Icon(Icons.Default.PlayCircle, null, tint = Color.White, modifier = Modifier.size(56.dp))
+                                }
                             }
                             Spacer(Modifier.height(8.dp))
                             Text(v.title, color = TextDark, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                            if (!v.description.isNullOrBlank()) {
+                                Spacer(Modifier.height(2.dp))
+                                Text(v.description!!, color = TextMid, fontSize = 11.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                            }
                             Spacer(Modifier.height(6.dp))
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 InfoChipWithIcon(theme, Icons.Default.Timer, "${v.durationMin} min", NavyBlue); Spacer(Modifier.width(6.dp))
