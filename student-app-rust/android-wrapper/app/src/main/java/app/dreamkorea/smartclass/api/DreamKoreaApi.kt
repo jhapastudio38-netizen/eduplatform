@@ -209,6 +209,8 @@ data class VideoLesson(
     val title: String,
     val description: String?,
     val youtubeId: String,
+    val videoUrl: String? = null,
+    val videoSource: String = "youtube",
     val thumbnailUrl: String?,
     val durationMin: Int,
     val level: String?,
