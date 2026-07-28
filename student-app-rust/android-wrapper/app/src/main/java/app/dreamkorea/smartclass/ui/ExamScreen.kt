@@ -29,6 +29,7 @@ import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
@@ -1048,8 +1049,8 @@ private fun QuestionGridSection(
                                         isAnswered -> Brush.verticalGradient(
                                             listOf(Color(0xFF003F73), Color(0xFF1E88E5))
                                         )
-                                        isCurrent -> Color(0xFFFEF3C7)
-                                        else -> Color.White
+                                        isCurrent -> SolidColor(Color(0xFFFEF3C7))
+                                        else -> SolidColor(Color.White)
                                     }
                                 )
                                 .alpha(if (isFilteredOut) 0.25f else 1f)
