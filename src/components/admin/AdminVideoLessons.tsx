@@ -220,7 +220,7 @@ export function AdminVideoLessons() {
                 />
               ) : preview.youtubeId ? (
                 <iframe
-                  src={`https://www.youtube-nocookie.com/embed/${preview.youtubeId}?rel=0&modestbranding=1&playsinline=1`}
+                  src={`https://www.youtube.com/embed/${preview.youtubeId}?rel=0&modestbranding=1&playsinline=1`}
                   title={preview.title}
                   allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                   allowFullScreen
