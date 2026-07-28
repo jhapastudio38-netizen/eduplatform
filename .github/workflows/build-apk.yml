@@ -34,52 +34,50 @@ jobs:
           echo "$HOME/gradle-8.7/bin" >> $GITHUB_PATH
       - run: gradle assembleDebug --no-daemon --build-cache --parallel
         working-directory: student-app-rust/android-wrapper
+
+      # Read versionName + versionCode from build.gradle.kts
+      - name: Read version
+        id: ver
+        run: |
+          VGREP=$(grep versionName student-app-rust/android-wrapper/app/build.gradle.kts | head -1)
+          CGREP=$(grep versionCode student-app-rust/android-wrapper/app/build.gradle.kts | head -1)
+          VNAME=$(echo "$VGREP" | sed -E 's/.*versionName[[:space:]]*=[[:space:]]*"([^"]+)".*/\1/')
+          VCODE=$(echo "$CGREP" | sed -E 's/.*versionCode[[:space:]]*=[[:space:]]*([0-9]+).*/\1/')
+          echo "version_name=$VNAME" >> $GITHUB_OUTPUT
+          echo "version_code=$VCODE" >> $GITHUB_OUTPUT
+          echo "Detected version: $VNAME (code $VCODE)"
+
       - name: Rename APK with version
         run: |
           mv student-app-rust/android-wrapper/app/build/outputs/apk/debug/app-debug.apk \
-             student-app-rust/android-wrapper/app/build/outputs/apk/debug/dreamkorea-v8.5.0-debug.apk
-      # Upload as a GitHub Release asset — Releases storage is UNLIMITED for
-      # public repos and doesn't count against the Actions artifact quota.
-      - name: Create or update release
+             student-app-rust/android-wrapper/app/build/outputs/apk/debug/dreamkorea-v${{ steps.ver.outputs.version_name }}-debug.apk
+
+      # ALWAYS upload as workflow artifact — downloadable even if release step fails.
+      # Artifacts expire after 90 days, but they're a guaranteed fallback.
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: dreamkorea-v${{ steps.ver.outputs.version_name }}-apk
+          path: student-app-rust/android-wrapper/app/build/outputs/apk/debug/dreamkorea-v${{ steps.ver.outputs.version_name }}-debug.apk
+          retention-days: 90
+          if-no-files-found: error
+
+      # Create a GitHub Release with the correct version tag.
+      - name: Create release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v8.5.0-${{ github.run_number }}
-          name: DreamKorea v8.5.0 (Build ${{ github.run_number }})
+          tag_name: v${{ steps.ver.outputs.version_name }}-${{ github.run_number }}
+          name: DreamKorea v${{ steps.ver.outputs.version_name }} (Build ${{ github.run_number }})
           body: |
-            ## What's new in v8.5.0
+            ## DreamKorea v${{ steps.ver.outputs.version_name }}
 
-            ### Bundle-combined exams (QBank + Batch packages)
-            - Admin can now create a Question Bank bundle and pick tests from
-              ANY category (batch, exam, demo, chapter, etc.). The system
-              extracts all questions from those tests and combines them into
-              ONE combined exam the student solves like a normal exam.
-            - Admin can create a Batch bundle that ONLY accepts batch-category
-              tests. Same combined-exam flow.
-            - Student opens Question Bank or Batch Packages from home → sees
-              bundle cards with title + description + "View All Questions"
-              button → opens the combined exam.
-            - Tapping "View All Questions" loads the combined exam in the
-              standard exam-taking screen (landscape mode, status bar,
-              Nepali nav, etc.).
+            Build #${{ github.run_number }} • versionCode ${{ steps.ver.outputs.version_code }}
 
-            ### Completed exam tracking
-            - After the student submits any exam (including combined exams),
-              it's marked as completed.
-            - The bundle card shows a green "Completed" badge with the score
-              once the student has submitted.
-            - The "View All Questions" button changes to "Solve Again" if
-              completed, so the student can re-attempt.
+            Commit: ${{ github.sha }}
 
-            ### Bug fixes
-            - Submitting a combined exam (qbank-combined or bundle-{id}) no
-              longer fails with a 500 error. The submit endpoint now handles
-              synthetic test IDs by looking up questions directly.
-            - A virtual Test row is created on first combined-exam submission
-              to satisfy the Submission.testId FK constraint.
-            - SubmitResponse now includes a `completed: Boolean` flag.
-
-            SHA: ${{ github.sha }}
+            Download the APK below and install on your Android device.
           files: |
-            student-app-rust/android-wrapper/app/build/outputs/apk/debug/dreamkorea-v8.5.0-debug.apk
+            student-app-rust/android-wrapper/app/build/outputs/apk/debug/dreamkorea-v${{ steps.ver.outputs.version_name }}-debug.apk
           draft: false
           prerelease: false
+          make_latest: true
