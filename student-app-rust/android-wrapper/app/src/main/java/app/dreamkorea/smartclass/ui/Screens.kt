@@ -100,6 +100,24 @@ fun MainScreen(userName: String, onLogout: () -> Unit) {
     var screen by remember { mutableStateOf<Screen>(Screen.Home) }
     var activeTab by remember { mutableStateOf(BottomTab.Home) }
     var hideBottomBar by remember { mutableStateOf(false) }
+    val context = androidx.compose.ui.platform.LocalContext.current
+
+    // ── ORIENTATION CONTROL ──────────────────────────────────────────────
+    // Force PORTRAIT for all screens EXCEPT exam + exam entry (landscape).
+    // This runs whenever the screen changes.
+    androidx.compose.runtime.DisposableEffect(screen) {
+        val activity = context as? android.app.Activity
+        when (screen) {
+            is Screen.Exam, is Screen.ExamEntry -> {
+                // Exam screens handle their own orientation (landscape)
+            }
+            else -> {
+                // Force portrait for ALL other screens (home, books, etc.)
+                activity?.requestedOrientation = android.content.pm.ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+            }
+        }
+        onDispose { }
+    }
 
     fun navigateTo(s: Screen) {
         screen = s
