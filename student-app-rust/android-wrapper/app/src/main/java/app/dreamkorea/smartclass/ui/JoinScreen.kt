@@ -72,6 +72,17 @@ fun JoinScreen(theme: AppTheme, sound: SoundManager, onBack: () -> Unit) {
                     }
                     Spacer(Modifier.height(16.dp))
                 }
+                // Show meeting URL so student can copy it
+                if (s.meetingUrl.isNotBlank()) {
+                    Surface(color = Color(0xFFF2F2F7), shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth()) {
+                        Column(modifier = Modifier.padding(16.dp)) {
+                            Text("Meeting Link", color = theme.subText, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                            Spacer(Modifier.height(4.dp))
+                            Text(s.meetingUrl, color = theme.primary, fontSize = 13.sp, fontWeight = FontWeight.Medium)
+                        }
+                    }
+                    Spacer(Modifier.height(12.dp))
+                }
                 Button(
                     onClick = {
                         sound.click()
@@ -85,6 +96,21 @@ fun JoinScreen(theme: AppTheme, sound: SoundManager, onBack: () -> Unit) {
                     Icon(Icons.Default.VideoCall, null, modifier = Modifier.size(20.dp))
                     Spacer(Modifier.width(8.dp))
                     Text("Open Meeting Link", fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+                }
+                Spacer(Modifier.height(8.dp))
+                // Copy link button
+                OutlinedButton(
+                    onClick = {
+                        sound.click()
+                        val clipboard = context.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+                        clipboard.setPrimaryClip(android.content.ClipData.newPlainText("Meeting Link", s.meetingUrl))
+                    },
+                    modifier = Modifier.fillMaxWidth().height(44.dp),
+                    shape = RoundedCornerShape(12.dp),
+                ) {
+                    Icon(Icons.Default.ContentCopy, null, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text("Copy Link", fontSize = 14.sp)
                 }
                 Spacer(Modifier.height(12.dp))
                 TextButton(onClick = { session = null; code = "" }) {
@@ -152,6 +178,15 @@ fun JoinScreen(theme: AppTheme, sound: SoundManager, onBack: () -> Unit) {
                                 } else {
                                     sound.error()
                                     error = resp.error ?: "Invalid code or session has ended"
+                                }
+                            } catch (e: retrofit2.HttpException) {
+                                sound.error()
+                                val rawBody = try { e.response()?.errorBody()?.string() } catch (_: Exception) { null }
+                                error = try {
+                                    val json = org.json.JSONObject(rawBody ?: "{}")
+                                    json.optString("error", "Invalid code or session has ended")
+                                } catch (_: Exception) {
+                                    "Invalid code or session has ended"
                                 }
                             } catch (e: Exception) {
                                 sound.error()

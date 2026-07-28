@@ -254,7 +254,47 @@ interface DreamKoreaApi {
 
     @POST("api/student/live-sessions/join")
     suspend fun joinLiveSession(@Body body: Map<String, String>): LiveSessionJoinResponse
+
+    @GET("api/student/eye-vision")
+    suspend fun getEyeVisionTests(): EyeVisionResponse
+
+    @POST("api/student/eye-vision/{testId}/check")
+    @Headers("Content-Type: application/json")
+    suspend fun checkEyeVisionAnswer(@Path("testId") testId: String, @Body body: Map<String, String>): EyeVisionCheckResponse
 }
+
+// ─── Eye Vision ──────────────────────────────────────────────────────────────
+data class EyeVisionTestItem(
+    val id: String,
+    val title: String,
+    val description: String? = null,
+    val imageUrl: String,
+    val category: String? = null,
+    val level: Int = 1
+)
+data class EyeVisionResponse(
+    val tests: List<EyeVisionTestItem> = emptyList(),
+    val level: Int = 1,
+    val recommendedLevel: Int = 1,
+    val stats: EyeVisionStats = EyeVisionStats()
+)
+data class EyeVisionStats(
+    val totalAttempts: Int = 0,
+    val correctAttempts: Int = 0,
+    val accuracy: Int = 0,
+    val consecutiveCorrect: Int = 0
+)
+data class EyeVisionCheckResponse(
+    val correct: Boolean = false,
+    val correctAnswer: String = "",
+    val level: Int = 1,
+    val nextLevel: Int = 1,
+    val leveledUp: Boolean = false,
+    val leveledDown: Boolean = false,
+    val consecutiveCorrect: Int = 0,
+    val consecutiveWrong: Int = 0,
+    val stats: EyeVisionStats = EyeVisionStats()
+)
 
 // ─── Notifications ────────────────────────────────────────────────────────────
 data class AppNotification(

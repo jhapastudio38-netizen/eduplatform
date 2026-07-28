@@ -58,6 +58,7 @@ sealed class Screen {
     object ClassResult : Screen()
     object CourseVideo : Screen()
     object Join : Screen()
+    object EyeVision : Screen()
     data class Exam(val testId: String) : Screen()
     data class BookReader(val book: Book) : Screen()
     /** Filtered test list. filter: "all" | "practice" | "exam" | "ubt" | "free" | "batch" */
@@ -116,6 +117,7 @@ fun MainScreen(userName: String, onLogout: () -> Unit) {
                         is Screen.CourseVideo -> VideosScreen(theme, sound, onBack = { screen = Screen.Home })
                         is Screen.TestList -> TestsScreen(theme, sound, filter = s.filter, title = s.title, onBack = { screen = Screen.Home }, onStartExam = { screen = Screen.Exam(it) })
                         is Screen.Join -> JoinScreen(theme, sound, onBack = { screen = Screen.Home })
+                        is Screen.EyeVision -> EyeVisionScreen(theme, sound, onBack = { screen = Screen.Home })
                     }
                 }
             }
@@ -240,8 +242,9 @@ fun HomeScreen(theme: AppTheme, sound: SoundManager, onNavigate: (Screen) -> Uni
             HomeCard(key = "results", title = "Results", section = "test", sortOrder = 3, route = "profile", imageUrl = ""),
             HomeCard(key = "all_books", title = "ALL BOOKS", section = "resources", sortOrder = 0, route = "books", imageUrl = ""),
             HomeCard(key = "question_bank", title = "QUESTION BANK", section = "resources", sortOrder = 1, route = "learn", imageUrl = ""),
-            HomeCard(key = "course_video", title = "COURSE VIDEO", section = "resources", sortOrder = 2, route = "videos", imageUrl = ""),
-            HomeCard(key = "audio_lessons", title = "AUDIO LESSONS", section = "resources", sortOrder = 3, route = "learn", imageUrl = ""),
+            HomeCard(key = "eye_vision", title = "EYE VISION", section = "resources", sortOrder = 2, route = "eyevision", imageUrl = ""),
+            HomeCard(key = "course_video", title = "COURSE VIDEO", section = "resources", sortOrder = 3, route = "videos", imageUrl = ""),
+            HomeCard(key = "audio_lessons", title = "AUDIO LESSONS", section = "resources", sortOrder = 4, route = "learn", imageUrl = ""),
             HomeCard(key = "classroom", title = "CLASSROOM", section = "premium", sortOrder = 0, route = "live", imageUrl = ""),
             HomeCard(key = "live_class", title = "LIVE CLASS", section = "premium", sortOrder = 1, route = "live", imageUrl = ""),
             HomeCard(key = "recorded_video", title = "RECORDED VIDEO", section = "premium", sortOrder = 2, route = "videos", imageUrl = ""),
@@ -304,6 +307,7 @@ fun HomeScreen(theme: AppTheme, sound: SoundManager, onNavigate: (Screen) -> Uni
                                     "live_class" -> Screen.Join
                                     "recorded_video" -> Screen.RecordedVideo
                                     "class_result" -> Screen.ClassResult
+                                    "eye_vision" -> Screen.EyeVision
                                     else -> when (card.route) {
                                         "tests" -> Screen.Tests
                                         "books" -> Screen.Books
@@ -311,6 +315,7 @@ fun HomeScreen(theme: AppTheme, sound: SoundManager, onNavigate: (Screen) -> Uni
                                         "learn" -> Screen.Learn
                                         "live" -> Screen.LiveRoom
                                         "profile" -> Screen.Profile
+                                        "eyevision" -> Screen.EyeVision
                                         else -> Screen.Tests
                                     }
                                 }
