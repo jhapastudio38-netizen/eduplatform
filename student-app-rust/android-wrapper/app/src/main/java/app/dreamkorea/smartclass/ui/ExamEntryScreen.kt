@@ -55,11 +55,11 @@ fun ExamEntryScreen(theme: AppTheme, sound: SoundManager, testId: String, onStar
     var loading by remember { mutableStateOf(true) }
     var error by remember { mutableStateOf("") }
 
-    // ── ORIENTATION ── don't force any orientation. The app renders in
-    // whatever orientation the user holds the phone.
+    // ── ORIENTATION ── FORCE LANDSCAPE for the exam overview. The phone
+    // auto-rotates to landscape when the overview opens, and restores on exit.
     DisposableEffect(Unit) {
         val activity = context as? Activity
-        activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+        activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
         onDispose {
             activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
         }
