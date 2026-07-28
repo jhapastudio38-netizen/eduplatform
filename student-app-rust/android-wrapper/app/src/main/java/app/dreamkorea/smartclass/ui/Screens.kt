@@ -980,48 +980,64 @@ fun VideosScreen(theme: AppTheme, sound: SoundManager, onBack: () -> Unit) {
     // ── Full-screen video player overlay — only video + close button ─────
     if (playingVideo != null) {
         val v = playingVideo!!
-        // Full screen black background — hides everything (nav, header, etc.)
+        val context = LocalContext.current
+
+        // For YouTube videos: open in YouTube app or browser (fastest, smoothest)
+        // For uploaded videos: use Android's native VideoView
+        if (v.youtubeId.isNotBlank()) {
+            // Launch YouTube app intent
+            LaunchedEffect(Unit) {
+                try {
+                    val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse("vnd.youtube:${v.youtubeId}"))
+                    intent.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+                    context.startActivity(intent)
+                } catch (e: Exception) {
+                    // YouTube app not installed — open in browser
+                    try {
+                        val browserIntent = android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse("https://www.youtube.com/watch?v=${v.youtubeId}"))
+                        browserIntent.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+                        context.startActivity(browserIntent)
+                    } catch (e2: Exception) {
+                        // Last resort — try webview
+                    }
+                }
+                // Close the overlay after launching (video plays in external app/browser)
+                playingVideo = null
+            }
+            // Show a brief loading message while launching
+            Box(
+                modifier = Modifier.fillMaxSize().background(Color.Black),
+                contentAlignment = Alignment.Center,
+            ) {
+                CircularProgressIndicator(color = Color.White)
+            }
+            return
+        }
+
+        // For uploaded videos — use Android's native VideoView (smooth, hardware-accelerated)
         Box(
             modifier = Modifier
                 .fillMaxSize()
                 .background(Color.Black)
         ) {
-            // Video player fills the entire screen
             AndroidView(
                 factory = { ctx ->
-                    android.webkit.WebView(ctx).apply {
-                        // ── Enable all features needed for YouTube + HTML5 video ──
-                        settings.javaScriptEnabled = true
-                        settings.domStorageEnabled = true
-                        settings.databaseEnabled = true
-                        settings.mediaPlaybackRequiresUserGesture = false
-                        settings.loadWithOverviewMode = true
-                        settings.useWideViewPort = true
-                        settings.cacheMode = android.webkit.WebSettings.LOAD_DEFAULT
-                        settings.pluginState = android.webkit.WebSettings.PluginState.ON
-                        settings.setSupportZoom(false)
-                        // Allow mixed content (YouTube uses both http and https)
-                        settings.mixedContentMode = android.webkit.WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
-                        // Enable hardware acceleration
-                        setLayerType(android.view.View.LAYER_TYPE_HARDWARE, null)
-                        webViewClient = android.webkit.WebViewClient()
-                        webChromeClient = object : android.webkit.WebChromeClient() {}
-
-                        val htmlContent = if (v.videoSource == "upload" && !v.videoUrl.isNullOrBlank()) {
-                            val abs = if (v.videoUrl!!.startsWith("http")) v.videoUrl else "https://my-project-five-sepia.vercel.app${v.videoUrl}"
-                            "<html><head><meta name='viewport' content='width=device-width, initial-scale=1.0, maximum-scale=1.0'></head><body style='margin:0;padding:0;background:#000;overflow:hidden;'><video src='$abs' controls autoplay playsinline webkit-playsinline style='width:100vw;height:100vh;object-fit:contain;'></video></body></html>"
-                        } else if (v.youtubeId.isNotBlank()) {
-                            "<html><head><meta name='viewport' content='width=device-width, initial-scale=1.0'></head><body style='margin:0;padding:0;background:#000;overflow:hidden;'><iframe width='100%' height='100%' src='https://www.youtube.com/embed/${v.youtubeId}?autoplay=1&rel=0&modestbranding=1&playsinline=1&fs=1' frameborder='0' allow='accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen' allowfullscreen></iframe></body></html>"
-                        } else {
-                            "<html><body style='margin:0;padding:0;background:#000;display:flex;align-items:center;justify-content:center;height:100vh;color:#fff;font-size:18px;'>No video source</body></html>"
+                    android.widget.VideoView(ctx).apply {
+                        val abs = if (v.videoUrl!!.startsWith("http")) v.videoUrl else "https://my-project-five-sepia.vercel.app${v.videoUrl}"
+                        setVideoURI(android.net.Uri.parse(abs))
+                        setOnPreparedListener { mp ->
+                            mp.isLooping = false
+                            start()
                         }
-                        loadDataWithBaseURL("https://www.youtube.com", htmlContent, "text/html", "UTF-8", null)
+                        setOnErrorListener { _, _, _ ->
+                            true
+                        }
                     }
                 },
                 modifier = Modifier.fillMaxSize()
             )
 
-            // Close button — floats on top of the video, top-right corner
+            // Close button — floats on top-right
             Surface(
                 color = Color.Black.copy(alpha = 0.6f),
                 shape = androidx.compose.foundation.shape.CircleShape,
