@@ -828,6 +828,8 @@ function ExamEditor({ test, testCategory, onClose }: { test: Test; testCategory:
   const [pasteCode, setPasteCode] = useState("");
   const [pushing, setPushing] = useState(false);
   const [isPublished, setIsPublished] = useState(test.isPublished);
+  const [saving, setSaving] = useState(false);
+  const [justSaved, setJustSaved] = useState(false);
   // Draft auto-save state
   const [draftSavedAt, setDraftSavedAt] = useState<number | null>(null);
   const [hasDraft, setHasDraft] = useState(false);
@@ -915,7 +917,13 @@ function ExamEditor({ test, testCategory, onClose }: { test: Test; testCategory:
 
   async function saveQuestion() {
     const q = currentQuestion;
-    if (!q.stem.trim()) { toast.error("Question text required"); return; }
+    if (!q.stem.trim() && q.title.trim()) {
+      // Allow title-only questions (image-based questions where title is the question)
+      q.stem = q.title;
+    }
+    if (!q.stem.trim()) { toast.error("Question text or title required"); return; }
+    setSaving(true);
+    setJustSaved(false);
     try {
       // Strip fields the API doesn't expect
       const payload = {
@@ -961,8 +969,12 @@ function ExamEditor({ test, testCategory, onClose }: { test: Test; testCategory:
       // Persist the updated state to the draft so a refresh still works
       setTimeout(() => flushDraft(), 50);
       toast.success(`Question ${q.blockNumber} saved`);
+      setSaving(false);
+      setJustSaved(true);
+      setTimeout(() => setJustSaved(false), 2000);
     } catch (e: any) {
       toast.error("Save failed: " + (e.message || "network error"));
+      setSaving(false);
     }
   }
 
@@ -1369,8 +1381,26 @@ function ExamEditor({ test, testCategory, onClose }: { test: Test; testCategory:
         {/* Action buttons — Done, Copy, Paste, Delete (simple), Push to App */}
         <div className="flex items-center justify-between border-t pt-3">
           <div className="flex gap-2 flex-wrap">
-            <Button onClick={saveQuestion} variant="default" size="lg">
-              <Save className="w-4 h-4 mr-1" /> Save
+            <Button
+              onClick={saveQuestion}
+              variant={justSaved ? "outline" : "default"}
+              size="lg"
+              disabled={saving}
+              className={justSaved ? "border-green-500 text-green-600" : ""}
+            >
+              {saving ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-1 animate-spin" /> Saving…
+                </>
+              ) : justSaved ? (
+                <>
+                  <CheckCircle2 className="w-4 h-4 mr-1 text-green-600" /> Saved!
+                </>
+              ) : (
+                <>
+                  <Save className="w-4 h-4 mr-1" /> Save
+                </>
+              )}
             </Button>
             <Button onClick={copyQuestion} variant="outline" size="lg">
               <Copy className="w-4 h-4 mr-1" /> Copy
