@@ -531,21 +531,19 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
     }
 
     // ── QUESTION GRID PAGE ── matches reference design exactly.
-    // NO sidebar. White top/bottom bars. Everything fits on screen.
+    // NO sidebar. White top/bottom bars. No Solved/Unsolved. No username.
+    // Listening = ONLY audio questions. Reading = text questions.
     if (showGrid) {
         val totalQ = t.items.size
+        // Reading = text questions only (blockType != "audio")
         val readingItems = t.items.filter { it.question.blockType != "audio" }
+        // Listening = audio questions ONLY (blockType == "audio")
         val listeningItems = t.items.filter { it.question.blockType == "audio" }
-        val readingList = if (readingItems.isNotEmpty()) readingItems else t.items.take((totalQ + 1) / 2)
-        val listeningList = if (listeningItems.isNotEmpty()) listeningItems else t.items.drop((totalQ + 1) / 2)
-        val displayReading = readingList.ifEmpty { t.items.take(20) }
-        val displayListening = listeningList.ifEmpty { t.items.drop(20).ifEmpty { t.items.take(20) } }
-        var tabFilter by remember { mutableStateOf(0) }
 
         Column(
             modifier = Modifier.fillMaxSize().background(Color.White)
         ) {
-            // ── TOP HEADER ── WHITE background, dark text ─────────────────
+            // ── TOP HEADER ── WHITE, logo + title + timer only (no username) ──
             Surface(
                 color = Color.White,
                 border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFE2E8F0)),
@@ -563,7 +561,7 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
                     )
                     Spacer(Modifier.width(6.dp))
                     Text(
-                        t.title.take(20),
+                        t.title.take(25),
                         color = Color(0xFF1E293B),
                         fontSize = 12.sp,
                         fontWeight = FontWeight.Bold,
@@ -571,34 +569,14 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
                         overflow = TextOverflow.Ellipsis,
                         modifier = Modifier.weight(1f)
                     )
-                    Text(
-                        AppState.getUserName().take(12),
-                        color = Color(0xFF64748B),
-                        fontSize = 10.sp,
-                        maxLines = 1
-                    )
-                    Spacer(Modifier.width(6.dp))
                     val mm = timeLeft / 60; val ss = timeLeft % 60
                     Text(
                         String.format("%02d:%02d", mm, ss),
-                        color = Color(0xFF003478),
+                        color = Color(0xFF1E293B),
                         fontSize = 12.sp,
                         fontWeight = FontWeight.Bold
                     )
                 }
-            }
-
-            // ── TABS ROW ── compact, white background ─────────────────────
-            Row(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 2.dp),
-                horizontalArrangement = Arrangement.spacedBy(4.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                TabButton("All", tabFilter == 0) { tabFilter = 0 }
-                TabButton("Solved", tabFilter == 1) { tabFilter = 1 }
-                TabButton("Unsolved", tabFilter == 2) { tabFilter = 2 }
-                Spacer(Modifier.weight(1f))
-                Text("$answeredCount / $totalQ", color = Color(0xFF64748B), fontSize = 10.sp, fontWeight = FontWeight.Medium)
             }
 
             // ── GRIDS ── Reading LEFT + Listening RIGHT — fills available space ─
@@ -608,13 +586,13 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
             ) {
                 Column(modifier = Modifier.weight(1f)) {
                     Text("Reading", color = Color(0xFF1E293B), fontSize = 11.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(start = 2.dp, bottom = 1.dp))
-                    QuestionGridSection(t, displayReading.ifEmpty { emptyList() }, answers, currentIdx, tabFilter, sound) { idx ->
+                    QuestionGridSection(t, readingItems, answers, currentIdx, 0, sound) { idx ->
                         currentIdx = idx; showGrid = false
                     }
                 }
                 Column(modifier = Modifier.weight(1f)) {
                     Text("Listening", color = Color(0xFF1E293B), fontSize = 11.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(start = 2.dp, bottom = 1.dp))
-                    QuestionGridSection(t, displayListening.ifEmpty { emptyList() }, answers, currentIdx, tabFilter, sound) { idx ->
+                    QuestionGridSection(t, listeningItems, answers, currentIdx, 0, sound) { idx ->
                         currentIdx = idx; showGrid = false
                     }
                 }
@@ -661,7 +639,7 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
                         Spacer(Modifier.width(8.dp))
                         Text("Exit", color = Color(0xFF64748B), fontSize = 12.sp, fontWeight = FontWeight.Medium, modifier = Modifier.clickable { sound.click(); onExit() })
                     } else {
-                        Text("Tap a number above to start answering", color = Color(0xFF94A3B8), fontSize = 12.sp)
+                        Text("Tap a number above to start", color = Color(0xFF94A3B8), fontSize = 12.sp)
                         Spacer(Modifier.width(8.dp))
                         Text("Exit", color = Color(0xFF64748B), fontSize = 12.sp, fontWeight = FontWeight.Medium, modifier = Modifier.clickable { sound.click(); onExit() })
                     }
@@ -798,8 +776,9 @@ fun AudioPlayerCard(theme: AppTheme, url: String, loopCount: Int, loopDelaySec: 
     var mediaPlayer by remember { mutableStateOf<android.media.MediaPlayer?>(null) }
     var isPlaying by remember { mutableStateOf(false) }
     var playCount by remember { mutableStateOf(0) }
-    // Total plays = loopCount (clamped to at least 1). -1 = infinite.
-    val totalPlays = if (loopCount == -1) "∞" else loopCount.coerceAtLeast(1).toString()
+    // disabled = all plays used up, can't replay
+    var disabled by remember { mutableStateOf(false) }
+    val maxPlays = loopCount.coerceAtLeast(1)
     val scope = rememberCoroutineScope()
 
     DisposableEffect(url) {
@@ -810,32 +789,54 @@ fun AudioPlayerCard(theme: AppTheme, url: String, loopCount: Int, loopDelaySec: 
     }
 
     Surface(color = theme.cardBg, shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth(), shadowElevation = 1.dp) {
-        Column(modifier = Modifier.padding(14.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Surface(color = theme.primary.copy(alpha = 0.15f), shape = RoundedCornerShape(10.dp), modifier = Modifier.size(40.dp)) {
-                    Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
-                        Icon(Icons.Default.Headphones, null, tint = theme.primary, modifier = Modifier.size(20.dp))
-                    }
-                }
-                Spacer(Modifier.width(10.dp))
-                Column(modifier = Modifier.weight(1f)) {
-                    Text("Audio question", color = theme.darkText, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
-                    Text(
-                        if (loopCount == -1) "Loops continuously"
-                        else if (loopCount <= 1) "Plays once"
-                        else "Plays $loopCount times" + if (loopDelaySec > 0) " • ${loopDelaySec}s delay" else "",
-                        color = theme.subText, fontSize = 11.sp
+        Row(
+            modifier = Modifier.padding(14.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // Audio icon
+            Surface(
+                color = if (disabled) Color(0xFFE2E8F0) else theme.primary.copy(alpha = 0.15f),
+                shape = RoundedCornerShape(10.dp),
+                modifier = Modifier.size(44.dp)
+            ) {
+                Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
+                    Icon(
+                        Icons.Default.Headphones,
+                        null,
+                        tint = if (disabled) Color(0xFF94A3B8) else theme.primary,
+                        modifier = Modifier.size(22.dp)
                     )
                 }
-                IconButton(onClick = {
+            }
+            Spacer(Modifier.width(12.dp))
+            // Play count info
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    if (disabled) "Audio played ($maxPlays/${maxPlays})" else "Audio — Play $playCount / $maxPlays",
+                    color = if (disabled) Color(0xFF94A3B8) else theme.darkText,
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.SemiBold
+                )
+                if (!disabled) {
+                    Text(
+                        if (maxPlays == 1) "Tap to listen (1 time only)" else "Tap to listen ($maxPlays times)",
+                        color = theme.subText, fontSize = 11.sp
+                    )
+                } else {
+                    Text("No more plays left", color = Color(0xFF94A3B8), fontSize = 11.sp)
+                }
+            }
+            // Play/Pause button — DISABLED after all plays used
+            IconButton(
+                onClick = {
+                    if (disabled) return@IconButton
                     sound.click()
                     if (isPlaying) {
-                        mediaPlayer?.pause()
-                        isPlaying = false
+                        // Don't pause — let it finish. Only allow play, not pause.
+                        return@IconButton
                     } else {
                         try {
                             mediaPlayer?.release()
-                            val maxPlays = loopCount.coerceAtLeast(1)
                             val mp = android.media.MediaPlayer().apply {
                                 setDataSource(url)
                                 setOnPreparedListener {
@@ -844,18 +845,20 @@ fun AudioPlayerCard(theme: AppTheme, url: String, loopCount: Int, loopDelaySec: 
                                     playCount = 1
                                 }
                                 setOnCompletionListener {
-                                    if (loopCount == -1 || playCount < maxPlays) {
+                                    if (playCount < maxPlays) {
                                         scope.launch {
                                             if (loopDelaySec > 0) delay(loopDelaySec * 1000L)
-                                            if (loopCount == -1 || playCount < maxPlays) {
+                                            if (playCount < maxPlays) {
                                                 playCount++
                                                 start()
                                             } else {
                                                 isPlaying = false
+                                                disabled = true
                                             }
                                         }
                                     } else {
                                         isPlaying = false
+                                        disabled = true
                                     }
                                 }
                                 setOnErrorListener { _, _, _ ->
@@ -869,18 +872,19 @@ fun AudioPlayerCard(theme: AppTheme, url: String, loopCount: Int, loopDelaySec: 
                             isPlaying = false
                         }
                     }
-                }) {
-                    Icon(
-                        if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
-                        null,
-                        tint = theme.primary,
-                        modifier = Modifier.size(28.dp)
-                    )
-                }
-            }
-            if (loopCount > 1 || loopCount == -1) {
-                Spacer(Modifier.height(6.dp))
-                Text("Play $playCount / $totalPlays", color = theme.subText, fontSize = 10.sp)
+                },
+                enabled = !disabled && !isPlaying
+            ) {
+                Icon(
+                    when {
+                        disabled -> Icons.Default.Lock
+                        isPlaying -> Icons.Default.VolumeUp
+                        else -> Icons.Default.PlayArrow
+                    },
+                    null,
+                    tint = if (disabled) Color(0xFFCBD5E1) else theme.primary,
+                    modifier = Modifier.size(32.dp)
+                )
             }
         }
     }
