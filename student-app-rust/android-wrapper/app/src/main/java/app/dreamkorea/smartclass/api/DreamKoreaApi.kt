@@ -147,6 +147,8 @@ data class ReviewItem(
     val title: String? = null, // optional per-question title
     val type: String,
     val options: List<String>?,
+    val optionImages: List<String> = emptyList(),
+    val optionAudios: List<String> = emptyList(),
     val imageUrl: String?,
     val audioUrl: String?,
     val audioLoop: Int = 0,
