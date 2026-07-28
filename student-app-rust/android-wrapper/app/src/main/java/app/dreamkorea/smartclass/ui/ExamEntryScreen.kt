@@ -56,6 +56,13 @@ fun ExamEntryScreen(theme: AppTheme, sound: SoundManager, testId: String, onStar
     var error by remember { mutableStateOf("") }
     var alreadyCompleted by remember { mutableStateOf(false) }
     var isSubscribed by remember { mutableStateOf(false) }
+    var showRotateHint by remember { mutableStateOf(true) }
+
+    // Auto-hide the rotate hint after 3 seconds
+    LaunchedEffect(Unit) {
+        kotlinx.coroutines.delay(3000)
+        showRotateHint = false
+    }
 
     // ── ORIENTATION ── FORCE LANDSCAPE for the exam overview. The phone
     // auto-rotates to landscape when the overview opens, and restores on exit.
@@ -138,6 +145,41 @@ fun ExamEntryScreen(theme: AppTheme, sound: SoundManager, testId: String, onStar
             error = "Could not load the test."
         } finally {
             loading = false
+        }
+    }
+
+    // ── Rotate hint overlay — shows briefly when entering landscape ─────
+    if (showRotateHint && !loading) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color.Black.copy(alpha = 0.7f))
+                .clickable { showRotateHint = false },
+            contentAlignment = Alignment.Center
+        ) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                // Rotating phone icon
+                Icon(
+                    Icons.Default.ScreenRotation,
+                    null,
+                    tint = Color.White,
+                    modifier = Modifier.size(64.dp)
+                )
+                Spacer(Modifier.height(16.dp))
+                Text(
+                    "Rotate to Landscape",
+                    color = Color.White,
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.Bold
+                )
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    "This exam works best in landscape mode.\nTap to continue.",
+                    color = Color.White.copy(alpha = 0.8f),
+                    fontSize = 13.sp,
+                    textAlign = TextAlign.Center
+                )
+            }
         }
     }
 
