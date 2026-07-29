@@ -539,148 +539,114 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
         }
     }
 
-            // ── QUESTION GRID PAGE ── worksheet-style exam navigation.
+            // ── QUESTION GRID PAGE ── matches HTML reference (4-col square grid, blue #1a56ff)
     if (showGrid) {
         val readingItems = t.items.filter { it.question.blockType != "audio" }
         val listeningItems = t.items.filter { it.question.blockType == "audio" }
         var showSubmitDialog by remember { mutableStateOf(false) }
         val haptic = LocalHapticFeedback.current
-        // Filter: null = all, true = answered only, false = unsolved only
+        // Filter: null = all, true = solved only, false = unsolved only
         var filterMode by remember { mutableStateOf<Boolean?>(null) }
 
-        // Count answered for live progress
         val readingAnswered = readingItems.count { answers.containsKey(it.question.id) }
         val listeningAnswered = listeningItems.count { answers.containsKey(it.question.id) }
         val totalAnswered = readingAnswered + listeningAnswered
         val totalQuestions = t.items.size
         val totalUnsolved = totalQuestions - totalAnswered
-        val mm = timeLeft / 60; val ss = timeLeft % 60
-        val timeStr = String.format("%02d:%02d", mm, ss)
+        // HH:MM:SS timer format (matches HTML reference)
+        val hh = timeLeft / 3600; val mm = (timeLeft % 3600) / 60; val ss = timeLeft % 60
+        val timeStr = String.format("%02d:%02d:%02d", hh, mm, ss)
         val isLowTime = timeLeft in 1..300
-        val timerColor = if (isLowTime) Color(0xFFDC2626) else Color(0xFF1F2937)
+        val timerColor = if (isLowTime) Color(0xFFDC2626) else Color(0xFF222222)
+        val accentBlue = Color(0xFF1A56FF)
 
-        Column(modifier = Modifier.fillMaxSize().background(Color.White)) {
-            // ── HEADER ROW 1: logo | title | ID | user ───────────────────
+        Column(modifier = Modifier.fillMaxSize().background(Color(0xFFF5F5F5))) {
+            // ── TABS ROW: All | Solved | UnSolved (with blue underline on active) ──
             Row(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 6.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(Color.White)
+                    .height(42.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Image(
-                    painter = painterResource(id = app.dreamkorea.smartclass.R.drawable.dreamkorea_logo),
-                    contentDescription = "DreamKorea",
-                    modifier = Modifier.size(30.dp),
-                    contentScale = ContentScale.Fit
-                )
-                Spacer(Modifier.width(8.dp))
-                Text(
-                    t.title.take(28),
-                    color = Color(0xFF111111),
-                    fontSize = 13.sp,
-                    fontWeight = FontWeight.Bold,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-                Spacer(Modifier.weight(1f))
-                Text(
-                    "ID",
-                    color = Color(0xFF9CA3AF),
-                    fontSize = 10.sp,
-                    fontWeight = FontWeight.Medium
-                )
-                Spacer(Modifier.width(4.dp))
-                Text(
-                    testId.take(10),
-                    color = Color(0xFF6B7280),
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
-                )
-                Spacer(Modifier.width(10.dp))
-                Text(
-                    AppState.getUserName().take(12),
-                    color = Color(0xFF111111),
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
+                RefTab("All", filterMode == null, accentBlue) { filterMode = null }
+                RefTab("Solved", filterMode == true, accentBlue) { filterMode = true }
+                RefTab("UnSolved", filterMode == false, accentBlue) { filterMode = false }
             }
-            // Thin divider
-            Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(Color(0xFFE5E7EB)))
+            // Thin border under tabs
+            Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(Color(0xFFE2E2E2)))
 
-            // ── STATUS ROW 2: Nepal | ALL | SOLVED | UNSOLVED | timer ────
-            Row(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 5.dp),
-                verticalAlignment = Alignment.CenterVertically
+            // ── TIMER (large, centered, monospace) ──────────────────────
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(Color.White)
+                    .padding(vertical = 8.dp),
+                contentAlignment = Alignment.Center
             ) {
-                Text("Nepal", color = Color(0xFF4B5563), fontSize = 11.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f).wrapContentWidth(Alignment.CenterHorizontally))
-                // Filter tabs
-                StatusTab("ALL", filterMode == null) { filterMode = null }
-                StatusTab("SOLVED", filterMode == true) { filterMode = true }
-                StatusTab("UNSOLVED", filterMode == false) { filterMode = false }
-                // Timer
                 Text(
                     timeStr,
                     color = timerColor,
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.Bold,
-                    fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
-                    modifier = Modifier.weight(1f).wrapContentWidth(Alignment.CenterHorizontally)
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Medium,
+                    letterSpacing = 1.sp,
+                    fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
                 )
             }
-            // Thin divider
-            Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(Color(0xFFE5E7EB)))
+            Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(Color(0xFFE2E2E2)))
 
-            // ── MAIN: Reading LEFT | watermark CENTER | Listening RIGHT ──
+            // ── MAIN AREA: Reading LEFT | Listening RIGHT (with watermark bg) ──
             Box(
                 modifier = Modifier
                     .weight(1f)
                     .fillMaxWidth()
-                    .background(Color.White)
+                    .background(Color(0xFFF5F5F5))
             ) {
-                // Watermark "DREAMKOREA" faint, centered
-                Text(
-                    "DREAMKOREA",
-                    color = Color(0xFF003F73).copy(alpha = 0.06f),
-                    fontSize = 38.sp,
-                    fontWeight = FontWeight.Black,
-                    modifier = Modifier.align(Alignment.Center)
+                // Watermark logo in background
+                Image(
+                    painter = painterResource(id = app.dreamkorea.smartclass.R.drawable.dreamkorea_logo),
+                    contentDescription = null,
+                    modifier = Modifier
+                        .size(180.dp)
+                        .align(Alignment.Center)
+                        .alpha(0.04f),
+                    contentScale = ContentScale.Fit
                 )
 
-                // Side-by-side panels
+                // Side-by-side scrollable panels
                 Row(
-                    modifier = Modifier.fillMaxSize().padding(12.dp),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    modifier = Modifier.fillMaxSize().padding(8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    // Reading panel (left) — scrollable
+                    // Reading panel (left)
                     Column(modifier = Modifier.weight(1f).fillMaxHeight()) {
-                        // Section header (sticky, not scrolled)
-                        Box(
-                            modifier = Modifier.fillMaxWidth().padding(bottom = 6.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                "Reading",
-                                color = Color(0xFF4B5563),
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.SemiBold
-                            )
-                        }
-                        // Grid — scrollable if it doesn't fit
+                        // Section label
+                        Text(
+                            "Reading",
+                            color = Color(0xFF333333),
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Medium,
+                            modifier = Modifier.padding(start = 4.dp, bottom = 6.dp)
+                        )
+                        // Scrollable grid with border
                         Column(
                             modifier = Modifier
                                 .weight(1f)
                                 .fillMaxWidth()
                                 .verticalScroll(rememberScrollState())
+                                .border(2.dp, Color(0xFF111111), RoundedCornerShape(10.dp))
+                                .background(Color.White)
+                                .padding(8.dp)
                         ) {
-                            QuestionGridWorksheet(
+                            QuestionGridRef(
                                 test = t,
                                 items = readingItems,
                                 answers = answers,
                                 currentIdx = currentIdx,
                                 sound = sound,
                                 haptic = haptic,
-                                filterMode = filterMode
+                                filterMode = filterMode,
+                                accentBlue = accentBlue
                             ) { idx ->
                                 currentIdx = idx
                                 showGrid = false
@@ -688,33 +654,33 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
                         }
                     }
 
-                    // Listening panel (right) — scrollable
+                    // Listening panel (right)
                     Column(modifier = Modifier.weight(1f).fillMaxHeight()) {
-                        Box(
-                            modifier = Modifier.fillMaxWidth().padding(bottom = 6.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                "Listening",
-                                color = Color(0xFF4B5563),
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.SemiBold
-                            )
-                        }
+                        Text(
+                            "Listening",
+                            color = Color(0xFF333333),
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Medium,
+                            modifier = Modifier.padding(start = 4.dp, bottom = 6.dp)
+                        )
                         Column(
                             modifier = Modifier
                                 .weight(1f)
                                 .fillMaxWidth()
                                 .verticalScroll(rememberScrollState())
+                                .border(2.dp, Color(0xFF111111), RoundedCornerShape(10.dp))
+                                .background(Color.White)
+                                .padding(8.dp)
                         ) {
-                            QuestionGridWorksheet(
+                            QuestionGridRef(
                                 test = t,
                                 items = listeningItems,
                                 answers = answers,
                                 currentIdx = currentIdx,
                                 sound = sound,
                                 haptic = haptic,
-                                filterMode = filterMode
+                                filterMode = filterMode,
+                                accentBlue = accentBlue
                             ) { idx ->
                                 currentIdx = idx
                                 showGrid = false
@@ -724,27 +690,25 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
                 }
             }
 
-            // Thin divider above submit
-            Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(Color(0xFFE5E7EB)))
-
-            // ── SUBMIT BUTTON (at the bottom, always visible after scrolling) ──
+            // ── SUBMIT BUTTON (blue pill, full-width-ish, at bottom) ─────
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(vertical = 8.dp),
+                    .background(Color(0xFFF5F5F5))
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
                 contentAlignment = Alignment.Center
             ) {
                 Button(
                     onClick = { showSubmitDialog = true },
-                    modifier = Modifier.fillMaxWidth(0.5f).height(44.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1E3A8A)),
-                    shape = RoundedCornerShape(8.dp)
+                    modifier = Modifier.fillMaxWidth().height(48.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = accentBlue),
+                    shape = RoundedCornerShape(24.dp)
                 ) {
                     Text(
                         "Submit and Finish Exam",
                         color = Color.White,
                         fontSize = 14.sp,
-                        fontWeight = FontWeight.Bold
+                        fontWeight = FontWeight.Medium
                     )
                 }
             }
@@ -786,7 +750,7 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
                                 }
                             }
                         },
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF003F73))
+                        colors = ButtonDefaults.buttonColors(containerColor = accentBlue)
                     ) { if (submitting) { CircularProgressIndicator(color = Color.White, modifier = Modifier.size(16.dp), strokeWidth = 2.dp) } else { Text("Submit", color = Color.White) } }
                 },
                 dismissButton = { OutlinedButton(onClick = { showSubmitDialog = false }) { Text("Cancel") } }
@@ -796,35 +760,39 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
     }
 }
 
-/// Worksheet-style status tab (ALL / SOLVED / UNSOLVED). Underlines when selected.
+/// Reference-style tab: flex:1, centered, blue bottom border (3dp) when active.
 @Composable
-private fun StatusTab(label: String, selected: Boolean, onClick: () -> Unit) {
+private fun RefTab(label: String, active: Boolean, accent: Color, onClick: () -> Unit) {
     Column(
         modifier = Modifier
+            .weight(1f)
+            .fillMaxHeight()
             .clickable { onClick() }
-            .padding(horizontal = 8.dp, vertical = 2.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
+            .background(if (active) Color(0xFFF2F2F2) else Color.White),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
     ) {
         Text(
             label,
-            color = if (selected) Color(0xFF1E3A8A) else Color(0xFF6B7280),
-            fontSize = 11.sp,
-            fontWeight = if (selected) FontWeight.Bold else FontWeight.SemiBold
+            color = if (active) Color(0xFF111111) else Color(0xFF444444),
+            fontSize = 13.sp,
+            fontWeight = if (active) FontWeight.SemiBold else FontWeight.Normal
         )
-        Spacer(Modifier.height(2.dp))
+        Spacer(Modifier.height(6.dp))
         Box(
             modifier = Modifier
-                .width(if (selected) 24.dp else 0.dp)
-                .height(2.dp)
-                .background(Color(0xFF1E3A8A))
+                .fillMaxWidth()
+                .height(if (active) 3.dp else 0.dp)
+                .background(accent)
         )
     }
 }
 
-/// Worksheet-style 5×4 grid — rectangular boxes (4:3), sharp corners, dark borders.
-/// Matches the reference screenshot aesthetic: flat, paper-form, no cards/shadows.
+/// Reference-style 4-column grid of square cells with 2px black borders.
+/// Solved = blue fill + white text. Current = blue border + glow.
+/// Uses continuous numbering: Reading 1-20, Listening 21-40 (from globalIdx).
 @Composable
-private fun QuestionGridWorksheet(
+private fun QuestionGridRef(
     test: TestDetail,
     items: List<TestItemDetail>,
     answers: SnapshotStateMap<String, Any>,
@@ -832,20 +800,23 @@ private fun QuestionGridWorksheet(
     sound: SoundManager,
     haptic: androidx.compose.ui.hapticfeedback.HapticFeedback,
     filterMode: Boolean?,
+    accentBlue: Color,
     onPick: (Int) -> Unit,
 ) {
     val globalIndices = items.mapNotNull { item -> test.items.indexOfFirst { it.question.id == item.question.id }.takeIf { it >= 0 } }
-    val cols = 5
-    val rowsCount = 4
+    val cols = 4  // 4 columns per the HTML reference (5 rows × 4 cols = 20 questions)
+
+    // Compute rows needed (always 5 for 20 questions, but dynamic for safety)
+    val rowsCount = (items.size + cols - 1) / cols
 
     Column(
         modifier = Modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(6.dp)
+        verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
         for (rowIdx in 0 until rowsCount) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 for (colIdx in 0 until cols) {
                     val localIdx = rowIdx * cols + colIdx
@@ -861,23 +832,19 @@ private fun QuestionGridWorksheet(
                         Box(
                             modifier = Modifier
                                 .weight(1f)
-                                .aspectRatio(1.2f)  // rectangular, slightly smaller
+                                .aspectRatio(1f)  // perfect square (matches HTML aspect-ratio: 1)
+                                .clip(RoundedCornerShape(6.dp))
                                 .border(
-                                    width = if (isCurrent) 2.dp else 1.dp,
+                                    width = if (isCurrent) 3.dp else 2.dp,
                                     color = when {
-                                        isCurrent -> Color(0xFF1E3A8A)
-                                        isAnswered -> Color(0xFF1E3A8A)
-                                        else -> Color(0xFF333333)
-                                    }
+                                        isCurrent -> accentBlue
+                                        isAnswered -> accentBlue
+                                        else -> Color(0xFF111111)
+                                    },
+                                    shape = RoundedCornerShape(6.dp)
                                 )
-                                .background(
-                                    when {
-                                        isAnswered -> SolidColor(Color(0xFF1E3A8A))
-                                        isCurrent -> SolidColor(Color(0xFFDBEAFE))
-                                        else -> SolidColor(Color.White)
-                                    }
-                                )
-                                .alpha(if (isFilteredOut) 0.2f else 1f)
+                                .background(if (isAnswered) accentBlue else Color.White)
+                                .alpha(if (isFilteredOut) 0.15f else 1f)
                                 .clickable(enabled = !isFilteredOut) {
                                     sound.click()
                                     haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
@@ -887,30 +854,26 @@ private fun QuestionGridWorksheet(
                         ) {
                             Text(
                                 "${globalIdx + 1}",
-                                color = when {
-                                    isAnswered -> Color.White
-                                    isCurrent -> Color(0xFF1E3A8A)
-                                    else -> Color(0xFF1F2937)
-                                },
+                                color = if (isAnswered) Color.White else Color(0xFF111111),
                                 fontSize = 16.sp,
-                                fontWeight = FontWeight.Normal,
+                                fontWeight = if (isCurrent) FontWeight.Bold else FontWeight.Medium,
                             )
                         }
                     } else {
-                        val baseNum = if (globalIndices.isNotEmpty()) globalIndices[0] else 0
-                        val displayNum = baseNum + localIdx + 1
-                        // Empty box — light gray border, not clickable
+                        // Empty placeholder cell (keeps grid aligned)
                         Box(
                             modifier = Modifier
                                 .weight(1f)
-                                .aspectRatio(1.2f)
-                                .border(1.dp, Color(0xFFE5E7EB))
+                                .aspectRatio(1f)
+                                .clip(RoundedCornerShape(6.dp))
+                                .border(2.dp, Color(0xFFEEEEEE), RoundedCornerShape(6.dp))
                                 .background(Color(0xFFFAFAFA)),
                             contentAlignment = Alignment.Center
                         ) {
+                            val baseNum = if (globalIndices.isNotEmpty()) globalIndices[0] else 0
                             Text(
-                                "$displayNum",
-                                color = Color(0xFFD1D5DB),
+                                "${baseNum + localIdx + 1}",
+                                color = Color(0xFFCCCCCC),
                                 fontSize = 14.sp,
                                 fontWeight = FontWeight.Normal,
                             )
