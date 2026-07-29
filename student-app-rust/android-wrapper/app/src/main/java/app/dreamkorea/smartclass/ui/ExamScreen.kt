@@ -831,6 +831,8 @@ private fun RefTab(label: String, active: Boolean, accent: Color, modifier: Modi
 /// showAllBlocks: true = pad grid to expected count (20) with blank cells so
 /// the user sees which questions are added vs blank.
 /// false = only show cells for questions that actually exist.
+/// Cells are FIXED SIZE (48dp) to match the HTML reference — they don't
+/// stretch to fill the screen.
 @Composable
 private fun QuestionGridRef(
     test: TestDetail,
@@ -846,12 +848,13 @@ private fun QuestionGridRef(
 ) {
     val globalIndices = items.mapNotNull { item -> test.items.indexOfFirst { it.question.id == item.question.id }.takeIf { it >= 0 } }
     val cols = 4  // 4 columns per the HTML reference (5 rows × 4 cols = 20 questions)
+    val cellSize = 48.dp  // fixed cell size — matches HTML's compact cells (~68px scaled for mobile)
+    val gap = 6.dp
 
     // Determine total cells to render:
     // - showAllBlocks=true: pad to the expected block count (20) so blank cells show
     // - showAllBlocks=false: only render cells for actual questions
     val expectedTotal = if (showAllBlocks) {
-        // Use the test's block count (default 20), or items.size if larger
         val isAudio = items.isNotEmpty() && items[0].question.blockType == "audio"
         val blockCount = if (isAudio) test.audioBlockCount else test.textBlockCount
         maxOf(blockCount, items.size)
@@ -862,12 +865,13 @@ private fun QuestionGridRef(
 
     Column(
         modifier = Modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(8.dp)
+        verticalArrangement = Arrangement.spacedBy(gap),
+        horizontalAlignment = Alignment.CenterHorizontally
     ) {
         for (rowIdx in 0 until rowsCount) {
             Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                modifier = Modifier,
+                horizontalArrangement = Arrangement.spacedBy(gap)
             ) {
                 for (colIdx in 0 until cols) {
                     val localIdx = rowIdx * cols + colIdx
@@ -882,11 +886,10 @@ private fun QuestionGridRef(
                         }
                         Box(
                             modifier = Modifier
-                                .weight(1f)
-                                .aspectRatio(1f)  // perfect square (matches HTML aspect-ratio: 1)
+                                .size(cellSize)
                                 .clip(RoundedCornerShape(6.dp))
                                 .border(
-                                    width = if (isCurrent) 3.dp else 2.dp,
+                                    width = if (isCurrent) 2.5.dp else 1.5.dp,
                                     color = when {
                                         isCurrent -> accentBlue
                                         isAnswered -> accentBlue
@@ -906,35 +909,32 @@ private fun QuestionGridRef(
                             Text(
                                 "${globalIdx + 1}",
                                 color = if (isAnswered) Color.White else Color(0xFF111111),
-                                fontSize = 16.sp,
+                                fontSize = 13.sp,
                                 fontWeight = if (isCurrent) FontWeight.Bold else FontWeight.Medium,
                             )
                         }
                     } else if (showAllBlocks) {
                         // Empty placeholder cell — only shown when showAllBlocks=true
-                        // so the user can see which blocks are blank
                         val baseNum = if (globalIndices.isNotEmpty()) globalIndices[0] else 0
                         val displayNum = baseNum + localIdx + 1
                         Box(
                             modifier = Modifier
-                                .weight(1f)
-                                .aspectRatio(1f)
+                                .size(cellSize)
                                 .clip(RoundedCornerShape(6.dp))
-                                .border(2.dp, Color(0xFFEEEEEE), RoundedCornerShape(6.dp))
+                                .border(1.5.dp, Color(0xFFEEEEEE), RoundedCornerShape(6.dp))
                                 .background(Color(0xFFFAFAFA)),
                             contentAlignment = Alignment.Center
                         ) {
                             Text(
                                 "$displayNum",
                                 color = Color(0xFFCCCCCC),
-                                fontSize = 14.sp,
+                                fontSize = 12.sp,
                                 fontWeight = FontWeight.Normal,
                             )
                         }
                     } else {
-                        // showAllBlocks=false and no question here — render invisible spacer
-                        // to keep the row aligned (but only if there are siblings in this row)
-                        Spacer(modifier = Modifier.weight(1f))
+                        // showAllBlocks=false and no question here — invisible spacer to keep row aligned
+                        Spacer(modifier = Modifier.size(cellSize))
                     }
                 }
             }
