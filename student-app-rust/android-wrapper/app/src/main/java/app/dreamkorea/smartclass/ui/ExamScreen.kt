@@ -569,9 +569,9 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
                     .height(42.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                RefTab("All", filterMode == null, accentBlue) { filterMode = null }
-                RefTab("Solved", filterMode == true, accentBlue) { filterMode = true }
-                RefTab("UnSolved", filterMode == false, accentBlue) { filterMode = false }
+                RefTab("All", filterMode == null, accentBlue, Modifier.weight(1f)) { filterMode = null }
+                RefTab("Solved", filterMode == true, accentBlue, Modifier.weight(1f)) { filterMode = true }
+                RefTab("UnSolved", filterMode == false, accentBlue, Modifier.weight(1f)) { filterMode = false }
             }
             // Thin border under tabs
             Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(Color(0xFFE2E2E2)))
@@ -762,10 +762,9 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
 
 /// Reference-style tab: flex:1, centered, blue bottom border (3dp) when active.
 @Composable
-private fun RefTab(label: String, active: Boolean, accent: Color, onClick: () -> Unit) {
+private fun RefTab(label: String, active: Boolean, accent: Color, modifier: Modifier, onClick: () -> Unit) {
     Column(
-        modifier = Modifier
-            .weight(1f)
+        modifier = modifier
             .fillMaxHeight()
             .clickable { onClick() }
             .background(if (active) Color(0xFFF2F2F2) else Color.White),
