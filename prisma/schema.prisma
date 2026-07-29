@@ -290,6 +290,9 @@ model Test {
   // the student app.
   textBlockEnabled  Boolean? @default(true)
   audioBlockEnabled Boolean? @default(true)
+  // Grid display mode: true = show all blocks (added + blank), false = show
+  // only blocks that contain questions. Default true (show all).
+  showAllBlocks     Boolean? @default(true)
 
   chapter     Chapter? @relation(fields: [chapterId], references: [id], onDelete: SetNull)
   items       TestItem[]

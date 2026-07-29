@@ -92,6 +92,7 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ testId: st
         audioBlockCount: sourceTest.audioBlockCount,
         textBlockEnabled: sourceTest.textBlockEnabled,
         audioBlockEnabled: sourceTest.audioBlockEnabled,
+        showAllBlocks: sourceTest.showAllBlocks,
       },
     });
 

@@ -92,6 +92,7 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ bundleId: s
     audioBlockCount: allItems.filter((x) => x.item.question.blockType === "audio").length,
     textBlockEnabled: true,
     audioBlockEnabled: true,
+    showAllBlocks: false, // Bundle: only show created questions, no blank placeholders
     items: allItems.map((x, idx) => ({
       id: `${combinedTestId}-item-${idx}`,
       order: idx + 1,

@@ -74,6 +74,7 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ testId: str
       audioBlockCount: test.audioBlockCount ?? 0,
       textBlockEnabled: textEnabled,
       audioBlockEnabled: audioEnabled,
+      showAllBlocks: test.showAllBlocks !== false, // default true if null
       items: filteredItems.map((i) => ({
         id: i.id,
         order: i.order,

@@ -477,6 +477,7 @@ internal suspend fun combineTestsClientSide(
         audioBlockCount = audioCount,
         textBlockEnabled = true,
         audioBlockEnabled = true,
+        showAllBlocks = false, // combined exams: only show created questions, no blanks
         items = allItems,
     )
 }

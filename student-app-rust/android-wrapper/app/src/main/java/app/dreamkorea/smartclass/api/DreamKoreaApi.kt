@@ -135,6 +135,7 @@ data class TestDetail(
     val audioBlockCount: Int = 0,
     val textBlockEnabled: Boolean = true,
     val audioBlockEnabled: Boolean = true,
+    val showAllBlocks: Boolean = true, // true = show all blocks (added+blank), false = only created
     val items: List<TestItemDetail>
 )
 data class TestDetailResponse(val test: TestDetail)

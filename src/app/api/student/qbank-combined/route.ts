@@ -58,6 +58,7 @@ export async function GET(req: NextRequest) {
     audioBlockCount: allItems.filter(i => i.question.blockType === "audio").length,
     textBlockEnabled: true,
     audioBlockEnabled: true,
+    showAllBlocks: false, // QBank: only show created questions, no blank placeholders
     items: allItems.map((item, idx) => ({
       id: `qb-${idx}`,
       order: idx + 1,

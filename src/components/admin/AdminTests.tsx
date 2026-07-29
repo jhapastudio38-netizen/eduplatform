@@ -85,6 +85,8 @@ interface Test {
   // Per-block enable flags — admin can hide the audio or text section
   textBlockEnabled?: boolean | null;
   audioBlockEnabled?: boolean | null;
+  // Grid display mode: true = show all blocks (added + blank), false = only created
+  showAllBlocks?: boolean | null;
   _count?: { items: number };
 }
 
@@ -345,6 +347,30 @@ export function AdminTests({ testCategory = "exam" }: { testCategory?: string })
                         title="Toggle audio block visibility for students"
                       >
                         Audio
+                      </button>
+                      <button
+                        onClick={async () => {
+                          const next = !(t.showAllBlocks !== false);
+                          try {
+                            await fetch(`/api/admin/tests/${t.id}/toggle-grid-mode`, {
+                              method: "POST",
+                              headers: { "Content-Type": "application/json" },
+                              body: JSON.stringify({ showAllBlocks: next }),
+                            });
+                            toast.success(next ? "Showing all blocks (added + blank)" : "Showing only created blocks");
+                            load();
+                          } catch {
+                            toast.error("Failed to toggle grid mode");
+                          }
+                        }}
+                        className={`text-[10px] px-2 py-0.5 rounded-full border transition-colors ${
+                          t.showAllBlocks !== false
+                            ? "bg-blue-50 text-blue-700 border-blue-300"
+                            : "bg-violet-50 text-violet-700 border-violet-300"
+                        }`}
+                        title="Toggle grid display mode: show all blocks vs only created ones"
+                      >
+                        {t.showAllBlocks !== false ? "All blocks" : "Created only"}
                       </button>
                     </div>
                   )}
@@ -633,6 +659,7 @@ function CreateExamDialog({ open, testCategory, onOpenChange, onCreated }: {
     audioGapSec: 2,
     textBlockCount: isSimple ? 0 : 20,
     audioBlockCount: isSimple ? 0 : 20,
+    showAllBlocks: true, // true = show all blocks (added + blank), false = only created
   });
 
   async function uploadFile(file: File, folder: string): Promise<string> {
@@ -663,6 +690,7 @@ function CreateExamDialog({ open, testCategory, onOpenChange, onCreated }: {
         audioGapSec: form.audioGapSec,
         textBlockCount: form.textBlockCount,
         audioBlockCount: form.audioBlockCount,
+        showAllBlocks: form.showAllBlocks,
         isExam: true,
         isPublished: false, // Draft — admin pushes when ready
       };
@@ -787,6 +815,43 @@ function CreateExamDialog({ open, testCategory, onOpenChange, onCreated }: {
               <div>
                 <Label className="text-sm font-semibold">Audio Questions Count</Label>
                 <Input type="number" value={form.audioBlockCount} onChange={(e) => setForm(f => ({ ...f, audioBlockCount: parseInt(e.target.value) || 20 }))} min={1} max={100} />
+              </div>
+            </div>
+          )}
+
+          {/* Grid Display Mode — only for exam & demo */}
+          {!isSimple && (
+            <div className="space-y-2">
+              <Label className="text-sm font-semibold">Grid Display Mode</Label>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setForm(f => ({ ...f, showAllBlocks: true }))}
+                  className={`flex-1 px-3 py-2 rounded-lg text-xs font-medium border transition-colors ${
+                    form.showAllBlocks
+                      ? "bg-blue-50 text-blue-700 border-blue-300"
+                      : "bg-white text-slate-600 border-slate-300 hover:bg-slate-50"
+                  }`}
+                >
+                  Show all blocks
+                  <span className="block text-[10px] font-normal text-muted-foreground mt-0.5">
+                    Students see added + blank blocks
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setForm(f => ({ ...f, showAllBlocks: false }))}
+                  className={`flex-1 px-3 py-2 rounded-lg text-xs font-medium border transition-colors ${
+                    !form.showAllBlocks
+                      ? "bg-blue-50 text-blue-700 border-blue-300"
+                      : "bg-white text-slate-600 border-slate-300 hover:bg-slate-50"
+                  }`}
+                >
+                  Show only created
+                  <span className="block text-[10px] font-normal text-muted-foreground mt-0.5">
+                    Students see only blocks with questions
+                  </span>
+                </button>
               </div>
             </div>
           )}

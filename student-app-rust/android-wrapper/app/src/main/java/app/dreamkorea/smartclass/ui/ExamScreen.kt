@@ -543,6 +543,11 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
     if (showGrid) {
         val readingItems = t.items.filter { it.question.blockType != "audio" }
         val listeningItems = t.items.filter { it.question.blockType == "audio" }
+        // Question Bank / combined exams: show ALL questions in ONE panel (no Reading/Listening split)
+        // Regular exams/tests: show Reading LEFT | Listening RIGHT
+        val isQBank = testId == "qbank-combined" || testId.startsWith("bundle-")
+        // showAllBlocks: true = show all blocks (added + blank), false = only show created questions
+        val showAllBlocks = t.showAllBlocks
         var showSubmitDialog by remember { mutableStateOf(false) }
         val haptic = LocalHapticFeedback.current
         // Filter: null = all, true = solved only, false = unsolved only
@@ -595,7 +600,9 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
             }
             Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(Color(0xFFE2E2E2)))
 
-            // ── MAIN AREA: Reading LEFT | Listening RIGHT (with watermark bg) ──
+            // ── MAIN AREA ──────────────────────────────────────────────────
+            // QBank: single panel with ALL questions (no Reading/Listening labels)
+            // Exam: Reading LEFT | Listening RIGHT
             Box(
                 modifier = Modifier
                     .weight(1f)
@@ -613,25 +620,13 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
                     contentScale = ContentScale.Fit
                 )
 
-                // Side-by-side scrollable panels
-                Row(
-                    modifier = Modifier.fillMaxSize().padding(8.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    // Reading panel (left)
-                    Column(modifier = Modifier.weight(1f).fillMaxHeight()) {
-                        // Section label
-                        Text(
-                            "Reading",
-                            color = Color(0xFF333333),
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.Medium,
-                            modifier = Modifier.padding(start = 4.dp, bottom = 6.dp)
-                        )
-                        // Scrollable grid with border
+                if (isQBank) {
+                    // ── QBANK: single panel, all questions, no section labels ──
+                    Column(
+                        modifier = Modifier.fillMaxSize().padding(12.dp)
+                    ) {
                         Column(
                             modifier = Modifier
-                                .weight(1f)
                                 .fillMaxWidth()
                                 .verticalScroll(rememberScrollState())
                                 .border(2.dp, Color(0xFF111111), RoundedCornerShape(10.dp))
@@ -640,50 +635,93 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
                         ) {
                             QuestionGridRef(
                                 test = t,
-                                items = readingItems,
+                                items = t.items, // ALL questions in one grid
                                 answers = answers,
                                 currentIdx = currentIdx,
                                 sound = sound,
                                 haptic = haptic,
                                 filterMode = filterMode,
-                                accentBlue = accentBlue
+                                accentBlue = accentBlue,
+                                showAllBlocks = showAllBlocks
                             ) { idx ->
                                 currentIdx = idx
                                 showGrid = false
                             }
                         }
                     }
+                } else {
+                    // ── EXAM: Reading LEFT | Listening RIGHT ──
+                    Row(
+                        modifier = Modifier.fillMaxSize().padding(8.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        // Reading panel (left)
+                        Column(modifier = Modifier.weight(1f).fillMaxHeight()) {
+                            Text(
+                                "Reading",
+                                color = Color(0xFF333333),
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Medium,
+                                modifier = Modifier.padding(start = 4.dp, bottom = 6.dp)
+                            )
+                            Column(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .fillMaxWidth()
+                                    .verticalScroll(rememberScrollState())
+                                    .border(2.dp, Color(0xFF111111), RoundedCornerShape(10.dp))
+                                    .background(Color.White)
+                                    .padding(8.dp)
+                            ) {
+                                QuestionGridRef(
+                                    test = t,
+                                    items = readingItems,
+                                    answers = answers,
+                                    currentIdx = currentIdx,
+                                    sound = sound,
+                                    haptic = haptic,
+                                    filterMode = filterMode,
+                                    accentBlue = accentBlue,
+                                    showAllBlocks = showAllBlocks
+                                ) { idx ->
+                                    currentIdx = idx
+                                    showGrid = false
+                                }
+                            }
+                        }
 
-                    // Listening panel (right)
-                    Column(modifier = Modifier.weight(1f).fillMaxHeight()) {
-                        Text(
-                            "Listening",
-                            color = Color(0xFF333333),
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.Medium,
-                            modifier = Modifier.padding(start = 4.dp, bottom = 6.dp)
-                        )
-                        Column(
-                            modifier = Modifier
-                                .weight(1f)
-                                .fillMaxWidth()
-                                .verticalScroll(rememberScrollState())
-                                .border(2.dp, Color(0xFF111111), RoundedCornerShape(10.dp))
-                                .background(Color.White)
-                                .padding(8.dp)
-                        ) {
-                            QuestionGridRef(
-                                test = t,
-                                items = listeningItems,
-                                answers = answers,
-                                currentIdx = currentIdx,
-                                sound = sound,
-                                haptic = haptic,
-                                filterMode = filterMode,
-                                accentBlue = accentBlue
-                            ) { idx ->
-                                currentIdx = idx
-                                showGrid = false
+                        // Listening panel (right)
+                        Column(modifier = Modifier.weight(1f).fillMaxHeight()) {
+                            Text(
+                                "Listening",
+                                color = Color(0xFF333333),
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Medium,
+                                modifier = Modifier.padding(start = 4.dp, bottom = 6.dp)
+                            )
+                            Column(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .fillMaxWidth()
+                                    .verticalScroll(rememberScrollState())
+                                    .border(2.dp, Color(0xFF111111), RoundedCornerShape(10.dp))
+                                    .background(Color.White)
+                                    .padding(8.dp)
+                            ) {
+                                QuestionGridRef(
+                                    test = t,
+                                    items = listeningItems,
+                                    answers = answers,
+                                    currentIdx = currentIdx,
+                                    sound = sound,
+                                    haptic = haptic,
+                                    filterMode = filterMode,
+                                    accentBlue = accentBlue,
+                                    showAllBlocks = showAllBlocks
+                                ) { idx ->
+                                    currentIdx = idx
+                                    showGrid = false
+                                }
                             }
                         }
                     }
@@ -790,6 +828,9 @@ private fun RefTab(label: String, active: Boolean, accent: Color, modifier: Modi
 /// Reference-style 4-column grid of square cells with 2px black borders.
 /// Solved = blue fill + white text. Current = blue border + glow.
 /// Uses continuous numbering: Reading 1-20, Listening 21-40 (from globalIdx).
+/// showAllBlocks: true = pad grid to expected count (20) with blank cells so
+/// the user sees which questions are added vs blank.
+/// false = only show cells for questions that actually exist.
 @Composable
 private fun QuestionGridRef(
     test: TestDetail,
@@ -800,13 +841,24 @@ private fun QuestionGridRef(
     haptic: androidx.compose.ui.hapticfeedback.HapticFeedback,
     filterMode: Boolean?,
     accentBlue: Color,
+    showAllBlocks: Boolean,
     onPick: (Int) -> Unit,
 ) {
     val globalIndices = items.mapNotNull { item -> test.items.indexOfFirst { it.question.id == item.question.id }.takeIf { it >= 0 } }
     val cols = 4  // 4 columns per the HTML reference (5 rows × 4 cols = 20 questions)
 
-    // Compute rows needed (always 5 for 20 questions, but dynamic for safety)
-    val rowsCount = (items.size + cols - 1) / cols
+    // Determine total cells to render:
+    // - showAllBlocks=true: pad to the expected block count (20) so blank cells show
+    // - showAllBlocks=false: only render cells for actual questions
+    val expectedTotal = if (showAllBlocks) {
+        // Use the test's block count (default 20), or items.size if larger
+        val isAudio = items.isNotEmpty() && items[0].question.blockType == "audio"
+        val blockCount = if (isAudio) test.audioBlockCount else test.textBlockCount
+        maxOf(blockCount, items.size)
+    } else {
+        items.size
+    }
+    val rowsCount = (expectedTotal + cols - 1) / cols
 
     Column(
         modifier = Modifier.fillMaxWidth(),
@@ -858,8 +910,11 @@ private fun QuestionGridRef(
                                 fontWeight = if (isCurrent) FontWeight.Bold else FontWeight.Medium,
                             )
                         }
-                    } else {
-                        // Empty placeholder cell (keeps grid aligned)
+                    } else if (showAllBlocks) {
+                        // Empty placeholder cell — only shown when showAllBlocks=true
+                        // so the user can see which blocks are blank
+                        val baseNum = if (globalIndices.isNotEmpty()) globalIndices[0] else 0
+                        val displayNum = baseNum + localIdx + 1
                         Box(
                             modifier = Modifier
                                 .weight(1f)
@@ -869,14 +924,17 @@ private fun QuestionGridRef(
                                 .background(Color(0xFFFAFAFA)),
                             contentAlignment = Alignment.Center
                         ) {
-                            val baseNum = if (globalIndices.isNotEmpty()) globalIndices[0] else 0
                             Text(
-                                "${baseNum + localIdx + 1}",
+                                "$displayNum",
                                 color = Color(0xFFCCCCCC),
                                 fontSize = 14.sp,
                                 fontWeight = FontWeight.Normal,
                             )
                         }
+                    } else {
+                        // showAllBlocks=false and no question here — render invisible spacer
+                        // to keep the row aligned (but only if there are siblings in this row)
+                        Spacer(modifier = Modifier.weight(1f))
                     }
                 }
             }
