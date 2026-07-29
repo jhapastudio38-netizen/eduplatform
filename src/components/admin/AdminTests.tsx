@@ -844,6 +844,19 @@ function ExamEditor({ test, testCategory, onClose }: { test: Test; testCategory:
     return `${blockType}-${blockNumber}`;
   }
 
+  // A question is "filled" if it has ANY of: stem (text), title, or media.
+  // Text/title are OPTIONAL — media alone is enough to count as a question.
+  function isFilled(q: QuestionData | undefined | null): boolean {
+    if (!q) return false;
+    return !!(
+      q.stem?.trim() ||
+      q.title?.trim() ||
+      q.mediaImageUrl?.trim() ||
+      q.mediaAudioUrl?.trim() ||
+      q.descImageUrl?.trim()
+    );
+  }
+
   // Merge fetched server questions with any locally-saved draft.
   // Draft wins when present (it represents the most recent edit), but we
   // keep the server's `id` / `testItemId` so saving updates the same row
@@ -917,12 +930,9 @@ function ExamEditor({ test, testCategory, onClose }: { test: Test; testCategory:
 
   async function saveQuestion() {
     const q = currentQuestion;
-    if (!q.stem.trim() && q.title.trim()) {
-      // Allow title-only questions (image-based questions where title is the question)
-      q.stem = q.title;
-    }
-    // Both title AND question text are optional — admin can add image/audio only
-    if (!q.stem.trim() && !q.title.trim() && q.mediaImageUrl.isBlank() && q.mediaAudioUrl.isBlank() && q.descImageUrl.isBlank()) {
+    // Question text (stem) AND title are both OPTIONAL — media alone is enough.
+    // Just need at least ONE of: stem, title, image, or audio.
+    if (!isFilled(q)) {
       toast.error("Add at least a title, question text, image, or audio");
       return;
     }
@@ -984,7 +994,7 @@ function ExamEditor({ test, testCategory, onClose }: { test: Test; testCategory:
 
   function copyQuestion() {
     const q = currentQuestion;
-    if (!q.stem.trim()) { toast.error("Nothing to copy — question is empty"); return; }
+    if (!isFilled(q)) { toast.error("Nothing to copy — question is empty"); return; }
     // Generate a copy code — admin can define their own prefix
     const code = `DK-${activeBlock.toUpperCase()}-${q.blockNumber}-${Date.now().toString(36).toUpperCase()}`;
     const data = JSON.stringify({ code, question: q });
@@ -1002,7 +1012,7 @@ function ExamEditor({ test, testCategory, onClose }: { test: Test; testCategory:
   // Generates a single code that bundles every filled question. The admin
   // can paste the code into another test to bulk-import all questions at once.
   function copyAll() {
-    const filled = Object.values(questions).filter(q => q.stem.trim());
+    const filled = Object.values(questions).filter(q => isFilled(q));
     if (filled.length === 0) { toast.error("No questions to copy — add some first"); return; }
     const code = `DK-ALL-${test.id.slice(-4).toUpperCase()}-${Date.now().toString(36).toUpperCase()}`;
     const data = JSON.stringify({ code, allQuestions: filled, sourceTestId: test.id, sourceTitle: test.title });
@@ -1054,7 +1064,7 @@ function ExamEditor({ test, testCategory, onClose }: { test: Test; testCategory:
   }
 
   async function pushToApp() {
-    const filledQuestions = Object.values(questions).filter(q => q.stem.trim());
+    const filledQuestions = Object.values(questions).filter(q => isFilled(q));
     if (filledQuestions.length === 0) {
       toast.error("Cannot push: add at least one question first");
       return;
@@ -1189,7 +1199,7 @@ function ExamEditor({ test, testCategory, onClose }: { test: Test; testCategory:
 
   // Simple-mode list of saved questions (sorted by block number)
   const simpleList = Object.values(questions)
-    .filter((q) => q.stem.trim())
+    .filter((q) => isFilled(q))
     .sort((a, b) => a.blockNumber - b.blockNumber);
 
   function addQuestion() {
@@ -1312,7 +1322,7 @@ function ExamEditor({ test, testCategory, onClose }: { test: Test; testCategory:
           <div className="grid grid-cols-10 gap-1 max-h-24 overflow-y-auto p-1 bg-slate-50 rounded">
             {blockNumbers.map((num) => {
               const k = key(activeBlock, num);
-              const isFilled = questions[k] && questions[k].stem.trim();
+              const isQFilled = isFilled(questions[k]);
               const isActive = num === activeNumber;
               return (
                 <button
@@ -1320,7 +1330,7 @@ function ExamEditor({ test, testCategory, onClose }: { test: Test; testCategory:
                   onClick={() => setActiveNumber(num)}
                   className={`h-8 rounded text-xs font-medium transition-colors ${
                     isActive ? "bg-primary text-primary-foreground" :
-                    isFilled ? "bg-green-100 text-green-700 border border-green-300" :
+                    isQFilled ? "bg-green-100 text-green-700 border border-green-300" :
                     "bg-white border hover:bg-slate-100"
                   }`}
                 >
@@ -1733,8 +1743,8 @@ function QuestionEditor({ question, onChange, blockLabel, isAudioBlock }: {
 
           {/* Question text */}
           <div className="space-y-1">
-            <Label className="text-sm font-semibold">Question <span className="text-red-500">*</span></Label>
-            <Textarea rows={3} value={question.stem} onChange={(e) => onChange({ ...question, stem: e.target.value })} placeholder="What is the question?" className="text-base" />
+            <Label className="text-sm font-semibold">Question text <span className="text-gray-400 font-normal text-xs">(optional — leave empty if using media below)</span></Label>
+            <Textarea rows={3} value={question.stem} onChange={(e) => onChange({ ...question, stem: e.target.value })} placeholder="Type the question… (optional if you add media below)" className="text-base" />
           </div>
 
           {/* Question Media Type */}

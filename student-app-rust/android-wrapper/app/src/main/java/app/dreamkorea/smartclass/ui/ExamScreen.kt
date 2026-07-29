@@ -727,7 +727,7 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
             // Thin divider above submit
             Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(Color(0xFFE5E7EB)))
 
-            // ── SUBMIT BUTTON ────────────────────────────────────────────
+            // ── SUBMIT BUTTON (at the bottom, always visible after scrolling) ──
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
