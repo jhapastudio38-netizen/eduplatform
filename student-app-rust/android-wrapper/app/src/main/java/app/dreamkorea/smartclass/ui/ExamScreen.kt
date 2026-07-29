@@ -397,23 +397,27 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
                     }
                     Spacer(Modifier.height(6.dp))
                 }
-                // Question card (stem) — white with subtle shadow
-                Surface(
-                    color = Color.White,
-                    shape = RoundedCornerShape(14.dp),
-                    shadowElevation = 2.dp,
-                    border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFE2E8F0)),
-                    modifier = Modifier.fillMaxWidth(0.92f)
-                ) {
-                    Text(
-                        q.stem,
-                        color = Color(0xFF1E293B),
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.Medium,
-                        modifier = Modifier.padding(14.dp)
-                    )
+                // Question card — shows stem (if set) OR mediaText (if media type is text)
+                // When admin removes the Question text field, mediaText serves as the question
+                val questionText = q.stem.ifBlank { q.mediaText ?: "" }
+                if (questionText.isNotBlank()) {
+                    Surface(
+                        color = Color.White,
+                        shape = RoundedCornerShape(14.dp),
+                        shadowElevation = 2.dp,
+                        border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFE2E8F0)),
+                        modifier = Modifier.fillMaxWidth(0.92f)
+                    ) {
+                        Text(
+                            questionText,
+                            color = Color(0xFF1E293B),
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Medium,
+                            modifier = Modifier.padding(14.dp)
+                        )
+                    }
+                    Spacer(Modifier.height(6.dp))
                 }
-                Spacer(Modifier.height(6.dp))
                 // Media images — ContentScale.Fit (contain, not cover)
                 if (q.descType == "image" && !q.descImageUrl.isNullOrBlank()) {
                     val url = q.descImageUrl!!.toAbsoluteUrl()
