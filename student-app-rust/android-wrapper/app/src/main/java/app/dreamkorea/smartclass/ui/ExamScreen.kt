@@ -832,15 +832,14 @@ private fun RefTab(label: String, active: Boolean, accent: Color, modifier: Modi
     }
 }
 
-/// Reference-style 4-column grid of square cells with 2px black borders.
+/// Reference-style 4-column grid of PERFECT SQUARE cells with 2px black borders.
 /// Solved = blue fill + white text. Current = blue border + glow.
 /// Uses continuous numbering: Reading 1-20, Listening 21-40 (from globalIdx).
 /// showAllBlocks: true = pad grid to expected count (20) with blank cells so
 /// the user sees which questions are added vs blank.
 /// false = only show cells for questions that actually exist.
-/// Cells use weight(1f).aspectRatio(1f) so they FILL the panel width
-/// (not clustered in the middle). The panel itself constrains the max width
-/// so cells stay a reasonable size.
+/// Cells ALWAYS maintain 1:1 aspect ratio (perfect square) regardless of count.
+/// Grid is scrollable so all blocks are reachable.
 @Composable
 private fun QuestionGridRef(
     test: TestDetail,
@@ -855,11 +854,10 @@ private fun QuestionGridRef(
     onPick: (Int) -> Unit,
 ) {
     val globalIndices = items.mapNotNull { item -> test.items.indexOfFirst { it.question.id == item.question.id }.takeIf { it >= 0 } }
-    val cols = 4  // 4 columns per the HTML reference (5 rows × 4 cols = 20 questions)
+    val cols = 4  // 4 columns per the HTML reference
+    val gridScrollState = rememberScrollState()
 
-    // Determine total cells to render:
-    // - showAllBlocks=true: pad to the expected block count (20) so blank cells show
-    // - showAllBlocks=false: only render cells for actual questions
+    // Determine total cells to render
     val expectedTotal = if (showAllBlocks) {
         val isAudio = items.isNotEmpty() && items[0].question.blockType == "audio"
         val blockCount = if (isAudio) test.audioBlockCount else test.textBlockCount
@@ -869,15 +867,16 @@ private fun QuestionGridRef(
     }
     val rowsCount = (expectedTotal + cols - 1) / cols
 
-    // fillMaxHeight + weight(1f) on rows = all rows distribute to fill the
-    // entire panel area (no empty space, blocks fit screen "all along")
+    // Scrollable grid — cells are PERFECT SQUARES (aspectRatio 1f)
     Column(
-        modifier = Modifier.fillMaxWidth().fillMaxHeight(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .verticalScroll(gridScrollState),
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
         for (rowIdx in 0 until rowsCount) {
             Row(
-                modifier = Modifier.fillMaxWidth().weight(1f),
+                modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 for (colIdx in 0 until cols) {
@@ -894,7 +893,7 @@ private fun QuestionGridRef(
                         Box(
                             modifier = Modifier
                                 .weight(1f)
-                                .fillMaxHeight()
+                                .aspectRatio(1f)  // PERFECT SQUARE — always 1:1
                                 .clip(RoundedCornerShape(6.dp))
                                 .border(
                                     width = if (isCurrent) 2.5.dp else 1.5.dp,
@@ -922,13 +921,13 @@ private fun QuestionGridRef(
                             )
                         }
                     } else if (showAllBlocks) {
-                        // Empty placeholder cell — fills height to keep grid aligned
+                        // Empty placeholder cell — perfect square
                         val baseNum = if (globalIndices.isNotEmpty()) globalIndices[0] else 0
                         val displayNum = baseNum + localIdx + 1
                         Box(
                             modifier = Modifier
                                 .weight(1f)
-                                .fillMaxHeight()
+                                .aspectRatio(1f)  // PERFECT SQUARE
                                 .clip(RoundedCornerShape(6.dp))
                                 .border(1.5.dp, Color(0xFFEEEEEE), RoundedCornerShape(6.dp))
                                 .background(Color(0xFFFAFAFA)),
@@ -942,8 +941,8 @@ private fun QuestionGridRef(
                             )
                         }
                     } else {
-                        // showAllBlocks=false, no question — invisible spacer to keep row aligned
-                        Spacer(modifier = Modifier.weight(1f).fillMaxHeight())
+                        // showAllBlocks=false, no question — invisible spacer (perfect square)
+                        Spacer(modifier = Modifier.weight(1f).aspectRatio(1f))
                     }
                 }
             }
