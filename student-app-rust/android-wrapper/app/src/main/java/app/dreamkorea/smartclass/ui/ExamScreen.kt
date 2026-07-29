@@ -622,12 +622,18 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
 
                 if (isQBank) {
                     // ── QBANK: single panel, all questions, no section labels ──
+                    // Constrain to max width so cells stay a reasonable size
+                    // (matches HTML's 320px panel — not full landscape width)
                     Column(
-                        modifier = Modifier.fillMaxSize().padding(12.dp)
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(12.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
                     ) {
                         Column(
                             modifier = Modifier
-                                .fillMaxWidth()
+                                .widthIn(max = 360.dp)
+                                .fillMaxHeight()
                                 .verticalScroll(rememberScrollState())
                                 .border(2.dp, Color(0xFF111111), RoundedCornerShape(10.dp))
                                 .background(Color.White)
@@ -831,8 +837,9 @@ private fun RefTab(label: String, active: Boolean, accent: Color, modifier: Modi
 /// showAllBlocks: true = pad grid to expected count (20) with blank cells so
 /// the user sees which questions are added vs blank.
 /// false = only show cells for questions that actually exist.
-/// Cells are FIXED SIZE (48dp) to match the HTML reference — they don't
-/// stretch to fill the screen.
+/// Cells use weight(1f).aspectRatio(1f) so they FILL the panel width
+/// (not clustered in the middle). The panel itself constrains the max width
+/// so cells stay a reasonable size.
 @Composable
 private fun QuestionGridRef(
     test: TestDetail,
@@ -848,8 +855,6 @@ private fun QuestionGridRef(
 ) {
     val globalIndices = items.mapNotNull { item -> test.items.indexOfFirst { it.question.id == item.question.id }.takeIf { it >= 0 } }
     val cols = 4  // 4 columns per the HTML reference (5 rows × 4 cols = 20 questions)
-    val cellSize = 48.dp  // fixed cell size — matches HTML's compact cells (~68px scaled for mobile)
-    val gap = 6.dp
 
     // Determine total cells to render:
     // - showAllBlocks=true: pad to the expected block count (20) so blank cells show
@@ -865,13 +870,12 @@ private fun QuestionGridRef(
 
     Column(
         modifier = Modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(gap),
-        horizontalAlignment = Alignment.CenterHorizontally
+        verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
         for (rowIdx in 0 until rowsCount) {
             Row(
-                modifier = Modifier,
-                horizontalArrangement = Arrangement.spacedBy(gap)
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 for (colIdx in 0 until cols) {
                     val localIdx = rowIdx * cols + colIdx
@@ -886,7 +890,8 @@ private fun QuestionGridRef(
                         }
                         Box(
                             modifier = Modifier
-                                .size(cellSize)
+                                .weight(1f)
+                                .aspectRatio(1f)  // square — fills available width
                                 .clip(RoundedCornerShape(6.dp))
                                 .border(
                                     width = if (isCurrent) 2.5.dp else 1.5.dp,
@@ -909,17 +914,18 @@ private fun QuestionGridRef(
                             Text(
                                 "${globalIdx + 1}",
                                 color = if (isAnswered) Color.White else Color(0xFF111111),
-                                fontSize = 13.sp,
+                                fontSize = 15.sp,
                                 fontWeight = if (isCurrent) FontWeight.Bold else FontWeight.Medium,
                             )
                         }
                     } else if (showAllBlocks) {
-                        // Empty placeholder cell — only shown when showAllBlocks=true
+                        // Empty placeholder cell — fills width to keep grid aligned
                         val baseNum = if (globalIndices.isNotEmpty()) globalIndices[0] else 0
                         val displayNum = baseNum + localIdx + 1
                         Box(
                             modifier = Modifier
-                                .size(cellSize)
+                                .weight(1f)
+                                .aspectRatio(1f)
                                 .clip(RoundedCornerShape(6.dp))
                                 .border(1.5.dp, Color(0xFFEEEEEE), RoundedCornerShape(6.dp))
                                 .background(Color(0xFFFAFAFA)),
@@ -928,13 +934,13 @@ private fun QuestionGridRef(
                             Text(
                                 "$displayNum",
                                 color = Color(0xFFCCCCCC),
-                                fontSize = 12.sp,
+                                fontSize = 13.sp,
                                 fontWeight = FontWeight.Normal,
                             )
                         }
                     } else {
-                        // showAllBlocks=false and no question here — invisible spacer to keep row aligned
-                        Spacer(modifier = Modifier.size(cellSize))
+                        // showAllBlocks=false, no question — invisible spacer to keep row aligned
+                        Spacer(modifier = Modifier.weight(1f).aspectRatio(1f))
                     }
                 }
             }
