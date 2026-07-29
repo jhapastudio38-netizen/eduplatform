@@ -9,7 +9,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { FileText, Plus, Trash2, Clock, Upload, X, ChevronRight, ChevronLeft, Image as ImageIcon, Headphones, CheckCircle2, Copy, ClipboardPaste, Save, CloudOff, Cloud, RotateCcw } from "lucide-react";
+import { FileText, Plus, Trash2, Clock, Upload, X, ChevronRight, ChevronLeft, Image as ImageIcon, Headphones, CheckCircle2, Copy, ClipboardPaste, Save, CloudOff, Cloud, RotateCcw, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
 // ─── Draft persistence (localStorage) ────────────────────────────────────────
@@ -1772,18 +1772,17 @@ function QuestionEditor({ question, onChange, blockLabel, isAudioBlock }: {
             />
           )}
 
-          {/* Question — this IS the question text. Admin types the question here.
-              It shows at the top of the question card in the exam app. */}
+          {/* Question Title — optional. The question itself comes from
+              Question Media (text/image/audio) below. Title is just a label. */}
           <div className="space-y-1">
-            <Label className="text-sm font-semibold">Question <span className="text-red-500">*</span></Label>
+            <Label className="text-sm font-semibold">Question Title <span className="text-muted-foreground font-normal">(optional)</span></Label>
             <Input
               value={question.title || ""}
-              onChange={(e) => onChange({ ...question, title: e.target.value, stem: e.target.value })}
-              placeholder="Type the question… e.g. What does '안녕하세요' mean?"
+              onChange={(e) => onChange({ ...question, title: e.target.value })}
+              placeholder="e.g. Question 1 — Vocabulary, or 어휘 (Vocabulary)"
               className="text-base"
-              maxLength={500}
+              maxLength={200}
             />
-            <p className="text-xs text-muted-foreground">This is the question text shown to students. Question Media (image/audio) below is optional.</p>
           </div>
 
           {/* Free / Paid toggle — free questions show at the top of QBank + Batch packages */}

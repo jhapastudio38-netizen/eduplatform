@@ -292,35 +292,37 @@ function QuestionDialog({ chapters, onSaved }: { chapters: Chapter[]; onSaved: (
             </div>
           </div>
 
-          {/* Question — this IS the question text. Admin types the question here. */}
-          <div className="space-y-1">
-            <div className="flex items-center justify-between mb-1">
-              <Label>Question <span className="text-red-500">*</span></Label>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={translateToKorean}
-                disabled={translating || !stem.trim()}
-                className="h-7 text-xs"
-              >
-                <Languages className="mr-1 h-3 w-3" />
-                {translating ? "Translating…" : "EN → 한국어"}
-              </Button>
-            </div>
-            <Textarea
-              rows={2}
-              value={stem}
-              onChange={(e) => setStem(e.target.value)}
-              placeholder="Type the question… e.g. What does '안녕하세요' mean?"
-              className="text-base"
-            />
-            <p className="text-xs text-muted-foreground">This is the question text shown to students. Question Media (image/audio) below is optional.</p>
-          </div>
+          {/* Question field — REMOVED. The question comes from Question Media
+              (text/image/audio) below. No separate question text field needed. */}
 
-          {/* ── QUESTION MEDIA (optional) ──────────────────────────────── */}
-          {/* Image or Audio as supplementary media — optional */}
+          {/* ── QUESTION MEDIA ──────────────────────────────────────────── */}
+          {/* Text/Image/Audio serves as the question. Admin picks one. */}
           <div className="space-y-3 p-3 border rounded-lg bg-blue-50/30 border-blue-200">
-            <Label className="text-sm font-semibold">Question Media <span className="text-gray-400 font-normal text-xs">(optional — image or audio supplement)</span></Label>
+            <Label className="text-sm font-semibold">Question Media <span className="text-gray-400 font-normal text-xs">(text, image, or audio serves as the question)</span></Label>
+
+            {/* Text — the question text itself */}
+            <div>
+              <div className="flex items-center justify-between mb-1">
+                <Label className="text-xs text-muted-foreground">Text (type the question)</Label>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={translateToKorean}
+                  disabled={translating || !stem.trim()}
+                  className="h-7 text-xs"
+                >
+                  <Languages className="mr-1 h-3 w-3" />
+                  {translating ? "Translating…" : "EN → 한국어"}
+                </Button>
+              </div>
+              <Textarea
+                rows={2}
+                value={stem}
+                onChange={(e) => setStem(e.target.value)}
+                placeholder="Type the question… e.g. What does '안녕하세요' mean?"
+                className="text-base"
+              />
+            </div>
 
             {/* Image */}
             <div>
