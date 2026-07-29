@@ -1035,7 +1035,14 @@ function ExamEditor({ test, testCategory, onClose }: { test: Test; testCategory:
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
-      const d = await res.json();
+      // Safe JSON parse — API may return empty body on crash
+      let d: any;
+      try {
+        const text = await res.text();
+        d = text ? JSON.parse(text) : {};
+      } catch {
+        d = {};
+      }
       if (!res.ok) {
         toast.error(d.error || `Save failed (HTTP ${res.status})`);
         return;
@@ -1183,7 +1190,9 @@ function ExamEditor({ test, testCategory, onClose }: { test: Test; testCategory:
 
       // Now publish
       const res = await fetch(`/api/admin/tests/${test.id}/publish`, { method: "POST" });
-      const d = await res.json();
+      // Safe JSON parse — API may return empty body on crash
+      let d: any;
+      try { const t = await res.text(); d = t ? JSON.parse(t) : {}; } catch { d = {}; }
       if (!res.ok) {
         toast.error(d.error || `Push failed (HTTP ${res.status})`);
         return;
@@ -1678,16 +1687,35 @@ function QuestionEditor({ question, onChange, blockLabel, isAudioBlock }: {
             )}
           </div>
         ) : (
-          /* ─── Upload zone (drag-drop + click) ─── */
+          /* ─── Upload zone (drag-drop files + drag-drop/paste URLs + click) ─── */
           <div
             onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
             onDragLeave={() => setDragOver(false)}
             onDrop={(e) => {
               e.preventDefault();
               setDragOver(false);
+              // Check for dragged URL (text/uri-list or text/plain)
+              const draggedText = e.dataTransfer.getData("text/uri-list") || e.dataTransfer.getData("text/plain") || "";
+              if (draggedText.trim().startsWith("http")) {
+                // It's a URL — use it directly (no upload needed)
+                onUpload(draggedText.trim());
+                toast.success("URL added");
+                return;
+              }
+              // Otherwise treat as file
               const f = e.dataTransfer.files?.[0];
               if (f) handleFile(f);
             }}
+            onPaste={(e) => {
+              // Paste a URL from clipboard
+              const pastedText = e.clipboardData.getData("text") || "";
+              if (pastedText.trim().startsWith("http")) {
+                onUpload(pastedText.trim());
+                toast.success("URL pasted");
+                e.preventDefault();
+              }
+            }}
+            tabIndex={0}
             className={`flex flex-col items-center justify-center w-full h-28 border-2 border-dashed rounded-lg cursor-pointer transition-all ${
               dragOver ? "border-primary bg-primary/10 scale-[1.02]" : "border-slate-300 hover:border-primary hover:bg-slate-50"
             }`}
@@ -1698,9 +1726,50 @@ function QuestionEditor({ question, onChange, blockLabel, isAudioBlock }: {
               e.target.value = "";
             }} />
             <Upload className="w-7 h-7 text-slate-400 mb-1" />
-            <span className="text-xs text-slate-500 font-medium">
-              {dragOver ? "Drop here!" : `Drag & drop or click to upload ${type}`}
+            <span className="text-xs text-slate-500 font-medium text-center px-2">
+              {dragOver ? "Drop here!" : `Drag & drop file, or paste URL`}
             </span>
+            <span className="text-[10px] text-slate-400 mt-0.5">
+              e.g. https://api.dreamkoreaubttest.com/...mp3
+            </span>
+          </div>
+        )}
+
+        {/* URL input — paste/type a URL directly */}
+        {!url && (
+          <div className="flex gap-2">
+            <Input
+              placeholder="Or paste URL here…"
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  const val = (e.target as HTMLInputElement).value.trim();
+                  if (val.startsWith("http")) {
+                    onUpload(val);
+                    toast.success("URL added");
+                    (e.target as HTMLInputElement).value = "";
+                  }
+                }
+              }}
+              className="text-xs"
+            />
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              onClick={(e) => {
+                const input = (e.currentTarget.previousElementSibling as HTMLInputElement);
+                const val = input?.value?.trim();
+                if (val && val.startsWith("http")) {
+                  onUpload(val);
+                  toast.success("URL added");
+                  input.value = "";
+                } else {
+                  toast.error("Enter a valid URL (starts with http)");
+                }
+              }}
+            >
+              Add URL
+            </Button>
           </div>
         )}
       </div>
@@ -1772,16 +1841,29 @@ function QuestionEditor({ question, onChange, blockLabel, isAudioBlock }: {
             />
           )}
 
-          {/* Question Title — optional. The question itself comes from
-              Question Media (text/image/audio) below. Title is just a label. */}
+          {/* Question Title — optional. Shows at the TOP of the question in the exam. */}
           <div className="space-y-1">
-            <Label className="text-sm font-semibold">Question Title <span className="text-muted-foreground font-normal">(optional)</span></Label>
+            <Label className="text-sm font-semibold">Title <span className="text-muted-foreground font-normal">(optional — shows at top)</span></Label>
             <Input
               value={question.title || ""}
               onChange={(e) => onChange({ ...question, title: e.target.value })}
               placeholder="e.g. Question 1 — Vocabulary, or 어휘 (Vocabulary)"
               className="text-base"
               maxLength={200}
+            />
+          </div>
+
+          {/* Question — optional. Shows BELOW the title. Admin can type the
+              question text here, or use Question Media (image/audio) instead. */}
+          <div className="space-y-1">
+            <Label className="text-sm font-semibold">Question <span className="text-muted-foreground font-normal">(optional — shows below title)</span></Label>
+            <Textarea
+              rows={2}
+              value={question.stem || ""}
+              onChange={(e) => onChange({ ...question, stem: e.target.value })}
+              placeholder="Type the question… e.g. What does '안녕하세요' mean?"
+              className="text-base"
+              maxLength={500}
             />
           </div>
 

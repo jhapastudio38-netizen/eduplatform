@@ -397,10 +397,9 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
                     }
                     Spacer(Modifier.height(6.dp))
                 }
-                // Question card — shows stem (if set) OR title OR mediaText
-                // Admin types the question in the "Question" field which maps to
-                // both title and stem. Fallback chain: stem → title → mediaText
-                val questionText = q.stem.ifBlank { q.title?.ifBlank { q.mediaText ?: "" } ?: q.mediaText ?: "" }
+                // Question card — shows stem (the Question field) OR mediaText
+                // Title is already shown above in the blue header.
+                val questionText = q.stem.ifBlank { q.mediaText ?: "" }
                 if (questionText.isNotBlank()) {
                     Surface(
                         color = Color.White,
