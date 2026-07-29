@@ -1126,38 +1126,41 @@ function ExamEditor({ test, testCategory, onClose }: { test: Test; testCategory:
   }
 
   function applyAppJsonToQuestion(data: any) {
-    const q = currentQuestion;
-    // Map fields from the other app's JSON format
-    const updated: QuestionData = {
-      ...q,
-      stem: data.question || data.question_text || "",
-      title: data.question_number ? `Question ${data.question_number}` : "",
-      // Question media
-      mediaType: (data.question_media_type || "none") as "none" | "text" | "image" | "audio",
-      mediaText: data.question_text || "",
-      mediaImageUrl: data.question_media_type === "image" ? (data.question_media || "") : (q.mediaImageUrl || ""),
-      mediaAudioUrl: data.question_media_type === "audio" ? (data.question_media || "") : (q.mediaAudioUrl || ""),
-      // Description
-      descType: (data.question_description_type || "none") as "none" | "text" | "image" | "audio",
-      descText: data.question_description || "",
-      // Options
-      options: [
-        data.option_1 || "",
-        data.option_2 || "",
-        data.option_3 || "",
-        data.option_4 || "",
-      ].filter((o) => o !== undefined),
-      // Correct answer — map "option 1" → index 0, "option 4" → index 3
-      correctOption: data.correct_answer ? (() => {
-        const m = data.correct_answer.match(/option\s*(\d+)/i);
-        return m ? parseInt(m[1]) - 1 : 0;
-      })() : (q.correctOption || 0),
-      // Answer type
-      answerType: (data.answer_media_type || "text") as "text" | "image" | "audio" | "choose",
-      // Explanation
-      explanation: data.answer_description || "",
-    };
-    updateQuestion(updated);
+    setQuestions((prev) => {
+      const q = prev[currentKey] || emptyQuestion(activeBlock, activeNumber);
+      const updated: QuestionData = {
+        ...q,
+        stem: data.question || data.question_text || "",
+        title: data.question_number ? `Question ${data.question_number}` : q.title,
+        // Question media
+        mediaType: (data.question_media_type || "none") as "none" | "text" | "image" | "audio",
+        mediaText: data.question_text || "",
+        mediaImageUrl: data.question_media_type === "image" ? (data.question_media || "") : (q.mediaImageUrl || ""),
+        mediaAudioUrl: data.question_media_type === "audio" ? (data.question_media || "") : (q.mediaAudioUrl || ""),
+        // Description
+        descType: (data.question_description_type || "none") as "none" | "text" | "image" | "audio",
+        descText: data.question_description || "",
+        // Options
+        options: [
+          data.option_1 || "",
+          data.option_2 || "",
+          data.option_3 || "",
+          data.option_4 || "",
+        ].filter((o) => o !== undefined),
+        // Correct answer — map "option 1" → index 0, "option 4" → index 3
+        correctOption: data.correct_answer ? (() => {
+          const m = data.correct_answer.match(/option\s*(\d+)/i);
+          return m ? parseInt(m[1]) - 1 : 0;
+        })() : (q.correctOption || 0),
+        // Answer type
+        answerType: (data.answer_media_type || "text") as "text" | "image" | "audio" | "choose",
+        // Explanation
+        explanation: data.answer_description || "",
+      };
+      const next = { ...prev, [currentKey]: updated };
+      scheduleDraftSave(next);
+      return next;
+    });
     toast.success("Question imported from app JSON!");
     setShowAppPasteDialog(false);
     setAppPasteJson("");
