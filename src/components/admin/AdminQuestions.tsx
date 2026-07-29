@@ -199,11 +199,14 @@ function QuestionDialog({ chapters, onSaved }: { chapters: Chapter[]; onSaved: (
   }
 
   async function save() {
-    if (!stem.trim()) { toast.error("Question stem required"); return; }
+    // Question text is OPTIONAL — allowed to save with just image/audio media
+    if (!stem.trim() && !imageUrl && !audioUrl) {
+      toast.error("Add question text OR an image/audio first"); return;
+    }
     setBusy(true);
     const body: Record<string, unknown> = {
       type, difficulty, chapterId: chapterId || undefined,
-      stem, explanation,
+      stem: stem || "", explanation,
       imageUrl: imageUrl || undefined,
       audioUrl: audioUrl || undefined,
       audioLoop, audioLoopDelay,
@@ -292,7 +295,7 @@ function QuestionDialog({ chapters, onSaved }: { chapters: Chapter[]; onSaved: (
           {/* Question text with translate button */}
           <div>
             <div className="flex items-center justify-between mb-1">
-              <Label>Question text</Label>
+              <Label>Question text <span className="text-gray-400 font-normal text-xs">(optional — leave empty if using image/audio)</span></Label>
               <Button
                 size="sm"
                 variant="outline"
@@ -308,7 +311,7 @@ function QuestionDialog({ chapters, onSaved }: { chapters: Chapter[]; onSaved: (
               rows={3}
               value={stem}
               onChange={(e) => setStem(e.target.value)}
-              placeholder="Type in English… e.g. What is the capital of Korea?"
+              placeholder="Type in English… (optional if you add an image or audio below)"
             />
           </div>
 

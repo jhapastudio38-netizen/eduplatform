@@ -652,59 +652,73 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
                     modifier = Modifier.fillMaxSize().padding(12.dp),
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    // Reading panel (left)
+                    // Reading panel (left) — scrollable
                     Column(modifier = Modifier.weight(1f).fillMaxHeight()) {
-                        // Section header
+                        // Section header (sticky, not scrolled)
                         Box(
-                            modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
+                            modifier = Modifier.fillMaxWidth().padding(bottom = 6.dp),
                             contentAlignment = Alignment.Center
                         ) {
                             Text(
                                 "Reading",
                                 color = Color(0xFF4B5563),
-                                fontSize = 13.sp,
+                                fontSize = 12.sp,
                                 fontWeight = FontWeight.SemiBold
                             )
                         }
-                        // Grid
-                        QuestionGridWorksheet(
-                            test = t,
-                            items = readingItems,
-                            answers = answers,
-                            currentIdx = currentIdx,
-                            sound = sound,
-                            haptic = haptic,
-                            filterMode = filterMode
-                        ) { idx ->
-                            currentIdx = idx
-                            showGrid = false
+                        // Grid — scrollable if it doesn't fit
+                        Column(
+                            modifier = Modifier
+                                .weight(1f)
+                                .fillMaxWidth()
+                                .verticalScroll(rememberScrollState())
+                        ) {
+                            QuestionGridWorksheet(
+                                test = t,
+                                items = readingItems,
+                                answers = answers,
+                                currentIdx = currentIdx,
+                                sound = sound,
+                                haptic = haptic,
+                                filterMode = filterMode
+                            ) { idx ->
+                                currentIdx = idx
+                                showGrid = false
+                            }
                         }
                     }
 
-                    // Listening panel (right)
+                    // Listening panel (right) — scrollable
                     Column(modifier = Modifier.weight(1f).fillMaxHeight()) {
                         Box(
-                            modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
+                            modifier = Modifier.fillMaxWidth().padding(bottom = 6.dp),
                             contentAlignment = Alignment.Center
                         ) {
                             Text(
                                 "Listening",
                                 color = Color(0xFF4B5563),
-                                fontSize = 13.sp,
+                                fontSize = 12.sp,
                                 fontWeight = FontWeight.SemiBold
                             )
                         }
-                        QuestionGridWorksheet(
-                            test = t,
-                            items = listeningItems,
-                            answers = answers,
-                            currentIdx = currentIdx,
-                            sound = sound,
-                            haptic = haptic,
-                            filterMode = filterMode
-                        ) { idx ->
-                            currentIdx = idx
-                            showGrid = false
+                        Column(
+                            modifier = Modifier
+                                .weight(1f)
+                                .fillMaxWidth()
+                                .verticalScroll(rememberScrollState())
+                        ) {
+                            QuestionGridWorksheet(
+                                test = t,
+                                items = listeningItems,
+                                answers = answers,
+                                currentIdx = currentIdx,
+                                sound = sound,
+                                haptic = haptic,
+                                filterMode = filterMode
+                            ) { idx ->
+                                currentIdx = idx
+                                showGrid = false
+                            }
                         }
                     }
                 }
@@ -826,12 +840,12 @@ private fun QuestionGridWorksheet(
 
     Column(
         modifier = Modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(8.dp)
+        verticalArrangement = Arrangement.spacedBy(6.dp)
     ) {
         for (rowIdx in 0 until rowsCount) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
             ) {
                 for (colIdx in 0 until cols) {
                     val localIdx = rowIdx * cols + colIdx
@@ -847,9 +861,9 @@ private fun QuestionGridWorksheet(
                         Box(
                             modifier = Modifier
                                 .weight(1f)
-                                .aspectRatio(1.33f)  // rectangular, wider than tall (4:3)
+                                .aspectRatio(1.2f)  // rectangular, slightly smaller
                                 .border(
-                                    width = if (isCurrent) 2.5.dp else 1.5.dp,
+                                    width = if (isCurrent) 2.dp else 1.dp,
                                     color = when {
                                         isCurrent -> Color(0xFF1E3A8A)
                                         isAnswered -> Color(0xFF1E3A8A)
@@ -878,7 +892,7 @@ private fun QuestionGridWorksheet(
                                     isCurrent -> Color(0xFF1E3A8A)
                                     else -> Color(0xFF1F2937)
                                 },
-                                fontSize = 18.sp,
+                                fontSize = 16.sp,
                                 fontWeight = FontWeight.Normal,
                             )
                         }
@@ -889,7 +903,7 @@ private fun QuestionGridWorksheet(
                         Box(
                             modifier = Modifier
                                 .weight(1f)
-                                .aspectRatio(1.33f)
+                                .aspectRatio(1.2f)
                                 .border(1.dp, Color(0xFFE5E7EB))
                                 .background(Color(0xFFFAFAFA)),
                             contentAlignment = Alignment.Center
@@ -897,7 +911,7 @@ private fun QuestionGridWorksheet(
                             Text(
                                 "$displayNum",
                                 color = Color(0xFFD1D5DB),
-                                fontSize = 16.sp,
+                                fontSize = 14.sp,
                                 fontWeight = FontWeight.Normal,
                             )
                         }
