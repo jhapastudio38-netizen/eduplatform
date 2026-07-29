@@ -1806,12 +1806,8 @@ function QuestionEditor({ question, onChange, blockLabel, isAudioBlock }: {
             </div>
           </div>
 
-          {/* Question text */}
-          <div className="space-y-1">
-            <Label className="text-sm font-semibold">Question text <span className="text-gray-400 font-normal text-xs">(optional — leave empty if using media below)</span></Label>
-            <Textarea rows={3} value={question.stem} onChange={(e) => onChange({ ...question, stem: e.target.value })} placeholder="Type the question… (optional if you add media below)" className="text-base" />
-          </div>
-
+          {/* Question text — REMOVED. Question media (text/image/audio) serves
+              as the question. Title below is used as the question label. */}
           {/* Question Media Type */}
           <div className="space-y-2">
             <Label className="text-sm font-semibold">Question Media (shows in exam)</Label>

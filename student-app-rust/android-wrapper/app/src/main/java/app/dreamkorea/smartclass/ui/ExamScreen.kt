@@ -622,8 +622,7 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
 
                 if (isQBank) {
                     // ── QBANK: single panel, all questions, no section labels ──
-                    // Constrain to max width so cells stay a reasonable size
-                    // (matches HTML's 320px panel — not full landscape width)
+                    // Fills the FULL screen — no max width constraint
                     Column(
                         modifier = Modifier
                             .fillMaxSize()
@@ -632,9 +631,8 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
                     ) {
                         Column(
                             modifier = Modifier
-                                .widthIn(max = 360.dp)
+                                .fillMaxWidth()
                                 .fillMaxHeight()
-                                .verticalScroll(rememberScrollState())
                                 .border(2.dp, Color(0xFF111111), RoundedCornerShape(10.dp))
                                 .background(Color.White)
                                 .padding(8.dp)
@@ -670,11 +668,11 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
                                 fontWeight = FontWeight.Medium,
                                 modifier = Modifier.padding(start = 4.dp, bottom = 6.dp)
                             )
+                        // Scrollable grid with border — fills full panel
                             Column(
                                 modifier = Modifier
                                     .weight(1f)
                                     .fillMaxWidth()
-                                    .verticalScroll(rememberScrollState())
                                     .border(2.dp, Color(0xFF111111), RoundedCornerShape(10.dp))
                                     .background(Color.White)
                                     .padding(8.dp)
@@ -709,7 +707,6 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
                                 modifier = Modifier
                                     .weight(1f)
                                     .fillMaxWidth()
-                                    .verticalScroll(rememberScrollState())
                                     .border(2.dp, Color(0xFF111111), RoundedCornerShape(10.dp))
                                     .background(Color.White)
                                     .padding(8.dp)
@@ -868,13 +865,15 @@ private fun QuestionGridRef(
     }
     val rowsCount = (expectedTotal + cols - 1) / cols
 
+    // fillMaxHeight + weight(1f) on rows = all rows distribute to fill the
+    // entire panel area (no empty space, blocks fit screen "all along")
     Column(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier.fillMaxWidth().fillMaxHeight(),
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
         for (rowIdx in 0 until rowsCount) {
             Row(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier.fillMaxWidth().weight(1f),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 for (colIdx in 0 until cols) {
@@ -891,7 +890,7 @@ private fun QuestionGridRef(
                         Box(
                             modifier = Modifier
                                 .weight(1f)
-                                .aspectRatio(1f)  // square — fills available width
+                                .fillMaxHeight()
                                 .clip(RoundedCornerShape(6.dp))
                                 .border(
                                     width = if (isCurrent) 2.5.dp else 1.5.dp,
@@ -919,13 +918,13 @@ private fun QuestionGridRef(
                             )
                         }
                     } else if (showAllBlocks) {
-                        // Empty placeholder cell — fills width to keep grid aligned
+                        // Empty placeholder cell — fills height to keep grid aligned
                         val baseNum = if (globalIndices.isNotEmpty()) globalIndices[0] else 0
                         val displayNum = baseNum + localIdx + 1
                         Box(
                             modifier = Modifier
                                 .weight(1f)
-                                .aspectRatio(1f)
+                                .fillMaxHeight()
                                 .clip(RoundedCornerShape(6.dp))
                                 .border(1.5.dp, Color(0xFFEEEEEE), RoundedCornerShape(6.dp))
                                 .background(Color(0xFFFAFAFA)),
@@ -940,7 +939,7 @@ private fun QuestionGridRef(
                         }
                     } else {
                         // showAllBlocks=false, no question — invisible spacer to keep row aligned
-                        Spacer(modifier = Modifier.weight(1f).aspectRatio(1f))
+                        Spacer(modifier = Modifier.weight(1f).fillMaxHeight())
                     }
                 }
             }
