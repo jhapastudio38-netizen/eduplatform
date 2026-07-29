@@ -891,6 +891,8 @@ function ExamEditor({ test, testCategory, onClose }: { test: Test; testCategory:
   const [clipboard, setClipboard] = useState<string>("");
   const [showPasteDialog, setShowPasteDialog] = useState(false);
   const [pasteCode, setPasteCode] = useState("");
+  const [showAppPasteDialog, setShowAppPasteDialog] = useState(false);
+  const [appPasteJson, setAppPasteJson] = useState("");
   const [pushing, setPushing] = useState(false);
   const [isPublished, setIsPublished] = useState(test.isPublished);
   const [saving, setSaving] = useState(false);
@@ -1097,6 +1099,68 @@ function ExamEditor({ test, testCategory, onClose }: { test: Test; testCategory:
 
   function pasteQuestion() {
     setShowPasteDialog(true);
+  }
+
+  // ─── Paste from App — decode JSON from the other DreamKorea app ──────────
+  // Parses JSON like:
+  //   {"question_number":"21","question":"...","question_media":"https://...mp3",
+  //    "question_media_type":"audio","option_1":"...","option_2":"...",
+  //    "correct_answer":"option 4","answer_media_type":"text"}
+  // Maps it to our QuestionData fields and fills the current question.
+  function pasteFromApp() {
+    const raw = appPasteJson.trim();
+    if (!raw) { toast.error("Paste the JSON from your other app first"); return; }
+    try {
+      // The other app may output multiple JSON objects (one per line) — take the first
+      const lines = raw.split("\n").filter((l) => l.trim().startsWith("{"));
+      if (lines.length === 0) {
+        // Try parsing the whole thing as a single object or array
+        const parsed = JSON.parse(raw);
+        applyAppJsonToQuestion(Array.isArray(parsed) ? parsed[0] : parsed);
+        return;
+      }
+      applyAppJsonToQuestion(JSON.parse(lines[0]));
+    } catch (e: any) {
+      toast.error("Invalid JSON: " + (e.message || "parse error"));
+    }
+  }
+
+  function applyAppJsonToQuestion(data: any) {
+    const q = currentQuestion;
+    // Map fields from the other app's JSON format
+    const updated: QuestionData = {
+      ...q,
+      stem: data.question || data.question_text || "",
+      title: data.question_number ? `Question ${data.question_number}` : "",
+      // Question media
+      mediaType: (data.question_media_type || "none") as "none" | "text" | "image" | "audio",
+      mediaText: data.question_text || "",
+      mediaImageUrl: data.question_media_type === "image" ? (data.question_media || "") : (q.mediaImageUrl || ""),
+      mediaAudioUrl: data.question_media_type === "audio" ? (data.question_media || "") : (q.mediaAudioUrl || ""),
+      // Description
+      descType: (data.question_description_type || "none") as "none" | "text" | "image" | "audio",
+      descText: data.question_description || "",
+      // Options
+      options: [
+        data.option_1 || "",
+        data.option_2 || "",
+        data.option_3 || "",
+        data.option_4 || "",
+      ].filter((o) => o !== undefined),
+      // Correct answer — map "option 1" → index 0, "option 4" → index 3
+      correctOption: data.correct_answer ? (() => {
+        const m = data.correct_answer.match(/option\s*(\d+)/i);
+        return m ? parseInt(m[1]) - 1 : 0;
+      })() : (q.correctOption || 0),
+      // Answer type
+      answerType: (data.answer_media_type || "text") as "text" | "image" | "audio" | "choose",
+      // Explanation
+      explanation: data.answer_description || "",
+    };
+    updateQuestion(updated);
+    toast.success("Question imported from app JSON!");
+    setShowAppPasteDialog(false);
+    setAppPasteJson("");
   }
 
   // ─── Paste All questions from a Copy-All code ─────────────────────────────
@@ -1496,6 +1560,9 @@ function ExamEditor({ test, testCategory, onClose }: { test: Test; testCategory:
             <Button onClick={pasteQuestion} variant="outline" size="lg">
               <ClipboardPaste className="w-4 h-4 mr-1" /> Paste
             </Button>
+            <Button onClick={() => setShowAppPasteDialog(true)} variant="outline" size="lg" className="text-blue-600 hover:text-blue-700 border-blue-300 hover:border-blue-400">
+              <ClipboardPaste className="w-4 h-4 mr-1" /> Paste from App
+            </Button>
             <Button onClick={copyAll} variant="outline" size="lg" className="text-purple-600 hover:text-purple-700">
               <Copy className="w-4 h-4 mr-1" /> Copy All
             </Button>
@@ -1548,6 +1615,36 @@ function ExamEditor({ test, testCategory, onClose }: { test: Test; testCategory:
           </DialogContent>
         </Dialog>
       )}
+
+      {/* Paste from App dialog — decode JSON from the other DreamKorea app */}
+      {showAppPasteDialog && (
+        <Dialog open={true} onOpenChange={setShowAppPasteDialog}>
+          <DialogContent className="max-w-2xl">
+            <DialogHeader><DialogTitle>Paste from App</DialogTitle></DialogHeader>
+            <div className="space-y-3">
+              <Label>Paste the JSON from your other DreamKorea app</Label>
+              <Textarea
+                rows={10}
+                value={appPasteJson}
+                onChange={(e) => setAppPasteJson(e.target.value)}
+                placeholder={`{"question_number":"21","question":"들은 것을 고르십시오.","question_media":"https://api.dreamkoreaubttest.com/...mp3","question_media_type":"audio","option_1":"불이","option_2":"부리","option_3":"물리","option_4":"무리","correct_answer":"option 4","answer_media_type":"text"}`}
+                className="font-mono text-xs"
+              />
+              <p className="text-xs text-muted-foreground">
+                Paste the JSON code from your other app. The system will decode it and fill all fields
+                (title, question, media URL, options, correct answer) automatically. If multiple JSON objects
+                are pasted, only the first one is used.
+              </p>
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setShowAppPasteDialog(false)}>Cancel</Button>
+              <Button onClick={pasteFromApp} className="bg-blue-600 hover:bg-blue-700">
+                <ClipboardPaste className="w-4 h-4 mr-1" /> Import
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
     </Dialog>
   );
 }
@@ -1587,6 +1684,7 @@ function QuestionEditor({ question, onChange, blockLabel, isAudioBlock }: {
     const [uploading, setUploading] = useState(false);
     const [dragOver, setDragOver] = useState(false);
     const [localPreview, setLocalPreview] = useState<string>(""); // instant blob URL
+    const [localUrl, setLocalUrl] = useState<string>(""); // manually-pasted/dragged URL (instant display)
 
     // Compress images before upload (max 800px, 80% quality) — much faster
     async function compressImage(file: File): Promise<File> {
@@ -1639,8 +1737,8 @@ function QuestionEditor({ question, onChange, blockLabel, isAudioBlock }: {
       }
     }
 
-    // The display URL: local preview during upload, real URL after
-    const displayUrl = uploading && localPreview ? localPreview : url;
+    // The display URL: local preview during upload, OR a manually-set URL, OR the prop URL
+    const displayUrl = uploading && localPreview ? localPreview : (url || localUrl);
 
     return (
       <div className="space-y-2">
@@ -1659,7 +1757,7 @@ function QuestionEditor({ question, onChange, blockLabel, isAudioBlock }: {
                 )}
                 {!uploading && (
                   <button
-                    onClick={() => { onClear(); setLocalPreview(""); }}
+                    onClick={() => { onClear(); setLocalPreview(""); setLocalUrl(""); }}
                     className="absolute -top-2 -right-2 w-7 h-7 bg-red-500 text-white rounded-full flex items-center justify-center text-sm font-bold hover:bg-red-600 shadow"
                     title="Remove"
                   >✕</button>
@@ -1678,7 +1776,7 @@ function QuestionEditor({ question, onChange, blockLabel, isAudioBlock }: {
                 )}
                 {!uploading && (
                   <button
-                    onClick={() => { onClear(); setLocalPreview(""); }}
+                    onClick={() => { onClear(); setLocalPreview(""); setLocalUrl(""); }}
                     className="absolute -top-2 -right-2 w-7 h-7 bg-red-500 text-white rounded-full flex items-center justify-center text-sm font-bold hover:bg-red-600 shadow"
                     title="Remove"
                   >✕</button>
@@ -1698,7 +1796,9 @@ function QuestionEditor({ question, onChange, blockLabel, isAudioBlock }: {
               const draggedText = e.dataTransfer.getData("text/uri-list") || e.dataTransfer.getData("text/plain") || "";
               if (draggedText.trim().startsWith("http")) {
                 // It's a URL — use it directly (no upload needed)
-                onUpload(draggedText.trim());
+                const cleanUrl = draggedText.trim();
+                setLocalUrl(cleanUrl); // instant display
+                onUpload(cleanUrl); // save to parent state
                 toast.success("URL added");
                 return;
               }
@@ -1710,7 +1810,9 @@ function QuestionEditor({ question, onChange, blockLabel, isAudioBlock }: {
               // Paste a URL from clipboard
               const pastedText = e.clipboardData.getData("text") || "";
               if (pastedText.trim().startsWith("http")) {
-                onUpload(pastedText.trim());
+                const cleanUrl = pastedText.trim();
+                setLocalUrl(cleanUrl); // instant display
+                onUpload(cleanUrl); // save to parent state
                 toast.success("URL pasted");
                 e.preventDefault();
               }
@@ -1744,7 +1846,8 @@ function QuestionEditor({ question, onChange, blockLabel, isAudioBlock }: {
                 if (e.key === "Enter") {
                   const val = (e.target as HTMLInputElement).value.trim();
                   if (val.startsWith("http")) {
-                    onUpload(val);
+                    setLocalUrl(val); // instant display
+                    onUpload(val); // save to parent state
                     toast.success("URL added");
                     (e.target as HTMLInputElement).value = "";
                   }
@@ -1760,7 +1863,8 @@ function QuestionEditor({ question, onChange, blockLabel, isAudioBlock }: {
                 const input = (e.currentTarget.previousElementSibling as HTMLInputElement);
                 const val = input?.value?.trim();
                 if (val && val.startsWith("http")) {
-                  onUpload(val);
+                  setLocalUrl(val); // instant display
+                  onUpload(val); // save to parent state
                   toast.success("URL added");
                   input.value = "";
                 } else {
