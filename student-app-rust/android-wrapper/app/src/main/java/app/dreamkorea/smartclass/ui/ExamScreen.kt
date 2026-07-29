@@ -397,9 +397,10 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
                     }
                     Spacer(Modifier.height(6.dp))
                 }
-                // Question card — shows stem (if set) OR mediaText (if media type is text)
-                // When admin removes the Question text field, mediaText serves as the question
-                val questionText = q.stem.ifBlank { q.mediaText ?: "" }
+                // Question card — shows stem (if set) OR title OR mediaText
+                // Admin types the question in the "Question" field which maps to
+                // both title and stem. Fallback chain: stem → title → mediaText
+                val questionText = q.stem.ifBlank { q.title?.ifBlank { q.mediaText ?: "" } ?: q.mediaText ?: "" }
                 if (questionText.isNotBlank()) {
                     Surface(
                         color = Color.White,

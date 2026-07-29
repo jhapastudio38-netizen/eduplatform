@@ -1772,16 +1772,18 @@ function QuestionEditor({ question, onChange, blockLabel, isAudioBlock }: {
             />
           )}
 
-          {/* Question title (optional — shown at top of each question in exam UI) */}
+          {/* Question — this IS the question text. Admin types the question here.
+              It shows at the top of the question card in the exam app. */}
           <div className="space-y-1">
-            <Label className="text-sm font-semibold">Question Title <span className="text-muted-foreground font-normal">(optional — shown at the top of this question in the exam)</span></Label>
+            <Label className="text-sm font-semibold">Question <span className="text-red-500">*</span></Label>
             <Input
               value={question.title || ""}
-              onChange={(e) => onChange({ ...question, title: e.target.value })}
-              placeholder="e.g. Question 1 — Vocabulary, or 어휘 (Vocabulary)"
+              onChange={(e) => onChange({ ...question, title: e.target.value, stem: e.target.value })}
+              placeholder="Type the question… e.g. What does '안녕하세요' mean?"
               className="text-base"
-              maxLength={200}
+              maxLength={500}
             />
+            <p className="text-xs text-muted-foreground">This is the question text shown to students. Question Media (image/audio) below is optional.</p>
           </div>
 
           {/* Free / Paid toggle — free questions show at the top of QBank + Batch packages */}
