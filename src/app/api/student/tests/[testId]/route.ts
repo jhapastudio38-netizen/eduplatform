@@ -41,7 +41,8 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ testId: str
     update: {},
   });
 
-  return NextResponse.json({
+  // No caching — students always see real-time data
+  const res = NextResponse.json({
     test: {
       id: test.id, title: test.title, description: test.description,
       durationMin: test.durationMin, isExam: test.isExam, passScore: test.passScore,
@@ -87,4 +88,6 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ testId: str
     },
     submissionId: draft.id,
   });
+  res.headers.set("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0");
+  return res;
 }

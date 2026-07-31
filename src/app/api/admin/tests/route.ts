@@ -24,7 +24,10 @@ export async function GET(req: NextRequest) {
     take: 200,
     include: { _count: { select: { items: true } } },
   });
-  return NextResponse.json({ tests });
+  // No caching — admin always sees real-time data
+  const res = NextResponse.json({ tests });
+  res.headers.set("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0");
+  return res;
 }
 
 const testSchema = z.object({
