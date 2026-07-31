@@ -34,9 +34,11 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ testId: str
       try { return JSON.parse(val); } catch { return def; }
     };
 
-    // Filter disabled blocks
-    const textEnabled = test.textBlockEnabled !== false;
-    const audioEnabled = test.audioBlockEnabled !== false;
+    // Filter disabled blocks — use (test as any) because Prisma client
+    // might not have the new columns in its type definitions
+    const testAny = test as any;
+    const textEnabled = testAny.textBlockEnabled !== false;
+    const audioEnabled = testAny.audioBlockEnabled !== false;
     const filteredItems = test.items.filter((i) => {
       const bt = (i.question as any).blockType || "text";
       if (bt === "text" && !textEnabled) return false;
@@ -70,7 +72,7 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ testId: str
         audioBlockCount: safe(test.audioBlockCount, 0),
         textBlockEnabled,
         audioBlockEnabled,
-        showAllBlocks: test.showAllBlocks !== false,
+        showAllBlocks: testAny.showAllBlocks !== false,
         items: filteredItems.map((i) => {
           const q = i.question as any;
           return {
