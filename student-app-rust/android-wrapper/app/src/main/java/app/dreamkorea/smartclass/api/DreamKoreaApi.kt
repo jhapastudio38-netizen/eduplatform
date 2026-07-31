@@ -160,6 +160,8 @@ data class EyeVisionRecommendation(
     val show: Boolean = false,
     val numbers: List<List<Int>> = emptyList(),
     val message: String? = null,
+    val count: Int = 0,
+    val reason: String? = null,
 )
 
 data class SubmitResponse(
