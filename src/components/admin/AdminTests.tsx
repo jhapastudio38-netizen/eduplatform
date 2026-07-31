@@ -627,8 +627,8 @@ function ExamEditor({ test, testCategory, onClose }: { test: Test; testCategory:
   }
 
   // ─── Paste from App — decode JSON from the other DreamKorea app ──────────
-  function pasteFromApp() {
-    const raw = appPasteJson.trim();
+  function pasteFromApp(rawInput?: string) {
+    const raw = (rawInput || appPasteJson).trim();
     if (!raw) { toast.error("Paste the JSON from your other app first"); return; }
     try {
       const lines = raw.split("\n").filter((l) => l.trim().startsWith("{"));
@@ -1038,7 +1038,15 @@ function ExamEditor({ test, testCategory, onClose }: { test: Test; testCategory:
             </div>
             <div className="flex justify-end gap-2">
               <Button variant="outline" onClick={() => setShowAppPasteDialog(false)}>Cancel</Button>
-              <Button onClick={pasteFromApp} className="bg-blue-600 hover:bg-blue-700">
+              <Button onClick={() => {
+                const ta = document.querySelector('textarea[class*="font-mono"]') as HTMLTextAreaElement;
+                const val = ta?.value?.trim() || appPasteJson.trim();
+                if (val) {
+                  pasteFromApp(val);
+                } else {
+                  toast.error("Paste the JSON from your other app first");
+                }
+              }} className="bg-blue-600 hover:bg-blue-700">
                 <ClipboardPaste className="w-4 h-4 mr-1" /> Import
               </Button>
             </div>
@@ -1452,6 +1460,16 @@ function QuestionEditor({ question, onChange, blockLabel, isAudioBlock }: {
                       }}
                       type="audio"
                     />
+                    {/* Per-option play count */}
+                    <div className="flex items-center gap-2 mt-1">
+                      <span className="text-[10px] text-muted-foreground">Plays:</span>
+                      <Button type="button" variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={() => {
+                        const loops = [...(question.optionBlanks || ["", "", "", ""])]; // reuse not ideal, use audioLoop directly
+                        onChange({ ...question, audioLoop: Math.max(1, (question.audioLoop || 1) - 1) });
+                      }}>−</Button>
+                      <span className="text-xs font-bold w-6 text-center">{question.audioLoop || 1}</span>
+                      <Button type="button" variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={() => onChange({ ...question, audioLoop: Math.min(100, (question.audioLoop || 1) + 1) })}>+</Button>
+                    </div>
                   </div>
                 ))}
               </div>
