@@ -26,5 +26,35 @@ export async function POST(req: NextRequest) {
     }
   }
 
+  // Add missing columns to Question table
+  const questionColumns = [
+    { name: "title", type: "TEXT" },
+    { name: "isFree", type: "BOOLEAN DEFAULT false" },
+    { name: "blockType", type: "TEXT" },
+    { name: "blockNumber", type: "INTEGER" },
+    { name: "descType", type: "TEXT DEFAULT 'none'" },
+    { name: "descText", type: "TEXT" },
+    { name: "descImageUrl", type: "TEXT" },
+    { name: "descAudioUrl", type: "TEXT" },
+    { name: "mediaType", type: "TEXT DEFAULT 'none'" },
+    { name: "mediaText", type: "TEXT" },
+    { name: "mediaImageUrl", type: "TEXT" },
+    { name: "mediaAudioUrl", type: "TEXT" },
+    { name: "answerType", type: "TEXT DEFAULT 'text'" },
+    { name: "optionImages", type: "TEXT" },
+    { name: "optionAudios", type: "TEXT" },
+    { name: "optionBlanks", type: "TEXT" },
+    { name: "correctOption", type: "INTEGER DEFAULT 0" },
+  ];
+
+  for (const col of questionColumns) {
+    try {
+      await db.$executeRawUnsafe(`ALTER TABLE "Question" ADD COLUMN IF NOT EXISTS "${col.name}" ${col.type}`);
+      results.push(`Question.${col.name} — OK`);
+    } catch (e: any) {
+      results.push(`Question.${col.name} — ${e.message?.substring(0, 80)}`);
+    }
+  }
+
   return NextResponse.json({ ok: true, results });
 }
