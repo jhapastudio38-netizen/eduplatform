@@ -72,8 +72,7 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
     var currentIdx by remember { mutableStateOf(0) }
     val answers = remember { mutableStateMapOf<String, Any>() }
     // Persistent audio play counts per question ID — survives navigation.
-    // Key = question ID, Value = number of times audio has been played.
-    // This prevents the cheat where student navigates back to replay audio.
+    // Prevents cheat where student navigates away and back to reset plays.
     val audioPlayCounts = remember { mutableStateMapOf<String, Int>() }
     var submitResult by remember { mutableStateOf<SubmitResponse?>(null) }
     var submitting by remember { mutableStateOf(false) }
@@ -441,17 +440,12 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
                 }
                 val mediaAudUrl = (q.mediaAudioUrl ?: q.audioUrl)?.toAbsoluteUrl()
                 if (!mediaAudUrl.isNullOrBlank()) {
-                    // Persistent play count via audioPlayCounts map — prevents cheat
-                    // where student navigates away and back to reset plays.
-                    AudioPlayerCard(
-                        theme = theme,
-                        url = mediaAudUrl,
-                        loopCount = q.audioLoop,
-                        loopDelaySec = q.audioLoopDelay,
-                        sound = sound,
-                        questionId = q.id,
-                        playCounts = audioPlayCounts,
-                    )
+                    // key(q.id) ensures the AudioPlayerCard is FULLY RECREATED when
+                    // the question changes — state (playCount, disabled) resets completely.
+                    // This fixes the bug where audio was locked from the previous question.
+                    key(q.id) {
+                        AudioPlayerCard(theme = theme, url = mediaAudUrl, loopCount = q.audioLoop, loopDelaySec = q.audioLoopDelay, sound = sound, questionId = q.id, playCounts = audioPlayCounts)
+                    }
                 }
             }
 
@@ -519,16 +513,10 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
                                     Box(contentAlignment = Alignment.Center) { Text("${i+1}", color = if (isSelected) Color.White else Color.Black, fontSize = 10.sp, fontWeight = FontWeight.Bold) }
                                 }
                                 Spacer(Modifier.width(4.dp))
-                                // Option audio — persistent play count per question (prevents cheat)
-                                AudioPlayerCard(
-                                    theme = theme,
-                                    url = absUrl,
-                                    loopCount = q.audioLoop.coerceAtLeast(1),
-                                    loopDelaySec = q.audioLoopDelay,
-                                    sound = sound,
-                                    questionId = "${q.id}-opt-$i",
-                                    playCounts = audioPlayCounts,
-                                )
+                                // key(q.id, i) — recreate when question changes so play count resets
+                                key(q.id, i) {
+                                    AudioPlayerCard(theme = theme, url = absUrl, loopCount = q.audioLoop.coerceAtLeast(1), loopDelaySec = q.audioLoopDelay, sound = sound, questionId = "${q.id}-opt-$i", playCounts = audioPlayCounts)
+                                }
                             }
                         }
                     }
@@ -1033,9 +1021,8 @@ fun AudioPlayerCard(
     var mediaPlayer by remember { mutableStateOf<android.media.MediaPlayer?>(null) }
     var isPlaying by remember { mutableStateOf(false) }
 
-    // PERSISTENT play count — stored in the parent's map (survives navigation).
-    // This prevents the cheat where student navigates away and back to reset plays.
-    // Falls back to local state if no map provided (backward compat).
+    // PERSISTENT play count — stored in parent map (survives navigation).
+    // Prevents cheat where student navigates away and back to reset plays.
     val persistentCount = playCounts?.get(questionId) ?: 0
     val maxPlays = loopCount.coerceAtLeast(1)
     val disabled = persistentCount >= maxPlays
@@ -1111,10 +1098,12 @@ fun AudioPlayerCard(
                                     incrementPlayCount()
                                 }
                                 setOnCompletionListener {
-                                    if (persistentCount < maxPlays) {
+                                    val currentCount = playCounts?.get(questionId) ?: 0
+                                    if (currentCount < maxPlays) {
                                         scope.launch {
                                             if (loopDelaySec > 0) delay(loopDelaySec * 1000L)
-                                            if ((playCounts?.get(questionId) ?: 0) < maxPlays) {
+                                            val latestCount = playCounts?.get(questionId) ?: 0
+                                            if (latestCount < maxPlays) {
                                                 incrementPlayCount()
                                                 start()
                                             } else {

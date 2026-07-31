@@ -7,6 +7,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
@@ -24,18 +25,31 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.viewinterop.AndroidView
 import app.dreamkorea.smartclass.api.*
 import app.dreamkorea.smartclass.data.AppState
 import kotlinx.coroutines.launch
 
-// Color constants used in this file
-val SuccessGreen = Color(0xFF00C853)
+// Professional color palette — matching the reference design
+val NavyBlue = Color(0xFF1E3A8A)
+val NavyBlueLight = Color(0xFF3B82F6)
+val SuccessGreen = Color(0xFF22C55E)
+val WarningOrange = Color(0xFFF59E0B)
+val AccentPurple = Color(0xFF8B5CF6)
+val AccentPink = Color(0xFFEC4899)
+val BgGray = Color(0xFFF8FAFC)
+val CardWhite = Color(0xFFFFFFFF)
+val TextDark = Color(0xFF1E293B)
+val TextMid = Color(0xFF64748B)
+val TextLight = Color(0xFF94A3B8)
+val DividerColor = Color(0xFFE2E8F0)
 
 // Navigation destinations
 sealed class Screen {
@@ -58,10 +72,25 @@ sealed class Screen {
     object ClassResult : Screen()
     object CourseVideo : Screen()
     object Join : Screen()
+    object EyeVision : Screen()
+    object Bundles : Screen()
+    object Dictionary : Screen()
+    object Grammar : Screen()
+    object Alarms : Screen()
+    data class BundleList(val kind: String) : Screen()
     data class Exam(val testId: String) : Screen()
+    data class ExamEntry(val testId: String) : Screen()
     data class BookReader(val book: Book) : Screen()
-    /** Filtered test list. filter: "all" | "practice" | "exam" | "ubt" | "free" | "batch" */
     data class TestList(val filter: String, val title: String) : Screen()
+    data class BundleDetail(val bundleId: String, val bundleTitle: String) : Screen()
+}
+
+// Tab destinations for bottom navigation
+enum class BottomTab(val label: String, val icon: ImageVector) {
+    Home("Home", Icons.Default.Home),
+    Exams("Exams", Icons.Default.Quiz),
+    Tools("Tools", Icons.Default.Build),
+    Books("Books", Icons.Default.Book),
 }
 
 @Composable
@@ -69,53 +98,219 @@ fun MainScreen(userName: String, onLogout: () -> Unit) {
     val theme = rememberAppTheme()
     val sound = rememberSoundManager()
     var screen by remember { mutableStateOf<Screen>(Screen.Home) }
+    var activeTab by remember { mutableStateOf(BottomTab.Home) }
+    var hideBottomBar by remember { mutableStateOf(false) }
+    val context = androidx.compose.ui.platform.LocalContext.current
 
-    Surface(modifier = Modifier.fillMaxSize(), color = theme.background) {
+    // ── ORIENTATION CONTROL ──────────────────────────────────────────────
+    // Force PORTRAIT for all screens EXCEPT exam + exam entry (landscape).
+    // Uses LaunchedEffect (runs AFTER DisposableEffect) so it doesn't
+    // override the exam screen's own landscape lock.
+    androidx.compose.runtime.LaunchedEffect(screen) {
+        val activity = context as? android.app.Activity
+        when (screen) {
+            is Screen.Exam, is Screen.ExamEntry -> {
+                // Exam screens handle their own orientation (landscape)
+                // Don't override — let ExamScreen/ExamEntryScreen set LANDSCAPE
+            }
+            else -> {
+                // Force portrait for ALL other screens (home, books, etc.)
+                activity?.requestedOrientation = android.content.pm.ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+            }
+        }
+    }
+
+    fun navigateTo(s: Screen) {
+        screen = s
+        activeTab = when (s) {
+            is Screen.Home -> BottomTab.Home
+            is Screen.Tests, is Screen.UbtTest, is Screen.FreeExam,
+            is Screen.Batch, is Screen.TestList, is Screen.QuestionBank,
+            is Screen.Exam -> BottomTab.Exams
+            is Screen.Books, is Screen.BookReader -> BottomTab.Books
+            is Screen.Learn -> BottomTab.Tools
+            else -> activeTab
+        }
+    }
+
+    // ── System back button handler ──────────────────────────────────────
+    // When the user presses the hardware/gesture back button:
+    //   • If on a sub-screen → go to Home (not close the app)
+    //   • If on Home → let the system handle it (exit app)
+    //   • If in an exam → the ExamScreen has its own BackHandler (exit dialog)
+    androidx.activity.compose.BackHandler(enabled = screen !is Screen.Home && screen !is Screen.Exam && screen !is Screen.ExamEntry) {
+        navigateTo(Screen.Home)
+    }
+
+    Surface(modifier = Modifier.fillMaxSize(), color = BgGray) {
         Column(modifier = Modifier.fillMaxSize()) {
-            // ─── Top bar — hidden only on Exam and BookReader for immersive mode ──
+            // ─── Top bar — shown on Home with profile/settings icons ──────────
             val showTopBar = when (screen) {
                 is Screen.Exam -> false
                 is Screen.BookReader -> false
-                else -> true
+                is Screen.Home -> true
+                is Screen.Settings -> false
+                else -> false
             }
             if (showTopBar) {
-                TopBar(theme, userName, sound, onProfile = { screen = Screen.Profile }, onSettings = { screen = Screen.Settings })
+                TopBar(theme, userName, sound, onProfile = { navigateTo(Screen.Profile) }, onSettings = { screen = Screen.Settings })
             }
 
-            // ─── Animated screen content — smooth fade transition ──────────────
+            // ─── Screen content with slide animation ─────────────────────────
             Box(modifier = Modifier.weight(1f)) {
+                // Subtle background image — low opacity, barely noticeable
+                Image(
+                    painter = painterResource(id = app.dreamkorea.smartclass.R.drawable.app_bg),
+                    contentDescription = null,
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.Fit
+                )
+                Box(modifier = Modifier.fillMaxSize().background(BgGray.copy(alpha = 0.92f)))
                 AnimatedContent(
                     targetState = screen,
                     transitionSpec = {
-                        // Clean fade-only transition — minimal, no distracting slides
-                        fadeIn(tween(350, easing = FastOutSlowInEasing)) togetherWith
-                        fadeOut(tween(200, easing = FastOutSlowInEasing))
+                        // Slide + fade for tab switches, fade for sub-screens
+                        if (screen is Screen.Home || screen is Screen.Tests || screen is Screen.Books || screen is Screen.Learn) {
+                            (fadeIn(tween(300)) + slideInHorizontally(tween(300), initialOffsetX = { it / 8 })) togetherWith
+                            (fadeOut(tween(200)) + slideOutHorizontally(tween(200), targetOffsetX = { -it / 8 }))
+                        } else {
+                            fadeIn(tween(300)) togetherWith fadeOut(tween(200))
+                        }
                     },
                     label = "screenTransition"
                 ) { s ->
                     when (s) {
-                        is Screen.Home -> HomeScreen(theme, sound, onNavigate = { screen = it })
-                        is Screen.Learn -> LearnScreen(theme, sound, onBack = { screen = Screen.Home })
-                        is Screen.Books -> BooksScreen(theme, sound, onBack = { screen = Screen.Home }, onBookClick = { screen = Screen.BookReader(it) })
-                        is Screen.Tests -> TestsScreen(theme, sound, filter = "all", title = "All Tests & Exams", onBack = { screen = Screen.Home }, onStartExam = { screen = Screen.Exam(it) })
-                        is Screen.Videos -> VideosScreen(theme, sound, onBack = { screen = Screen.Home })
-                        is Screen.Profile -> ProfileScreen(theme, sound, userName, onBack = { screen = Screen.Home }, onLogout = onLogout)
-                        is Screen.LiveRoom -> LiveRoomScreen(theme, onBack = { screen = Screen.Home })
-                        is Screen.Settings -> SettingsScreen(theme, sound, onBack = { screen = Screen.Home })
-                        is Screen.Exam -> ExamScreen(theme, testId = s.testId, onExit = { screen = Screen.Home })
+                        is Screen.Home -> HomeScreen(theme, sound, userName, onNavigate = { navigateTo(it) })
+                        is Screen.Learn -> {
+                            onNavigateToTool = { route ->
+                                when (route) {
+                                    "dictionary" -> navigateTo(Screen.Dictionary)
+                                    "grammar" -> navigateTo(Screen.Grammar)
+                                    "alarms" -> navigateTo(Screen.Alarms)
+                                    "eyevision" -> navigateTo(Screen.EyeVision)
+                                }
+                            }
+                            LearnScreen(theme, sound, onBack = { navigateTo(Screen.Home) })
+                        }
+                        is Screen.Books -> BooksScreen(theme, sound, onBack = { navigateTo(Screen.Home) }, onBookClick = { screen = Screen.BookReader(it) })
+                        is Screen.Tests -> TestsScreen(theme, sound, filter = "all", title = "All Exams", onBack = { navigateTo(Screen.Home) }, onStartExam = { screen = Screen.ExamEntry(it) }, onOpenPackages = { screen = Screen.Bundles })
+                        is Screen.Videos -> VideosScreen(theme, sound, onBack = { navigateTo(Screen.Home) }, onHideBottomBar = { hide -> hideBottomBar = hide })
+                        is Screen.Profile -> ProfileScreen(theme, sound, userName, onBack = { navigateTo(Screen.Home) }, onLogout = onLogout)
+                        is Screen.LiveRoom -> LiveRoomScreen(theme, onBack = { navigateTo(Screen.Home) })
+                        is Screen.Settings -> SettingsScreen(theme, sound, onBack = { navigateTo(Screen.Home) })
+                        is Screen.ExamEntry -> ExamEntryScreen(theme, sound, testId = s.testId, onStart = { screen = Screen.Exam(s.testId) }, onBack = { navigateTo(Screen.Home) })
+                        is Screen.Exam -> ExamScreen(theme, testId = s.testId, onExit = { navigateTo(Screen.Home) })
                         is Screen.BookReader -> BookReaderScreen(theme, sound, s.book, onBack = { screen = Screen.Books })
-                        is Screen.UbtTest -> TestsScreen(theme, sound, filter = "ubt", title = "UBT Tests", onBack = { screen = Screen.Home }, onStartExam = { screen = Screen.Exam(it) })
-                        is Screen.FreeExam -> TestsScreen(theme, sound, filter = "free", title = "Free Practice Tests", onBack = { screen = Screen.Home }, onStartExam = { screen = Screen.Exam(it) })
-                        is Screen.Batch -> TestsScreen(theme, sound, filter = "batch", title = "Batch Exams", onBack = { screen = Screen.Home }, onStartExam = { screen = Screen.Exam(it) })
-                        is Screen.Results -> ProfileScreen(theme, sound, userName, onBack = { screen = Screen.Home }, onLogout = onLogout)
-                        is Screen.QuestionBank -> QuestionBankScreen(theme, sound, onBack = { screen = Screen.Home })
-                        is Screen.AudioLessons -> LearnScreen(theme, sound, onBack = { screen = Screen.Home })
-                        is Screen.Classroom -> LiveRoomScreen(theme, onBack = { screen = Screen.Home })
-                        is Screen.RecordedVideo -> VideosScreen(theme, sound, onBack = { screen = Screen.Home })
-                        is Screen.ClassResult -> ProfileScreen(theme, sound, userName, onBack = { screen = Screen.Home }, onLogout = onLogout)
-                        is Screen.CourseVideo -> VideosScreen(theme, sound, onBack = { screen = Screen.Home })
-                        is Screen.TestList -> TestsScreen(theme, sound, filter = s.filter, title = s.title, onBack = { screen = Screen.Home }, onStartExam = { screen = Screen.Exam(it) })
-                        is Screen.Join -> JoinScreen(theme, sound, onBack = { screen = Screen.Home })
+                        is Screen.UbtTest -> TestsScreen(theme, sound, filter = "exam", title = "UBT Exams", onBack = { navigateTo(Screen.Home) }, onStartExam = { screen = Screen.ExamEntry(it) }, onOpenPackages = { screen = Screen.Bundles })
+                        is Screen.FreeExam -> TestsScreen(theme, sound, filter = "demo", title = "Demo Exams", onBack = { navigateTo(Screen.Home) }, onStartExam = { screen = Screen.ExamEntry(it) }, onOpenPackages = { screen = Screen.Bundles })
+                        is Screen.Batch -> TestsScreen(theme, sound, filter = "batch", title = "Batch Exams", onBack = { navigateTo(Screen.Home) }, onStartExam = { screen = Screen.ExamEntry(it) }, onOpenPackages = { screen = Screen.Bundles })
+                        is Screen.Results -> ResultsScreen(theme, sound, onBack = { navigateTo(Screen.Home) })
+                        is Screen.QuestionBank -> QuestionBankScreen(theme, sound, onBack = { navigateTo(Screen.Home) }, onStartExam = { screen = Screen.ExamEntry(it) }, onOpenPackages = { screen = Screen.Bundles })
+                        is Screen.AudioLessons -> LearnScreen(theme, sound, onBack = { navigateTo(Screen.Home) })
+                        is Screen.Classroom -> LiveRoomScreen(theme, onBack = { navigateTo(Screen.Home) })
+                        is Screen.RecordedVideo -> VideosScreen(theme, sound, onBack = { navigateTo(Screen.Home) })
+                        is Screen.ClassResult -> ResultsScreen(theme, sound, onBack = { navigateTo(Screen.Home) })
+                        is Screen.CourseVideo -> VideosScreen(theme, sound, onBack = { navigateTo(Screen.Home) })
+                        is Screen.TestList -> TestsScreen(theme, sound, filter = s.filter, title = s.title, onBack = { navigateTo(Screen.Home) }, onStartExam = { screen = Screen.ExamEntry(it) }, onOpenPackages = { screen = Screen.Bundles })
+                        is Screen.Join -> JoinScreen(theme, sound, onBack = { navigateTo(Screen.Home) })
+                        is Screen.EyeVision -> EyeVisionScreen(theme, sound, onBack = { navigateTo(Screen.Home) })
+                        is Screen.Dictionary -> DictionaryScreen(theme, sound, onBack = { navigateTo(Screen.Home) })
+                        is Screen.Grammar -> GrammarScreen(theme, sound, onBack = { navigateTo(Screen.Home) })
+                        is Screen.Alarms -> AlarmsScreen(theme, sound, onBack = { navigateTo(Screen.Home) })
+                        is Screen.Bundles -> BundlesScreen(theme, sound, onBack = { navigateTo(Screen.Home) }, onOpenBundle = { id, title -> screen = Screen.BundleDetail(id, title) }, onOpenTest = { screen = Screen.ExamEntry(it) })
+                        is Screen.BundleList -> BundlesScreen(theme, sound, onBack = { navigateTo(Screen.Home) }, onOpenBundle = { id, title -> screen = Screen.BundleDetail(id, title) }, onOpenTest = { screen = Screen.ExamEntry(it) }, initialKind = s.kind)
+                        is Screen.BundleDetail -> BundleDetailScreen(theme, sound, bundleId = s.bundleId, bundleTitle = s.bundleTitle, onBack = { screen = Screen.Bundles }, onOpenTest = { screen = Screen.ExamEntry(it) })                    }
+                }
+            }
+
+            // ─── Bottom navigation bar ──────────────────────────────────────
+            val showBottomBar = when (screen) {
+                is Screen.Exam -> false
+                is Screen.ExamEntry -> false
+                is Screen.BookReader -> false
+                is Screen.BundleDetail -> false
+                is Screen.Settings -> false
+                else -> !hideBottomBar
+            }
+            if (showBottomBar) {
+                BottomNavBar(activeTab = activeTab, onTabClick = { tab ->
+                    sound.click()
+                    when (tab) {
+                        BottomTab.Home -> navigateTo(Screen.Home)
+                        BottomTab.Exams -> navigateTo(Screen.Tests)
+                        BottomTab.Tools -> navigateTo(Screen.Learn)
+                        BottomTab.Books -> navigateTo(Screen.Books)
+                    }
+                })
+            }
+        }
+
+        // Global full-screen image viewer overlay — renders above every screen
+        // when an image URL is set via FullScreenImageViewer.show(url).
+        // Used by EyeVisionScreen, ExamScreen, and any other place that shows
+        // images the student may want to tap to enlarge.
+        FullScreenViewerOverlay(theme = theme)
+    }
+}
+
+// ─── Bottom Navigation Bar — clean, full-width ────────────────────────────────
+@Composable
+fun BottomNavBar(activeTab: BottomTab, onTabClick: (BottomTab) -> Unit) {
+    Surface(
+        color = CardWhite,
+        shadowElevation = 8.dp,
+        tonalElevation = 0.dp,
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .navigationBarsPadding()
+                .padding(vertical = 8.dp),
+            horizontalArrangement = Arrangement.SpaceEvenly,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            BottomTab.values().forEach { tab ->
+                val isActive = tab == activeTab
+                val iconColor = if (isActive) NavyBlue else Color(0xFF94A3B8)
+                val textColor = if (isActive) NavyBlue else Color(0xFF94A3B8)
+
+                // Animated scale on press
+                var pressed by remember { mutableStateOf(false) }
+                val scale by animateFloatAsState(
+                    targetValue = if (pressed) 0.85f else 1f,
+                    animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy),
+                    label = "navScale"
+                )
+                // Animated background for active tab
+                val bgAlpha by animateFloatAsState(
+                    targetValue = if (isActive) 1f else 0f,
+                    animationSpec = tween(300, easing = FastOutSlowInEasing),
+                    label = "navBgAlpha"
+                )
+
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(NavyBlue.copy(alpha = 0.08f * bgAlpha))
+                        .clickable { onTabClick(tab) }
+                        .padding(horizontal = 16.dp, vertical = 6.dp)
+                        .scale(scale),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Icon(
+                            tab.icon,
+                            tab.label,
+                            tint = iconColor,
+                            modifier = Modifier.size(24.dp),
+                        )
+                        Spacer(Modifier.height(3.dp))
+                        Text(
+                            tab.label,
+                            color = textColor,
+                            fontSize = 10.sp,
+                            fontWeight = if (isActive) FontWeight.SemiBold else FontWeight.Normal,
+                        )
                     }
                 }
             }
@@ -123,19 +318,14 @@ fun MainScreen(userName: String, onLogout: () -> Unit) {
     }
 }
 
-// ─── Top bar — clean, with DreamKorea logo ───────────────────────────────────
+// ─── Top bar ──────────────────────────────────────────────────────────────────
 @Composable
 fun TopBar(theme: AppTheme, userName: String, sound: SoundManager, onProfile: () -> Unit, onSettings: () -> Unit) {
-    Surface(
-        color = theme.white,
-        shadowElevation = 0.dp,
-        tonalElevation = 0.dp
-    ) {
+    Surface(color = CardWhite, shadowElevation = 0.dp, tonalElevation = 0.dp) {
         Row(
             modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // DreamKorea logo
             Image(
                 painter = painterResource(id = app.dreamkorea.smartclass.R.drawable.dreamkorea_logo),
                 contentDescription = "DreamKorea Logo",
@@ -143,241 +333,378 @@ fun TopBar(theme: AppTheme, userName: String, sound: SoundManager, onProfile: ()
                 contentScale = ContentScale.Fit
             )
             Spacer(Modifier.width(10.dp))
-            Text("DreamKorea", color = theme.darkText, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+            Text("DreamKorea", color = TextDark, fontSize = 18.sp, fontWeight = FontWeight.Bold)
             Spacer(Modifier.weight(1f))
-            // Profile icon
+            // Profile icon only (settings removed)
             Box(
-                modifier = Modifier
-                    .size(36.dp)
-                    .clip(CircleShape)
-                    .clickable { sound.click(); onProfile() },
+                modifier = Modifier.size(36.dp).clip(CircleShape).clickable { sound.click(); onProfile() },
                 contentAlignment = Alignment.Center
             ) {
-                Icon(Icons.Default.Person, "Profile", tint = theme.darkText, modifier = Modifier.size(22.dp))
-            }
-            Spacer(Modifier.width(4.dp))
-            // Settings icon
-            Box(
-                modifier = Modifier
-                    .size(36.dp)
-                    .clip(CircleShape)
-                    .clickable { sound.click(); onSettings() },
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(Icons.Default.Settings, "Settings", tint = theme.darkText, modifier = Modifier.size(22.dp))
+                Icon(Icons.Default.Person, "Profile", tint = TextDark, modifier = Modifier.size(22.dp))
             }
         }
     }
 }
 
-// Async image loader — uses Coil to load admin-uploaded images from URLs
+// Async image loader — uses Coil
 @Composable
 fun AsyncImageLoader(url: String, modifier: Modifier = Modifier) {
-    val theme = rememberAppTheme()
-    if (url.isBlank()) {
-        Box(
-            modifier = modifier.background(theme.primary.copy(alpha = 0.1f)),
-            contentAlignment = Alignment.Center
-        ) {
-            Icon(Icons.Default.Image, null, tint = theme.primary.copy(alpha = 0.3f), modifier = Modifier.size(32.dp))
+    val absoluteUrl = if (url.isBlank()) "" else if (url.startsWith("http")) url else "https://my-project-five-sepia.vercel.app$url"
+    if (absoluteUrl.isBlank()) {
+        Box(modifier = modifier.background(NavyBlue.copy(alpha = 0.05f)), contentAlignment = Alignment.Center) {
+            Icon(Icons.Default.Image, null, tint = NavyBlue.copy(alpha = 0.2f), modifier = Modifier.size(32.dp))
         }
         return
     }
-    coil.compose.AsyncImage(
-        model = url,
-        contentDescription = null,
-        modifier = modifier,
-        contentScale = ContentScale.Crop
-    )
+    // Use Crop so the image fills the entire card — no empty space, no "cut" look
+    coil.compose.AsyncImage(model = absoluteUrl, contentDescription = null, modifier = modifier, contentScale = ContentScale.Crop)
 }
 
+// ─── HOME SCREEN — Professional EdTech design ─────────────────────────────────
 @Composable
-fun MiniStat(theme: AppTheme, icon: ImageVector, value: String, label: String) {
-    Surface(
-        color = theme.primary.copy(alpha = 0.08f),
-        shape = RoundedCornerShape(6.dp)
-    ) {
-        Row(
-            modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Icon(icon, null, tint = theme.primary, modifier = Modifier.size(11.dp))
-            Spacer(Modifier.width(2.dp))
-            Text(value, color = theme.primary, fontSize = 10.sp, fontWeight = FontWeight.Bold)
-        }
-    }
-}
-
-// ─── Home — image cards like the original app ─────────────────────────────────
-@Composable
-fun HomeScreen(theme: AppTheme, sound: SoundManager, onNavigate: (Screen) -> Unit) {
-    // Stale-while-revalidate: show cached data INSTANTLY, refresh in background
+fun HomeScreen(theme: AppTheme, sound: SoundManager, userName: String, onNavigate: (Screen) -> Unit) {
+    var stats by remember { mutableStateOf<UserStats?>(null) }
     var homeCards by remember {
         mutableStateOf<List<HomeCard>>(AppState.getCachedNow<List<HomeCard>>(AppState.KEY_HOME_CARDS) ?: emptyList())
     }
     var loading by remember { mutableStateOf(homeCards.isEmpty()) }
-
-    LaunchedEffect(Unit) {
-        // If we already have cached data, don't show loading — just refresh silently
-        if (homeCards.isNotEmpty()) loading = false
-        try {
-            homeCards = AppState.getCachedHomeCards()
-        } catch (_: Exception) {
-            // Keep cached data if refresh fails
-        } finally {
-            loading = false
-        }
+    val configuration = androidx.compose.ui.platform.LocalConfiguration.current
+    val isLandscape = configuration.screenWidthDp > configuration.screenHeightDp
+    // Adapt column count to orientation — 2 cols portrait, 3-4 cols landscape
+    val cardColumns = when {
+        isLandscape && configuration.screenWidthDp >= 900 -> 4
+        isLandscape -> 3
+        else -> 2
     }
 
-    // Fallback cards if API fails or returns empty — ensures home is never blank
+    // Real-time refresh: load on mount, and refresh every time the screen
+    // becomes visible (e.g. when user navigates back from another screen).
+    val lifecycleOwner = androidx.compose.ui.platform.LocalLifecycleOwner.current
+    var refreshTrigger by remember { mutableStateOf(0) }
+    LaunchedEffect(refreshTrigger) {
+        if (homeCards.isNotEmpty()) loading = false
+        try {
+            homeCards = AppState.cachedFresh(AppState.KEY_HOME_CARDS) {
+                AppState.api.getHomeCards().cards
+            }
+            stats = AppState.api.getStats().stats
+        } catch (_: Exception) {}
+        finally { loading = false }
+    }
+    // Refresh when the app comes to foreground (real-time updates)
+    DisposableEffect(lifecycleOwner) {
+        val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
+            if (event == androidx.lifecycle.Lifecycle.Event.ON_RESUME) {
+                refreshTrigger++ // triggers LaunchedEffect above to re-fetch
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+
     val effectiveCards = remember(homeCards, loading) {
         if (loading) emptyList()
-        else if (homeCards.isNotEmpty()) homeCards
-        else listOf(
-            HomeCard(key = "ubt_test", title = "UBT TEST", section = "test", sortOrder = 0, route = "tests", imageUrl = ""),
-            HomeCard(key = "free_exam", title = "Free Exam", section = "test", sortOrder = 1, route = "tests", imageUrl = ""),
-            HomeCard(key = "batch", title = "Batch", section = "test", sortOrder = 2, route = "tests", imageUrl = ""),
-            HomeCard(key = "results", title = "Results", section = "test", sortOrder = 3, route = "profile", imageUrl = ""),
-            HomeCard(key = "all_books", title = "ALL BOOKS", section = "resources", sortOrder = 0, route = "books", imageUrl = ""),
-            HomeCard(key = "question_bank", title = "QUESTION BANK", section = "resources", sortOrder = 1, route = "learn", imageUrl = ""),
-            HomeCard(key = "course_video", title = "COURSE VIDEO", section = "resources", sortOrder = 2, route = "videos", imageUrl = ""),
-            HomeCard(key = "audio_lessons", title = "AUDIO LESSONS", section = "resources", sortOrder = 3, route = "learn", imageUrl = ""),
-            HomeCard(key = "classroom", title = "CLASSROOM", section = "premium", sortOrder = 0, route = "live", imageUrl = ""),
-            HomeCard(key = "live_class", title = "LIVE CLASS", section = "premium", sortOrder = 1, route = "live", imageUrl = ""),
-            HomeCard(key = "recorded_video", title = "RECORDED VIDEO", section = "premium", sortOrder = 2, route = "videos", imageUrl = ""),
-            HomeCard(key = "class_result", title = "CLASS RESULT", section = "premium", sortOrder = 3, route = "profile", imageUrl = "")
+        else if (homeCards.isNotEmpty()) {
+            // Merge server cards with guaranteed QBank + Batch cards
+            val serverKeys = homeCards.map { it.key }.toSet()
+            val serverRoutes = homeCards.map { it.route }.toSet()
+            val extras = mutableListOf<HomeCard>()
+            // Only add QBank card if server doesn't have one (by key OR by route)
+            if (!serverKeys.contains("qbank_packages") && !serverRoutes.contains("questionbank")) {
+                extras.add(HomeCard(key = "qbank_packages", title = "Question Bank", section = "test", sortOrder = 99, route = "questionbank", imageUrl = ""))
+            }
+            // Only add Batch card if server doesn't have one (by key OR by route)
+            if (!serverKeys.contains("batch_packages") && !serverRoutes.contains("batch")) {
+                extras.add(HomeCard(key = "batch_packages", title = "Batch", section = "test", sortOrder = 100, route = "batch", imageUrl = ""))
+            }
+            homeCards + extras
+        } else listOf(
+            HomeCard(key = "ubt_test", title = "UBT Test", section = "test", sortOrder = 0, route = "tests", imageUrl = ""),
+            HomeCard(key = "demo_exam", title = "Demo Exam", section = "test", sortOrder = 1, route = "tests", imageUrl = ""),
+            HomeCard(key = "qbank_packages", title = "Question Bank", section = "test", sortOrder = 2, route = "questionbank", imageUrl = ""),
+            HomeCard(key = "batch_packages", title = "Batch", section = "test", sortOrder = 3, route = "batch", imageUrl = ""),
+            HomeCard(key = "results", title = "Results", section = "test", sortOrder = 5, route = "results", imageUrl = ""),
+            HomeCard(key = "all_books", title = "Books", section = "resources", sortOrder = 0, route = "books", imageUrl = ""),
+            HomeCard(key = "eye_vision", title = "Eye Vision", section = "resources", sortOrder = 2, route = "eyevision", imageUrl = ""),
+            HomeCard(key = "dictionary", title = "Dictionary", section = "resources", sortOrder = 4, route = "dictionary", imageUrl = ""),
+            HomeCard(key = "grammar", title = "Grammar", section = "resources", sortOrder = 5, route = "grammar", imageUrl = ""),
+            HomeCard(key = "alarms", title = "Alarms", section = "resources", sortOrder = 6, route = "alarms", imageUrl = ""),
+            HomeCard(key = "join", title = "Join Live", section = "resources", sortOrder = 3, route = "join", imageUrl = "")
         )
     }
 
     if (loading) {
-        SkeletonGridScreen(theme, rows = 3)
+        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            CircularProgressIndicator(color = NavyBlue)
+        }
         return
     }
 
-    // Group cards by section
     val sections = effectiveCards.groupBy { it.section }
 
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(bottom = 24.dp)
+        contentPadding = PaddingValues(bottom = 100.dp)
     ) {
-        sections.forEach { (sectionKey, cards) ->
-            val sectionTitle = when (sectionKey) {
-                "test" -> "Tests"
-                "resources" -> "Resources"
-                "premium" -> "Premium"
-                else -> sectionKey.replaceFirstChar { it.uppercase() }
+        // ─── Hero card — with tree image background + greeting + progress ─────
+        item {
+            Surface(
+                shape = RoundedCornerShape(20.dp),
+                modifier = Modifier.fillMaxWidth().padding(16.dp),
+                shadowElevation = 6.dp,
+            ) {
+                Box(modifier = Modifier.fillMaxWidth().height(if (isLandscape) 120.dp else 160.dp)) {
+                    // Tree image as background — Crop to fill the entire card
+                    // so it blends with the gradient overlay nicely
+                    Image(
+                        painter = painterResource(id = app.dreamkorea.smartclass.R.drawable.hero_bg),
+                        contentDescription = null,
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Crop
+                    )
+                    // Gradient overlay — pink/magenta to match the tree image
+                    Box(
+                        modifier = Modifier.fillMaxSize().background(
+                            Brush.verticalGradient(
+                                listOf(Color(0xFF8B2252).copy(alpha = 0.75f), Color(0xFF1E3A8A).copy(alpha = 0.85f))
+                            )
+                        )
+                    )
+                    // Content on top
+                    Column(modifier = Modifier.padding(20.dp)) {
+                        Text("Hello, $userName", color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.Bold)
+                        Text("Let's learn Korean together", color = Color.White.copy(alpha = 0.8f), fontSize = 13.sp)
+                        Spacer(Modifier.height(12.dp))
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Surface(color = Color.White.copy(alpha = 0.2f), shape = RoundedCornerShape(8.dp)) {
+                                Text("${stats?.totalExamsTaken ?: 0} exams", color = Color.White, fontSize = 11.sp, modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp))
+                            }
+                            Spacer(Modifier.width(6.dp))
+                            Surface(color = Color.White.copy(alpha = 0.2f), shape = RoundedCornerShape(8.dp)) {
+                                Text("${stats?.studyStreakDays ?: 0} day streak", color = Color.White, fontSize = 11.sp, modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp))
+                            }
+                        }
+                        Spacer(Modifier.height(10.dp))
+                        val progress = ((stats?.averageScore ?: 0.0).toFloat() / 100f).coerceIn(0f, 1f)
+                        LinearProgressIndicator(
+                            progress = { progress },
+                            color = Color(0xFFF472B6),
+                            trackColor = Color.White.copy(alpha = 0.2f),
+                            modifier = Modifier.fillMaxWidth().height(6.dp).clip(RoundedCornerShape(3.dp)),
+                        )
+                        Spacer(Modifier.height(4.dp))
+                        Text("${String.format("%.0f", stats?.averageScore ?: 0.0)}% average score", color = Color.White.copy(alpha = 0.7f), fontSize = 11.sp)
+                    }
+                }
             }
+        }
 
-            // Section header — clean, no background color, just text
+        // ─── Quick Access grid (4 colorful buttons) ──────────────────────
+        item {
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
+                horizontalArrangement = Arrangement.SpaceEvenly,
+            ) {
+                QuickAccessBtn("UBT", NavyBlue, Icons.Default.School) { onNavigate(Screen.UbtTest) }
+                QuickAccessBtn("Demo", SuccessGreen, Icons.Default.Quiz) { onNavigate(Screen.FreeExam) }
+                QuickAccessBtn("Books", WarningOrange, Icons.Default.Book) { onNavigate(Screen.Books) }
+                QuickAccessBtn("Eye Test", AccentPurple, Icons.Default.Visibility) { onNavigate(Screen.EyeVision) }
+                if (isLandscape) {
+                    QuickAccessBtn("QBank", AccentPink, Icons.Default.Quiz) { onNavigate(Screen.QuestionBank) }
+                    QuickAccessBtn("Batch", Color(0xFFEF6C00), Icons.Default.Layers) { onNavigate(Screen.BundleList("batch")) }
+                }
+            }
+        }
+
+        // ─── Today's goal bar ────────────────────────────────────────────
+        item {
+            Surface(
+                color = CardWhite,
+                shape = RoundedCornerShape(14.dp),
+                modifier = Modifier.fillMaxWidth().padding(16.dp, 4.dp),
+                shadowElevation = 1.dp,
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Row(Modifier.fillMaxWidth(), Arrangement.SpaceBetween) {
+                        Text("Today's Goal", color = TextDark, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                        Text("${stats?.totalQuestionsAnswered ?: 0} answered", color = TextMid, fontSize = 12.sp)
+                    }
+                    Spacer(Modifier.height(8.dp))
+                    val goalProgress = ((stats?.totalQuestionsAnswered ?: 0).coerceAtMost(20) / 20f).coerceIn(0f, 1f)
+                    LinearProgressIndicator(
+                        progress = { goalProgress },
+                        color = NavyBlue,
+                        trackColor = DividerColor,
+                        modifier = Modifier.fillMaxWidth().height(8.dp).clip(RoundedCornerShape(4.dp)),
+                    )
+                    Spacer(Modifier.height(4.dp))
+                    Text("${stats?.totalQuestionsAnswered ?: 0} / 20 questions", color = TextMid, fontSize = 11.sp)
+                }
+            }
+        }
+
+        // ─── Section: Free Exams ─────────────────────────────────────────
+        val testCards = sections["test"] ?: emptyList()
+        if (testCards.isNotEmpty()) {
             item {
-                Text(
-                    sectionTitle,
-                    color = theme.subText,
-                    fontSize = 13.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp)
-                )
+                Text("Free Exams", color = TextDark, fontSize = 17.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
             }
-
-            // Cards in 2-column grid
-            val rows = cards.chunked(2)
-            rows.forEachIndexed { rowIdx, rowCards ->
+            val rows = testCards.chunked(cardColumns)
+            rows.forEach { rowCards ->
                 item {
                     Row(
                         modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp),
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         rowCards.forEach { card ->
-                            ImageCard(theme, sound, card, modifier = Modifier.weight(1f)) {
-                                // Navigate to distinct page based on card key
+                            HomeCardItem(theme, sound, card, modifier = Modifier.weight(1f)) {
                                 val dest = when (card.key) {
                                     "ubt_test" -> Screen.UbtTest
-                                    "free_exam" -> Screen.FreeExam
+                                    "demo_exam" -> Screen.FreeExam
                                     "batch" -> Screen.Batch
+                                    "batch_packages" -> Screen.BundleList("batch")
+                                    "qbank_packages" -> Screen.QuestionBank
+                                    "chapter_exam" -> Screen.TestList("chapter", "Chapter Exams")
                                     "results" -> Screen.Results
-                                    "all_books" -> Screen.Books
-                                    "question_bank" -> Screen.QuestionBank
-                                    "course_video" -> Screen.CourseVideo
-                                    "audio_lessons" -> Screen.AudioLessons
-                                    "classroom" -> Screen.Join
-                                    "live_class" -> Screen.Join
-                                    "recorded_video" -> Screen.RecordedVideo
-                                    "class_result" -> Screen.ClassResult
                                     else -> when (card.route) {
                                         "tests" -> Screen.Tests
-                                        "books" -> Screen.Books
-                                        "videos" -> Screen.Videos
-                                        "learn" -> Screen.Learn
-                                        "live" -> Screen.LiveRoom
-                                        "profile" -> Screen.Profile
+                                        "results" -> Screen.Results
+                                        "batch" -> Screen.BundleList("batch")
+                                        "questionbank" -> Screen.QuestionBank
                                         else -> Screen.Tests
                                     }
                                 }
                                 onNavigate(dest)
                             }
                         }
-                        // Fill empty slot if odd number
-                        if (rowCards.size == 1) {
-                            Spacer(Modifier.weight(1f))
-                        }
+                        // Fill empty slots so cards don't stretch
+                        repeat(cardColumns - rowCards.size) { Spacer(Modifier.weight(1f)) }
                     }
                 }
             }
         }
 
-        // Footer
+        // ─── Section: Tools & Resources ──────────────────────────────────
+        val resourceCards = sections["resources"] ?: emptyList()
+        if (resourceCards.isNotEmpty()) {
+            item {
+                Text("Tools & Resources", color = TextDark, fontSize = 17.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
+            }
+            // Grid of resource cards
+            val resRows = resourceCards.chunked(cardColumns)
+            resRows.forEach { rowCards ->
+                item {
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        rowCards.forEach { card ->
+                            HomeCardItem(theme, sound, card, modifier = Modifier.weight(1f)) {
+                                val dest = when (card.key) {
+                                    "all_books" -> Screen.Books
+                                    "question_bank" -> Screen.QuestionBank
+                                    "qbank_packages" -> Screen.QuestionBank
+                                    "batch_packages" -> Screen.BundleList("batch")
+                                    "eye_vision" -> Screen.EyeVision
+                                    "dictionary" -> Screen.Dictionary
+                                    "grammar" -> Screen.Grammar
+                                    "alarms" -> Screen.Alarms
+                                    "join" -> Screen.Join
+                                    "course_video" -> Screen.CourseVideo
+                                    "audio_lessons" -> Screen.AudioLessons
+                                    "recorded_video" -> Screen.RecordedVideo
+                                    "packages" -> Screen.Bundles
+                                    else -> when (card.route) {
+                                        "books" -> Screen.Books
+                                        "videos" -> Screen.Videos
+                                        "learn" -> Screen.Learn
+                                        "live" -> Screen.Join
+                                        "eyevision" -> Screen.EyeVision
+                                        "dictionary" -> Screen.Dictionary
+                                        "grammar" -> Screen.Grammar
+                                        "alarms" -> Screen.Alarms
+                                        "questionbank" -> Screen.QuestionBank
+                                        "packages" -> Screen.Bundles
+                                        "join" -> Screen.Join
+                                        else -> Screen.Tests
+                                    }
+                                }
+                                onNavigate(dest)
+                            }
+                        }
+                        // Fill empty slots so cards don't stretch
+                        repeat(cardColumns - rowCards.size) { Spacer(Modifier.weight(1f)) }
+                    }
+                }
+            }
+        }
+
+        // ─── Footer ──────────────────────────────────────────────────────
         item {
-            Text(
-                "© DreamKorea SmartClass 2024. All Rights Reserved.",
-                color = theme.subText,
-                fontSize = 10.sp,
-                textAlign = TextAlign.Center,
-                modifier = Modifier.fillMaxWidth().padding(16.dp)
-            )
+            Text("DreamKorea SmartClass", color = TextLight, fontSize = 10.sp, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth().padding(16.dp))
         }
     }
 }
 
-// ─── Image card (like original app) — bigger, not squished ────────────────────
+// ─── Quick Access Button ──────────────────────────────────────────────────────
 @Composable
-fun ImageCard(theme: AppTheme, sound: SoundManager, card: HomeCard, modifier: Modifier = Modifier, onClick: () -> Unit) {
+fun QuickAccessBtn(label: String, color: Color, icon: ImageVector, onClick: () -> Unit) {
+    var pressed by remember { mutableStateOf(false) }
+    val scale by animateFloatAsState(
+        targetValue = if (pressed) 0.92f else 1f,
+        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy),
+        label = "quickScale"
+    )
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = Modifier.clickable { pressed = true; onClick() }.scale(scale).padding(4.dp),
+    ) {
+        Surface(color = color.copy(alpha = 0.15f), shape = RoundedCornerShape(14.dp), modifier = Modifier.size(48.dp)) {
+            Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
+                Icon(icon, label, tint = color, modifier = Modifier.size(24.dp))
+            }
+        }
+        Spacer(Modifier.height(4.dp))
+        Text(label, color = TextDark, fontSize = 11.sp, fontWeight = FontWeight.Medium)
+    }
+}
+
+// ─── Home Card Item — professional card design ────────────────────────────────
+@Composable
+fun HomeCardItem(theme: AppTheme, sound: SoundManager, card: HomeCard, modifier: Modifier = Modifier, onClick: () -> Unit) {
     var pressed by remember { mutableStateOf(false) }
     val scale by animateFloatAsState(
         targetValue = if (pressed) 0.96f else 1f,
         animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy),
         label = "cardScale"
     )
+    val configuration = androidx.compose.ui.platform.LocalConfiguration.current
+    val isLandscape = configuration.screenWidthDp > configuration.screenHeightDp
+    // In landscape, cards should be wider (less tall) so they don't get huge
+    val aspectRatio = if (isLandscape) 1.2f else 0.85f
     Surface(
-        color = theme.cardBg,
-        shape = RoundedCornerShape(18.dp),
-        modifier = modifier
-            .fillMaxWidth()
-            .aspectRatio(0.75f)  // taller cards — better fit for images
-            .scale(scale),
-        shadowElevation = 3.dp,
-        border = androidx.compose.foundation.BorderStroke(1.dp, theme.divider)
+        color = CardWhite,
+        shape = RoundedCornerShape(16.dp),
+        modifier = modifier.fillMaxWidth().aspectRatio(aspectRatio).scale(scale),
+        shadowElevation = 2.dp,
+        border = androidx.compose.foundation.BorderStroke(1.dp, DividerColor),
     ) {
-        Column(
-            modifier = Modifier.fillMaxSize().clickable { sound.click(); pressed = true; onClick() }
-        ) {
-            // Image area (top 75% — bigger for uploaded images)
+        Column(modifier = Modifier.fillMaxSize().clickable { sound.click(); pressed = true; onClick() }) {
             Box(
-                modifier = Modifier.fillMaxWidth().weight(1f).background(theme.lightGray),
+                modifier = Modifier.fillMaxWidth().weight(1f).background(BgGray),
                 contentAlignment = Alignment.Center
             ) {
                 AsyncImageLoader(url = card.imageUrl ?: "", modifier = Modifier.fillMaxSize())
             }
-            // Label area (bottom 25%)
             Box(
-                modifier = Modifier.fillMaxWidth().padding(14.dp),
+                modifier = Modifier.fillMaxWidth().padding(12.dp),
                 contentAlignment = Alignment.Center
             ) {
                 Text(
                     card.title,
-                    color = theme.darkText,
+                    color = TextDark,
                     fontSize = 12.sp,
-                    fontWeight = FontWeight.Bold,
+                    fontWeight = FontWeight.SemiBold,
                     textAlign = TextAlign.Center,
                     maxLines = 2,
                     lineHeight = 14.sp
@@ -387,56 +714,21 @@ fun ImageCard(theme: AppTheme, sound: SoundManager, card: HomeCard, modifier: Mo
     }
 }
 
-@Composable
-fun RowScope.NavCard(
-    theme: AppTheme, sound: SoundManager,
-    title: String, subtitle: String, icon: ImageVector, color: Color,
-    onClick: () -> Unit
-) {
-    var pressed by remember { mutableStateOf(false) }
-    val scale by animateFloatAsState(
-        targetValue = if (pressed) 0.95f else 1f,
-        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy),
-        label = "navScale"
-    )
-    Surface(
-        color = theme.cardBg,
-        shape = RoundedCornerShape(14.dp),
-        modifier = Modifier.weight(1f).scale(scale),
-        shadowElevation = 2.dp
-    ) {
-        Column(
-            modifier = Modifier.fillMaxWidth()
-                .clickable { sound.click(); pressed = true; onClick() }
-                .padding(14.dp)
-        ) {
-            Surface(color = color.copy(alpha = 0.15f), shape = RoundedCornerShape(10.dp), modifier = Modifier.size(34.dp)) {
-                Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
-                    Icon(icon, null, tint = color, modifier = Modifier.size(18.dp))
-                }
-            }
-            Spacer(Modifier.height(8.dp))
-            Text(title, color = theme.darkText, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
-            Text(subtitle, color = theme.subText, fontSize = 9.sp, maxLines = 1)
-        }
-    }
-}
-
 // ─── Screen header (back button + title) ──────────────────────────────────────
 @Composable
 fun ScreenHeader(theme: AppTheme, sound: SoundManager, title: String, subtitle: String? = null, onBack: () -> Unit) {
     Row(
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp).statusBarsPadding(),
         verticalAlignment = Alignment.CenterVertically
     ) {
         IconButton(onClick = { sound.click(); onBack() }, modifier = Modifier.size(36.dp)) {
-            Icon(Icons.Default.ArrowBack, "Back", tint = theme.darkText, modifier = Modifier.size(20.dp))
+            Icon(Icons.Default.ArrowBack, "Back", tint = TextDark, modifier = Modifier.size(22.dp))
         }
         Spacer(Modifier.width(8.dp))
         Column {
-            Text(title, color = theme.darkText, fontSize = 20.sp, fontWeight = FontWeight.ExtraBold)
+            Text(title, color = TextDark, fontSize = 20.sp, fontWeight = FontWeight.Bold)
             if (subtitle != null) {
-                Text(subtitle, color = theme.subText, fontSize = 12.sp, fontWeight = FontWeight.Medium)
+                Text(subtitle, color = TextMid, fontSize = 12.sp, fontWeight = FontWeight.Medium)
             }
         }
     }
@@ -445,57 +737,44 @@ fun ScreenHeader(theme: AppTheme, sound: SoundManager, title: String, subtitle: 
 // ─── Learn Screen ─────────────────────────────────────────────────────────────
 @Composable
 fun LearnScreen(theme: AppTheme, sound: SoundManager, onBack: () -> Unit) {
-    var subjects by remember { mutableStateOf<List<Subject>>(emptyList()) }
-    var loading by remember { mutableStateOf(true) }
-
-    LaunchedEffect(Unit) {
-        try {
-            subjects = AppState.api.getSubjects().subjects
-        } catch (_: Exception) {}
-        finally { loading = false }
-    }
-
-    if (loading) {
-        SkeletonListScreen(theme, itemCount = 5)
-        return
-    }
-
-    LazyColumn(
-        modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(16.dp),
-        verticalArrangement = Arrangement.spacedBy(10.dp)
-    ) {
-        item { ScreenHeader(theme, sound, "Subjects", "Choose a subject to start learning", onBack) }
-        if (subjects.isEmpty()) {
-            item { EmptyState(theme, "No subjects yet", "Check back soon.", Icons.Default.School) }
-        } else {
-            itemsIndexed(subjects) { i, s ->
-                AnimatedListItem(index = i, theme = theme) {
-                    Surface(
-                        color = theme.cardBg,
-                        shape = RoundedCornerShape(14.dp),
-                        modifier = Modifier.fillMaxWidth(),
-                        shadowElevation = 2.dp
-                    ) {
-                        Row(modifier = Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
-                            Surface(color = theme.primary.copy(alpha = 0.1f), shape = RoundedCornerShape(10.dp), modifier = Modifier.size(44.dp)) {
-                                Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
-                                    Icon(Icons.Default.School, null, tint = theme.primary, modifier = Modifier.size(22.dp))
-                                }
-                            }
-                            Spacer(Modifier.width(12.dp))
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(s.name, color = theme.darkText, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
-                                Text(s.description ?: "", color = theme.subText, fontSize = 11.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                            }
-                            Icon(Icons.Default.ChevronRight, null, tint = theme.subText, modifier = Modifier.size(20.dp))
+    // Tools page — shows all study tools instead of empty subjects list
+    data class Tool(val title: String, val desc: String, val icon: ImageVector, val route: String)
+    val tools = listOf(
+        Tool("Dictionary", "Search English, Korean & Nepali words", Icons.Default.Translate, "dictionary"),
+        Tool("Korean Grammar", "10 essential grammar lessons", Icons.Default.MenuBook, "grammar"),
+        Tool("Study Alarms", "Set daily study reminders", Icons.Default.Alarm, "alarms"),
+        Tool("Eye Vision", "Adaptive vision tests", Icons.Default.Visibility, "eyevision"),
+    )
+    LazyColumn(modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        item { ScreenHeader(theme, sound, "Tools", "Study tools and resources", onBack) }
+        items(tools.size) { idx ->
+            val tool = tools[idx]
+            Surface(
+                color = CardWhite,
+                shape = RoundedCornerShape(14.dp),
+                modifier = Modifier.fillMaxWidth().clickable { sound.click(); onNavigateToTool(tool.route) },
+                shadowElevation = 2.dp,
+            ) {
+                Row(modifier = Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Surface(color = NavyBlue.copy(alpha = 0.1f), shape = RoundedCornerShape(10.dp), modifier = Modifier.size(48.dp)) {
+                        Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
+                            Icon(tool.icon, null, tint = NavyBlue, modifier = Modifier.size(24.dp))
                         }
                     }
+                    Spacer(Modifier.width(12.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(tool.title, color = TextDark, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+                        Text(tool.desc, color = TextMid, fontSize = 11.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                    }
+                    Icon(Icons.Default.ChevronRight, null, tint = TextLight, modifier = Modifier.size(20.dp))
                 }
             }
         }
     }
 }
+
+// Helper for tool navigation (not used directly — tools are navigated from Home cards)
+var onNavigateToTool: (String) -> Unit = {}
 
 // ─── Books Screen ─────────────────────────────────────────────────────────────
 @Composable
@@ -504,52 +783,62 @@ fun BooksScreen(theme: AppTheme, sound: SoundManager, onBack: () -> Unit, onBook
         mutableStateOf<List<Book>>(AppState.getCachedNow<List<Book>>(AppState.KEY_BOOKS) ?: emptyList())
     }
     var loading by remember { mutableStateOf(books.isEmpty()) }
+    var retryCount by remember { mutableStateOf(0) }
 
-    LaunchedEffect(Unit) {
-        try { books = AppState.getCachedBooks() } catch (_: Exception) {}
+    // Use cachedFresh so we ALWAYS hit the network when this screen mounts —
+    // the user expects to see new books the admin just published, not stale
+    // cache. Cache is still updated so getCachedNow() returns fresh data
+    // after a screen rotation.
+    LaunchedEffect(retryCount) {
+        if (books.isNotEmpty()) loading = false else loading = true
+        try {
+            books = AppState.cachedFresh(AppState.KEY_BOOKS) { AppState.api.getBooks().books }
+        } catch (_: Exception) {}
         finally { loading = false }
     }
 
     if (loading) {
-        SkeletonListScreen(theme, itemCount = 5)
+        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator(color = NavyBlue) }
         return
     }
 
-    LazyColumn(
-        modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(16.dp),
-        verticalArrangement = Arrangement.spacedBy(10.dp)
-    ) {
+    LazyColumn(modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
         item { ScreenHeader(theme, sound, "Books", "Digital library for Korean learning", onBack) }
         if (books.isEmpty()) {
             item { EmptyState(theme, "No books yet", "Your teacher will add books here soon.", Icons.Default.Book) }
         } else {
             itemsIndexed(books) { i, b ->
                 AnimatedListItem(index = i, theme = theme) {
-                    Surface(color = theme.cardBg, shape = RoundedCornerShape(14.dp), modifier = Modifier.fillMaxWidth(), shadowElevation = 2.dp) {
+                    Surface(color = CardWhite, shape = RoundedCornerShape(14.dp), modifier = Modifier.fillMaxWidth().clickable { onBookClick(b) }, shadowElevation = 2.dp) {
                         Row(modifier = Modifier.padding(12.dp)) {
-                            Surface(color = theme.primary, shape = RoundedCornerShape(8.dp), modifier = Modifier.size(54.dp, 72.dp)) {
-                                Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
-                                    Icon(Icons.Default.Book, null, tint = Color.White, modifier = Modifier.size(24.dp))
+                            // Cover image (or fallback icon)
+                            Surface(color = NavyBlue, shape = RoundedCornerShape(8.dp), modifier = Modifier.size(54.dp, 72.dp)) {
+                                if (!b.coverUrl.isNullOrBlank()) {
+                                    coil.compose.AsyncImage(
+                                        model = b.coverUrl,
+                                        contentDescription = b.title,
+                                        modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(8.dp)),
+                                        contentScale = ContentScale.Fit
+                                    )
+                                } else {
+                                    Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
+                                        Icon(Icons.Default.Book, null, tint = Color.White, modifier = Modifier.size(24.dp))
+                                    }
                                 }
                             }
                             Spacer(Modifier.width(12.dp))
                             Column(modifier = Modifier.weight(1f)) {
-                                Text(b.title, color = theme.darkText, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                                if (!b.author.isNullOrBlank()) Text("by ${b.author}", color = theme.subText, fontSize = 11.sp)
+                                Text(b.title, color = TextDark, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                                if (!b.author.isNullOrBlank()) Text("by ${b.author}", color = TextMid, fontSize = 11.sp)
                                 Spacer(Modifier.height(6.dp))
                                 Row(verticalAlignment = Alignment.CenterVertically) {
-                                    if (!b.category.isNullOrBlank()) {
-                                        InfoChip(theme, b.category, theme.primary)
-                                        Spacer(Modifier.width(6.dp))
-                                    }
-                                    if (!b.level.isNullOrBlank()) {
-                                        InfoChip(theme, b.level, theme.accent)
-                                        Spacer(Modifier.width(6.dp))
-                                    }
-                                    if (b.pageCount != null) {
-                                        InfoChip(theme, "${b.pageCount}p", theme.subText)
-                                    }
+                                    if (!b.category.isNullOrBlank()) { InfoChip(theme, b.category, NavyBlue); Spacer(Modifier.width(6.dp)) }
+                                    if (!b.level.isNullOrBlank()) { InfoChip(theme, b.level, AccentPurple); Spacer(Modifier.width(6.dp)) }
+                                    if (b.pageCount != null) InfoChip(theme, "${b.pageCount}p", TextMid)
+                                }
+                                if (!b.description.isNullOrBlank()) {
+                                    Spacer(Modifier.height(4.dp))
+                                    Text(b.description!!, color = TextMid, fontSize = 10.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
                                 }
                             }
                         }
@@ -562,176 +851,135 @@ fun BooksScreen(theme: AppTheme, sound: SoundManager, onBack: () -> Unit, onBook
 
 // ─── Tests Screen ─────────────────────────────────────────────────────────────
 @Composable
-fun TestsScreen(theme: AppTheme, sound: SoundManager, filter: String = "all", title: String = "Tests & Exams", onBack: () -> Unit, onStartExam: (String) -> Unit) {
-    // Stale-while-revalidate: show cached data instantly
+fun TestsScreen(theme: AppTheme, sound: SoundManager, filter: String = "all", title: String = "All Exams", onBack: () -> Unit, onStartExam: (String) -> Unit, onOpenPackages: () -> Unit = {}) {
+    // Local filter state — allows in-screen filtering via tabs
+    var activeFilter by remember { mutableStateOf(filter) }
     var tests by remember {
-        mutableStateOf<List<TestItem>>(AppState.getCachedNow<List<TestItem>>(AppState.keyTests(filter)) ?: emptyList())
+        mutableStateOf<List<TestItem>>(AppState.getCachedNow<List<TestItem>>(AppState.keyTests(activeFilter)) ?: emptyList())
     }
     var loading by remember { mutableStateOf(tests.isEmpty()) }
     var error by remember { mutableStateOf("") }
     var retryCount by remember { mutableStateOf(0) }
 
-    LaunchedEffect(filter, retryCount) {
-        if (tests.isNotEmpty()) loading = false
-        else loading = true
+    LaunchedEffect(activeFilter, retryCount) {
+        if (tests.isNotEmpty()) loading = false else loading = true
         error = ""
         try {
-            if (retryCount > 0) AppState.invalidateCache(AppState.keyTests(filter))
-            val result = kotlinx.coroutines.withTimeoutOrNull(20_000L) {
-                AppState.getCachedTests(filter)
-            }
-            if (result != null) {
-                tests = result
-            } else if (tests.isEmpty()) {
-                error = "The request timed out. Check your internet and try again."
-            }
+            // Always fetch fresh — admin may have just published a new exam
+            AppState.invalidateCache(AppState.keyTests(activeFilter))
+            val result = kotlinx.coroutines.withTimeoutOrNull(20_000L) { AppState.getCachedTests(activeFilter) }
+            if (result != null) tests = result
+            else if (tests.isEmpty()) error = "The request timed out. Check your internet and try again."
         } catch (e: retrofit2.HttpException) {
-            if (tests.isEmpty()) {
-                error = when (e.code()) {
-                    401 -> "Your session has expired. Please log out and sign in again."
-                    else -> "Could not load tests (HTTP ${e.code()})."
-                }
-            }
-        } catch (e: java.net.UnknownHostException) {
-            if (tests.isEmpty()) error = "No internet connection. Please check your network."
-        } catch (e: java.net.SocketTimeoutException) {
-            if (tests.isEmpty()) error = "The request timed out. Please try again."
-        } catch (e: java.io.IOException) {
-            if (tests.isEmpty()) error = "Network error: ${e.message ?: "Could not connect."}"
-        } catch (e: Exception) {
-            if (tests.isEmpty()) error = "Unexpected error: ${e.message ?: "Please try again."}"
-        } finally {
-            loading = false
-        }
+            if (tests.isEmpty()) error = when (e.code()) { 401 -> "Your session has expired." else -> "Could not load (HTTP ${e.code()})." }
+        } catch (e: java.net.UnknownHostException) { if (tests.isEmpty()) error = "No internet connection." }
+        catch (e: java.net.SocketTimeoutException) { if (tests.isEmpty()) error = "The request timed out." }
+        catch (e: java.io.IOException) { if (tests.isEmpty()) error = "Network error." }
+        catch (e: Exception) { if (tests.isEmpty()) error = "Unexpected error." }
+        finally { loading = false }
     }
 
     if (loading) {
         Column(Modifier.fillMaxSize()) {
-            LinearProgressIndicator(
-                modifier = Modifier.fillMaxWidth(),
-                color = theme.primary,
-                trackColor = theme.primary.copy(alpha = 0.1f),
-            )
+            LinearProgressIndicator(modifier = Modifier.fillMaxWidth(), color = NavyBlue, trackColor = NavyBlue.copy(alpha = 0.1f))
             ScreenHeader(theme, sound, title, "Tap a test to start.", onBack)
-            SkeletonListScreen(theme, itemCount = 5)
         }
         return
     }
 
     if (error.isNotEmpty()) {
-        Column(
-            Modifier.fillMaxSize().padding(24.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center
-        ) {
-            Icon(Icons.Default.CloudOff, null, tint = theme.errorRed.copy(alpha = 0.7f), modifier = Modifier.size(56.dp))
+        Column(Modifier.fillMaxSize().padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
+            Icon(Icons.Default.CloudOff, null, tint = TextLight, modifier = Modifier.size(56.dp))
             Spacer(Modifier.height(16.dp))
-            Text("Couldn't load tests", color = theme.darkText, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+            Text("Couldn't load tests", color = TextDark, fontSize = 18.sp, fontWeight = FontWeight.Bold)
             Spacer(Modifier.height(8.dp))
-            Text(error, color = theme.subText, fontSize = 13.sp, textAlign = TextAlign.Center, modifier = Modifier.padding(horizontal = 16.dp))
+            Text(error, color = TextMid, fontSize = 13.sp, textAlign = TextAlign.Center)
             Spacer(Modifier.height(24.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 OutlinedButton(onClick = onBack, shape = RoundedCornerShape(10.dp)) { Text("Go back") }
-                Button(
-                    onClick = { sound.click(); retryCount++ },
-                    colors = ButtonDefaults.buttonColors(containerColor = theme.primary),
-                    shape = RoundedCornerShape(10.dp)
-                ) {
-                    Icon(Icons.Default.Refresh, null, modifier = Modifier.size(18.dp))
-                    Spacer(Modifier.width(6.dp))
-                    Text("Retry")
+                Button(onClick = { sound.click(); retryCount++ }, colors = ButtonDefaults.buttonColors(containerColor = NavyBlue), shape = RoundedCornerShape(10.dp)) {
+                    Icon(Icons.Default.Refresh, null, modifier = Modifier.size(18.dp)); Spacer(Modifier.width(6.dp)); Text("Retry")
                 }
             }
         }
         return
     }
 
-    LazyColumn(
-        modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(16.dp),
-        verticalArrangement = Arrangement.spacedBy(10.dp)
-    ) {
-        item { ScreenHeader(theme, sound, title, if (tests.isEmpty()) "No tests in this category yet." else "Tap a test to start. Stats update automatically.", onBack) }
+    LazyColumn(modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 100.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        item {
+            Column(modifier = Modifier.fillMaxWidth().padding(top = 16.dp)) {
+                Text(title, color = TextDark, fontSize = 24.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 16.dp))
+                Text(if (tests.isEmpty()) "No tests available." else "${tests.size} exams available", color = TextMid, fontSize = 13.sp, modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp))
+            }
+        }
+
+        // Filter tabs + Packages button — only show when initial filter="all"
+        if (filter == "all") {
+            item {
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    val filters = listOf("all" to "All", "exam" to "Exam", "demo" to "Demo")
+                    filters.forEach { (key, label) ->
+                        val isActive = activeFilter == key
+                        Surface(
+                            color = if (isActive) NavyBlue else CardWhite,
+                            shape = RoundedCornerShape(20.dp),
+                            modifier = Modifier.clickable { sound.click(); activeFilter = key },
+                            shadowElevation = if (isActive) 2.dp else 0.dp,
+                            border = if (isActive) null else androidx.compose.foundation.BorderStroke(1.dp, DividerColor),
+                        ) {
+                            Text(
+                                label,
+                                color = if (isActive) Color.White else TextMid,
+                                fontSize = 13.sp,
+                                fontWeight = if (isActive) FontWeight.SemiBold else FontWeight.Normal,
+                                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
         if (tests.isEmpty()) {
             item { EmptyState(theme, "Nothing here yet", "Your teacher will add content to this section soon.", Icons.Default.Quiz) }
         } else {
-            itemsIndexed(tests) { i, t ->
-                AnimatedListItem(index = i, theme = theme) {
-                    TestCard(theme, sound, t, onClick = { onStartExam(t.id) })
-                }
-            }
+            itemsIndexed(tests) { i, t -> AnimatedListItem(index = i, theme = theme) { TestCard(theme, sound, t, onClick = { onStartExam(t.id) }) } }
         }
     }
 }
 
-// ─── Test Card with rich info + gradient accent ──────────────────────────────
+// ─── Test Card ────────────────────────────────────────────────────────────────
 @Composable
 fun TestCard(theme: AppTheme, sound: SoundManager, t: TestItem, onClick: () -> Unit) {
     var pressed by remember { mutableStateOf(false) }
-    val scale by animateFloatAsState(
-        targetValue = if (pressed) 0.97f else 1f,
-        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy),
-        label = "testScale"
-    )
-    val accentColor = if (t.isExam) theme.accent else theme.primary
+    val scale by animateFloatAsState(targetValue = if (pressed) 0.97f else 1f, animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy), label = "testScale")
+    val accentColor = if (t.isExam) AccentPink else NavyBlue
     Surface(
-        color = theme.cardBg,
-        shape = RoundedCornerShape(16.dp),
-        modifier = Modifier
-            .fillMaxWidth()
-            .scale(scale)
-            .clickable { sound.click(); pressed = true; onClick() },
-        shadowElevation = 3.dp
+        color = CardWhite, shape = RoundedCornerShape(16.dp),
+        modifier = Modifier.fillMaxWidth().scale(scale).clickable { sound.click(); pressed = true; onClick() },
+        shadowElevation = 2.dp,
     ) {
         Row(modifier = Modifier.fillMaxWidth()) {
-            // Left gradient accent bar — color-coded by exam/practice
-            Box(
-                modifier = Modifier
-                    .width(6.dp)
-                    .height(100.dp)
-                    .background(
-                        Brush.verticalGradient(
-                            listOf(accentColor, accentColor.copy(alpha = 0.4f))
-                        )
-                    )
-            )
+            Box(modifier = Modifier.width(6.dp).height(100.dp).background(Brush.verticalGradient(listOf(accentColor, accentColor.copy(alpha = 0.4f)))))
             Column(modifier = Modifier.padding(16.dp).weight(1f)) {
                 Row(Modifier.fillMaxWidth(), Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        t.title,
-                        color = theme.darkText,
-                        fontSize = 17.sp,
-                        fontWeight = FontWeight.ExtraBold,
-                        modifier = Modifier.weight(1f)
-                    )
-                    Surface(
-                        color = accentColor.copy(alpha = 0.15f),
-                        shape = RoundedCornerShape(6.dp)
-                    ) {
-                        Text(
-                            if (t.isExam) "EXAM" else "PRACTICE",
-                            color = accentColor,
-                            fontSize = 9.sp, fontWeight = FontWeight.Bold,
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
-                        )
+                    Text(t.title, color = TextDark, fontSize = 17.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+                    Surface(color = accentColor.copy(alpha = 0.15f), shape = RoundedCornerShape(6.dp)) {
+                        Text(if (t.isExam) "EXAM" else "PRACTICE", color = accentColor, fontSize = 9.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp))
                     }
                 }
-                if (!t.description.isNullOrBlank()) {
-                    Spacer(Modifier.height(4.dp))
-                    Text(t.description, color = theme.subText, fontSize = 12.sp, fontWeight = FontWeight.Medium, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                }
+                if (!t.description.isNullOrBlank()) { Spacer(Modifier.height(4.dp)); Text(t.description, color = TextMid, fontSize = 12.sp, maxLines = 2, overflow = TextOverflow.Ellipsis) }
                 Spacer(Modifier.height(10.dp))
-                // Info chips row
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    InfoChipWithIcon(theme, Icons.Default.Timer, "${t.durationMin} min", theme.primary)
-                    Spacer(Modifier.width(6.dp))
+                    InfoChipWithIcon(theme, Icons.Default.Timer, "${t.durationMin} min", NavyBlue); Spacer(Modifier.width(6.dp))
                     InfoChipWithIcon(theme, Icons.Default.CheckCircle, "Pass ${t.passScore}%", SuccessGreen)
-                    if (t.questionCount > 0) {
-                        Spacer(Modifier.width(6.dp))
-                        InfoChipWithIcon(theme, Icons.Default.Quiz, "${t.questionCount} Q", theme.accent)
-                    }
+                    if (t.questionCount > 0) { Spacer(Modifier.width(6.dp)); InfoChipWithIcon(theme, Icons.Default.Quiz, "${t.questionCount} Q", AccentPurple) }
                     Spacer(Modifier.weight(1f))
-                    Text("Start →", color = accentColor, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                    Text("Start", color = accentColor, fontSize = 13.sp, fontWeight = FontWeight.Bold)
                 }
             }
         }
@@ -740,57 +988,93 @@ fun TestCard(theme: AppTheme, sound: SoundManager, t: TestItem, onClick: () -> U
 
 // ─── Videos Screen ────────────────────────────────────────────────────────────
 @Composable
-fun VideosScreen(theme: AppTheme, sound: SoundManager, onBack: () -> Unit) {
-    var videos by remember {
-        mutableStateOf<List<VideoLesson>>(AppState.getCachedNow<List<VideoLesson>>(AppState.KEY_VIDEOS) ?: emptyList())
-    }
+fun VideosScreen(theme: AppTheme, sound: SoundManager, onBack: () -> Unit, onHideBottomBar: (Boolean) -> Unit = {}) {
+    var videos by remember { mutableStateOf<List<VideoLesson>>(AppState.getCachedNow<List<VideoLesson>>(AppState.KEY_VIDEOS) ?: emptyList()) }
     var loading by remember { mutableStateOf(videos.isEmpty()) }
+    var playingVideo by remember { mutableStateOf<VideoLesson?>(null) }
+
+    // Hide bottom bar when video is playing
+    LaunchedEffect(playingVideo) {
+        onHideBottomBar(playingVideo != null)
+    }
 
     LaunchedEffect(Unit) {
-        try { videos = AppState.getCachedVideos() } catch (_: Exception) {}
+        try { videos = AppState.cachedFresh(AppState.KEY_VIDEOS) { AppState.api.getVideoLessons().videos } } catch (_: Exception) {}
         finally { loading = false }
     }
 
-    if (loading) {
-        SkeletonGridScreen(theme, rows = 3)
+    // ── Video click → open in external browser/YouTube app ─────────────
+    // Simple, reliable approach: just launch the URL externally
+    val context = LocalContext.current
+    if (playingVideo != null) {
+        val v = playingVideo!!
+        LaunchedEffect(v.id) {
+            val url = if (v.videoSource == "upload" && !v.videoUrl.isNullOrBlank()) {
+                if (v.videoUrl!!.startsWith("http")) v.videoUrl else "https://my-project-five-sepia.vercel.app${v.videoUrl}"
+            } else if (v.youtubeId.isNotBlank()) {
+                "https://www.youtube.com/watch?v=${v.youtubeId}"
+            } else {
+                null
+            }
+            if (url != null) {
+                try {
+                    val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(url))
+                    intent.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+                    context.startActivity(intent)
+                } catch (_: Exception) {}
+            }
+            playingVideo = null
+        }
         return
     }
 
-    LazyColumn(
-        modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(16.dp),
-        verticalArrangement = Arrangement.spacedBy(10.dp)
-    ) {
+    if (loading) {
+        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator(color = NavyBlue) }
+        return
+    }
+
+    LazyColumn(modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
         item { ScreenHeader(theme, sound, "Video Lessons", "Watch and learn Korean", onBack) }
         if (videos.isEmpty()) {
             item { EmptyState(theme, "No videos yet", "Your teacher will add videos here soon.", Icons.Default.VideoLibrary) }
         } else {
             itemsIndexed(videos) { i, v ->
                 AnimatedListItem(index = i, theme = theme) {
-                    Surface(color = theme.cardBg, shape = RoundedCornerShape(14.dp), modifier = Modifier.fillMaxWidth(), shadowElevation = 2.dp) {
+                    Surface(
+                        color = CardWhite,
+                        shape = RoundedCornerShape(14.dp),
+                        modifier = Modifier.fillMaxWidth().clickable { sound.click(); playingVideo = v },
+                        shadowElevation = 2.dp,
+                    ) {
                         Column(modifier = Modifier.padding(12.dp)) {
-                            // Thumbnail placeholder with play button
-                            Surface(color = theme.errorRed, shape = RoundedCornerShape(10.dp), modifier = Modifier.fillMaxWidth().height(120.dp)) {
+                            // Thumbnail or placeholder
+                            Surface(color = Color.Black, shape = RoundedCornerShape(10.dp), modifier = Modifier.fillMaxWidth().height(160.dp)) {
                                 Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
-                                    Icon(Icons.Default.PlayCircle, null, tint = Color.White, modifier = Modifier.size(40.dp))
+                                    if (!v.thumbnailUrl.isNullOrBlank()) {
+                                        val thumbUrl = if (v.thumbnailUrl!!.startsWith("http")) v.thumbnailUrl else "https://my-project-five-sepia.vercel.app${v.thumbnailUrl}"
+                                        coil.compose.AsyncImage(
+                                            model = thumbUrl,
+                                            contentDescription = v.title,
+                                            modifier = Modifier.fillMaxSize(),
+                                            contentScale = ContentScale.Crop,
+                                        )
+                                    }
+                                    Icon(Icons.Default.PlayCircle, null, tint = Color.White, modifier = Modifier.size(56.dp))
                                 }
                             }
                             Spacer(Modifier.height(8.dp))
-                            Text(v.title, color = theme.darkText, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                            Text(v.title, color = TextDark, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                            if (!v.description.isNullOrBlank()) {
+                                Spacer(Modifier.height(2.dp))
+                                Text(v.description!!, color = TextMid, fontSize = 11.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                            }
                             Spacer(Modifier.height(6.dp))
                             Row(verticalAlignment = Alignment.CenterVertically) {
-                                InfoChipWithIcon(theme, Icons.Default.Timer, "${v.durationMin} min", theme.primary)
-                                Spacer(Modifier.width(6.dp))
-                                if (!v.level.isNullOrBlank()) {
-                                    InfoChip(theme, v.level, theme.accent)
-                                    Spacer(Modifier.width(6.dp))
-                                }
-                                if (!v.category.isNullOrBlank()) {
-                                    InfoChip(theme, v.category, theme.subText)
-                                    Spacer(Modifier.width(6.dp))
-                                }
+                                InfoChipWithIcon(theme, Icons.Default.Timer, "${v.durationMin} min", NavyBlue); Spacer(Modifier.width(6.dp))
+                                if (!v.level.isNullOrBlank()) { InfoChip(theme, v.level, AccentPurple); Spacer(Modifier.width(6.dp)) }
+                                if (!v.category.isNullOrBlank()) { InfoChip(theme, v.category, TextMid); Spacer(Modifier.width(6.dp)) }
                                 Spacer(Modifier.weight(1f))
-                                Text("${v.views} views", color = theme.subText, fontSize = 9.sp)
+                                Text("${v.views} views", color = TextMid, fontSize = 9.sp)
                             }
                         }
                     }
@@ -812,36 +1096,36 @@ fun ProfileScreen(theme: AppTheme, sound: SoundManager, userName: String, onBack
         finally { loading = false }
     }
 
-    LazyColumn(
-        modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(16.dp),
-        verticalArrangement = Arrangement.spacedBy(14.dp)
-    ) {
-        item { ScreenHeader(theme, sound, "Profile", "Your account and progress", onBack) }
+    LazyColumn(modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+        item {
+            Column(modifier = Modifier.fillMaxWidth().padding(top = 16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                Text("Profile", color = TextDark, fontSize = 24.sp, fontWeight = FontWeight.Bold)
+            }
+        }
 
         // Profile header card
         item {
-            Surface(color = theme.cardBg, shape = RoundedCornerShape(16.dp), modifier = Modifier.fillMaxWidth(), shadowElevation = 2.dp) {
+            Surface(color = CardWhite, shape = RoundedCornerShape(16.dp), modifier = Modifier.fillMaxWidth(), shadowElevation = 2.dp) {
                 Column(modifier = Modifier.padding(20.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                    Surface(color = theme.primary, shape = CircleShape, modifier = Modifier.size(72.dp)) {
+                    Surface(color = NavyBlue, shape = CircleShape, modifier = Modifier.size(72.dp)) {
                         Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
                             Text(userName.take(2).uppercase(), color = Color.White, fontSize = 24.sp, fontWeight = FontWeight.Bold)
                         }
                     }
                     Spacer(Modifier.height(10.dp))
-                    Text(userName, color = theme.darkText, fontSize = 18.sp, fontWeight = FontWeight.Bold)
-                    Text("Student", color = theme.subText, fontSize = 12.sp)
+                    Text(userName, color = TextDark, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                    Text("Student", color = TextMid, fontSize = 12.sp)
                 }
             }
         }
 
         // Stats grid
         item {
-            Surface(color = theme.cardBg, shape = RoundedCornerShape(14.dp), modifier = Modifier.fillMaxWidth(), shadowElevation = 1.dp) {
+            Surface(color = CardWhite, shape = RoundedCornerShape(14.dp), modifier = Modifier.fillMaxWidth(), shadowElevation = 1.dp) {
                 Column(modifier = Modifier.padding(16.dp)) {
-                    Text("Your Progress", color = theme.darkText, fontSize = 14.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(bottom = 12.dp))
+                    Text("Your Progress", color = TextDark, fontSize = 14.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(bottom = 12.dp))
                     if (loading) {
-                        SkeletonStatsRow(theme)
+                        Row(Modifier.fillMaxWidth(), Arrangement.SpaceEvenly) { repeat(4) { SkeletonBox(theme, Modifier.size(60.dp, 40.dp)) } }
                     } else {
                         Row(Modifier.fillMaxWidth(), Arrangement.SpaceEvenly) {
                             ProfileStat(theme, "${stats?.totalExamsTaken ?: 0}", "Exams")
@@ -854,63 +1138,81 @@ fun ProfileScreen(theme: AppTheme, sound: SoundManager, userName: String, onBack
             }
         }
 
-        // Detailed stats list
-        item {
-            Surface(color = theme.cardBg, shape = RoundedCornerShape(14.dp), modifier = Modifier.fillMaxWidth(), shadowElevation = 1.dp) {
-                Column(modifier = Modifier.padding(14.dp)) {
-                    StatRow(theme, "Books Read", "${stats?.booksRead ?: 0}", Icons.Default.Book)
-                    Divider(color = theme.divider, thickness = 0.5.dp, modifier = Modifier.padding(vertical = 8.dp))
-                    StatRow(theme, "Audio Lessons", "${stats?.audioLessonsCompleted ?: 0}", Icons.Default.Headphones)
-                    Divider(color = theme.divider, thickness = 0.5.dp, modifier = Modifier.padding(vertical = 8.dp))
-                    StatRow(theme, "Total Time", "${stats?.totalTimeSpentMin ?: 0} min", Icons.Default.Schedule)
-                    Divider(color = theme.divider, thickness = 0.5.dp, modifier = Modifier.padding(vertical = 8.dp))
-                    StatRow(theme, "Correct Answers", "${stats?.totalCorrectAnswers ?: 0}", Icons.Default.CheckCircle)
-                }
-            }
-        }
-
         // Account info
         item {
-            val userEmail = AppState.user?.email ?: ""
-            val userPhone = AppState.user?.phone ?: ""
-            Surface(color = theme.cardBg, shape = RoundedCornerShape(14.dp), modifier = Modifier.fillMaxWidth(), shadowElevation = 1.dp) {
+            Surface(color = CardWhite, shape = RoundedCornerShape(14.dp), modifier = Modifier.fillMaxWidth(), shadowElevation = 1.dp) {
                 Column(modifier = Modifier.padding(14.dp)) {
-                    Text("Account", color = theme.darkText, fontSize = 14.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(bottom = 8.dp))
-                    if (userEmail.isNotEmpty()) {
-                        StatRow(theme, "Email", userEmail, Icons.Default.Email)
-                        Spacer(Modifier.height(6.dp))
-                    }
-                    if (userPhone.isNotEmpty()) {
-                        StatRow(theme, "Phone", userPhone, Icons.Default.Phone)
-                    }
+                    Text("Account", color = TextDark, fontSize = 14.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(bottom = 8.dp))
+                    val userEmail = AppState.user?.email ?: ""
+                    val userPhone = AppState.user?.phone ?: ""
+                    if (userEmail.isNotEmpty()) { StatRow(theme, "Email", userEmail, Icons.Default.Email); Spacer(Modifier.height(6.dp)) }
+                    if (userPhone.isNotEmpty()) { StatRow(theme, "Phone", userPhone, Icons.Default.Phone) }
                 }
             }
         }
 
-        // Contact info — institute details
+        // Contact info
+        item {
+            Surface(color = CardWhite, shape = RoundedCornerShape(14.dp), modifier = Modifier.fillMaxWidth(), shadowElevation = 1.dp) {
+                Column(modifier = Modifier.padding(14.dp)) {
+                    Text("Contact DreamKorea", color = TextDark, fontSize = 14.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(bottom = 10.dp))
+                    ContactRow(theme, Icons.Default.Phone, "023-591658", "tel:023591658"); Spacer(Modifier.height(8.dp))
+                    ContactRow(theme, Icons.Default.Phone, "9852677658", "tel:9852677658"); Spacer(Modifier.height(8.dp))
+                    ContactRow(theme, Icons.Default.Phone, "9765308000", "tel:9765308000"); Spacer(Modifier.height(10.dp))
+                    Divider(color = DividerColor, thickness = 0.5.dp); Spacer(Modifier.height(10.dp))
+                    ContactRow(theme, Icons.Default.LocationOn, "Krishithok Road, Birtamod, Jhapa", "geo:26.67,87.99?q=Krishithok+Road+Birtamod+Jhapa+Nepal"); Spacer(Modifier.height(10.dp))
+                    Divider(color = DividerColor, thickness = 0.5.dp); Spacer(Modifier.height(10.dp))
+                    ContactRow(theme, Icons.Default.Language, "DreamKorea SmartClass", "https://my-project-five-sepia.vercel.app")
+                }
+            }
+        }
+
+        // Display Mode toggle
         item {
             Surface(color = theme.cardBg, shape = RoundedCornerShape(14.dp), modifier = Modifier.fillMaxWidth(), shadowElevation = 1.dp) {
                 Column(modifier = Modifier.padding(14.dp)) {
-                    Text("Contact DreamKorea", color = theme.darkText, fontSize = 14.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(bottom = 10.dp))
-
-                    // Phone numbers (tappable)
-                    ContactRow(theme, Icons.Default.Phone, "023-591658", "tel:023591658")
-                    Spacer(Modifier.height(8.dp))
-                    ContactRow(theme, Icons.Default.Phone, "9852677658", "tel:9852677658")
-                    Spacer(Modifier.height(8.dp))
-                    ContactRow(theme, Icons.Default.Phone, "9765308000", "tel:9765308000")
-                    Spacer(Modifier.height(10.dp))
-                    Divider(color = theme.divider, thickness = 0.5.dp)
-                    Spacer(Modifier.height(10.dp))
-
-                    // Location (tappable — opens maps)
-                    ContactRow(theme, Icons.Default.LocationOn, "Krishithok Road, Birtamod, Jhapa", "geo:26.67,87.99?q=Krishithok+Road+Birtamod+Jhapa+Nepal")
-                    Spacer(Modifier.height(10.dp))
-                    Divider(color = theme.divider, thickness = 0.5.dp)
-                    Spacer(Modifier.height(10.dp))
-
-                    // Website (tappable — opens browser)
-                    ContactRow(theme, Icons.Default.Language, "DreamKorea SmartClass", "https://my-project-five-sepia.vercel.app")
+                    Text("Display Mode", color = theme.darkText, fontSize = 14.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(bottom = 10.dp))
+                    val isHorizontal = AppState.getTextSizeMultiplier() > 1.0f
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Button(
+                            onClick = {
+                                sound.click()
+                                AppState.setTextSizeMultiplier(1.0f)
+                            },
+                            modifier = Modifier.weight(1f).height(44.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = if (!isHorizontal) theme.primary else Color.Transparent,
+                                contentColor = if (!isHorizontal) Color.White else theme.subText
+                            ),
+                            shape = RoundedCornerShape(10.dp),
+                            border = if (!isHorizontal) null else androidx.compose.foundation.BorderStroke(1.dp, theme.divider)
+                        ) {
+                            Text("Stable", fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                        }
+                        Button(
+                            onClick = {
+                                sound.click()
+                                AppState.setTextSizeMultiplier(1.15f)
+                            },
+                            modifier = Modifier.weight(1f).height(44.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = if (isHorizontal) theme.primary else Color.Transparent,
+                                contentColor = if (isHorizontal) Color.White else theme.subText
+                            ),
+                            shape = RoundedCornerShape(10.dp),
+                            border = if (isHorizontal) null else androidx.compose.foundation.BorderStroke(1.dp, theme.divider)
+                        ) {
+                            Text("Horizontal", fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                        }
+                    }
+                    Spacer(Modifier.height(6.dp))
+                    Text(
+                        if (isHorizontal) "Questions display side-by-side (landscape recommended)" else "Questions display vertically (portrait)",
+                        color = theme.subText, fontSize = 11.sp
+                    )
                 }
             }
         }
@@ -918,27 +1220,17 @@ fun ProfileScreen(theme: AppTheme, sound: SoundManager, userName: String, onBack
         // Logout
         item {
             Button(
-                onClick = {
-                    sound.click()
-                    scope.launch {
-                        try { AppState.api.logout() } catch (_: Exception) {}
-                        AppState.clearSession()
-                        onLogout()
-                    }
-                },
+                onClick = { sound.click(); scope.launch { try { AppState.api.logout() } catch (_: Exception) {}; AppState.clearSession(); onLogout() } },
                 modifier = Modifier.fillMaxWidth().height(48.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = theme.errorRed),
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFEF4444)),
                 shape = RoundedCornerShape(12.dp)
             ) {
-                Icon(Icons.Default.Logout, null, modifier = Modifier.size(18.dp))
-                Spacer(Modifier.width(8.dp))
+                Icon(Icons.Default.Logout, null, modifier = Modifier.size(18.dp)); Spacer(Modifier.width(8.dp))
                 Text("Sign out", fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
             }
         }
 
-        item {
-            Text("DreamKorea SmartClass v1.0.0", color = theme.subText, fontSize = 10.sp, modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center)
-        }
+        item { Text("DreamKorea SmartClass v2.1.0", color = TextLight, fontSize = 10.sp, modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center) }
     }
 }
 
@@ -954,8 +1246,7 @@ fun InfoChip(theme: AppTheme, text: String, color: Color) {
 fun InfoChipWithIcon(theme: AppTheme, icon: ImageVector, text: String, color: Color) {
     Surface(color = color.copy(alpha = 0.1f), shape = RoundedCornerShape(4.dp)) {
         Row(modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp), verticalAlignment = Alignment.CenterVertically) {
-            Icon(icon, null, tint = color, modifier = Modifier.size(10.dp))
-            Spacer(Modifier.width(2.dp))
+            Icon(icon, null, tint = color, modifier = Modifier.size(10.dp)); Spacer(Modifier.width(2.dp))
             Text(text, color = color, fontSize = 9.sp, fontWeight = FontWeight.SemiBold)
         }
     }
@@ -965,11 +1256,10 @@ fun InfoChipWithIcon(theme: AppTheme, icon: ImageVector, text: String, color: Co
 fun StatRow(theme: AppTheme, label: String, value: String, icon: ImageVector) {
     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Icon(icon, null, tint = theme.primary, modifier = Modifier.size(16.dp))
-            Spacer(Modifier.width(8.dp))
-            Text(label, color = theme.subText, fontSize = 12.sp)
+            Icon(icon, null, tint = NavyBlue, modifier = Modifier.size(16.dp)); Spacer(Modifier.width(8.dp))
+            Text(label, color = TextMid, fontSize = 12.sp)
         }
-        Text(value, color = theme.darkText, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+        Text(value, color = TextDark, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
     }
 }
 
@@ -978,36 +1268,37 @@ fun ContactRow(theme: AppTheme, icon: ImageVector, text: String, link: String) {
     val context = androidx.compose.ui.platform.LocalContext.current
     Row(
         modifier = Modifier.fillMaxWidth().clickable {
-            // Open the link (tel:, geo:, https:)
             val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(link))
             context.startActivity(intent)
         }.padding(vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Icon(icon, null, tint = theme.primary, modifier = Modifier.size(18.dp))
-        Spacer(Modifier.width(10.dp))
-        Text(text, color = theme.darkText, fontSize = 13.sp, fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f))
-        Icon(Icons.Default.ChevronRight, null, tint = theme.subText, modifier = Modifier.size(16.dp))
+        Icon(icon, null, tint = NavyBlue, modifier = Modifier.size(18.dp)); Spacer(Modifier.width(10.dp))
+        Text(text, color = TextDark, fontSize = 13.sp, fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f))
+        Icon(Icons.Default.ChevronRight, null, tint = TextLight, modifier = Modifier.size(16.dp))
     }
 }
 
 @Composable
 fun ProfileStat(theme: AppTheme, value: String, label: String) {
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Text(value, color = theme.primary, fontSize = 20.sp, fontWeight = FontWeight.Bold)
-        Text(label, color = theme.subText, fontSize = 10.sp)
+        Text(value, color = NavyBlue, fontSize = 20.sp, fontWeight = FontWeight.Bold)
+        Text(label, color = TextMid, fontSize = 10.sp)
     }
 }
 
 @Composable
+fun SkeletonBox(theme: AppTheme, modifier: Modifier) {
+    Box(modifier = modifier.clip(RoundedCornerShape(4.dp)).background(DividerColor))
+}
+
+@Composable
 fun EmptyState(theme: AppTheme, title: String, body: String, icon: ImageVector) {
-    Surface(color = theme.cardBg, shape = RoundedCornerShape(14.dp), modifier = Modifier.fillMaxWidth(), shadowElevation = 1.dp) {
+    Surface(color = CardWhite, shape = RoundedCornerShape(14.dp), modifier = Modifier.fillMaxWidth(), shadowElevation = 1.dp) {
         Column(modifier = Modifier.padding(32.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-            Icon(icon, null, tint = theme.subText.copy(alpha = 0.5f), modifier = Modifier.size(48.dp))
-            Spacer(Modifier.height(12.dp))
-            Text(title, color = theme.darkText, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
-            Spacer(Modifier.height(4.dp))
-            Text(body, color = theme.subText, fontSize = 12.sp, textAlign = TextAlign.Center)
+            Icon(icon, null, tint = TextLight, modifier = Modifier.size(48.dp)); Spacer(Modifier.height(12.dp))
+            Text(title, color = TextDark, fontSize = 15.sp, fontWeight = FontWeight.SemiBold); Spacer(Modifier.height(4.dp))
+            Text(body, color = TextMid, fontSize = 12.sp, textAlign = TextAlign.Center)
         }
     }
 }
@@ -1015,72 +1306,48 @@ fun EmptyState(theme: AppTheme, title: String, body: String, icon: ImageVector) 
 @Composable
 fun AnimatedListItem(index: Int, theme: AppTheme, content: @Composable () -> Unit) {
     var visible by remember { mutableStateOf(false) }
-    LaunchedEffect(Unit) {
-        kotlinx.coroutines.delay(index * 40L)
-        visible = true
-    }
-    AnimatedVisibility(
-        visible = visible,
-        enter = fadeIn(tween(300)) + slideInVertically(initialOffsetY = { it / 4 }, animationSpec = tween(300))
-    ) {
+    LaunchedEffect(Unit) { kotlinx.coroutines.delay(index * 40L); visible = true }
+    AnimatedVisibility(visible = visible, enter = fadeIn(tween(300)) + slideInVertically(initialOffsetY = { it / 4 }, animationSpec = tween(300))) {
         content()
     }
 }
 
-// ─── Book Reader Screen — opens PDF in browser ────────────────────────────────
+// ─── Book Reader Screen — in-app PDF viewer via WebView ──────────────────────
 @Composable
 fun BookReaderScreen(theme: AppTheme, sound: SoundManager, book: Book, onBack: () -> Unit) {
-    Column(modifier = Modifier.fillMaxSize().background(theme.background)) {
-        // Header
-        ScreenHeader(theme, sound, book.title, "Tap 'Open PDF' to read", onBack)
-        
-        Column(
-            modifier = Modifier.fillMaxSize().padding(20.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center
-        ) {
-            // Book cover
-            Surface(
-                color = theme.primary,
-                shape = RoundedCornerShape(8.dp),
-                modifier = Modifier.size(120.dp, 160.dp),
-                shadowElevation = 4.dp
-            ) {
-                Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
-                    Icon(Icons.Default.Book, null, tint = Color.White, modifier = Modifier.size(48.dp))
+    Column(modifier = Modifier.fillMaxSize().background(BgGray)) {
+        ScreenHeader(theme, sound, book.title, if (book.pdfUrl.isNullOrBlank()) "No PDF" else "Reading…", onBack)
+
+        if (book.pdfUrl.isNullOrBlank()) {
+            Column(modifier = Modifier.fillMaxSize().padding(20.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
+                Surface(color = NavyBlue, shape = RoundedCornerShape(8.dp), modifier = Modifier.size(120.dp, 160.dp), shadowElevation = 4.dp) {
+                    Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) { Icon(Icons.Default.Book, null, tint = Color.White, modifier = Modifier.size(48.dp)) }
                 }
+                Spacer(Modifier.height(16.dp))
+                Text(book.title, color = TextDark, fontSize = 18.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
+                if (!book.author.isNullOrBlank()) Text("by ${book.author}", color = TextMid, fontSize = 13.sp)
+                Spacer(Modifier.height(16.dp))
+                Text("No PDF available for this book", color = TextMid, fontSize = 13.sp, textAlign = TextAlign.Center)
             }
-            Spacer(Modifier.height(16.dp))
-            Text(book.title, color = theme.darkText, fontSize = 18.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
-            if (!book.author.isNullOrBlank()) {
-                Text("by ${book.author}", color = theme.subText, fontSize = 13.sp)
-            }
-            Spacer(Modifier.height(8.dp))
-            if (!book.description.isNullOrBlank()) {
-                Text(book.description ?: "", color = theme.subText, fontSize = 12.sp, textAlign = TextAlign.Center, maxLines = 3)
-            }
-            Spacer(Modifier.height(24.dp))
-            
-            // Open PDF button
-            if (!book.pdfUrl.isNullOrBlank()) {
-                val context = androidx.compose.ui.platform.LocalContext.current
-                Button(
-                    onClick = {
-                        sound.click()
-                        val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(book.pdfUrl))
-                        context.startActivity(intent)
-                    },
-                    modifier = Modifier.fillMaxWidth().height(48.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = theme.primary),
-                    shape = RoundedCornerShape(10.dp)
-                ) {
-                    Icon(Icons.Default.Book, null, modifier = Modifier.size(18.dp))
-                    Spacer(Modifier.width(8.dp))
-                    Text("Open PDF", fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
-                }
-            } else {
-                Text("No PDF available", color = theme.subText, fontSize = 13.sp)
-            }
+        } else {
+            // In-app PDF viewer using Android WebView
+            // Google Docs Viewer embeds the PDF inside a WebView — no external app needed
+            val pdfUrl = book.pdfUrl!!
+            val googleDocsUrl = "https://docs.google.com/viewer?embedded=true&url=${android.net.Uri.encode(pdfUrl)}"
+            AndroidView(
+                factory = { ctx ->
+                    android.webkit.WebView(ctx).apply {
+                        settings.javaScriptEnabled = true
+                        settings.loadWithOverviewMode = true
+                        settings.useWideViewPort = true
+                        settings.builtInZoomControls = true
+                        settings.displayZoomControls = false
+                        webViewClient = android.webkit.WebViewClient()
+                        loadUrl(googleDocsUrl)
+                    }
+                },
+                modifier = Modifier.fillMaxSize()
+            )
         }
     }
 }
