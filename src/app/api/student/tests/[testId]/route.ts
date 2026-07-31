@@ -17,51 +17,74 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ testId: str
       items: {
         orderBy: { order: "asc" },
         include: {
-          question: {
-            select: {
-              id: true, type: true, difficulty: true, stem: true,
-              options: true,
-              imageUrl: true, audioUrl: true,
-              audioLoop: true, audioLoopDelay: true,
-            },
-          },
+          question: true, // include ALL fields
         },
       },
     },
   });
   if (!test) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
-  // NOTE: We intentionally do NOT block on isActive / startAt / endAt here.
-  // Previous strict checks caused "can't load" errors for students whenever
-  // an admin-created test had an empty endAt or isActive=false by default.
-  // Published tests are always openable; admins control visibility via isPublished.
+  // ─── Filter out disabled blocks ────────────────────────────────────────────
+  const textEnabled = test.textBlockEnabled !== false;
+  const audioEnabled = test.audioBlockEnabled !== false;
+  const filteredItems = test.items.filter((i) => {
+    const bt = i.question.blockType || "text";
+    if (bt === "text" && !textEnabled) return false;
+    if (bt === "audio" && !audioEnabled) return false;
+    return true;
+  });
 
   // Create or fetch a draft submission so the timer starts now
   const draft = await db.submission.upsert({
     where: { testId_userId: { testId, userId: user.id } },
-    create: { testId, userId: user.id, answers: "{}", maxScore: test.items.reduce((s, i) => s + i.points, 0) },
+    create: { testId, userId: user.id, answers: "{}", maxScore: filteredItems.reduce((s, i) => s + i.points, 0) },
     update: {},
   });
 
-  return NextResponse.json({
+  const res = NextResponse.json({
     test: {
       id: test.id, title: test.title, description: test.description,
       durationMin: test.durationMin, isExam: test.isExam, passScore: test.passScore,
-      items: test.items.map((i) => ({
+      textBlockCount: test.textBlockCount ?? 0,
+      audioBlockCount: test.audioBlockCount ?? 0,
+      textBlockEnabled: textEnabled,
+      audioBlockEnabled: audioEnabled,
+      showAllBlocks: test.showAllBlocks !== false,
+      items: filteredItems.map((i) => ({
         id: i.id,
         order: i.order,
         points: i.points,
         question: {
           id: i.question.id, type: i.question.type, difficulty: i.question.difficulty,
-          stem: i.question.stem,
+          stem: i.question.stem || "",
+          title: i.question.title || "",
+          isFree: i.question.isFree || false,
           options: i.question.options ? JSON.parse(i.question.options) : null,
+          optionBlanks: i.question.optionBlanks ? JSON.parse(i.question.optionBlanks) : [],
           imageUrl: i.question.imageUrl || null,
           audioUrl: i.question.audioUrl || null,
           audioLoop: i.question.audioLoop || 0,
           audioLoopDelay: i.question.audioLoopDelay || 0,
+          blockType: i.question.blockType || "text",
+          blockNumber: i.question.blockNumber || 0,
+          descType: i.question.descType || "none",
+          descText: i.question.descText || null,
+          descImageUrl: i.question.descImageUrl || null,
+          descAudioUrl: i.question.descAudioUrl || null,
+          mediaType: i.question.mediaType || "none",
+          mediaText: i.question.mediaText || null,
+          mediaImageUrl: i.question.mediaImageUrl || null,
+          mediaAudioUrl: i.question.mediaAudioUrl || null,
+          answerType: i.question.answerType || "text",
+          optionImages: i.question.optionImages ? JSON.parse(i.question.optionImages) : [],
+          optionAudios: i.question.optionAudios ? JSON.parse(i.question.optionAudios) : [],
+          correctOption: i.question.correctOption ?? 0,
+          explanation: i.question.explanation || null,
         },
       })),
     },
     submissionId: draft.id,
   });
+  res.headers.set("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0");
+  return res;
 }
