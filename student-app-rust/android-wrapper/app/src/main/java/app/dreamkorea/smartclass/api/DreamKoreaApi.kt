@@ -156,12 +156,20 @@ data class ReviewItem(
     val explanation: String?,
     val isCorrect: Boolean
 )
+data class EyeVisionRecommendation(
+    val show: Boolean = false,
+    val numbers: List<List<Int>> = emptyList(),
+    val message: String? = null,
+)
+
 data class SubmitResponse(
     val score: Int,
     val maxScore: Int,
     val graded: Boolean,
     val submissionId: String,
-    val review: List<ReviewItem> = emptyList()
+    val review: List<ReviewItem> = emptyList(),
+    val eyeVision: EyeVisionRecommendation = EyeVisionRecommendation(),
+    val completed: Boolean = false,
 )
 
 data class Book(
