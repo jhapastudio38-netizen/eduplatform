@@ -39,6 +39,7 @@ fun SettingsScreen(theme: AppTheme, sound: SoundManager, onBack: () -> Unit) {
     var animations by remember { mutableStateOf(AppState.areAnimationsEnabled()) }
     var notifications by remember { mutableStateOf(AppState.areNotificationsEnabled()) }
     var textSize by remember { mutableStateOf(AppState.getTextSizeMultiplier()) }
+    var examHorizontal by remember { mutableStateOf(AppState.isExamHorizontalMode()) }
 
     LazyColumn(
         modifier = Modifier.fillMaxSize().background(theme.background),
@@ -100,6 +101,18 @@ fun SettingsScreen(theme: AppTheme, sound: SoundManager, onBack: () -> Unit) {
                     TextSizeOption(theme, "M", 1.0f, textSize == 1.0f) { textSize = 1.0f; AppState.setTextSizeMultiplier(1.0f); notifySettingsChanged() }
                     TextSizeOption(theme, "L", 1.15f, textSize == 1.15f) { textSize = 1.15f; AppState.setTextSizeMultiplier(1.15f); notifySettingsChanged() }
                     TextSizeOption(theme, "XL", 1.3f, textSize == 1.3f) { textSize = 1.3f; AppState.setTextSizeMultiplier(1.3f); notifySettingsChanged() }
+                }
+                Divider(color = theme.divider, thickness = 0.5.dp, modifier = Modifier.padding(vertical = 10.dp))
+                ToggleRow(
+                    theme = theme,
+                    title = "Horizontal Exam Layout",
+                    subtitle = "Question on left, options on right (great for tablets / landscape)",
+                    value = examHorizontal
+                ) {
+                    examHorizontal = it
+                    AppState.setExamHorizontalMode(it)
+                    notifySettingsChanged()
+                    sound.click()
                 }
             }
         }

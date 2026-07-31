@@ -45,7 +45,7 @@ const questionSchema = z.object({
     "ONE_WORD", "SHORT_ANSWER", "LONG_ANSWER", "FILL_BLANK", "MATCHING",
   ]),
   difficulty: z.enum(["EASY", "MEDIUM", "HARD"]).default("MEDIUM"),
-  stem: z.string().min(2).max(2000),
+  stem: z.string().max(2000).optional().or(z.literal("")),
   options: z.array(z.string()).optional().default([]),
   correctAnswer: z.string().or(z.array(z.string())).optional(),
   explanation: z.string().optional().default(""),

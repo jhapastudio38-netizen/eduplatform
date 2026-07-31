@@ -17,15 +17,14 @@ jobs:
         run: npm install --legacy-peer-deps
       - name: Generate Prisma client
         run: npx prisma generate
-      - name: Push schema to Supabase
+      - name: Deploy to Vercel
         env:
-          DATABASE_URL: postgresql://postgres:assissobigsexylady@db.rupwlrmtcwzqaohbsswj.supabase.co:5432/postgres
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
         run: |
-          rm -f .env
-          npx prisma db push --accept-data-loss || echo "Schema push skipped"
-      - name: Seed
-        env:
-          DATABASE_URL: postgresql://postgres:assissobigsexylady@db.rupwlrmtcwzqaohbsswj.supabase.co:5432/postgres
+          npx vercel --prod --yes --token "$VERCEL_TOKEN" || echo "Deploy skipped"
+      - name: Run database migrations
         run: |
-          npx tsx scripts/seed-korean.ts || echo "Seed skipped"
-          npx tsx scripts/seed-fixed-tokens.ts || echo "Token seed skipped"
+          sleep 5
+          curl -s -X POST "https://my-project-five-sepia.vercel.app/api/admin/migrate" \
+            -H "Cookie: ep_role=ADMIN; ep_sid=${{ secrets.ADMIN_SESSION_ID }}" \
+            || echo "Migration skipped"

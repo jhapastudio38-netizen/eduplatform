@@ -11,12 +11,16 @@ export async function GET(req: NextRequest) {
   }
   const url = new URL(req.url);
   const category = url.searchParams.get("category"); // exam | demo | batch | chapter | question_bank
+  const q = url.searchParams.get("q")?.trim() || ""; // free-text title search
   const where: Record<string, unknown> = {};
   if (
     category &&
     ["exam", "demo", "batch", "chapter", "question_bank"].includes(category)
   ) {
     where.testCategory = category;
+  }
+  if (q) {
+    where.title = { contains: q, mode: "insensitive" };
   }
   const tests = await db.test.findMany({
     where,
@@ -38,12 +42,18 @@ const testSchema = z.object({
   isPublished: z.boolean().default(false),
   // New fields
   price: z.number().min(0).optional(),
+  priceNpr: z.number().int().min(0).max(10_000_000).optional(),
   featuredImage: z.string().optional().or(z.literal("")),
   category: z.string().max(100).optional().or(z.literal("")),
   audioPlayMode: z.enum(["single", "double"]).default("single"),
   audioGapSec: z.number().int().min(0).max(60).default(2),
   textBlockCount: z.number().int().min(0).max(100).default(20),
   audioBlockCount: z.number().int().min(0).max(100).default(20),
+  // Per-block enable/disable — admin can hide the audio or text section.
+  textBlockEnabled: z.boolean().optional().default(true),
+  audioBlockEnabled: z.boolean().optional().default(true),
+  // Grid display: true = show all blocks (added + blank), false = show only created
+  showAllBlocks: z.boolean().optional().default(true),
 });
 
 export async function POST(req: NextRequest) {
@@ -71,12 +81,16 @@ export async function POST(req: NextRequest) {
         isActive: true,
         createdBy: user.id,
         price: d.price ?? null,
+        priceNpr: d.priceNpr ?? null,
         featuredImage: d.featuredImage || null,
         category: d.category || null,
         audioPlayMode: d.audioPlayMode,
         audioGapSec: d.audioGapSec,
         textBlockCount: d.textBlockCount,
         audioBlockCount: d.audioBlockCount,
+        textBlockEnabled: d.textBlockEnabled ?? true,
+        audioBlockEnabled: d.audioBlockEnabled ?? true,
+        showAllBlocks: d.showAllBlocks ?? true,
       },
     });
     await audit({ actorId: user.id, action: "create_test", entity: "Test", entityId: test.id });

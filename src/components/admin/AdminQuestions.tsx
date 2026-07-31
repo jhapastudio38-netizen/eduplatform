@@ -199,11 +199,14 @@ function QuestionDialog({ chapters, onSaved }: { chapters: Chapter[]; onSaved: (
   }
 
   async function save() {
-    if (!stem.trim()) { toast.error("Question stem required"); return; }
+    // Question text is OPTIONAL — allowed to save with just image/audio media
+    if (!stem.trim() && !imageUrl && !audioUrl) {
+      toast.error("Add question text OR an image/audio first"); return;
+    }
     setBusy(true);
     const body: Record<string, unknown> = {
       type, difficulty, chapterId: chapterId || undefined,
-      stem, explanation,
+      stem: stem || "", explanation,
       imageUrl: imageUrl || undefined,
       audioUrl: audioUrl || undefined,
       audioLoop, audioLoopDelay,
@@ -289,27 +292,105 @@ function QuestionDialog({ chapters, onSaved }: { chapters: Chapter[]; onSaved: (
             </div>
           </div>
 
-          {/* Question text with translate button */}
-          <div>
-            <div className="flex items-center justify-between mb-1">
-              <Label>Question text</Label>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={translateToKorean}
-                disabled={translating || !stem.trim()}
-                className="h-7 text-xs"
-              >
-                <Languages className="mr-1 h-3 w-3" />
-                {translating ? "Translating…" : "EN → 한국어"}
-              </Button>
+          {/* Question field — REMOVED. The question comes from Question Media
+              (text/image/audio) below. No separate question text field needed. */}
+
+          {/* ── QUESTION MEDIA ──────────────────────────────────────────── */}
+          {/* Text/Image/Audio serves as the question. Admin picks one. */}
+          <div className="space-y-3 p-3 border rounded-lg bg-blue-50/30 border-blue-200">
+            <Label className="text-sm font-semibold">Question Media <span className="text-gray-400 font-normal text-xs">(text, image, or audio serves as the question)</span></Label>
+
+            {/* Text — the question text itself */}
+            <div>
+              <div className="flex items-center justify-between mb-1">
+                <Label className="text-xs text-muted-foreground">Text (type the question)</Label>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={translateToKorean}
+                  disabled={translating || !stem.trim()}
+                  className="h-7 text-xs"
+                >
+                  <Languages className="mr-1 h-3 w-3" />
+                  {translating ? "Translating…" : "EN → 한국어"}
+                </Button>
+              </div>
+              <Textarea
+                rows={2}
+                value={stem}
+                onChange={(e) => setStem(e.target.value)}
+                placeholder="Type the question… e.g. What does '안녕하세요' mean?"
+                className="text-base"
+              />
             </div>
-            <Textarea
-              rows={3}
-              value={stem}
-              onChange={(e) => setStem(e.target.value)}
-              placeholder="Type in English… e.g. What is the capital of Korea?"
-            />
+
+            {/* Image */}
+            <div>
+              <Label className="text-xs text-muted-foreground">Image (for visual questions)</Label>
+              <div className="flex gap-2 mt-1">
+                <Input value={imageUrl} onChange={(e) => setImageUrl(e.target.value)} placeholder="Upload a file or paste URL…" className="flex-1" />
+                <label className="cursor-pointer">
+                  <input
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={async (e) => {
+                      const f = e.target.files?.[0];
+                      if (!f) return;
+                      try {
+                        const fd = new FormData();
+                        fd.append("file", f);
+                        fd.append("folder", "questions");
+                        const res = await fetch("/api/admin/file-upload", { method: "POST", body: fd });
+                        if (!res.ok) { const d = await res.json(); toast.error(d.error || "Upload failed"); return; }
+                        const d = await res.json();
+                        setImageUrl(d.url);
+                        toast.success("Image uploaded");
+                      } catch { toast.error("Upload failed"); }
+                    }}
+                  />
+                  <span className="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium h-9 px-3 bg-primary text-primary-foreground cursor-pointer hover:bg-primary/90">
+                    📁 Upload
+                  </span>
+                </label>
+              </div>
+              {imageUrl && <img src={imageUrl} alt="Preview" className="mt-2 max-h-40 rounded border" />}
+            </div>
+
+            {/* Audio */}
+            <div>
+              <Label className="text-xs text-muted-foreground">Audio (for listening questions)</Label>
+              <div className="flex gap-2 mt-1">
+                <Input value={audioUrl} onChange={(e) => setAudioUrl(e.target.value)} placeholder="Upload a file or paste URL…" className="flex-1" />
+                <label className="cursor-pointer">
+                  <input
+                    type="file"
+                    accept="audio/*"
+                    className="hidden"
+                    onChange={async (e) => {
+                      const f = e.target.files?.[0];
+                      if (!f) return;
+                      try {
+                        const fd = new FormData();
+                        fd.append("file", f);
+                        fd.append("folder", "audio");
+                        const res = await fetch("/api/admin/file-upload", { method: "POST", body: fd });
+                        if (!res.ok) { const d = await res.json(); toast.error(d.error || "Upload failed"); return; }
+                        const d = await res.json();
+                        setAudioUrl(d.url);
+                        toast.success("Audio uploaded");
+                      } catch { toast.error("Upload failed"); }
+                    }}
+                  />
+                  <span className="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium h-9 px-3 bg-primary text-primary-foreground cursor-pointer hover:bg-primary/90">
+                    📁 Upload
+                  </span>
+                </label>
+              </div>
+              {audioUrl && (
+                <audio controls src={audioUrl} className="mt-2 w-full h-9" />
+              )}
+            </div>
           </div>
 
           {/* Options with click-to-select correct answer */}
@@ -417,104 +498,41 @@ function QuestionDialog({ chapters, onSaved }: { chapters: Chapter[]; onSaved: (
             <Textarea rows={2} value={explanation} onChange={(e) => setExplanation(e.target.value)} />
           </div>
 
-          {/* Image URL */}
-          <div>
-            <Label>Image (optional — for visual questions)</Label>
-            <div className="flex gap-2">
-              <Input value={imageUrl} onChange={(e) => setImageUrl(e.target.value)} placeholder="Upload a file or paste URL…" className="flex-1" />
-              <label className="cursor-pointer">
-                <input
-                  type="file"
-                  accept="image/*"
-                  className="hidden"
-                  onChange={async (e) => {
-                    const f = e.target.files?.[0];
-                    if (!f) return;
-                    try {
-                      const fd = new FormData();
-                      fd.append("file", f);
-                      fd.append("folder", "questions");
-                      const res = await fetch("/api/admin/file-upload", { method: "POST", body: fd });
-                      if (!res.ok) { const d = await res.json(); toast.error(d.error || "Upload failed"); return; }
-                      const d = await res.json();
-                      setImageUrl(d.url);
-                      toast.success("Image uploaded");
-                    } catch { toast.error("Upload failed"); }
-                  }}
-                />
-                <span className="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium h-9 px-3 bg-primary text-primary-foreground cursor-pointer hover:bg-primary/90">
-                  📁 Upload
-                </span>
-              </label>
-            </div>
-            {imageUrl && <img src={imageUrl} alt="Preview" className="mt-2 max-h-40 rounded border" />}
-          </div>
-
-          {/* Audio URL with loop settings */}
-          <div className="space-y-2 p-3 border rounded-lg bg-slate-50">
-            <Label>Audio (optional — for listening exams)</Label>
-            <div className="flex gap-2">
-              <Input value={audioUrl} onChange={(e) => setAudioUrl(e.target.value)} placeholder="Upload a file or paste URL…" className="flex-1" />
-              <label className="cursor-pointer">
-                <input
-                  type="file"
-                  accept="audio/*"
-                  className="hidden"
-                  onChange={async (e) => {
-                    const f = e.target.files?.[0];
-                    if (!f) return;
-                    try {
-                      const fd = new FormData();
-                      fd.append("file", f);
-                      fd.append("folder", "audio");
-                      const res = await fetch("/api/admin/file-upload", { method: "POST", body: fd });
-                      if (!res.ok) { const d = await res.json(); toast.error(d.error || "Upload failed"); return; }
-                      const d = await res.json();
-                      setAudioUrl(d.url);
-                      toast.success("Audio uploaded");
-                    } catch { toast.error("Upload failed"); }
-                  }}
-                />
-                <span className="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium h-9 px-3 bg-primary text-primary-foreground cursor-pointer hover:bg-primary/90">
-                  📁 Upload
-                </span>
-              </label>
-            </div>
-            {audioUrl && (
-              <div className="space-y-2">
-                <audio controls src={audioUrl} className="w-full h-8" />
-                <div className="grid grid-cols-2 gap-2">
-                  <div>
-                    <Label className="text-xs">Loop count (0 = once, -1 = infinite)</Label>
-                    <Input
-                      type="number"
-                      value={audioLoop}
-                      onChange={(e) => setAudioLoop(parseInt(e.target.value) || 0)}
-                      min={-1}
-                      max={20}
-                    />
-                  </div>
-                  <div>
-                    <Label className="text-xs">Delay between loops (seconds)</Label>
-                    <Input
-                      type="number"
-                      value={audioLoopDelay}
-                      onChange={(e) => setAudioLoopDelay(parseInt(e.target.value) || 0)}
-                      min={0}
-                      max={60}
-                    />
-                  </div>
+          {/* Audio loop settings (only shown when audio is uploaded above) */}
+          {audioUrl && (
+            <div className="space-y-2 p-3 border rounded-lg bg-slate-50">
+              <Label className="text-xs">Audio playback settings</Label>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <Label className="text-xs">Loop count (0 = once, -1 = infinite)</Label>
+                  <Input
+                    type="number"
+                    value={audioLoop}
+                    onChange={(e) => setAudioLoop(parseInt(e.target.value) || 0)}
+                    min={-1}
+                    max={20}
+                  />
                 </div>
-                <p className="text-xs text-muted-foreground">
-                  {audioLoop === -1
-                    ? "Audio will loop continuously during the question"
-                    : audioLoop === 0
-                    ? "Audio plays once"
-                    : `Audio will play ${audioLoop + 1} times with ${audioLoopDelay}s delay`}
-                </p>
+                <div>
+                  <Label className="text-xs">Delay between loops (seconds)</Label>
+                  <Input
+                    type="number"
+                    value={audioLoopDelay}
+                    onChange={(e) => setAudioLoopDelay(parseInt(e.target.value) || 0)}
+                    min={0}
+                    max={60}
+                  />
+                </div>
               </div>
-            )}
-          </div>
+              <p className="text-xs text-muted-foreground">
+                {audioLoop === -1
+                  ? "Audio will loop continuously during the question"
+                  : audioLoop === 0
+                  ? "Audio plays once"
+                  : `Audio will play ${audioLoop + 1} times with ${audioLoopDelay}s delay`}
+              </p>
+            </div>
+          )}
 
           <div className="flex justify-end gap-2 pt-2">
             <Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button>

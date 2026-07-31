@@ -41,6 +41,14 @@ model User {
   lastActiveAt DateTime?
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
+  // ─── Subscription ──────────────────────────────────────────────────────
+  // Subscribers get unlimited access to ALL exams, QBank, Batch packages.
+  // Non-subscribers: QBank + Batch = unlimited, but exams = 1 attempt only.
+  // Payment API will be integrated later — for now admin can manually
+  // subscribe users via the admin panel.
+  subscriptionType  String?  // "monthly" | "yearly" | "lifetime" | null
+  subscribedUntil   DateTime? // when the subscription expires (null = not subscribed)
+  subscriptionPrice Int?     // price paid in NPR (for records)
 
   // Relations
   sessions     Session[]
@@ -183,6 +191,11 @@ model Question {
   chapterId   String?
   type        QuestionType
   difficulty  Difficulty @default(MEDIUM)
+  title       String?    // per-question title (admin/teacher sets this; shown
+                        // at the top of each question in the exam UI)
+  isFree      Boolean  @default(false) // free (demo) questions show at the top
+                        // of batch + QBank packages so students can try before
+                        // paying. Paid questions come after free ones.
   stem        String // question text (markdown)
   options     String? // JSON array for MCQ
   correctAnswer String? // JSON: string | string[] | {match: ...}
@@ -200,6 +213,9 @@ model Question {
   // ─── New block-based exam fields ────────────────────────────────────────
   blockType   String?  // "text" | "audio" — which block this question belongs to
   blockNumber Int?     // 1-40 (1-20 text block, 21-40 audio block)
+  // Set number within a QBank test — admin groups questions into Set 1, Set 2,
+  // Set 3 etc. so the student can pick a set to practice. Default 1.
+  setNumber   Int?     @default(1)
   // Description type: "none" | "text" | "image" | "audio"
   descType    String?  @default("none")
   descText    String?  // text description (if descType = "text")
@@ -216,6 +232,10 @@ model Question {
   optionImages String? // JSON: ["url1", "url2", "url3", "url4"]
   // For audio answers: JSON array of 4 audio URLs
   optionAudios String? // JSON: ["url1", "url2", "url3", "url4"]
+  // Per-option blank/underline word — admin types a word for each option,
+  // it gets underlined in the actual option text shown to students.
+  // JSON: ["word1", "", "word3", ""] — empty string = no underline
+  optionBlanks String?
   // Which option is correct (0-3 index)
   correctOption Int?   @default(0)
   createdAt   DateTime @default(now())
@@ -256,6 +276,7 @@ model Test {
   updatedAt   DateTime @updatedAt
   // ─── New exam fields ────────────────────────────────────────────────────
   price       Float?   // optional exam price
+  priceNpr    Int?     // price in NPR (Nepali Rupees) — non-subscribers pay this
   featuredImage String? // featured image URL
   category    String?  // admin-defined category (shows in app)
   // Audio settings — controls how exam audio plays
@@ -264,10 +285,19 @@ model Test {
   // Block configuration (only for "exam" and "demo" categories)
   textBlockCount  Int? @default(20) // number of text questions (default 20)
   audioBlockCount Int? @default(20) // number of audio questions (default 20)
+  // Per-block enable/disable — admin can hide the audio or text section of an
+  // exam without deleting the questions. Disabled blocks are filtered out on
+  // the student app.
+  textBlockEnabled  Boolean? @default(true)
+  audioBlockEnabled Boolean? @default(true)
+  // Grid display mode: true = show all blocks (added + blank), false = show
+  // only blocks that contain questions. Default true (show all).
+  showAllBlocks     Boolean? @default(true)
 
   chapter     Chapter? @relation(fields: [chapterId], references: [id], onDelete: SetNull)
   items       TestItem[]
   submissions Submission[]
+  bundleItems QuestionBundleItem[]
 
   @@index([chapterId])
   @@index([isPublished, startAt])
@@ -445,6 +475,10 @@ model EyeVisionTest {
   imageUrl    String   // the image to display
   correctAnswer String // what admin typed — student must match (case-insensitive)
   category    String?  // optional grouping (e.g. "Letters", "Numbers", "Symbols")
+  // Adaptive difficulty — 1 (easiest) to 5 (hardest). Defaults to 1.
+  // When a student fails an attempt, the system serves tests at the same level
+  // or one level easier; after 2+ consecutive correct, it advances to harder tests.
+  level       Int      @default(1)
   sortOrder   Int      @default(0)
   isPublished Boolean  @default(true)
   createdBy   String?
@@ -453,6 +487,7 @@ model EyeVisionTest {
 
   @@index([isPublished])
   @@index([category])
+  @@index([level, isPublished])
 }
 
 // ─── Live Sessions — teacher creates a join code + meeting link ──────────────
@@ -785,4 +820,89 @@ model Notification {
 
   @@index([createdAt])
   @@index([category])
+}
+
+// ─── v0.5 — Teacher invite codes & password signup ───────────────────────────
+// Admin generates an invite code → shares with a teacher → teacher self-signs up
+// at /teacher with username+password+invite code (no admin intervention needed
+// for the password part). The invite is single-use and tracks the consumer.
+model TeacherInvite {
+  id          String    @id @default(cuid())
+  code        String    @unique
+  // Optional pre-filled fields the admin can seed into the signup form
+  presetName  String?
+  presetEmail String?
+  // Who created the invite
+  createdBy   String
+  // Who consumed the invite (null until used)
+  consumedBy  String?
+  consumedAt  DateTime?
+  expiresAt   DateTime
+  isRevoked   Boolean   @default(false)
+  createdAt   DateTime  @default(now())
+
+  @@index([createdBy])
+  @@index([expiresAt])
+}
+
+// ─── v0.5 — Question Bank bundles / packages ────────────────────────────────
+// A bundle groups multiple Tests (of any testCategory) into a sellable / assignable
+// package. Students can be assigned bundles by batch or individually.
+model QuestionBundle {
+  id          String   @id @default(cuid())
+  title       String
+  slug        String   @unique
+  description String?
+  // Bundle kind — drives how the student app renders it
+  // "qbank" | "batch" | "exam" | "chapter"
+  kind        String   @default("qbank")
+  coverUrl    String?
+  price       Int      @default(0) // in KRW (₩)
+  isPublished Boolean  @default(false)
+  // Optional: target batch this bundle is auto-assigned to
+  batchId     String?
+  createdBy   String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  items       QuestionBundleItem[]
+
+  @@index([kind, isPublished])
+  @@index([batchId])
+}
+
+model QuestionBundleItem {
+  id         String   @id @default(cuid())
+  bundleId   String
+  testId     String
+  sortOrder  Int      @default(0)
+  createdAt  DateTime @default(now())
+
+  bundle     QuestionBundle @relation(fields: [bundleId], references: [id], onDelete: Cascade)
+  test       Test           @relation(fields: [testId], references: [id], onDelete: Cascade)
+
+  @@unique([bundleId, testId])
+  @@index([bundleId, sortOrder])
+}
+
+// ─── v0.5 — Eye Vision adaptive difficulty ───────────────────────────────────
+// Every eye-vision attempt by a student is logged so we can serve more (or harder)
+// tests when the student makes mistakes. The "level" field lets us grade tests
+// by difficulty and adaptively pick the next test at the right level.
+model EyeVisionAttempt {
+  id         String   @id @default(cuid())
+  userId     String
+  testId     String
+  isCorrect  Boolean
+  // Snapshot of the student's answer for audit / review
+  userAnswer String?
+  // Snapshot of the test's category — lets us group attempts even if the test
+  // is later deleted
+  category   String?
+  // Difficulty level of the test at the time of the attempt (1-5, 5 = hardest)
+  level      Int      @default(1)
+  createdAt  DateTime @default(now())
+
+  @@index([userId, createdAt])
+  @@index([testId])
 }

@@ -110,7 +110,7 @@ export const createQuestionSchema = z.object({
     "MATCHING",
   ]),
   difficulty: z.enum(["EASY", "MEDIUM", "HARD"]).default("MEDIUM"),
-  stem: z.string().trim().min(3).max(5000),
+  stem: z.string().trim().max(5000).optional().or(z.literal("")),
   options: z.array(z.string().min(1).max(500)).max(10).optional(),
   correctAnswer: z.string().max(2000).optional(),
   explanation: z.string().max(5000).optional(),

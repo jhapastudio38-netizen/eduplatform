@@ -1,0 +1,892 @@
+     1→// EduPlatform — Prisma schema
+     2→// Multi-role education app: Student / Teacher / Admin
+     3→// Optimized for indexing & 100k concurrency.
+     4→
+     5→generator client {
+     6→  provider = "prisma-client-js"
+     7→}
+     8→
+     9→datasource db {
+    10→  // In production (AWS RDS) we use Postgres. In local dev we use SQLite.
+    11→  // The DATABASE_URL env var determines which — for dev it's `file:...`,
+    12→  // for prod it's `postgresql://...`. Prisma accepts either provider
+    13→  // value at runtime; the URL prefix wins.
+    14→  provider = "postgresql"
+    15→  url      = env("DATABASE_URL")
+    16→}
+    17→
+    18→// ─── Users & Auth ─────────────────────────────────────────────────────────────
+    19→
+    20→enum Role {
+    21→  STUDENT
+    22→  TEACHER
+    23→  ADMIN
+    24→}
+    25→
+    26→model User {
+    27→  id           String   @id @default(cuid())
+    28→  email        String   @unique
+    29→  phone        String?  @unique
+    30→  name         String?
+    31→  role         Role     @default(STUDENT)
+    32→  avatarUrl    String?
+    33→  isVerified   Boolean  @default(false)
+    34→  isBanned     Boolean  @default(false)
+    35→  // Credential login (teachers + admins only — students use OTP)
+    36→  passwordHash String?
+    37→  username     String?  @unique // for teacher/admin login
+    38→  // Student signup tracking
+    39→  signupMethod String?  // "otp_email" | "otp_phone" | "credentials"
+    40→  createdBy    String?  // admin who created this teacher account
+    41→  lastActiveAt DateTime?
+    42→  createdAt    DateTime @default(now())
+    43→  updatedAt    DateTime @updatedAt
+    44→
+    45→  // Relations
+    46→  sessions     Session[]
+    47→  // Student-side
+    48→  submissions  Submission[]
+    49→  enrollments  Enrollment[]
+    50→  qaQuestions  QAQuestion[]
+    51→  // Teacher-side
+    52→  liveClasses  LiveClass[]   @relation("TeacherClasses")
+    53→  taughtChapters Chapter[]   @relation("AuthorChapters")
+    54→}
+    55→
+    56→model Session {
+    57→  id           String   @id @default(cuid())
+    58→  userId       String
+    59→  token        String   @unique
+    60→  expiresAt    DateTime
+    61→  ip           String?
+    62→  userAgent    String?
+    63→  createdAt    DateTime @default(now())
+    64→
+    65→  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+    66→
+    67→  @@index([userId])
+    68→  @@index([expiresAt])
+    69→}
+    70→
+    71→model OtpCode {
+    72→  id        String   @id @default(cuid())
+    73→  contact   String // email or phone
+    74→  code      String
+    75→  purpose   String   @default("login") // login | reset | verify
+    76→  attempts  Int      @default(0)
+    77→  expiresAt DateTime
+    78→  consumed  Boolean  @default(false)
+    79→  createdAt DateTime @default(now())
+    80→
+    81→  @@index([contact, expiresAt])
+    82→}
+    83→
+    84→// ─── Content Model (Admin-managed) ────────────────────────────────────────────
+    85→
+    86→model Subject {
+    87→  id          String   @id @default(cuid())
+    88→  name        String   @unique
+    89→  slug        String   @unique
+    90→  description String?
+    91→  iconUrl     String?
+    92→  createdAt   DateTime @default(now())
+    93→
+    94→  chapters    Chapter[]
+    95→}
+    96→
+    97→model Chapter {
+    98→  id          String   @id @default(cuid())
+    99→  subjectId   String
+   100→  title       String
+   101→  slug        String
+   102→  description String?
+   103→  order       Int      @default(0)
+   104→  authorId    String?
+   105→  isPublished Boolean  @default(false)
+   106→  createdAt   DateTime @default(now())
+   107→  updatedAt   DateTime @updatedAt
+   108→
+   109→  subject     Subject  @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+   110→  author      User?    @relation("AuthorChapters", fields: [authorId], references: [id])
+   111→  lessons     Lesson[]
+   112→  tests       Test[]
+   113→  questions   Question[]
+   114→
+   115→  @@unique([subjectId, slug])
+   116→  @@index([subjectId, order])
+   117→}
+   118→
+   119→enum LessonType {
+   120→  TEXT
+   121→  VIDEO
+   122→  PDF
+   123→  INTERACTIVE
+   124→}
+   125→
+   126→model Lesson {
+   127→  id          String   @id @default(cuid())
+   128→  chapterId   String
+   129→  title       String
+   130→  slug        String
+   131→  type        LessonType @default(TEXT)
+   132→  content     String // markdown / HTML
+   133→  videoUrl    String?
+   134→  attachments String? // JSON array of file URLs
+   135→  durationMin Int      @default(10)
+   136→  order       Int      @default(0)
+   137→  isPublished Boolean  @default(false)
+   138→  createdAt   DateTime @default(now())
+   139→  updatedAt   DateTime @updatedAt
+   140→
+   141→  chapter     Chapter  @relation(fields: [chapterId], references: [id], onDelete: Cascade)
+   142→  progress    LessonProgress[]
+   143→
+   144→  @@unique([chapterId, slug])
+   145→  @@index([chapterId, order])
+   146→}
+   147→
+   148→model LessonProgress {
+   149→  id        String   @id @default(cuid())
+   150→  userId    String
+   151→  lessonId  String
+   152→  percent   Int      @default(0)
+   153→  completed Boolean  @default(false)
+   154→  updatedAt DateTime @updatedAt
+   155→
+   156→  lesson    Lesson   @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+   157→
+   158→  @@unique([userId, lessonId])
+   159→  @@index([userId])
+   160→}
+   161→
+   162→// ─── Questions, Tests, Exams ──────────────────────────────────────────────────
+   163→
+   164→enum QuestionType {
+   165→  SINGLE_CHOICE
+   166→  MULTIPLE_CHOICE
+   167→  TRUE_FALSE
+   168→  ONE_WORD
+   169→  SHORT_ANSWER
+   170→  LONG_ANSWER
+   171→  FILL_BLANK
+   172→  MATCHING
+   173→}
+   174→
+   175→enum Difficulty {
+   176→  EASY
+   177→  MEDIUM
+   178→  HARD
+   179→}
+   180→
+   181→model Question {
+   182→  id          String     @id @default(cuid())
+   183→  chapterId   String?
+   184→  type        QuestionType
+   185→  difficulty  Difficulty @default(MEDIUM)
+   186→  stem        String // question text (markdown)
+   187→  options     String? // JSON array for MCQ
+   188→  correctAnswer String? // JSON: string | string[] | {match: ...}
+   189→  explanation String?
+   190→  tags        String? // JSON array
+   191→  imageUrl    String? // Optional image for visual questions
+   192→  audioUrl    String? // Optional audio for listening questions
+   193→  audioLoop   Int      @default(0) // 0 = no loop, N = loop N times, -1 = infinite
+   194→  audioLoopDelay Int   @default(0) // delay (seconds) between loops
+   195→  aiGenerated Boolean    @default(false)
+   196→  sourceFile  String?
+   197→  // Question Bank: standalone practice questions (not tied to a test)
+   198→  inQuestionBank Boolean @default(false)
+   199→  category    String?  // e.g. "Vocabulary", "Grammar", "Listening", "Reading"
+   200→  // ─── New block-based exam fields ────────────────────────────────────────
+   201→  blockType   String?  // "text" | "audio" — which block this question belongs to
+   202→  blockNumber Int?     // 1-40 (1-20 text block, 21-40 audio block)
+   203→  // Set number within a QBank test — admin groups questions into Set 1, Set 2,
+   204→  // Set 3 etc. so the student can pick a set to practice. Default 1.
+   205→  setNumber   Int?     @default(1)
+   206→  // Description type: "none" | "text" | "image" | "audio"
+   207→  descType    String?  @default("none")
+   208→  descText    String?  // text description (if descType = "text")
+   209→  descImageUrl String? // image description (if descType = "image")
+   210→  descAudioUrl String? // audio description (if descType = "audio")
+   211→  // Question media type: "none" | "text" | "image" | "audio"
+   212→  mediaType   String?  @default("none")
+   213→  mediaText   String?  // text media (if mediaType = "text")
+   214→  mediaImageUrl String? // image media (if mediaType = "image")
+   215→  mediaAudioUrl String? // audio media (if mediaType = "audio")
+   216→  // Answer type: "text" | "image" | "audio" | "choose"
+   217→  answerType  String?  @default("text")
+   218→  // For image answers: JSON array of 4 image URLs
+   219→  optionImages String? // JSON: ["url1", "url2", "url3", "url4"]
+   220→  // For audio answers: JSON array of 4 audio URLs
+   221→  optionAudios String? // JSON: ["url1", "url2", "url3", "url4"]
+   222→  // Per-option blank/underline word — admin types a word for each option,
+   223→  // it gets underlined in the actual option text shown to students.
+   224→  // JSON: ["word1", "", "word3", ""] — empty string = no underline
+   225→  optionBlanks String?
+   226→  // Which option is correct (0-3 index)
+   227→  correctOption Int?   @default(0)
+   228→  createdAt   DateTime @default(now())
+   229→  updatedAt   DateTime @updatedAt
+   230→
+   231→  chapter     Chapter?  @relation(fields: [chapterId], references: [id], onDelete: SetNull)
+   232→  testItems   TestItem[]
+   233→
+   234→  @@index([chapterId])
+   235→  @@index([type, difficulty])
+   236→  @@index([inQuestionBank])
+   237→  @@index([category])
+   238→  @@index([blockType, blockNumber])
+   239→}
+   240→
+   241→model Test {
+   242→  id          String   @id @default(cuid())
+   243→  chapterId   String?
+   244→  title       String
+   245→  description String?
+   246→  durationMin Int      @default(30)
+   247→  isExam      Boolean  @default(false)
+   248→  examType    String   @default("REGULAR") // UBT / CBT / CHAPTER / REGULAR
+   249→  // testCategory: which tab this appears in on the app
+   250→  // exam | demo | batch | chapter | question_bank
+   251→  testCategory String  @default("exam")
+   252→  passScore   Int      @default(40)
+   253→  startAt     DateTime?
+   254→  endAt       DateTime?
+   255→  isActive    Boolean  @default(true)
+   256→  isPublished Boolean  @default(false)
+   257→  negativeMarking Float @default(0)
+   258→  shuffleQuestions Boolean @default(false)
+   259→  showResultImmediately Boolean @default(true)
+   260→  maxAttempts Int      @default(1)
+   261→  createdBy   String?
+   262→  createdAt   DateTime @default(now())
+   263→  updatedAt   DateTime @updatedAt
+   264→  // ─── New exam fields ────────────────────────────────────────────────────
+   265→  price       Float?   // optional exam price
+   266→  featuredImage String? // featured image URL
+   267→  category    String?  // admin-defined category (shows in app)
+   268→  // Audio settings — controls how exam audio plays
+   269→  audioPlayMode String? @default("single") // "single" | "double"
+   270→  audioGapSec  Int?     @default(2) // gap between audio plays in seconds
+   271→  // Block configuration (only for "exam" and "demo" categories)
+   272→  textBlockCount  Int? @default(20) // number of text questions (default 20)
+   273→  audioBlockCount Int? @default(20) // number of audio questions (default 20)
+   274→  // Per-block enable/disable — admin can hide the audio or text section of an
+   275→  // exam without deleting the questions. Disabled blocks are filtered out on
+   276→  // the student app.
+   277→  textBlockEnabled  Boolean? @default(true)
+   278→  audioBlockEnabled Boolean? @default(true)
+   279→
+   280→  chapter     Chapter? @relation(fields: [chapterId], references: [id], onDelete: SetNull)
+   281→  items       TestItem[]
+   282→  submissions Submission[]
+   283→  bundleItems QuestionBundleItem[]
+   284→
+   285→  @@index([chapterId])
+   286→  @@index([isPublished, startAt])
+   287→  @@index([examType])
+   288→  @@index([isActive])
+   289→  @@index([category])
+   290→  @@index([testCategory])
+   291→}
+   292→
+   293→model TestItem {
+   294→  id          String   @id @default(cuid())
+   295→  testId      String
+   296→  questionId  String
+   297→  points      Int      @default(1)
+   298→  order       Int      @default(0)
+   299→
+   300→  test        Test     @relation(fields: [testId], references: [id], onDelete: Cascade)
+   301→  question    Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+   302→
+   303→  @@index([testId, order])
+   304→}
+   305→
+   306→model Submission {
+   307→  id          String   @id @default(cuid())
+   308→  testId      String
+   309→  userId      String
+   310→  answers     String // JSON: { questionId: answer }
+   311→  score       Int?
+   312→  maxScore    Int?
+   313→  startedAt   DateTime @default(now())
+   314→  submittedAt DateTime?
+   315→  graded      Boolean  @default(false)
+   316→
+   317→  test        Test     @relation(fields: [testId], references: [id], onDelete: Cascade)
+   318→  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+   319→
+   320→  @@unique([testId, userId]) // one submission per test per user (configurable)
+   321→  @@index([userId, submittedAt])
+   322→}
+   323→
+   324→// ─── Live Classes (Teacher) ───────────────────────────────────────────────────
+   325→
+   326→model LiveClass {
+   327→  id          String   @id @default(cuid())
+   328→  teacherId   String
+   329→  title       String
+   330→  description String?
+   331→  subject     String?
+   332→  scheduledAt DateTime
+   333→  durationMin Int      @default(60)
+   334→  roomCode    String   @unique
+   335→  isLive      Boolean  @default(false)
+   336→  endedAt     DateTime?
+   337→  recordingUrl String?
+   338→  createdAt   DateTime @default(now())
+   339→
+   340→  teacher     User     @relation("TeacherClasses", fields: [teacherId], references: [id], onDelete: Cascade)
+   341→  attendees   LiveAttendance[]
+   342→
+   343→  @@index([teacherId, scheduledAt])
+   344→  @@index([isLive])
+   345→}
+   346→
+   347→model LiveAttendance {
+   348→  id        String   @id @default(cuid())
+   349→  classId   String
+   350→  userId    String
+   351→  joinedAt  DateTime @default(now())
+   352→  leftAt    DateTime?
+   353→
+   354→  liveClass LiveClass @relation(fields: [classId], references: [id], onDelete: Cascade)
+   355→
+   356→  @@unique([classId, userId])
+   357→  @@index([classId])
+   358→}
+   359→
+   360→// ─── Q&A (Student asks, Teacher/Admin answers) ────────────────────────────────
+   361→
+   362→model QAQuestion {
+   363→  id         String   @id @default(cuid())
+   364→  userId     String
+   365→  lessonId   String?
+   366→  title      String
+   367→  body       String
+   368→  tags       String? // JSON array
+   369→  createdAt  DateTime @default(now())
+   370→  updatedAt  DateTime @updatedAt
+   371→
+   372→  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+   373→  answers    QAAnswer[]
+   374→
+   375→  @@index([userId, createdAt])
+   376→  @@index([lessonId])
+   377→}
+   378→
+   379→model QAAnswer {
+   380→  id         String   @id @default(cuid())
+   381→  questionId String
+   382→  authorId   String
+   383→  body       String
+   384→  isAccepted Boolean  @default(false)
+   385→  createdAt  DateTime @default(now())
+   386→
+   387→  question   QAQuestion @relation(fields: [questionId], references: [id], onDelete: Cascade)
+   388→
+   389→  @@index([questionId, createdAt])
+   390→}
+   391→
+   392→// ─── Enrollments ──────────────────────────────────────────────────────────────
+   393→
+   394→model Enrollment {
+   395→  id        String   @id @default(cuid())
+   396→  userId    String
+   397→  subjectId String
+   398→  enrolledAt DateTime @default(now())
+   399→
+   400→  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+   401→
+   402→  @@unique([userId, subjectId])
+   403→  @@index([subjectId])
+   404→}
+   405→
+   406→// ─── Audit Log (Admin actions) ────────────────────────────────────────────────
+   407→
+   408→model AuditLog {
+   409→  id        String   @id @default(cuid())
+   410→  actorId   String?
+   411→  action    String
+   412→  entity    String
+   413→  entityId  String?
+   414→  metadata  String? // JSON
+   415→  ip        String?
+   416→  createdAt DateTime @default(now())
+   417→
+   418→  @@index([entity, entityId])
+   419→  @@index([createdAt])
+   420→}
+   421→
+   422→// ─── DreamKorea SmartClass — Extended schema (v0.2) ──────────────────────────
+   423→
+   424→// Books — digital library for Korean language learning
+   425→model Book {
+   426→  id          String   @id @default(cuid())
+   427→  title       String
+   428→  slug        String   @unique
+   429→  description String?  // about the book
+   430→  author      String?
+   431→  coverUrl    String?
+   432→  pdfUrl      String? // S3 URL to the PDF file
+   433→  fileSizeKb  Int?
+   434→  pageCount   Int?
+   435→  category    String? // e.g. "Beginner", "Intermediate", "Advanced", "TOPIK"
+   436→  level       String? // TOPIK 1-6
+   437→  tags        String? // JSON array
+   438→  publishedDate String? // publication date (admin-entered)
+   439→  isPublished Boolean  @default(true)
+   440→  downloads   Int      @default(0)
+   441→  createdAt   DateTime @default(now())
+   442→  updatedAt   DateTime @updatedAt
+   443→
+   444→  chapters    BookChapter[]
+   445→  progress    BookProgress[]
+   446→
+   447→  @@index([category, level])
+   448→  @@index([isPublished])
+   449→}
+   450→
+   451→// ─── Eye Vision Tests ────────────────────────────────────────────────────────
+   452→// Admin uploads an image with text/numbers. Student types what they see.
+   453→// Answer is case-insensitive compared to what admin entered.
+   454→model EyeVisionTest {
+   455→  id          String   @id @default(cuid())
+   456→  title       String
+   457→  description String?
+   458→  imageUrl    String   // the image to display
+   459→  correctAnswer String // what admin typed — student must match (case-insensitive)
+   460→  category    String?  // optional grouping (e.g. "Letters", "Numbers", "Symbols")
+   461→  // Adaptive difficulty — 1 (easiest) to 5 (hardest). Defaults to 1.
+   462→  // When a student fails an attempt, the system serves tests at the same level
+   463→  // or one level easier; after 2+ consecutive correct, it advances to harder tests.
+   464→  level       Int      @default(1)
+   465→  sortOrder   Int      @default(0)
+   466→  isPublished Boolean  @default(true)
+   467→  createdBy   String?
+   468→  createdAt   DateTime @default(now())
+   469→  updatedAt   DateTime @updatedAt
+   470→
+   471→  @@index([isPublished])
+   472→  @@index([category])
+   473→  @@index([level, isPublished])
+   474→}
+   475→
+   476→// ─── Live Sessions — teacher creates a join code + meeting link ──────────────
+   477→// Teacher generates a code, adds a Zoom/Meet link. Student enters code to
+   478→// reveal the link and credentials.
+   479→model LiveSession {
+   480→  id          String   @id @default(cuid())
+   481→  title       String
+   482→  description String?
+   483→  joinCode    String   @unique // the code students enter (e.g. "DK2024")
+   484→  meetingUrl  String   // Zoom / Google Meet / any link
+   485→  credentials String?  // optional: meeting ID, password, etc.
+   486→  hostName    String?  // teacher name
+   487→  isActive    Boolean  @default(true)
+   488→  createdBy   String?
+   489→  startedAt   DateTime?
+   490→  endedAt     DateTime?
+   491→  createdAt   DateTime @default(now())
+   492→  updatedAt   DateTime @updatedAt
+   493→
+   494→  @@index([isActive])
+   495→  @@index([joinCode])
+   496→}
+   497→
+   498→model BookChapter {
+   499→  id          String   @id @default(cuid())
+   500→  bookId      String
+   501→  title       String
+   502→  order       Int      @default(0)
+   503→  startPage   Int
+   504→  endPage     Int
+   505→  audioUrl    String? // Optional audio narration
+   506→
+   507→  book        Book     @relation(fields: [bookId], references: [id], onDelete: Cascade)
+   508→
+   509→  @@index([bookId, order])
+   510→}
+   511→
+   512→model BookProgress {
+   513→  id           String   @id @default(cuid())
+   514→  userId       String
+   515→  bookId       String
+   516→  currentPage  Int      @default(1)
+   517→  percent      Int      @default(0)
+   518→  completed    Boolean  @default(false)
+   519→  lastReadAt   DateTime @default(now())
+   520→
+   521→  book         Book     @relation(fields: [bookId], references: [id], onDelete: Cascade)
+   522→
+   523→  @@unique([userId, bookId])
+   524→  @@index([userId])
+   525→}
+   526→
+   527→// Audio lessons — listening practice for Korean language
+   528→model AudioLesson {
+   529→  id          String   @id @default(cuid())
+   530→  title       String
+   531→  slug        String   @unique
+   532→  description String?
+   533→  audioUrl    String // S3 URL to the audio file (MP3/M4A)
+   534→  durationSec Int
+   535→  transcript  String? // Full text transcript
+   536→  translation String? // English translation
+   537→  level       String? // Beginner / Intermediate / Advanced / TOPIK 1-6
+   538→  category    String? // "Conversation", "News", "Story", "Pronunciation"
+   539→  tags        String? // JSON array
+   540→  isPublished Boolean  @default(false)
+   541→  plays       Int      @default(0)
+   542→  createdAt   DateTime @default(now())
+   543→
+   544→  progress    AudioLessonProgress[]
+   545→
+   546→  @@index([level, category])
+   547→  @@index([isPublished])
+   548→}
+   549→
+   550→model AudioLessonProgress {
+   551→  id              String   @id @default(cuid())
+   552→  userId          String
+   553→  audioLessonId   String
+   554→  listenedSec     Int      @default(0)
+   555→  completed       Boolean  @default(false)
+   556→  lastListenedAt  DateTime @default(now())
+   557→
+   558→  audioLesson     AudioLesson @relation(fields: [audioLessonId], references: [id], onDelete: Cascade)
+   559→
+   560→  @@unique([userId, audioLessonId])
+   561→  @@index([userId])
+   562→}
+   563→
+   564→// Exam timer customization — admin/teacher sets duration per exam
+   565→// (Already in Test model via durationMin, but we add ExamSettings for finer control)
+   566→model ExamSettings {
+   567→  id              String   @id @default(cuid())
+   568→  testId          String   @unique
+   569→  showTimer       Boolean  @default(true)
+   570→  allowPause      Boolean  @default(false)
+   571→  allowReview     Boolean  @default(true)
+   572→  shuffleQuestions Boolean @default(false)
+   573→  passingScore    Int      @default(40) // percentage
+   574→  maxAttempts     Int      @default(1) // 0 = unlimited
+   575→  negativeMarking Float    @default(0) // points deducted per wrong answer
+   576→  scheduleStartAt DateTime?
+   577→  scheduleEndAt   DateTime?
+   578→  proctoringEnabled Boolean @default(false)
+   579→
+   580→  // We don't enforce a relation to Test here to avoid schema migrations
+   581→  // breaking — Test.durationMin remains the source of truth for duration.
+   582→}
+   583→
+   584→// Live rooms — real-time classroom sessions
+   585→model LiveRoom {
+   586→  id          String   @id @default(cuid())
+   587→  roomCode    String   @unique // 6-char code students enter to join
+   588→  hostId      String // teacher or admin who created the room
+   589→  title       String
+   590→  description String?
+   591→  subject     String?
+   592→  audioOnly   Boolean  @default(true) // audio room by default (no video)
+   593→  maxStudents Int      @default(50)
+   594→  isLive      Boolean  @default(false)
+   595→  startedAt   DateTime?
+   596→  endedAt     DateTime?
+   597→  recordingUrl String?
+   598→  createdAt   DateTime @default(now())
+   599→
+   600→  attendees   LiveRoomAttendee[]
+   601→  messages    LiveRoomMessage[]
+   602→
+   603→  @@index([hostId, createdAt])
+   604→  @@index([isLive])
+   605→}
+   606→
+   607→model LiveRoomAttendee {
+   608→  id          String   @id @default(cuid())
+   609→  roomId      String
+   610→  userId      String
+   611→  role        String   // "host" | "student"
+   612→  joinedAt    DateTime @default(now())
+   613→  leftAt      DateTime?
+   614→  handRaised  Boolean  @default(false)
+   615→  micEnabled  Boolean  @default(false)
+   616→
+   617→  room        LiveRoom @relation(fields: [roomId], references: [id], onDelete: Cascade)
+   618→
+   619→  @@unique([roomId, userId])
+   620→  @@index([roomId])
+   621→}
+   622→
+   623→model LiveRoomMessage {
+   624→  id        String   @id @default(cuid())
+   625→  roomId    String
+   626→  userId    String
+   627→  userName  String
+   628→  body      String
+   629→  isSystem  Boolean  @default(false)
+   630→  createdAt DateTime @default(now())
+   631→
+   632→  room      LiveRoom @relation(fields: [roomId], references: [id], onDelete: Cascade)
+   633→
+   634→  @@index([roomId, createdAt])
+   635→}
+   636→
+   637→// Batches — groups of students for cohort-based learning
+   638→model Batch {
+   639→  id          String   @id @default(cuid())
+   640→  name        String
+   641→  slug        String   @unique
+   642→  description String?
+   643→  teacherId   String?
+   644→  startDate   DateTime?
+   645→  endDate     DateTime?
+   646→  createdAt   DateTime @default(now())
+   647→
+   648→  students    BatchStudent[]
+   649→  exams       BatchExam[]
+   650→
+   651→  @@index([teacherId])
+   652→}
+   653→
+   654→model BatchStudent {
+   655→  id        String   @id @default(cuid())
+   656→  batchId   String
+   657→  userId    String
+   658→  joinedAt  DateTime @default(now())
+   659→
+   660→  batch     Batch    @relation(fields: [batchId], references: [id], onDelete: Cascade)
+   661→
+   662→  @@unique([batchId, userId])
+   663→  @@index([userId])
+   664→}
+   665→
+   666→model BatchExam {
+   667→  id        String   @id @default(cuid())
+   668→  batchId   String
+   669→  testId    String
+   670→  assignedAt DateTime @default(now())
+   671→  dueAt     DateTime?
+   672→
+   673→  batch     Batch    @relation(fields: [batchId], references: [id], onDelete: Cascade)
+   674→
+   675→  @@unique([batchId, testId])
+   676→}
+   677→
+   678→// User stats — aggregated progress for student dashboard
+   679→model UserStat {
+   680→  id                String   @id @default(cuid())
+   681→  userId            String   @unique
+   682→  totalExamsTaken   Int      @default(0)
+   683→  totalCorrectAnswers Int    @default(0)
+   684→  totalQuestionsAnswered Int @default(0)
+   685→  averageScore      Float    @default(0) // percentage
+   686→  studyStreakDays   Int      @default(0)
+   687→  lastStudyDate     DateTime?
+   688→  totalTimeSpentMin Int      @default(0)
+   689→  booksRead         Int      @default(0)
+   690→  audioLessonsCompleted Int  @default(0)
+   691→  badgesEarned      Int      @default(0)
+   692→  updatedAt         DateTime @updatedAt
+   693→}
+   694→
+   695→// Secure admin/teacher URL tokens — separate login URLs
+   696→// Admin URL: /admin-login/<token>  (token rotates monthly)
+   697→// Teacher URL: /teacher-login/<token>
+   698→model SecureLoginToken {
+   699→  id        String   @id @default(cuid())
+   700→  role      String   // "ADMIN" | "TEACHER"
+   701→  token     String   @unique
+   702→  createdBy String?
+   703→  expiresAt DateTime
+   704→  lastUsedAt DateTime?
+   705→  createdAt DateTime @default(now())
+   706→
+   707→  @@index([role, expiresAt])
+   708→}
+   709→
+   710→// Push notification tokens for OTA updates + exam reminders
+   711→model DeviceToken {
+   712→  id        String   @id @default(cuid())
+   713→  userId    String
+   714→  platform  String   // "android" | "ios" | "web"
+   715→  token     String
+   716→  createdAt DateTime @default(now())
+   717→  updatedAt DateTime @updatedAt
+   718→
+   719→  @@unique([userId, platform, token])
+   720→  @@index([userId])
+   721→}
+   722→
+   723→// ─── v0.4 — Home screen cards (admin-editable images) ────────────────────────
+   724→
+   725→model HomeCard {
+   726→  id          String   @id @default(cuid())
+   727→  key         String   @unique // "ubt_test", "results", "all_books", "question_bank", etc.
+   728→  title       String   // Display title (e.g. "UBT TEST")
+   729→  section     String   @default("test") // "test" | "resources" | "premium"
+   730→  imageUrl    String?  // Image URL (admin uploads)
+   731→  sortOrder   Int      @default(0)
+   732→  isActive    Boolean  @default(true)
+   733→  route       String?  // App route to navigate to when tapped (e.g. "tests", "books")
+   734→  createdAt   DateTime @default(now())
+   735→  updatedAt   DateTime @updatedAt
+   736→
+   737→  @@index([section, sortOrder])
+   738→}
+   739→
+   740→// ─── v0.3 — Video lessons, enhanced exams, media questions ─────────────────
+   741→
+   742→// Video lessons — YouTube embeds OR uploaded video files, managed by teachers/admins
+   743→model VideoLesson {
+   744→  id          String   @id @default(cuid())
+   745→  title       String
+   746→  slug        String   @unique
+   747→  description String?
+   748→  youtubeUrl  String   // Full YouTube URL or video ID
+   749→  youtubeId   String   // Extracted 11-char video ID for embed
+   750→  videoUrl    String?  // Direct video URL (uploaded to R2) — takes priority over YouTube
+   751→  videoSource String   @default("youtube") // "youtube" | "upload"
+   752→  thumbnailUrl String?
+   753→  durationMin Int      @default(10)
+   754→  level       String?  // Beginner / Intermediate / Advanced / TOPIK 1-6
+   755→  category    String?  // "Grammar", "Conversation", "TOPIK Prep", "Pronunciation"
+   756→  chapterId   String?  // Optional: link to a book chapter
+   757→  isPublished Boolean  @default(false)
+   758→  views       Int      @default(0)
+   759→  sortOrder   Int      @default(0)
+   760→  createdAt   DateTime @default(now())
+   761→  updatedAt   DateTime @updatedAt
+   762→
+   763→  progress    VideoLessonProgress[]
+   764→
+   765→  @@index([isPublished, level])
+   766→  @@index([category])
+   767→}
+   768→
+   769→model VideoLessonProgress {
+   770→  id          String   @id @default(cuid())
+   771→  userId      String
+   772→  videoLessonId String
+   773→  watchedSec  Int      @default(0)
+   774→  completed   Boolean  @default(false)
+   775→  lastWatchedAt DateTime @default(now())
+   776→
+   777→  videoLesson VideoLesson @relation(fields: [videoLessonId], references: [id], onDelete: Cascade)
+   778→
+   779→  @@unique([userId, videoLessonId])
+   780→  @@index([userId])
+   781→}
+   782→
+   783→// Exam types — UBT, TOPIK, regular practice, etc.
+   784→enum ExamType {
+   785→  REGULAR
+   786→  UBT
+   787→  TOPIK_I
+   788→  TOPIK_II
+   789→  DEMO
+   790→  CHAPTER
+   791→  BATCH
+   792→  PLACEMENT
+   793→}
+   794→
+   795→// ─── Notifications — admin broadcasts to all students ────────────────────────
+   796→model Notification {
+   797→  id          String   @id @default(cuid())
+   798→  title       String
+   799→  body        String
+   800→  category    String   @default("general") // general | exam | update | alert
+   801→  createdBy   String?
+   802→  createdAt   DateTime @default(now())
+   803→
+   804→  @@index([createdAt])
+   805→  @@index([category])
+   806→}
+   807→
+   808→// ─── v0.5 — Teacher invite codes & password signup ───────────────────────────
+   809→// Admin generates an invite code → shares with a teacher → teacher self-signs up
+   810→// at /teacher with username+password+invite code (no admin intervention needed
+   811→// for the password part). The invite is single-use and tracks the consumer.
+   812→model TeacherInvite {
+   813→  id          String    @id @default(cuid())
+   814→  code        String    @unique
+   815→  // Optional pre-filled fields the admin can seed into the signup form
+   816→  presetName  String?
+   817→  presetEmail String?
+   818→  // Who created the invite
+   819→  createdBy   String
+   820→  // Who consumed the invite (null until used)
+   821→  consumedBy  String?
+   822→  consumedAt  DateTime?
+   823→  expiresAt   DateTime
+   824→  isRevoked   Boolean   @default(false)
+   825→  createdAt   DateTime  @default(now())
+   826→
+   827→  @@index([createdBy])
+   828→  @@index([expiresAt])
+   829→}
+   830→
+   831→// ─── v0.5 — Question Bank bundles / packages ────────────────────────────────
+   832→// A bundle groups multiple Tests (of any testCategory) into a sellable / assignable
+   833→// package. Students can be assigned bundles by batch or individually.
+   834→model QuestionBundle {
+   835→  id          String   @id @default(cuid())
+   836→  title       String
+   837→  slug        String   @unique
+   838→  description String?
+   839→  // Bundle kind — drives how the student app renders it
+   840→  // "qbank" | "batch" | "exam" | "chapter"
+   841→  kind        String   @default("qbank")
+   842→  coverUrl    String?
+   843→  price       Int      @default(0) // in KRW (₩)
+   844→  isPublished Boolean  @default(false)
+   845→  // Optional: target batch this bundle is auto-assigned to
+   846→  batchId     String?
+   847→  createdBy   String?
+   848→  createdAt   DateTime @default(now())
+   849→  updatedAt   DateTime @updatedAt
+   850→
+   851→  items       QuestionBundleItem[]
+   852→
+   853→  @@index([kind, isPublished])
+   854→  @@index([batchId])
+   855→}
+   856→
+   857→model QuestionBundleItem {
+   858→  id         String   @id @default(cuid())
+   859→  bundleId   String
+   860→  testId     String
+   861→  sortOrder  Int      @default(0)
+   862→  createdAt  DateTime @default(now())
+   863→
+   864→  bundle     QuestionBundle @relation(fields: [bundleId], references: [id], onDelete: Cascade)
+   865→  test       Test           @relation(fields: [testId], references: [id], onDelete: Cascade)
+   866→
+   867→  @@unique([bundleId, testId])
+   868→  @@index([bundleId, sortOrder])
+   869→}
+   870→
+   871→// ─── v0.5 — Eye Vision adaptive difficulty ───────────────────────────────────
+   872→// Every eye-vision attempt by a student is logged so we can serve more (or harder)
+   873→// tests when the student makes mistakes. The "level" field lets us grade tests
+   874→// by difficulty and adaptively pick the next test at the right level.
+   875→model EyeVisionAttempt {
+   876→  id         String   @id @default(cuid())
+   877→  userId     String
+   878→  testId     String
+   879→  isCorrect  Boolean
+   880→  // Snapshot of the student's answer for audit / review
+   881→  userAnswer String?
+   882→  // Snapshot of the test's category — lets us group attempts even if the test
+   883→  // is later deleted
+   884→  category   String?
+   885→  // Difficulty level of the test at the time of the attempt (1-5, 5 = hardest)
+   886→  level      Int      @default(1)
+   887→  createdAt  DateTime @default(now())
+   888→
+   889→  @@index([userId, createdAt])
+   890→  @@index([testId])
+   891→}
+   892→

@@ -11,8 +11,8 @@ android {
         applicationId = "app.dreamkorea.smartclass"
         minSdk = 24
         targetSdk = 34
-        versionCode = 14
-        versionName = "2.0.0"
+        versionCode = 117
+        versionName = "9.3.0"
     }
 
     buildFeatures {
@@ -29,6 +29,11 @@ android {
         }
         debug {
             isDebuggable = true
+            // Speed up dexing for debug builds — disables the slow
+            // mergeDebugGlobalSynthetics step that took 25+ min on the
+            // GitHub Action runner. This is fine for debug builds.
+            isMinifyEnabled = false
+            isShrinkResources = false
         }
     }
 
@@ -39,6 +44,13 @@ android {
 
     kotlinOptions {
         jvmTarget = "17"
+    }
+
+    // Speed up packaging — don't split ABI for debug, use the universal APK.
+    splits {
+        abi {
+            isEnable = false
+        }
     }
 }
 

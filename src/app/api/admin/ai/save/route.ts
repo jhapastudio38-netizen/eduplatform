@@ -9,7 +9,7 @@ const schema = z.object({
   questions: z.array(z.object({
     type: z.string(),
     difficulty: z.string(),
-    stem: z.string().min(3),
+    stem: z.string().max(5000).optional().or(z.literal("")),
     options: z.array(z.string()).optional(),
     correctAnswer: z.string().optional(),
     explanation: z.string().optional(),

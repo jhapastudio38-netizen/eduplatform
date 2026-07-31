@@ -14,3 +14,4 @@
 .vscode/
 .idea/
 *.iml
+tool-results/
