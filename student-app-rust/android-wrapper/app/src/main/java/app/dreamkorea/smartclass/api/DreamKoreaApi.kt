@@ -254,6 +254,12 @@ interface DreamKoreaApi {
 
     @POST("api/student/live-sessions/join")
     suspend fun joinLiveSession(@Body body: Map<String, String>): LiveSessionJoinResponse
+
+    @GET("api/student/tests/{id}/completion-status")
+    suspend fun getCompletionStatus(@Path("id") testId: String): CompletionStatus
+
+    @GET("api/student/subscription")
+    suspend fun getSubscriptionStatus(): SubscriptionStatus
 }
 
 // ─── Notifications ────────────────────────────────────────────────────────────
@@ -320,4 +326,16 @@ data class LiveRoomJoinResponse(
     val hostName: String? = null,
     val attendeeCount: Int = 0,
     val error: String? = null
+)
+
+// ─── Completion status + subscription ────────────────────────────────────────
+data class CompletionStatus(
+    val completed: Boolean = false,
+    val isSubscribed: Boolean = false,
+    val score: Int? = null,
+    val maxScore: Int? = null,
+)
+data class SubscriptionStatus(
+    val isSubscribed: Boolean = false,
+    val expiresAt: String? = null,
 )
