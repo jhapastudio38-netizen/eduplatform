@@ -39,6 +39,11 @@ interface QuestionData {
   blockType: "text" | "audio";
   blockNumber: number;
   stem: string;
+  title: string;
+  isFree: boolean;
+  audioLoop: number;
+  audioLoopDelay: number;
+  setNumber?: number;
   descType: "none" | "text" | "image" | "audio";
   descText: string;
   descImageUrl: string;
@@ -51,6 +56,7 @@ interface QuestionData {
   options: string[];
   optionImages: string[];
   optionAudios: string[];
+  optionBlanks: string[];
   correctOption: number;
   explanation: string;
 }
@@ -60,6 +66,10 @@ function emptyQuestion(blockType: "text" | "audio", blockNumber: number): Questi
     blockType,
     blockNumber,
     stem: "",
+    title: "",
+    isFree: false,
+    audioLoop: 1,
+    audioLoopDelay: 0,
     descType: "none",
     descText: "",
     descImageUrl: "",
@@ -72,6 +82,7 @@ function emptyQuestion(blockType: "text" | "audio", blockNumber: number): Questi
     options: ["", "", "", ""],
     optionImages: ["", "", "", ""],
     optionAudios: ["", "", "", ""],
+    optionBlanks: ["", "", "", ""],
     correctOption: 0,
     explanation: "",
   };
@@ -506,6 +517,8 @@ function ExamEditor({ test, testCategory, onClose }: { test: Test; testCategory:
   const [clipboard, setClipboard] = useState<string>("");
   const [showPasteDialog, setShowPasteDialog] = useState(false);
   const [pasteCode, setPasteCode] = useState("");
+  const [showAppPasteDialog, setShowAppPasteDialog] = useState(false);
+  const [appPasteJson, setAppPasteJson] = useState("");
   const [pushing, setPushing] = useState(false);
   const [isPublished, setIsPublished] = useState(test.isPublished);
 
@@ -595,6 +608,120 @@ function ExamEditor({ test, testCategory, onClose }: { test: Test; testCategory:
 
   function pasteQuestion() {
     setShowPasteDialog(true);
+  }
+
+  // ─── Copy ALL questions — generates a single code that bundles every filled question ──
+  function copyAll() {
+    const filled = Object.values(questions).filter(q => {
+      return q.stem?.trim() || q.title?.trim() || q.mediaImageUrl?.trim() || q.mediaAudioUrl?.trim() || q.descImageUrl?.trim();
+    });
+    if (filled.length === 0) { toast.error("No questions to copy — add some first"); return; }
+    const code = `DK-ALL-${test.id.slice(-4).toUpperCase()}-${Date.now().toString(36).toUpperCase()}`;
+    const data = JSON.stringify({ code, allQuestions: filled, sourceTestId: test.id, sourceTitle: test.title });
+    const allCopies = JSON.parse(localStorage.getItem("dk_copies") || "{}");
+    allCopies[code] = data;
+    localStorage.setItem("dk_copies", JSON.stringify(allCopies));
+    setClipboard(code);
+    navigator.clipboard.writeText(code);
+    toast.success(`Copied ${filled.length} questions! Code: ${code}`);
+  }
+
+  // ─── Paste from App — decode JSON from the other DreamKorea app ──────────
+  function pasteFromApp() {
+    const raw = appPasteJson.trim();
+    if (!raw) { toast.error("Paste the JSON from your other app first"); return; }
+    try {
+      const lines = raw.split("\n").filter((l) => l.trim().startsWith("{"));
+      if (lines.length > 1) {
+        const parsed: any[] = [];
+        for (const line of lines) { try { parsed.push(JSON.parse(line)); } catch {} }
+        if (parsed.length === 0) { toast.error("No valid JSON found"); return; }
+        importMultipleFromApp(parsed);
+        return;
+      }
+      if (lines.length === 1) {
+        applyAppJsonToQuestion(JSON.parse(lines[0]));
+        return;
+      }
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) {
+        if (parsed.length === 0) { toast.error("Empty array"); return; }
+        if (parsed.length === 1) { applyAppJsonToQuestion(parsed[0]); return; }
+        importMultipleFromApp(parsed);
+        return;
+      }
+      applyAppJsonToQuestion(parsed);
+    } catch (e: any) {
+      toast.error("Invalid JSON: " + (e.message || "parse error"));
+    }
+  }
+
+  function applyAppJsonToQuestion(data: any) {
+    const q = currentQuestion;
+    const qNum = parseInt(data.question_number || "0");
+    const detectedBlockType: "text" | "audio" = qNum >= 21 ? "audio" : "text";
+    const detectedBlockNumber = qNum >= 21 ? qNum - 20 : qNum;
+    const updated: QuestionData = {
+      ...q,
+      blockType: detectedBlockType,
+      blockNumber: detectedBlockNumber || q.blockNumber,
+      stem: data.question || data.question_text || "",
+      title: data.question_number ? `Question ${data.question_number}` : q.title,
+      mediaType: (data.question_media_type || "none") as "none" | "text" | "image" | "audio",
+      mediaText: data.question_text || "",
+      mediaImageUrl: data.question_media_type === "image" ? (data.question_media || "") : (q.mediaImageUrl || ""),
+      mediaAudioUrl: data.question_media_type === "audio" ? (data.question_media || "") : (q.mediaAudioUrl || ""),
+      descType: (data.question_description_type || "none") as "none" | "text" | "image" | "audio",
+      descText: data.question_description || "",
+      options: [data.option_1 || "", data.option_2 || "", data.option_3 || "", data.option_4 || ""].filter((o) => o !== undefined),
+      correctOption: data.correct_answer ? (() => {
+        const m = data.correct_answer.match(/option\s*(\d+)/i);
+        return m ? parseInt(m[1]) - 1 : 0;
+      })() : (q.correctOption || 0),
+      answerType: (data.answer_media_type || "text") as "text" | "image" | "audio" | "choose",
+      explanation: data.answer_description || "",
+    };
+    updateQuestion(updated);
+    toast.success("Question imported from app JSON!");
+    setShowAppPasteDialog(false);
+    setAppPasteJson("");
+  }
+
+  function importMultipleFromApp(items: any[]) {
+    const next = { ...questions };
+    let imported = 0;
+    for (const data of items) {
+      const qNum = parseInt(data.question_number || "0");
+      if (!qNum) continue;
+      const blockType: "text" | "audio" = qNum >= 21 ? "audio" : "text";
+      const blockNumber = qNum >= 21 ? qNum - 20 : qNum;
+      const k = key(blockType, blockNumber);
+      const existing = next[k] || emptyQuestion(blockType, blockNumber);
+      next[k] = {
+        ...existing,
+        blockType, blockNumber,
+        stem: data.question || data.question_text || "",
+        title: `Question ${qNum}`,
+        mediaType: (data.question_media_type || "none") as "none" | "text" | "image" | "audio",
+        mediaText: data.question_text || "",
+        mediaImageUrl: data.question_media_type === "image" ? (data.question_media || "") : "",
+        mediaAudioUrl: data.question_media_type === "audio" ? (data.question_media || "") : "",
+        descType: (data.question_description_type || "none") as "none" | "text" | "image" | "audio",
+        descText: data.question_description || "",
+        options: [data.option_1 || "", data.option_2 || "", data.option_3 || "", data.option_4 || ""].filter((o) => o !== undefined),
+        correctOption: data.correct_answer ? (() => {
+          const m = data.correct_answer.match(/option\s*(\d+)/i);
+          return m ? parseInt(m[1]) - 1 : 0;
+        })() : 0,
+        answerType: (data.answer_media_type || "text") as "text" | "image" | "audio" | "choose",
+        explanation: data.answer_description || "",
+      };
+      imported++;
+    }
+    setQuestions(next);
+    toast.success(`Imported ${imported} questions! Click Save on each to persist.`);
+    setShowAppPasteDialog(false);
+    setAppPasteJson("");
   }
 
   async function pushToApp() {
@@ -833,6 +960,12 @@ function ExamEditor({ test, testCategory, onClose }: { test: Test; testCategory:
             <Button onClick={pasteQuestion} variant="outline" size="lg">
               <ClipboardPaste className="w-4 h-4 mr-1" /> Paste
             </Button>
+            <Button onClick={() => setShowAppPasteDialog(true)} variant="outline" size="lg" className="text-blue-600 hover:text-blue-700 border-blue-300 hover:border-blue-400">
+              <ClipboardPaste className="w-4 h-4 mr-1" /> Paste from App
+            </Button>
+            <Button onClick={copyAll} variant="outline" size="lg" className="text-purple-600 hover:text-purple-700">
+              <Copy className="w-4 h-4 mr-1" /> Copy All
+            </Button>
             {isSimple && (
               <Button onClick={deleteActiveQuestion} variant="outline" size="lg" className="text-rose-600 hover:text-rose-700">
                 <Trash2 className="w-4 h-4 mr-1" /> Delete
@@ -878,6 +1011,36 @@ function ExamEditor({ test, testCategory, onClose }: { test: Test; testCategory:
             <div className="flex justify-end gap-2">
               <Button variant="outline" onClick={() => setShowPasteDialog(false)}>Cancel</Button>
               <Button onClick={doPaste}>Paste</Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
+
+      {/* Paste from App dialog */}
+      {showAppPasteDialog && (
+        <Dialog open={true} onOpenChange={setShowAppPasteDialog}>
+          <DialogContent className="max-w-2xl">
+            <DialogHeader><DialogTitle>Paste from App</DialogTitle></DialogHeader>
+            <div className="space-y-3">
+              <Label>Paste the JSON from your other DreamKorea app</Label>
+              <Textarea
+                rows={10}
+                value={appPasteJson}
+                onChange={(e) => setAppPasteJson(e.target.value)}
+                placeholder={`{"question_number":"21","question":"들은 것을 고르십시오.","question_media":"https://api.dreamkoreaubttest.com/...mp3","question_media_type":"audio","option_1":"불이","option_2":"부리","option_3":"물리","option_4":"무리","correct_answer":"option 4","answer_media_type":"text"}`}
+                className="font-mono text-xs"
+              />
+              <p className="text-xs text-muted-foreground">
+                Paste the JSON code from your other app. The system will decode it and fill all fields
+                automatically. If multiple JSON objects are pasted (one per line), ALL are imported at once.
+                Question numbers 1-20 go to Reading, 21-40 go to Listening.
+              </p>
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setShowAppPasteDialog(false)}>Cancel</Button>
+              <Button onClick={pasteFromApp} className="bg-blue-600 hover:bg-blue-700">
+                <ClipboardPaste className="w-4 h-4 mr-1" /> Import
+              </Button>
             </div>
           </DialogContent>
         </Dialog>
@@ -1300,6 +1463,23 @@ function QuestionEditor({ question, onChange, blockLabel, isAudioBlock }: {
             <Label className="text-sm font-semibold">Answer Description (optional)</Label>
             <Textarea rows={2} value={question.explanation} onChange={(e) => onChange({ ...question, explanation: e.target.value })} placeholder="Explanation shown after answering…" />
           </div>
+
+          {/* Audio Play Count — shows for question audio AND option audios */}
+          {(question.mediaType === "audio" || question.answerType === "audio") && (
+            <div className="flex items-center gap-3 p-3 rounded-lg border bg-blue-50">
+              <div className="flex-1">
+                <Label className="text-sm font-semibold">Audio Play Count</Label>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  How many times the audio plays when the student taps play. Applies to both question audio and option audios.
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                <Button type="button" variant="outline" size="sm" onClick={() => onChange({ ...question, audioLoop: Math.max(1, (question.audioLoop || 1) - 1) })}>−</Button>
+                <span className="text-lg font-bold w-12 text-center">{question.audioLoop || 1}</span>
+                <Button type="button" variant="outline" size="sm" onClick={() => onChange({ ...question, audioLoop: Math.min(100, (question.audioLoop || 1) + 1) })}>+</Button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>
