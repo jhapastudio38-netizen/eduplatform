@@ -223,7 +223,7 @@ interface DreamKoreaApi {
     suspend fun getLessons(@Path("id") id: String): LessonsResponse
 
     @GET("api/student/tests")
-    suspend fun getTests(@Query("filter") filter: String = "all"): TestsResponse
+    suspend fun getTests(@Query("filter") filter: String = "all", @Query("category") category: String? = null): TestsResponse
 
     @GET("api/student/tests/{id}")
     suspend fun getTestDetail(@Path("id") id: String): TestDetailResponse
@@ -260,6 +260,15 @@ interface DreamKoreaApi {
 
     @GET("api/student/subscription")
     suspend fun getSubscriptionStatus(): SubscriptionStatus
+
+    @GET("api/student/qbank-combined")
+    suspend fun getQBankCombined(): TestDetailResponse
+
+    @GET("api/student/bundles/{bundleId}/combined")
+    suspend fun getBundleCombined(@Path("bundleId") bundleId: String): TestDetailResponse
+
+    @GET("api/student/bundles")
+    suspend fun getStudentBundles(): StudentBundlesResponse
 }
 
 // ─── Notifications ────────────────────────────────────────────────────────────
@@ -338,4 +347,22 @@ data class CompletionStatus(
 data class SubscriptionStatus(
     val isSubscribed: Boolean = false,
     val expiresAt: String? = null,
+)
+
+// ─── Student bundles ─────────────────────────────────────────────────────────
+data class StudentBundleItem(
+    val id: String,
+    val testId: String,
+    val title: String = "",
+    val durationMin: Int = 30,
+)
+data class StudentBundle(
+    val id: String,
+    val title: String,
+    val description: String? = null,
+    val kind: String = "qbank",
+    val items: List<StudentBundleItem> = emptyList(),
+)
+data class StudentBundlesResponse(
+    val bundles: List<StudentBundle> = emptyList(),
 )
