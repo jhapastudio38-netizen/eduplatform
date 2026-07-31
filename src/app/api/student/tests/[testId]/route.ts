@@ -2,122 +2,105 @@ import { NextResponse, NextRequest } from "next/server";
 import { db } from "@/lib/db";
 import { getCurrentUser } from "@/lib/session";
 
-/**
- * GET /api/student/tests/[testId]
- * Returns the test with questions & options (but NEVER the correct answers).
- * Crash-safe: wraps each field access in try-catch so missing DB columns
- * don't crash the entire API.
- */
 export async function GET(req: NextRequest, ctx: { params: Promise<{ testId: string }> }) {
   const { testId } = await ctx.params;
   const user = await getCurrentUser(req);
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   try {
-    // Use include: { question: true } to get ALL columns
-    const test = await db.test.findUnique({
-      where: { id: testId },
-      include: {
-        items: {
-          orderBy: { order: "asc" },
-          include: { question: true },
+    // Use raw SQL to avoid Prisma client type issues
+    const testRows = await db.$queryRaw`
+      SELECT * FROM "Test" WHERE id = ${testId}
+    ` as any[];
+    
+    if (!testRows || testRows.length === 0) {
+      return NextResponse.json({ error: "Not found" }, { status: 404 });
+    }
+    
+    const testRow = testRows[0];
+    
+    const itemRows = await db.$queryRaw`
+      SELECT t.*, q.* FROM "TestItem" t
+      JOIN "Question" q ON t."questionId" = q.id
+      WHERE t."testId" = ${testId}
+      ORDER BY t.order ASC
+    ` as any[];
+
+    // Parse items
+    const items = (itemRows || []).map((row: any) => {
+      const safeJson = (val: any, def: any[] = []) => {
+        if (!val) return def;
+        try { return JSON.parse(val); } catch { return def; }
+      };
+      return {
+        id: row.id,
+        order: row.order,
+        points: row.points,
+        question: {
+          id: row.questionId,
+          type: row.type,
+          difficulty: row.difficulty,
+          stem: row.stem || "",
+          title: row.title || "",
+          isFree: row.isFree || false,
+          options: safeJson(row.options, null),
+          optionBlanks: safeJson(row.optionBlanks, []),
+          imageUrl: row.imageUrl || null,
+          audioUrl: row.audioUrl || null,
+          audioLoop: row.audioLoop || 0,
+          audioLoopDelay: row.audioLoopDelay || 0,
+          blockType: row.blockType || "text",
+          blockNumber: row.blockNumber || 0,
+          descType: row.descType || "none",
+          descText: row.descText || null,
+          descImageUrl: row.descImageUrl || null,
+          descAudioUrl: row.descAudioUrl || null,
+          mediaType: row.mediaType || "none",
+          mediaText: row.mediaText || null,
+          mediaImageUrl: row.mediaImageUrl || null,
+          mediaAudioUrl: row.mediaAudioUrl || null,
+          answerType: row.answerType || "text",
+          optionImages: safeJson(row.optionImages, []),
+          optionAudios: safeJson(row.optionAudios, []),
+          correctOption: row.correctOption ?? 0,
+          explanation: row.explanation || null,
         },
-      },
+      };
     });
 
-    if (!test) return NextResponse.json({ error: "Not found" }, { status: 404 });
-
-    // Safe accessor — returns default if field doesn't exist or is null
-    const safe = (val: any, def: any = null) => (val === null || val === undefined ? def : val);
-    const safeJson = (val: any, def: any[] = []) => {
-      if (!val) return def;
-      try { return JSON.parse(val); } catch { return def; }
-    };
-
-    // Filter disabled blocks — use raw SQL result since Prisma client
-    // might not have the new columns at runtime
-    const textEnabled = (test as any).textBlockEnabled !== false;
-    const audioEnabled = (test as any).audioBlockEnabled !== false;
-    const filteredItems = test.items.filter((i) => {
-      const bt = (i.question as any).blockType || "text";
+    // Filter disabled blocks
+    const textEnabled = testRow.textBlockEnabled !== false;
+    const audioEnabled = testRow.audioBlockEnabled !== false;
+    const filteredItems = items.filter((i: any) => {
+      const bt = i.question.blockType;
       if (bt === "text" && !textEnabled) return false;
       if (bt === "audio" && !audioEnabled) return false;
       return true;
     });
 
-    // Create or fetch a draft submission (non-fatal if it fails)
-    let submissionId = "draft-" + Date.now();
-    try {
-      const draft = await db.submission.upsert({
-        where: { testId_userId: { testId, userId: user.id } },
-        create: { testId, userId: user.id, answers: "{}", maxScore: filteredItems.reduce((s, i) => s + i.points, 0) },
-        update: {},
-      });
-      submissionId = draft.id;
-    } catch (subErr) {
-      // Submission creation failed (FK constraint, etc.) — continue without it
-      console.error("Submission upsert failed:", subErr);
-    }
-
     const res = NextResponse.json({
       test: {
-        id: test.id,
-        title: test.title,
-        description: test.description,
-        durationMin: test.durationMin,
-        isExam: test.isExam,
-        passScore: test.passScore,
-        textBlockCount: safe(test.textBlockCount, 0),
-        audioBlockCount: safe(test.audioBlockCount, 0),
+        id: testRow.id,
+        title: testRow.title,
+        description: testRow.description,
+        durationMin: testRow.durationMin,
+        isExam: testRow.isExam,
+        passScore: testRow.passScore,
+        textBlockCount: testRow.textBlockCount || 0,
+        audioBlockCount: testRow.audioBlockCount || 0,
         textBlockEnabled,
         audioBlockEnabled,
-        showAllBlocks: (test as any).showAllBlocks !== false,
-        items: filteredItems.map((i) => {
-          const q = i.question as any;
-          return {
-            id: i.id,
-            order: i.order,
-            points: i.points,
-            question: {
-              id: q.id,
-              type: q.type,
-              difficulty: q.difficulty,
-              stem: safe(q.stem, ""),
-              title: safe(q.title, ""),
-              isFree: safe(q.isFree, false),
-              options: safeJson(q.options, null),
-              optionBlanks: safeJson(q.optionBlanks, []),
-              imageUrl: safe(q.imageUrl),
-              audioUrl: safe(q.audioUrl),
-              audioLoop: safe(q.audioLoop, 0),
-              audioLoopDelay: safe(q.audioLoopDelay, 0),
-              blockType: safe(q.blockType, "text"),
-              blockNumber: safe(q.blockNumber, 0),
-              descType: safe(q.descType, "none"),
-              descText: safe(q.descText),
-              descImageUrl: safe(q.descImageUrl),
-              descAudioUrl: safe(q.descAudioUrl),
-              mediaType: safe(q.mediaType, "none"),
-              mediaText: safe(q.mediaText),
-              mediaImageUrl: safe(q.mediaImageUrl),
-              mediaAudioUrl: safe(q.mediaAudioUrl),
-              answerType: safe(q.answerType, "text"),
-              optionImages: safeJson(q.optionImages, []),
-              optionAudios: safeJson(q.optionAudios, []),
-              correctOption: safe(q.correctOption, 0),
-              explanation: safe(q.explanation),
-            },
-          };
-        }),
+        showAllBlocks: testRow.showAllBlocks !== false,
+        items: filteredItems,
       },
-      submissionId,
+      submissionId: "draft-" + Date.now(),
     });
     res.headers.set("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0");
     return res;
   } catch (e: any) {
     console.error("Student test API error:", e);
     return NextResponse.json(
-      { error: `Failed to load test: ${e.message?.substring(0, 100)}` },
+      { error: `Failed to load test: ${e.message?.substring(0, 150)}` },
       { status: 500 }
     );
   }
