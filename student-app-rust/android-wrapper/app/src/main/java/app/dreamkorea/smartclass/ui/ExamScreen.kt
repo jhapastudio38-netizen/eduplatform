@@ -1649,7 +1649,7 @@ fun ReviewCard(theme: AppTheme, review: ReviewItem, questionNumber: Int = 0, sou
             if (!review.audioUrl.isNullOrBlank()) {
                 Spacer(Modifier.height(8.dp))
                 val audAbs = review.audioUrl!!.toAbsoluteUrl()
-                AudioPlayerCard(theme = theme, url = audAbs, loopCount = review.audioLoop.coerceAtLeast(1), loopDelaySec = review.audioLoopDelay, sound = sound)
+                AudioPlayerCard(theme = theme, url = audAbs, loopCount = review.audioLoop.coerceAtLeast(1), loopDelaySec = review.audioLoopDelay, sound = sound ?: rememberSoundManager())
             }
             Spacer(Modifier.height(8.dp))
 
