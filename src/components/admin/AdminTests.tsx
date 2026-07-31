@@ -681,7 +681,12 @@ function ExamEditor({ test, testCategory, onClose }: { test: Test; testCategory:
       answerType: (data.answer_media_type || "text") as "text" | "image" | "audio" | "choose",
       explanation: data.answer_description || "",
     };
-    updateQuestion(updated);
+    // Save to the CORRECT key (based on detected block type/number, not current)
+    const targetKey = key(detectedBlockType, detectedBlockNumber || q.blockNumber);
+    setQuestions((prev) => ({ ...prev, [targetKey]: updated }));
+    // Switch to the imported question's block
+    setActiveBlock(detectedBlockType);
+    setActiveNumber(detectedBlockNumber || q.blockNumber);
     toast.success("Question imported from app JSON!");
     setShowAppPasteDialog(false);
     setAppPasteJson("");
