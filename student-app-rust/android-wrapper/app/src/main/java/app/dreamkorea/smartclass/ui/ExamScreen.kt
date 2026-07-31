@@ -437,7 +437,12 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
                 }
                 val mediaAudUrl = (q.mediaAudioUrl ?: q.audioUrl)?.toAbsoluteUrl()
                 if (!mediaAudUrl.isNullOrBlank()) {
-                    AudioPlayerCard(theme = theme, url = mediaAudUrl, loopCount = q.audioLoop, loopDelaySec = q.audioLoopDelay, sound = sound)
+                    // key(q.id) ensures the AudioPlayerCard is FULLY RECREATED when
+                    // the question changes — state (playCount, disabled) resets completely.
+                    // This fixes the bug where audio was locked from the previous question.
+                    key(q.id) {
+                        AudioPlayerCard(theme = theme, url = mediaAudUrl, loopCount = q.audioLoop, loopDelaySec = q.audioLoopDelay, sound = sound)
+                    }
                 }
             }
 
@@ -505,7 +510,10 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
                                     Box(contentAlignment = Alignment.Center) { Text("${i+1}", color = if (isSelected) Color.White else Color.Black, fontSize = 10.sp, fontWeight = FontWeight.Bold) }
                                 }
                                 Spacer(Modifier.width(4.dp))
-                                AudioPlayerCard(theme = theme, url = absUrl, loopCount = 1, loopDelaySec = 0, sound = sound)
+                                // key(q.id, i) — recreate when question changes so play count resets
+                                key(q.id, i) {
+                                    AudioPlayerCard(theme = theme, url = absUrl, loopCount = q.audioLoop.coerceAtLeast(1), loopDelaySec = q.audioLoopDelay, sound = sound)
+                                }
                             }
                         }
                     }
@@ -883,6 +891,14 @@ private fun QuestionGridRef(
                     val localIdx = rowIdx * cols + colIdx
                     if (localIdx < items.size) {
                         val globalIdx = globalIndices[localIdx]
+                        // DISPLAY NUMBER: Reading shows 1-20, Listening shows 21-40
+                        // Uses blockNumber (1-20 within each block) + 20 offset for audio
+                        val q = items[localIdx].question
+                        val displayNum = if (q.blockType == "audio") {
+                            (q.blockNumber.takeIf { it > 0 } ?: (localIdx + 1)) + 20
+                        } else {
+                            q.blockNumber.takeIf { it > 0 } ?: (localIdx + 1)
+                        }
                         val isAnswered = answers.containsKey(items[localIdx].question.id)
                         val isCurrent = globalIdx == currentIdx
                         val isFilteredOut = when (filterMode) {
@@ -914,7 +930,7 @@ private fun QuestionGridRef(
                             contentAlignment = Alignment.Center
                         ) {
                             Text(
-                                "${globalIdx + 1}",
+                                "$displayNum",
                                 color = if (isAnswered) Color.White else Color(0xFF111111),
                                 fontSize = 15.sp,
                                 fontWeight = if (isCurrent) FontWeight.Bold else FontWeight.Medium,
@@ -922,8 +938,9 @@ private fun QuestionGridRef(
                         }
                     } else if (showAllBlocks) {
                         // Empty placeholder cell — perfect square
-                        val baseNum = if (globalIndices.isNotEmpty()) globalIndices[0] else 0
-                        val displayNum = baseNum + localIdx + 1
+                        // Reading placeholders: 1-20, Listening placeholders: 21-40
+                        val isAudioGrid = items.isNotEmpty() && items[0].question.blockType == "audio"
+                        val placeholderNum = if (isAudioGrid) localIdx + 21 else localIdx + 1
                         Box(
                             modifier = Modifier
                                 .weight(1f)
@@ -934,7 +951,7 @@ private fun QuestionGridRef(
                             contentAlignment = Alignment.Center
                         ) {
                             Text(
-                                "$displayNum",
+                                "$placeholderNum",
                                 color = Color(0xFFCCCCCC),
                                 fontSize = 13.sp,
                                 fontWeight = FontWeight.Normal,
@@ -991,10 +1008,11 @@ private fun LegendItem(color: Color, label: String) {
 fun AudioPlayerCard(theme: AppTheme, url: String, loopCount: Int, loopDelaySec: Int, sound: SoundManager) {
     val context = LocalContext.current
     var mediaPlayer by remember { mutableStateOf<android.media.MediaPlayer?>(null) }
-    var isPlaying by remember { mutableStateOf(false) }
-    var playCount by remember { mutableStateOf(0) }
+    // All state keyed to url — resets when URL changes (different question = fresh play count)
+    var isPlaying by remember(url) { mutableStateOf(false) }
+    var playCount by remember(url) { mutableStateOf(0) }
     // disabled = all plays used up, can't replay
-    var disabled by remember { mutableStateOf(false) }
+    var disabled by remember(url) { mutableStateOf(false) }
     val maxPlays = loopCount.coerceAtLeast(1)
     val scope = rememberCoroutineScope()
 
