@@ -347,7 +347,7 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
         Surface(modifier = Modifier.fillMaxWidth().padding(horizontal = 6.dp, vertical = 2.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text("${currentIdx + 1}. ", color = Color(0xFF003478), fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                val displayText = if (!q.title.isNullOrBlank()) q.title else q.stem.take(80)
+                val displayText = q.stem.take(80)
                 Text(displayText, color = Color(0xFF1E293B), fontSize = 11.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
                 if (q.isFree) {
                     Spacer(Modifier.width(4.dp))
@@ -364,7 +364,15 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
         Box(modifier = Modifier.fillMaxWidth().height(2.dp).background(Color.Black))
 
         // ── 3. MAIN CONTENT ── 60% question (left, scrollable) | 40% answers (right, scrollable)
+        // DreamKorea logo watermark in background (faded, centered)
         Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
+            // Watermark logo at the center of the background
+            Image(
+                painter = painterResource(id = app.dreamkorea.smartclass.R.drawable.dreamkorea_logo),
+                contentDescription = null,
+                modifier = Modifier.align(Alignment.Center).size(280.dp).alpha(0.08f),
+                contentScale = ContentScale.Fit
+            )
             Row(modifier = Modifier.fillMaxSize()) {
             // LEFT: Question content (60%) — scrollable so long titles/stems/images don't get cut
             Column(
@@ -372,16 +380,25 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
                 verticalArrangement = Arrangement.Center,
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                // Question text (stem) — shown directly, no title bar
+                // Question text (stem) — shown in a card with border/shadow, no blue title bar
                 val questionText = q.stem.ifBlank { q.mediaText ?: "" }
                 if (questionText.isNotBlank()) {
-                    Text(
-                        questionText,
-                        color = Color(0xFF1E293B),
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.Medium,
-                        modifier = Modifier.fillMaxWidth(0.92f).padding(bottom = 6.dp)
-                    )
+                    Surface(
+                        color = Color.White,
+                        shape = RoundedCornerShape(14.dp),
+                        shadowElevation = 2.dp,
+                        border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFE2E8F0)),
+                        modifier = Modifier.fillMaxWidth(0.92f)
+                    ) {
+                        Text(
+                            questionText,
+                            color = Color(0xFF1E293B),
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Medium,
+                            modifier = Modifier.padding(14.dp)
+                        )
+                    }
+                    Spacer(Modifier.height(6.dp))
                 }
                 // Media images — ContentScale.Fit (contain, not cover)
                 if (q.descType == "image" && !q.descImageUrl.isNullOrBlank()) {
