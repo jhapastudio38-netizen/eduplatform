@@ -90,11 +90,29 @@ data class QuestionDetail(
     val type: String,
     val difficulty: String,
     val stem: String,
+    val title: String? = null,
+    val isFree: Boolean = false,
     val options: List<String>?,
+    val optionBlanks: List<String> = emptyList(),
     val imageUrl: String?,
     val audioUrl: String?,
     val audioLoop: Int = 0,
-    val audioLoopDelay: Int = 0
+    val audioLoopDelay: Int = 0,
+    val blockType: String = "text",
+    val blockNumber: Int = 0,
+    val descType: String = "none",
+    val descText: String? = null,
+    val descImageUrl: String? = null,
+    val descAudioUrl: String? = null,
+    val mediaType: String = "none",
+    val mediaText: String? = null,
+    val mediaImageUrl: String? = null,
+    val mediaAudioUrl: String? = null,
+    val answerType: String = "text",
+    val optionImages: List<String> = emptyList(),
+    val optionAudios: List<String> = emptyList(),
+    val correctOption: Int = 0,
+    val explanation: String? = null
 )
 data class TestItemDetail(
     val id: String,
@@ -109,6 +127,11 @@ data class TestDetail(
     val durationMin: Int,
     val isExam: Boolean,
     val passScore: Int,
+    val textBlockCount: Int = 20,
+    val audioBlockCount: Int = 20,
+    val textBlockEnabled: Boolean = true,
+    val audioBlockEnabled: Boolean = true,
+    val showAllBlocks: Boolean = true,
     val items: List<TestItemDetail>
 )
 data class TestDetailResponse(val test: TestDetail)
@@ -355,6 +378,7 @@ data class StudentBundleItem(
     val testId: String,
     val title: String = "",
     val durationMin: Int = 30,
+    val test: TestItem? = null,
 )
 data class StudentBundle(
     val id: String,
