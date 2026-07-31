@@ -785,29 +785,37 @@ function ExamEditor({ test, testCategory, onClose }: { test: Test; testCategory:
   }
 
   function doPaste() {
-    // Read paste code directly from the input (more reliable than React state)
-    const input = document.querySelector('input[placeholder="DK-TEXT-1-XXXX"]') as HTMLInputElement;
-    const code = (input?.value || pasteCode).trim();
-    if (!code) { toast.error("Enter a paste code"); return; }
+    const code = pasteCode.trim();
+    if (!code) { toast.error("Enter a paste code first"); return; }
 
     const allCopies = JSON.parse(localStorage.getItem("dk_copies") || "{}");
     const data = allCopies[code];
-    if (!data) { toast.error("Invalid paste code"); return; }
+    if (!data) { toast.error("Invalid paste code — copy a question first"); return; }
 
-    const parsed = JSON.parse(data);
+    let parsed;
+    try {
+      parsed = JSON.parse(data);
+    } catch {
+      toast.error("Corrupted paste data — try copying again");
+      return;
+    }
 
     // Handle Copy All (multiple questions) vs Copy (single question)
-    if (parsed.allQuestions && Array.isArray(parsed.allQuestions)) {
-      // Copy All — paste ALL questions
+    if (parsed.allQuestions && Array.isArray(parsed.allQuestions) && parsed.allQuestions.length > 0) {
+      // Copy All — paste ALL questions to their correct blocks
       const next = { ...questions };
       let count = 0;
       for (const q of parsed.allQuestions) {
-        const k = key(q.blockType, q.blockNumber);
-        next[k] = { ...q };
+        const bt = q.blockType || "text";
+        const bn = q.blockNumber || (count + 1);
+        const k = key(bt, bn);
+        next[k] = { ...q, blockType: bt, blockNumber: bn };
         count++;
       }
       setQuestions(next);
-      toast.success(`Pasted ${count} questions — click Save on each to persist`);
+      setShowPasteDialog(false);
+      setPasteCode("");
+      toast.success(`Pasted ${count} questions! Switch blocks to see them. Click Save on each to persist.`);
     } else if (parsed.question) {
       // Copy single question — paste into current slot
       const q = parsed.question as QuestionData;
@@ -817,13 +825,12 @@ function ExamEditor({ test, testCategory, onClose }: { test: Test; testCategory:
         blockNumber: activeNumber,
       };
       updateQuestion(pasted);
+      setShowPasteDialog(false);
+      setPasteCode("");
       toast.success("Question pasted — click Save to persist");
     } else {
-      toast.error("Invalid paste data format");
+      toast.error("Unknown paste data format");
     }
-
-    setShowPasteDialog(false);
-    setPasteCode("");
   }
 
   const blockNumbers = activeBlock === "text"
@@ -1067,15 +1074,7 @@ function ExamEditor({ test, testCategory, onClose }: { test: Test; testCategory:
             </div>
             <div className="flex justify-end gap-2">
               <Button variant="outline" onClick={() => setShowAppPasteDialog(false)}>Cancel</Button>
-              <Button onClick={() => {
-                const ta = document.querySelector('textarea[class*="font-mono"]') as HTMLTextAreaElement;
-                const val = ta?.value?.trim() || appPasteJson.trim();
-                if (val) {
-                  pasteFromApp(val);
-                } else {
-                  toast.error("Paste the JSON from your other app first");
-                }
-              }} className="bg-blue-600 hover:bg-blue-700">
+              <Button onClick={() => pasteFromApp(appPasteJson)} className="bg-blue-600 hover:bg-blue-700">
                 <ClipboardPaste className="w-4 h-4 mr-1" /> Import
               </Button>
             </div>
