@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -9,8 +9,60 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { FileText, Plus, Trash2, Clock, Upload, X, ChevronRight, ChevronLeft, Image as ImageIcon, Headphones, CheckCircle2, Copy, ClipboardPaste, Save } from "lucide-react";
+import { FileText, Plus, Trash2, Clock, Upload, X, ChevronRight, ChevronLeft, Image as ImageIcon, Headphones, CheckCircle2, Copy, ClipboardPaste, Save, CloudOff, Cloud, RotateCcw, Loader2 } from "lucide-react";
 import { toast } from "sonner";
+
+// ─── Draft persistence (localStorage) ────────────────────────────────────────
+// Auto-saves in-progress question drafts keyed by testId so a misclick,
+// accidental close, or page refresh doesn't lose work. Drafts are cleared
+// after a successful "Push to App".
+
+const DRAFT_PREFIX = "dk_draft_test_";
+
+function loadDraft(testId: string): Record<string, QuestionData> | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = localStorage.getItem(DRAFT_PREFIX + testId);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== "object") return null;
+    // Sanity-check: only keep entries that look like questions
+    const out: Record<string, QuestionData> = {};
+    for (const [k, v] of Object.entries(parsed)) {
+      if (v && typeof v === "object" && "blockType" in (v as any)) {
+        out[k] = v as QuestionData;
+      }
+    }
+    return out;
+  } catch {
+    return null;
+  }
+}
+
+function saveDraft(testId: string, questions: Record<string, QuestionData>) {
+  if (typeof window === "undefined") return;
+  try {
+    // Only persist entries that have a stem (skip pure-empty placeholders)
+    const filtered: Record<string, QuestionData> = {};
+    for (const [k, q] of Object.entries(questions)) {
+      if (q && (q.stem?.trim() || q.descText?.trim() || q.mediaImageUrl || q.mediaAudioUrl || q.descImageUrl || (q.options && q.options.some((o) => o?.trim())))) {
+        filtered[k] = q;
+      }
+    }
+    localStorage.setItem(DRAFT_PREFIX + testId, JSON.stringify(filtered));
+  } catch {
+    // localStorage might be full or disabled — fail silently
+  }
+}
+
+function clearDraft(testId: string) {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.removeItem(DRAFT_PREFIX + testId);
+  } catch {
+    // ignore
+  }
+}
 
 interface Test {
   id: string;
@@ -30,6 +82,11 @@ interface Test {
   audioGapSec?: number | null;
   textBlockCount?: number | null;
   audioBlockCount?: number | null;
+  // Per-block enable flags — admin can hide the audio or text section
+  textBlockEnabled?: boolean | null;
+  audioBlockEnabled?: boolean | null;
+  // Grid display mode: true = show all blocks (added + blank), false = only created
+  showAllBlocks?: boolean | null;
   _count?: { items: number };
 }
 
@@ -38,6 +95,11 @@ interface QuestionData {
   testItemId?: string;
   blockType: "text" | "audio";
   blockNumber: number;
+  setNumber?: number;
+  title: string; // per-question title shown to students at top of question
+  isFree: boolean; // free (demo) questions show at the top of QBank/Batch
+  audioLoop: number; // 1=play once, 2=play twice, N=play N times (audio questions only)
+  audioLoopDelay: number; // delay between loops in seconds
   stem: string;
   descType: "none" | "text" | "image" | "audio";
   descText: string;
@@ -51,6 +113,7 @@ interface QuestionData {
   options: string[];
   optionImages: string[];
   optionAudios: string[];
+  optionBlanks: string[];
   correctOption: number;
   explanation: string;
 }
@@ -59,6 +122,11 @@ function emptyQuestion(blockType: "text" | "audio", blockNumber: number): Questi
   return {
     blockType,
     blockNumber,
+    setNumber: 1,
+    title: "",
+    isFree: false,
+    audioLoop: 1,
+    audioLoopDelay: 0,
     stem: "",
     descType: "none",
     descText: "",
@@ -72,6 +140,7 @@ function emptyQuestion(blockType: "text" | "audio", blockNumber: number): Questi
     options: ["", "", "", ""],
     optionImages: ["", "", "", ""],
     optionAudios: ["", "", "", ""],
+    optionBlanks: ["", "", "", ""],
     correctOption: 0,
     explanation: "",
   };
@@ -111,6 +180,78 @@ export function AdminTests({ testCategory = "exam" }: { testCategory?: string })
     await fetch(`/api/admin/tests/${test.id}`, { method: "DELETE" });
     toast.success("Exam deleted");
     load();
+  }
+
+  // ─── Make a Copy / Duplicate ──────────────────────────────────────────────
+  // Two modes:
+  //   • "Duplicate" — clone the whole test (all questions) into a target
+  //     category. New test starts as a draft. Optionally add to a package.
+  //   • "Copy Set" — only for question_bank tests. Copies one Set's questions
+  //     into another existing test.
+  const [duplicateTarget, setDuplicateTarget] = useState<Test | null>(null);
+
+  async function doDuplicate(test: Test, newTitle: string, targetCategory: string, bundleId?: string) {
+    try {
+      const res = await fetch(`/api/admin/tests/${test.id}/copy`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          mode: "duplicate",
+          targetCategory,
+          newTitle: newTitle.trim() || `${test.title} (Copy)`,
+        }),
+      });
+      const d = await res.json();
+      if (!res.ok) { toast.error(d.error || "Duplicate failed"); return; }
+      // Optionally add the new test to a package
+      if (bundleId && d.test?.id) {
+        try {
+          await fetch(`/api/admin/bundles/${bundleId}/items`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ testId: d.test.id }),
+          });
+          toast.success(`Duplicated as "${d.test.title}" and added to package`);
+        } catch {
+          toast.success(`Duplicated as "${d.test.title}" (package add failed — try manually)`);
+        }
+      } else {
+        toast.success(`Duplicated as "${d.test.title}"`);
+      }
+      setDuplicateTarget(null);
+      load();
+    } catch (e: any) {
+      toast.error("Duplicate failed: " + (e?.message || "network error"));
+    }
+  }
+
+  // Copy a single Set (only for question_bank tests) into another existing test
+  async function copySet(test: Test) {
+    const setNumberStr = prompt(`Which Set to copy? (1-10)`, "1");
+    if (!setNumberStr) return;
+    const setNumber = parseInt(setNumberStr, 10);
+    if (isNaN(setNumber) || setNumber < 1) { toast.error("Invalid set number"); return; }
+    const targetTestId = prompt(
+      `Paste the destination test ID (you can copy it from the URL of any test you open in the admin panel):`,
+      "",
+    );
+    if (!targetTestId?.trim()) { toast.error("Target test ID is required"); return; }
+    try {
+      const res = await fetch(`/api/admin/tests/${test.id}/copy`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          mode: "copySet",
+          setNumber,
+          targetTestId: targetTestId.trim(),
+        }),
+      });
+      const d = await res.json();
+      if (!res.ok) { toast.error(d.error || "Copy set failed"); return; }
+      toast.success(`Copied ${d.copiedCount} questions from Set ${setNumber}`);
+    } catch (e: any) {
+      toast.error("Copy set failed: " + (e?.message || "network error"));
+    }
   }
 
   return (
@@ -156,12 +297,111 @@ export function AdminTests({ testCategory = "exam" }: { testCategory?: string })
                   <p className="text-sm text-muted-foreground mt-1">
                     {t.durationMin} min • {t._count?.items || 0} questions • Pass {t.passScore}%
                   </p>
+                  {/* Block enable/disable toggles — only for exam & demo categories */}
+                  {(testCategory === "exam" || testCategory === "demo") && (
+                    <div className="flex items-center gap-1 mt-2" onClick={(e) => e.stopPropagation()}>
+                      <button
+                        onClick={async () => {
+                          const next = !(t.textBlockEnabled !== false);
+                          try {
+                            await fetch(`/api/admin/tests/${t.id}/toggle-block`, {
+                              method: "POST",
+                              headers: { "Content-Type": "application/json" },
+                              body: JSON.stringify({ block: "text", enabled: next }),
+                            });
+                            toast.success(next ? "Text block enabled" : "Text block disabled — students won't see text questions");
+                            load();
+                          } catch {
+                            toast.error("Failed to toggle");
+                          }
+                        }}
+                        className={`text-[10px] px-2 py-0.5 rounded-full border transition-colors ${
+                          t.textBlockEnabled !== false
+                            ? "bg-emerald-50 text-emerald-700 border-emerald-300"
+                            : "bg-slate-100 text-slate-500 border-slate-300 line-through"
+                        }`}
+                        title="Toggle text block visibility for students"
+                      >
+                        Text
+                      </button>
+                      <button
+                        onClick={async () => {
+                          const next = !(t.audioBlockEnabled !== false);
+                          try {
+                            await fetch(`/api/admin/tests/${t.id}/toggle-block`, {
+                              method: "POST",
+                              headers: { "Content-Type": "application/json" },
+                              body: JSON.stringify({ block: "audio", enabled: next }),
+                            });
+                            toast.success(next ? "Audio block enabled" : "Audio block disabled — students won't see audio questions");
+                            load();
+                          } catch {
+                            toast.error("Failed to toggle");
+                          }
+                        }}
+                        className={`text-[10px] px-2 py-0.5 rounded-full border transition-colors ${
+                          t.audioBlockEnabled !== false
+                            ? "bg-amber-50 text-amber-700 border-amber-300"
+                            : "bg-slate-100 text-slate-500 border-slate-300 line-through"
+                        }`}
+                        title="Toggle audio block visibility for students"
+                      >
+                        Audio
+                      </button>
+                      <button
+                        onClick={async () => {
+                          const next = !(t.showAllBlocks !== false);
+                          try {
+                            await fetch(`/api/admin/tests/${t.id}/toggle-grid-mode`, {
+                              method: "POST",
+                              headers: { "Content-Type": "application/json" },
+                              body: JSON.stringify({ showAllBlocks: next }),
+                            });
+                            toast.success(next ? "Showing all blocks (added + blank)" : "Showing only created blocks");
+                            load();
+                          } catch {
+                            toast.error("Failed to toggle grid mode");
+                          }
+                        }}
+                        className={`text-[10px] px-2 py-0.5 rounded-full border transition-colors ${
+                          t.showAllBlocks !== false
+                            ? "bg-blue-50 text-blue-700 border-blue-300"
+                            : "bg-violet-50 text-violet-700 border-violet-300"
+                        }`}
+                        title="Toggle grid display mode: show all blocks vs only created ones"
+                      >
+                        {t.showAllBlocks !== false ? "All blocks" : "Created only"}
+                      </button>
+                    </div>
+                  )}
                 </div>
                 <div className="flex items-center gap-2">
                   {t.isPublished ? (
                     <Badge className="bg-green-500">🚀 Live</Badge>
                   ) : (
                     <Badge variant="secondary">📝 Draft</Badge>
+                  )}
+                  {/* Make a Copy — duplicate whole test into another category */}
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="text-blue-600 hover:text-blue-700"
+                    title="Duplicate this test into another category"
+                    onClick={(e) => { e.stopPropagation(); setDuplicateTarget(t); }}
+                  >
+                    <Copy className="w-4 h-4 mr-1" /> Duplicate
+                  </Button>
+                  {/* Copy Set — only for question_bank tests */}
+                  {t.testCategory === "question_bank" && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="text-purple-600 hover:text-purple-700"
+                      title="Copy one Set's questions into another test"
+                      onClick={(e) => { e.stopPropagation(); copySet(t); }}
+                    >
+                      Copy Set
+                    </Button>
                   )}
                   <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); deleteTest(t); }}>
                     <Trash2 className="w-4 h-4 text-red-500" />
@@ -190,7 +430,107 @@ export function AdminTests({ testCategory = "exam" }: { testCategory?: string })
           onClose={() => { setEditingTest(null); load(); }}
         />
       )}
+
+      {duplicateTarget && (
+        <DuplicateDialog
+          test={duplicateTarget}
+          onClose={() => setDuplicateTarget(null)}
+          onDuplicate={(title, cat, bundleId) => doDuplicate(duplicateTarget, title, cat, bundleId)}
+        />
+      )}
     </div>
+  );
+}
+
+// ─── Duplicate Dialog ────────────────────────────────────────────────────────
+// Shows when admin clicks "Duplicate" on a test card. Lets the admin:
+//   • Edit the new title (default: "{Original} (Copy)")
+//   • Pick the target category (exam / demo / batch / chapter / question_bank)
+//   • Optionally pick a package to add the duplicated test to
+// Questions, blocks, and all other settings stay the same.
+function DuplicateDialog({ test, onClose, onDuplicate }: {
+  test: Test;
+  onClose: () => void;
+  onDuplicate: (newTitle: string, targetCategory: string, bundleId?: string) => void;
+}) {
+  const [newTitle, setNewTitle] = useState(`${test.title} (Copy)`);
+  const [targetCategory, setTargetCategory] = useState(test.testCategory || "exam");
+  const [bundles, setBundles] = useState<{ id: string; title: string; kind: string }[]>([]);
+  const [selectedBundle, setSelectedBundle] = useState<string>("");
+  const [busy, setBusy] = useState(false);
+
+  // Load bundles so the admin can pick one to add the duplicate to
+  useEffect(() => {
+    fetch("/api/admin/bundles")
+      .then((r) => r.json())
+      .then((d) => setBundles(d.bundles || []))
+      .catch(() => {});
+  }, []);
+
+  async function handleDuplicate() {
+    setBusy(true);
+    onDuplicate(newTitle, targetCategory, selectedBundle || undefined);
+    setBusy(false);
+  }
+
+  return (
+    <Dialog open={true} onOpenChange={(v) => { if (!v) onClose(); }}>
+      <DialogContent className="max-w-lg">
+        <DialogHeader>
+          <DialogTitle>Duplicate Test</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-4">
+          <div>
+            <Label className="text-sm font-semibold">New Title</Label>
+            <Input
+              value={newTitle}
+              onChange={(e) => setNewTitle(e.target.value)}
+              className="h-12 text-base"
+              autoFocus
+            />
+            <p className="text-xs text-muted-foreground mt-1">
+              Questions, blocks, audio settings, and all other content stay the same. Only the title changes.
+            </p>
+          </div>
+          <div>
+            <Label className="text-sm font-semibold">Target Category</Label>
+            <Select value={targetCategory} onValueChange={setTargetCategory}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="exam">Exam</SelectItem>
+                <SelectItem value="demo">Demo Exam</SelectItem>
+                <SelectItem value="batch">Batch Exam</SelectItem>
+                <SelectItem value="chapter">Chapter Exam</SelectItem>
+                <SelectItem value="question_bank">Question Bank</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div>
+            <Label className="text-sm font-semibold">Add to Package (optional)</Label>
+            <Select value={selectedBundle} onValueChange={setSelectedBundle}>
+              <SelectTrigger><SelectValue placeholder="— None —" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="">— None —</SelectItem>
+                {bundles.map((b) => (
+                  <SelectItem key={b.id} value={b.id}>
+                    {b.title} ({b.kind})
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground mt-1">
+              If you pick a package, the duplicated test is automatically added to it.
+            </p>
+          </div>
+        </div>
+        <div className="flex justify-end gap-2 pt-2 border-t">
+          <Button variant="outline" onClick={onClose}>Cancel</Button>
+          <Button onClick={handleDuplicate} disabled={busy || !newTitle.trim()}>
+            {busy ? "Duplicating…" : <><Copy className="w-4 h-4 mr-1" /> Duplicate</>}
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -313,11 +653,13 @@ function CreateExamDialog({ open, testCategory, onOpenChange, onCreated }: {
     examType: "UBT",
     category: "",
     price: "",
+    priceNpr: "",
     featuredImage: "",
     audioPlayMode: "single" as "single" | "double",
     audioGapSec: 2,
     textBlockCount: isSimple ? 0 : 20,
     audioBlockCount: isSimple ? 0 : 20,
+    showAllBlocks: true, // true = show all blocks (added + blank), false = only created
   });
 
   async function uploadFile(file: File, folder: string): Promise<string> {
@@ -342,11 +684,13 @@ function CreateExamDialog({ open, testCategory, onOpenChange, onCreated }: {
         testCategory,
         category: form.category || undefined,
         price: form.price ? parseFloat(form.price) : undefined,
+        priceNpr: form.priceNpr ? parseInt(form.priceNpr) : undefined,
         featuredImage: form.featuredImage || undefined,
         audioPlayMode: form.audioPlayMode,
         audioGapSec: form.audioGapSec,
         textBlockCount: form.textBlockCount,
         audioBlockCount: form.audioBlockCount,
+        showAllBlocks: form.showAllBlocks,
         isExam: true,
         isPublished: false, // Draft — admin pushes when ready
       };
@@ -402,8 +746,9 @@ function CreateExamDialog({ open, testCategory, onOpenChange, onCreated }: {
               <Input type="number" value={form.durationMin} onChange={(e) => setForm(f => ({ ...f, durationMin: parseInt(e.target.value) || 60 }))} min={1} />
             </div>
             <div>
-              <Label className="text-sm font-semibold">Price (optional)</Label>
-              <Input type="number" value={form.price} onChange={(e) => setForm(f => ({ ...f, price: e.target.value }))} placeholder="0 = free" min={0} />
+              <Label className="text-sm font-semibold">Price NPR (Rs.)</Label>
+              <Input type="number" value={form.priceNpr} onChange={(e) => setForm(f => ({ ...f, priceNpr: e.target.value }))} placeholder="0 = free" min={0} />
+              <p className="text-xs text-muted-foreground mt-1">Non-subscribers pay this. Subscribers get it free.</p>
             </div>
           </div>
 
@@ -474,6 +819,43 @@ function CreateExamDialog({ open, testCategory, onOpenChange, onCreated }: {
             </div>
           )}
 
+          {/* Grid Display Mode — only for exam & demo */}
+          {!isSimple && (
+            <div className="space-y-2">
+              <Label className="text-sm font-semibold">Grid Display Mode</Label>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setForm(f => ({ ...f, showAllBlocks: true }))}
+                  className={`flex-1 px-3 py-2 rounded-lg text-xs font-medium border transition-colors ${
+                    form.showAllBlocks
+                      ? "bg-blue-50 text-blue-700 border-blue-300"
+                      : "bg-white text-slate-600 border-slate-300 hover:bg-slate-50"
+                  }`}
+                >
+                  Show all blocks
+                  <span className="block text-[10px] font-normal text-muted-foreground mt-0.5">
+                    Students see added + blank blocks
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setForm(f => ({ ...f, showAllBlocks: false }))}
+                  className={`flex-1 px-3 py-2 rounded-lg text-xs font-medium border transition-colors ${
+                    !form.showAllBlocks
+                      ? "bg-blue-50 text-blue-700 border-blue-300"
+                      : "bg-white text-slate-600 border-slate-300 hover:bg-slate-50"
+                  }`}
+                >
+                  Show only created
+                  <span className="block text-[10px] font-normal text-muted-foreground mt-0.5">
+                    Students see only blocks with questions
+                  </span>
+                </button>
+              </div>
+            </div>
+          )}
+
           {/* Simple mode hint */}
           {isSimple && (
             <div className="p-4 border rounded-lg bg-emerald-50 border-emerald-200 text-sm text-emerald-800">
@@ -499,15 +881,28 @@ function CreateExamDialog({ open, testCategory, onOpenChange, onCreated }: {
 
 function ExamEditor({ test, testCategory, onClose }: { test: Test; testCategory: string; onClose: () => void }) {
   const isSimple = SIMPLE_CATEGORIES.includes(testCategory);
+  const isQBank = testCategory === "question_bank";
   const [activeBlock, setActiveBlock] = useState<"text" | "audio">("text");
   const [activeNumber, setActiveNumber] = useState(1);
+  // Set selector — only used for question_bank tests. Default Set 1.
+  const [activeSet, setActiveSet] = useState(1);
   const [questions, setQuestions] = useState<Record<string, QuestionData>>({});
   const [loading, setLoading] = useState(true);
   const [clipboard, setClipboard] = useState<string>("");
   const [showPasteDialog, setShowPasteDialog] = useState(false);
   const [pasteCode, setPasteCode] = useState("");
+  const [showAppPasteDialog, setShowAppPasteDialog] = useState(false);
+  const [appPasteJson, setAppPasteJson] = useState("");
   const [pushing, setPushing] = useState(false);
   const [isPublished, setIsPublished] = useState(test.isPublished);
+  const [saving, setSaving] = useState(false);
+  const [justSaved, setJustSaved] = useState(false);
+  // Draft auto-save state
+  const [draftSavedAt, setDraftSavedAt] = useState<number | null>(null);
+  const [hasDraft, setHasDraft] = useState(false);
+  const draftTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Track unsaved server-side question IDs so we can show "unsaved changes"
+  const [dirty, setDirty] = useState(false);
 
   const textCount = test.textBlockCount || (isSimple ? 0 : 20);
   const audioCount = test.audioBlockCount || (isSimple ? 0 : 20);
@@ -516,35 +911,110 @@ function ExamEditor({ test, testCategory, onClose }: { test: Test; testCategory:
     return `${blockType}-${blockNumber}`;
   }
 
+  // A question is "filled" if it has ANY of: stem (text), title, or media.
+  // Text/title are OPTIONAL — media alone is enough to count as a question.
+  function isFilled(q: QuestionData | undefined | null): boolean {
+    if (!q) return false;
+    return !!(
+      q.stem?.trim() ||
+      q.title?.trim() ||
+      q.mediaImageUrl?.trim() ||
+      q.mediaAudioUrl?.trim() ||
+      q.descImageUrl?.trim()
+    );
+  }
+
+  // Merge fetched server questions with any locally-saved draft.
+  // Draft wins when present (it represents the most recent edit), but we
+  // keep the server's `id` / `testItemId` so saving updates the same row
+  // instead of creating a duplicate.
   useEffect(() => {
-    // Load existing questions
-    fetch(`/api/admin/tests/${test.id}/questions`)
-      .then((r) => r.json())
-      .then((d) => {
-        const map: Record<string, QuestionData> = {};
+    let cancelled = false;
+    (async () => {
+      const serverMap: Record<string, QuestionData> = {};
+      try {
+        const r = await fetch(`/api/admin/tests/${test.id}/questions`);
+        const d = await r.json();
         for (const q of d.questions || []) {
-          map[key(q.blockType, q.blockNumber)] = q;
+          serverMap[key(q.blockType, q.blockNumber)] = q;
         }
-        setQuestions(map);
-      })
-      .finally(() => setLoading(false));
+      } catch {
+        // network error — fall through to draft-only
+      }
+      if (cancelled) return;
+
+      const draft = loadDraft(test.id);
+      if (draft) {
+        const merged: Record<string, QuestionData> = { ...serverMap };
+        for (const [k, dq] of Object.entries(draft)) {
+          const sq = serverMap[k];
+          merged[k] = sq
+            ? { ...sq, ...dq, id: sq.id, testItemId: sq.testItemId }
+            : dq;
+        }
+        setQuestions(merged);
+        setHasDraft(true);
+        toast.info("Restored unsaved draft from this browser.", { duration: 3500 });
+      } else {
+        setQuestions(serverMap);
+      }
+      setLoading(false);
+    })();
+    return () => { cancelled = true; };
   }, [test.id]);
 
+  // Debounced auto-save to localStorage whenever questions change.
+  // We also set a "dirty" flag so the editor can warn on close.
   const currentKey = key(activeBlock, activeNumber);
   const currentQuestion = questions[currentKey] || emptyQuestion(activeBlock, activeNumber);
 
+  const scheduleDraftSave = useCallback((next: Record<string, QuestionData>) => {
+    if (draftTimer.current) clearTimeout(draftTimer.current);
+    draftTimer.current = setTimeout(() => {
+      saveDraft(test.id, next);
+      setDraftSavedAt(Date.now());
+      setDirty(true);
+    }, 600); // 600ms debounce — feels instant but avoids thrashing on every keystroke
+  }, [test.id]);
+
   function updateQuestion(q: QuestionData) {
-    setQuestions((prev) => ({ ...prev, [currentKey]: q }));
+    setQuestions((prev) => {
+      const next = { ...prev, [currentKey]: q };
+      scheduleDraftSave(next);
+      return next;
+    });
+  }
+
+  // Force an immediate save (used after successful server-saves)
+  function flushDraft() {
+    if (draftTimer.current) clearTimeout(draftTimer.current);
+    // Save whatever's in state right now
+    setQuestions((prev) => {
+      saveDraft(test.id, prev);
+      return prev;
+    });
   }
 
   async function saveQuestion() {
     const q = currentQuestion;
-    if (!q.stem.trim()) { toast.error("Question text required"); return; }
+    // Question text (stem) AND title are both OPTIONAL — media alone is enough.
+    // Just need at least ONE of: stem, title, image, or audio.
+    if (!isFilled(q)) {
+      toast.error("Add at least a title, question text, image, or audio");
+      return;
+    }
+    setSaving(true);
+    setJustSaved(false);
     try {
       // Strip fields the API doesn't expect
       const payload = {
         blockType: q.blockType,
         blockNumber: q.blockNumber,
+        setNumber: q.setNumber ?? activeSet,
+        title: q.title || "",
+        isFree: q.isFree || false,
+        audioLoop: q.audioLoop || 1,
+        audioLoopDelay: q.audioLoopDelay || 0,
         stem: q.stem,
         descType: q.descType,
         descText: q.descText || "",
@@ -557,6 +1027,7 @@ function ExamEditor({ test, testCategory, onClose }: { test: Test; testCategory:
         answerType: q.answerType,
         options: q.options || [],
         optionImages: q.optionImages || [],
+        optionBlanks: q.optionBlanks || [],
         optionAudios: q.optionAudios || [],
         correctOption: q.correctOption,
         explanation: q.explanation || "",
@@ -566,20 +1037,38 @@ function ExamEditor({ test, testCategory, onClose }: { test: Test; testCategory:
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
-      const d = await res.json();
+      // Safe JSON parse — API may return empty body on crash
+      let d: any;
+      try {
+        const text = await res.text();
+        d = text ? JSON.parse(text) : {};
+      } catch {
+        d = {};
+      }
       if (!res.ok) {
         toast.error(d.error || `Save failed (HTTP ${res.status})`);
         return;
       }
+      // Update local state with the saved question (preserves id/testItemId)
+      setQuestions((prev) => ({
+        ...prev,
+        [currentKey]: { ...q, id: d.question?.id, testItemId: d.question?.testItemId ?? q.testItemId },
+      }));
+      // Persist the updated state to the draft so a refresh still works
+      setTimeout(() => flushDraft(), 50);
       toast.success(`Question ${q.blockNumber} saved`);
+      setSaving(false);
+      setJustSaved(true);
+      setTimeout(() => setJustSaved(false), 2000);
     } catch (e: any) {
       toast.error("Save failed: " + (e.message || "network error"));
+      setSaving(false);
     }
   }
 
   function copyQuestion() {
     const q = currentQuestion;
-    if (!q.stem.trim()) { toast.error("Nothing to copy — question is empty"); return; }
+    if (!isFilled(q)) { toast.error("Nothing to copy — question is empty"); return; }
     // Generate a copy code — admin can define their own prefix
     const code = `DK-${activeBlock.toUpperCase()}-${q.blockNumber}-${Date.now().toString(36).toUpperCase()}`;
     const data = JSON.stringify({ code, question: q });
@@ -593,26 +1082,212 @@ function ExamEditor({ test, testCategory, onClose }: { test: Test; testCategory:
     toast.success(`Copied! Code: ${code}`);
   }
 
+  // ─── Copy ALL questions in this test ──────────────────────────────────────
+  // Generates a single code that bundles every filled question. The admin
+  // can paste the code into another test to bulk-import all questions at once.
+  function copyAll() {
+    const filled = Object.values(questions).filter(q => isFilled(q));
+    if (filled.length === 0) { toast.error("No questions to copy — add some first"); return; }
+    const code = `DK-ALL-${test.id.slice(-4).toUpperCase()}-${Date.now().toString(36).toUpperCase()}`;
+    const data = JSON.stringify({ code, allQuestions: filled, sourceTestId: test.id, sourceTitle: test.title });
+    const allCopies = JSON.parse(localStorage.getItem("dk_copies") || "{}");
+    allCopies[code] = data;
+    localStorage.setItem("dk_copies", JSON.stringify(allCopies));
+    navigator.clipboard.writeText(code);
+    toast.success(`Copied ${filled.length} questions! Code: ${code}`);
+  }
+
   function pasteQuestion() {
     setShowPasteDialog(true);
   }
 
+  // ─── Paste from App — decode JSON from the other DreamKorea app ──────────
+  // Parses JSON like:
+  //   {"question_number":"21","question":"...","question_media":"https://...mp3",
+  //    "question_media_type":"audio","option_1":"...","option_2":"...",
+  //    "correct_answer":"option 4","answer_media_type":"text"}
+  // Maps it to our QuestionData fields and fills the current question.
+  function pasteFromApp() {
+    const raw = appPasteJson.trim();
+    if (!raw) { toast.error("Paste the JSON from your other app first"); return; }
+    try {
+      // Parse ALL JSON objects from the input (one per line or separated)
+      const lines = raw.split("\n").filter((l) => l.trim().startsWith("{"));
+      if (lines.length > 1) {
+        // Multiple questions — import all at once
+        const parsed: any[] = [];
+        for (const line of lines) {
+          try { parsed.push(JSON.parse(line)); } catch {}
+        }
+        if (parsed.length === 0) { toast.error("No valid JSON found"); return; }
+        importMultipleFromApp(parsed);
+        return;
+      }
+      // Single question
+      if (lines.length === 1) {
+        applyAppJsonToQuestion(JSON.parse(lines[0]));
+        return;
+      }
+      // Try parsing as array or single object
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) {
+        if (parsed.length === 0) { toast.error("Empty array"); return; }
+        if (parsed.length === 1) { applyAppJsonToQuestion(parsed[0]); return; }
+        importMultipleFromApp(parsed);
+        return;
+      }
+      applyAppJsonToQuestion(parsed);
+    } catch (e: any) {
+      toast.error("Invalid JSON: " + (e.message || "parse error"));
+    }
+  }
+
+  // Import multiple questions — auto-assigns block numbers based on question_number
+  function importMultipleFromApp(items: any[]) {
+    setQuestions((prev) => {
+      const next = { ...prev };
+      let imported = 0;
+      for (const data of items) {
+        const qNum = parseInt(data.question_number || "0");
+        if (!qNum) continue;
+        // 1-20 = text block, 21-40 = audio block
+        const blockType: "text" | "audio" = qNum >= 21 ? "audio" : "text";
+        const blockNumber = qNum >= 21 ? qNum - 20 : qNum;
+        const k = key(blockType, blockNumber);
+        const existing = next[k] || emptyQuestion(blockType, blockNumber);
+        next[k] = {
+          ...existing,
+          blockType,
+          blockNumber,
+          stem: data.question || data.question_text || "",
+          title: `Question ${qNum}`,
+          mediaType: (data.question_media_type || "none") as "none" | "text" | "image" | "audio",
+          mediaText: data.question_text || "",
+          mediaImageUrl: data.question_media_type === "image" ? (data.question_media || "") : "",
+          mediaAudioUrl: data.question_media_type === "audio" ? (data.question_media || "") : "",
+          descType: (data.question_description_type || "none") as "none" | "text" | "image" | "audio",
+          descText: data.question_description || "",
+          options: [data.option_1 || "", data.option_2 || "", data.option_3 || "", data.option_4 || ""].filter((o) => o !== undefined),
+          correctOption: data.correct_answer ? (() => {
+            const m = data.correct_answer.match(/option\s*(\d+)/i);
+            return m ? parseInt(m[1]) - 1 : 0;
+          })() : 0,
+          answerType: (data.answer_media_type || "text") as "text" | "image" | "audio" | "choose",
+          explanation: data.answer_description || "",
+        };
+        imported++;
+      }
+      scheduleDraftSave(next);
+      toast.success(`Imported ${imported} questions! Click Save on each to persist.`);
+      return next;
+    });
+    setShowAppPasteDialog(false);
+    setAppPasteJson("");
+  }
+
+  function applyAppJsonToQuestion(data: any) {
+    setQuestions((prev) => {
+      const q = prev[currentKey] || emptyQuestion(activeBlock, activeNumber);
+      // Auto-detect blockType from question_number:
+      // 1-20 = Reading (text block), 21-40 = Listening (audio block)
+      const qNum = parseInt(data.question_number || "0");
+      const detectedBlockType: "text" | "audio" = qNum >= 21 ? "audio" : "text";
+      const detectedBlockNumber = qNum >= 21 ? qNum - 20 : qNum;
+      const updated: QuestionData = {
+        ...q,
+        // Auto-set blockType + blockNumber based on question_number
+        blockType: detectedBlockType,
+        blockNumber: detectedBlockNumber || q.blockNumber,
+        stem: data.question || data.question_text || "",
+        title: data.question_number ? `Question ${data.question_number}` : q.title,
+        // Question media
+        mediaType: (data.question_media_type || "none") as "none" | "text" | "image" | "audio",
+        mediaText: data.question_text || "",
+        mediaImageUrl: data.question_media_type === "image" ? (data.question_media || "") : (q.mediaImageUrl || ""),
+        mediaAudioUrl: data.question_media_type === "audio" ? (data.question_media || "") : (q.mediaAudioUrl || ""),
+        // Description
+        descType: (data.question_description_type || "none") as "none" | "text" | "image" | "audio",
+        descText: data.question_description || "",
+        // Options
+        options: [
+          data.option_1 || "",
+          data.option_2 || "",
+          data.option_3 || "",
+          data.option_4 || "",
+        ].filter((o) => o !== undefined),
+        // Correct answer — map "option 1" → index 0, "option 4" → index 3
+        correctOption: data.correct_answer ? (() => {
+          const m = data.correct_answer.match(/option\s*(\d+)/i);
+          return m ? parseInt(m[1]) - 1 : 0;
+        })() : (q.correctOption || 0),
+        // Answer type
+        answerType: (data.answer_media_type || "text") as "text" | "image" | "audio" | "choose",
+        // Explanation
+        explanation: data.answer_description || "",
+      };
+      const next = { ...prev, [currentKey]: updated };
+      scheduleDraftSave(next);
+      return next;
+    });
+    toast.success("Question imported from app JSON!");
+    setShowAppPasteDialog(false);
+    setAppPasteJson("");
+  }
+
+  // ─── Paste All questions from a Copy-All code ─────────────────────────────
+  // Reads the code from localStorage, parses the bundled questions, and
+  // imports them into the current test with new block numbers (so they don't
+  // overwrite existing questions). The setNumber is preserved from source.
+  function doPasteAll(code: string) {
+    const allCopies = JSON.parse(localStorage.getItem("dk_copies") || "{}");
+    const data = allCopies[code.trim()];
+    if (!data) { toast.error("Invalid code"); return; }
+    const parsed = JSON.parse(data);
+    if (!parsed.allQuestions || !Array.isArray(parsed.allQuestions)) {
+      toast.error("This code is for a single question, not a bulk copy. Use Paste instead.");
+      return;
+    }
+    const incoming: QuestionData[] = parsed.allQuestions;
+    // Find the max block number currently in use so we append rather than overwrite
+    const used = new Set(Object.values(questions).map(q => q.blockNumber));
+    let nextNum = 1;
+    while (used.has(nextNum)) nextNum++;
+    const newQuestions = { ...questions };
+    for (const q of incoming) {
+      const k = key(q.blockType, nextNum);
+      newQuestions[k] = {
+        ...q,
+        blockNumber: nextNum,
+        // Preserve setNumber from source, default to current activeSet
+        setNumber: q.setNumber ?? activeSet,
+      };
+      nextNum++;
+    }
+    setQuestions(newQuestions);
+    scheduleDraftSave(newQuestions);
+    toast.success(`Pasted ${incoming.length} questions — click Save on each to persist`);
+    setShowPasteDialog(false);
+    setPasteCode("");
+  }
+
   async function pushToApp() {
-    // Count questions that have been filled in
-    const filledQuestions = Object.values(questions).filter(q => q.stem.trim());
+    const filledQuestions = Object.values(questions).filter(q => isFilled(q));
     if (filledQuestions.length === 0) {
       toast.error("Cannot push: add at least one question first");
       return;
     }
 
-    // Auto-save any unsaved questions before pushing
     setPushing(true);
     try {
-      // Save all filled questions that haven't been saved yet
+      // Auto-save ALL filled questions — check each response
+      let saveErrors = 0;
       for (const q of filledQuestions) {
         const payload = {
           blockType: q.blockType,
           blockNumber: q.blockNumber,
+          setNumber: q.setNumber ?? activeSet,
+          title: q.title || "",
+          isFree: q.isFree || false,
           stem: q.stem,
           descType: q.descType,
           descText: q.descText || "",
@@ -625,25 +1300,43 @@ function ExamEditor({ test, testCategory, onClose }: { test: Test; testCategory:
           answerType: q.answerType,
           options: q.options || [],
           optionImages: q.optionImages || [],
+        optionBlanks: q.optionBlanks || [],
           optionAudios: q.optionAudios || [],
           correctOption: q.correctOption,
           explanation: q.explanation || "",
         };
-        await fetch(`/api/admin/tests/${test.id}/questions`, {
+        const saveRes = await fetch(`/api/admin/tests/${test.id}/questions`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload),
         });
+        if (!saveRes.ok) {
+          const errData = await saveRes.json().catch(() => ({}));
+          console.error(`Question ${q.blockNumber} save failed:`, errData);
+          saveErrors++;
+        }
+      }
+
+      if (saveErrors > 0) {
+        toast.error(`${saveErrors} question(s) failed to save. Check console for details.`);
+        setPushing(false);
+        return;
       }
 
       // Now publish
       const res = await fetch(`/api/admin/tests/${test.id}/publish`, { method: "POST" });
-      const d = await res.json();
+      // Safe JSON parse — API may return empty body on crash
+      let d: any;
+      try { const t = await res.text(); d = t ? JSON.parse(t) : {}; } catch { d = {}; }
       if (!res.ok) {
         toast.error(d.error || `Push failed (HTTP ${res.status})`);
         return;
       }
       setIsPublished(true);
+      // Clear the local draft — everything is now safely on the server
+      clearDraft(test.id);
+      setHasDraft(false);
+      setDirty(false);
       toast.success(d.message || "Pushed to app — students can now see this exam");
     } catch (e: any) {
       toast.error("Push failed: " + (e.message || "network error"));
@@ -652,11 +1345,50 @@ function ExamEditor({ test, testCategory, onClose }: { test: Test; testCategory:
     }
   }
 
+  function discardDraft() {
+    if (!hasDraft) return;
+    if (!confirm("Discard local draft? Only unsaved changes from this browser will be removed — server-side questions stay intact.")) return;
+    clearDraft(test.id);
+    setHasDraft(false);
+    setDirty(false);
+    // Reload from server
+    setLoading(true);
+    fetch(`/api/admin/tests/${test.id}/questions`)
+      .then((r) => r.json())
+      .then((d) => {
+        const map: Record<string, QuestionData> = {};
+        for (const q of d.questions || []) {
+          map[key(q.blockType, q.blockNumber)] = q;
+        }
+        setQuestions(map);
+      })
+      .finally(() => setLoading(false));
+    toast.success("Draft discarded");
+  }
+
+  function attemptClose() {
+    if (dirty && !isPublished) {
+      // Confirm — but reassure the user that the draft is auto-saved
+      if (!confirm("You have unsaved changes on this browser. They will be auto-saved as a draft — you can come back later. Close anyway?")) {
+        return;
+      }
+      // Final flush of the draft just in case the debounce hasn't fired
+      flushDraft();
+    }
+    onClose();
+  }
+
   function doPaste() {
     const allCopies = JSON.parse(localStorage.getItem("dk_copies") || "{}");
     const data = allCopies[pasteCode.trim()];
     if (!data) { toast.error("Invalid paste code"); return; }
     const parsed = JSON.parse(data);
+    // If this is a bulk-copy code (allQuestions array), paste all into this test
+    if (parsed.allQuestions && Array.isArray(parsed.allQuestions)) {
+      doPasteAll(pasteCode.trim());
+      return;
+    }
+    // Single-question paste
     const q = parsed.question as QuestionData;
     // Paste into current slot — keep current block number/type
     const pasted: QuestionData = {
@@ -676,7 +1408,7 @@ function ExamEditor({ test, testCategory, onClose }: { test: Test; testCategory:
 
   // Simple-mode list of saved questions (sorted by block number)
   const simpleList = Object.values(questions)
-    .filter((q) => q.stem.trim())
+    .filter((q) => isFilled(q))
     .sort((a, b) => a.blockNumber - b.blockNumber);
 
   function addQuestion() {
@@ -702,6 +1434,8 @@ function ExamEditor({ test, testCategory, onClose }: { test: Test; testCategory:
     const next = { ...questions };
     delete next[k];
     setQuestions(next);
+    // Persist the deletion in the draft
+    saveDraft(test.id, next);
     // If it was persisted server-side, also delete via API
     if (q.testItemId) {
       fetch(`/api/admin/tests/${test.id}/questions/${q.testItemId}`, { method: "DELETE" }).catch(() => {});
@@ -716,15 +1450,61 @@ function ExamEditor({ test, testCategory, onClose }: { test: Test; testCategory:
   }
 
   return (
-    <Dialog open={true} onOpenChange={(v) => { if (!v) onClose(); }}>
+    <Dialog open={true} onOpenChange={(v) => { if (!v) attemptClose(); }}>
       <DialogContent className="sm:max-w-5xl max-h-[95vh] overflow-hidden flex flex-col">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
+          <DialogTitle className="flex items-center gap-2 flex-wrap">
             <span>{test.title}</span>
             <Badge variant="outline">{test.examType}</Badge>
             {test.category && <Badge variant="secondary">{test.category}</Badge>}
+            {/* Draft status pill */}
+            {hasDraft && (
+              <Badge
+                variant="outline"
+                className="ml-1 gap-1 text-amber-700 border-amber-300 bg-amber-50"
+                title={draftSavedAt ? `Auto-saved ${new Date(draftSavedAt).toLocaleTimeString()}` : "Auto-saved in this browser"}
+              >
+                <Cloud className="w-3 h-3" /> Draft saved
+                <button
+                  className="ml-1 hover:text-amber-900"
+                  onClick={discardDraft}
+                  title="Discard local draft"
+                >
+                  <RotateCcw className="w-3 h-3" />
+                </button>
+              </Badge>
+            )}
+            {!hasDraft && dirty && (
+              <Badge variant="outline" className="ml-1 gap-1 text-slate-600 border-slate-300">
+                <CloudOff className="w-3 h-3" /> Synced
+              </Badge>
+            )}
           </DialogTitle>
         </DialogHeader>
+
+        {/* Set selector — only for question_bank tests. Lets admin organize
+            questions into Set 1, 2, 3, 4, 5 within a single QBank test. */}
+        {isQBank && (
+          <div className="flex items-center gap-2 p-3 bg-purple-50 border border-purple-200 rounded-lg">
+            <span className="text-sm font-semibold text-purple-800">Set:</span>
+            {[1, 2, 3, 4, 5].map((s) => (
+              <button
+                key={s}
+                onClick={() => setActiveSet(s)}
+                className={`px-3 py-1 rounded-md text-sm font-medium transition-colors ${
+                  activeSet === s
+                    ? "bg-purple-600 text-white"
+                    : "bg-white text-purple-700 border border-purple-300 hover:bg-purple-100"
+                }`}
+              >
+                Set {s}
+              </button>
+            ))}
+            <span className="text-xs text-purple-600 ml-2">
+              Questions you add now go into Set {activeSet}. Use "Copy Set" on the test card to copy this set into another test.
+            </span>
+          </div>
+        )}
 
         {/* Block tabs — only for exam & demo */}
         {!isSimple && (
@@ -751,7 +1531,7 @@ function ExamEditor({ test, testCategory, onClose }: { test: Test; testCategory:
           <div className="grid grid-cols-10 gap-1 max-h-24 overflow-y-auto p-1 bg-slate-50 rounded">
             {blockNumbers.map((num) => {
               const k = key(activeBlock, num);
-              const isFilled = questions[k] && questions[k].stem.trim();
+              const isQFilled = isFilled(questions[k]);
               const isActive = num === activeNumber;
               return (
                 <button
@@ -759,7 +1539,7 @@ function ExamEditor({ test, testCategory, onClose }: { test: Test; testCategory:
                   onClick={() => setActiveNumber(num)}
                   className={`h-8 rounded text-xs font-medium transition-colors ${
                     isActive ? "bg-primary text-primary-foreground" :
-                    isFilled ? "bg-green-100 text-green-700 border border-green-300" :
+                    isQFilled ? "bg-green-100 text-green-700 border border-green-300" :
                     "bg-white border hover:bg-slate-100"
                   }`}
                 >
@@ -824,14 +1604,38 @@ function ExamEditor({ test, testCategory, onClose }: { test: Test; testCategory:
         {/* Action buttons — Done, Copy, Paste, Delete (simple), Push to App */}
         <div className="flex items-center justify-between border-t pt-3">
           <div className="flex gap-2 flex-wrap">
-            <Button onClick={saveQuestion} variant="default" size="lg">
-              <Save className="w-4 h-4 mr-1" /> Save
+            <Button
+              onClick={saveQuestion}
+              variant={justSaved ? "outline" : "default"}
+              size="lg"
+              disabled={saving}
+              className={justSaved ? "border-green-500 text-green-600" : ""}
+            >
+              {saving ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-1 animate-spin" /> Saving…
+                </>
+              ) : justSaved ? (
+                <>
+                  <CheckCircle2 className="w-4 h-4 mr-1 text-green-600" /> Saved!
+                </>
+              ) : (
+                <>
+                  <Save className="w-4 h-4 mr-1" /> Save
+                </>
+              )}
             </Button>
             <Button onClick={copyQuestion} variant="outline" size="lg">
               <Copy className="w-4 h-4 mr-1" /> Copy
             </Button>
             <Button onClick={pasteQuestion} variant="outline" size="lg">
               <ClipboardPaste className="w-4 h-4 mr-1" /> Paste
+            </Button>
+            <Button onClick={() => setShowAppPasteDialog(true)} variant="outline" size="lg" className="text-blue-600 hover:text-blue-700 border-blue-300 hover:border-blue-400">
+              <ClipboardPaste className="w-4 h-4 mr-1" /> Paste from App
+            </Button>
+            <Button onClick={copyAll} variant="outline" size="lg" className="text-purple-600 hover:text-purple-700">
+              <Copy className="w-4 h-4 mr-1" /> Copy All
             </Button>
             {isSimple && (
               <Button onClick={deleteActiveQuestion} variant="outline" size="lg" className="text-rose-600 hover:text-rose-700">
@@ -882,6 +1686,36 @@ function ExamEditor({ test, testCategory, onClose }: { test: Test; testCategory:
           </DialogContent>
         </Dialog>
       )}
+
+      {/* Paste from App dialog — decode JSON from the other DreamKorea app */}
+      {showAppPasteDialog && (
+        <Dialog open={true} onOpenChange={setShowAppPasteDialog}>
+          <DialogContent className="max-w-2xl">
+            <DialogHeader><DialogTitle>Paste from App</DialogTitle></DialogHeader>
+            <div className="space-y-3">
+              <Label>Paste the JSON from your other DreamKorea app</Label>
+              <Textarea
+                rows={10}
+                value={appPasteJson}
+                onChange={(e) => setAppPasteJson(e.target.value)}
+                placeholder={`{"question_number":"21","question":"들은 것을 고르십시오.","question_media":"https://api.dreamkoreaubttest.com/...mp3","question_media_type":"audio","option_1":"불이","option_2":"부리","option_3":"물리","option_4":"무리","correct_answer":"option 4","answer_media_type":"text"}`}
+                className="font-mono text-xs"
+              />
+              <p className="text-xs text-muted-foreground">
+                Paste the JSON code from your other app. The system will decode it and fill all fields
+                (title, question, media URL, options, correct answer) automatically. If multiple JSON objects
+                are pasted, only the first one is used.
+              </p>
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setShowAppPasteDialog(false)}>Cancel</Button>
+              <Button onClick={pasteFromApp} className="bg-blue-600 hover:bg-blue-700">
+                <ClipboardPaste className="w-4 h-4 mr-1" /> Import
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
     </Dialog>
   );
 }
@@ -921,6 +1755,7 @@ function QuestionEditor({ question, onChange, blockLabel, isAudioBlock }: {
     const [uploading, setUploading] = useState(false);
     const [dragOver, setDragOver] = useState(false);
     const [localPreview, setLocalPreview] = useState<string>(""); // instant blob URL
+    const [localUrl, setLocalUrl] = useState<string>(""); // manually-pasted/dragged URL (instant display)
 
     // Compress images before upload (max 800px, 80% quality) — much faster
     async function compressImage(file: File): Promise<File> {
@@ -973,8 +1808,8 @@ function QuestionEditor({ question, onChange, blockLabel, isAudioBlock }: {
       }
     }
 
-    // The display URL: local preview during upload, real URL after
-    const displayUrl = uploading && localPreview ? localPreview : url;
+    // The display URL: local preview during upload, OR a manually-set URL, OR the prop URL
+    const displayUrl = uploading && localPreview ? localPreview : (url || localUrl);
 
     return (
       <div className="space-y-2">
@@ -993,7 +1828,7 @@ function QuestionEditor({ question, onChange, blockLabel, isAudioBlock }: {
                 )}
                 {!uploading && (
                   <button
-                    onClick={() => { onClear(); setLocalPreview(""); }}
+                    onClick={() => { onClear(); setLocalPreview(""); setLocalUrl(""); }}
                     className="absolute -top-2 -right-2 w-7 h-7 bg-red-500 text-white rounded-full flex items-center justify-center text-sm font-bold hover:bg-red-600 shadow"
                     title="Remove"
                   >✕</button>
@@ -1012,7 +1847,7 @@ function QuestionEditor({ question, onChange, blockLabel, isAudioBlock }: {
                 )}
                 {!uploading && (
                   <button
-                    onClick={() => { onClear(); setLocalPreview(""); }}
+                    onClick={() => { onClear(); setLocalPreview(""); setLocalUrl(""); }}
                     className="absolute -top-2 -right-2 w-7 h-7 bg-red-500 text-white rounded-full flex items-center justify-center text-sm font-bold hover:bg-red-600 shadow"
                     title="Remove"
                   >✕</button>
@@ -1021,16 +1856,39 @@ function QuestionEditor({ question, onChange, blockLabel, isAudioBlock }: {
             )}
           </div>
         ) : (
-          /* ─── Upload zone (drag-drop + click) ─── */
+          /* ─── Upload zone (drag-drop files + drag-drop/paste URLs + click) ─── */
           <div
             onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
             onDragLeave={() => setDragOver(false)}
             onDrop={(e) => {
               e.preventDefault();
               setDragOver(false);
+              // Check for dragged URL (text/uri-list or text/plain)
+              const draggedText = e.dataTransfer.getData("text/uri-list") || e.dataTransfer.getData("text/plain") || "";
+              if (draggedText.trim().startsWith("http")) {
+                // It's a URL — use it directly (no upload needed)
+                const cleanUrl = draggedText.trim();
+                setLocalUrl(cleanUrl); // instant display
+                onUpload(cleanUrl); // save to parent state
+                toast.success("URL added");
+                return;
+              }
+              // Otherwise treat as file
               const f = e.dataTransfer.files?.[0];
               if (f) handleFile(f);
             }}
+            onPaste={(e) => {
+              // Paste a URL from clipboard
+              const pastedText = e.clipboardData.getData("text") || "";
+              if (pastedText.trim().startsWith("http")) {
+                const cleanUrl = pastedText.trim();
+                setLocalUrl(cleanUrl); // instant display
+                onUpload(cleanUrl); // save to parent state
+                toast.success("URL pasted");
+                e.preventDefault();
+              }
+            }}
+            tabIndex={0}
             className={`flex flex-col items-center justify-center w-full h-28 border-2 border-dashed rounded-lg cursor-pointer transition-all ${
               dragOver ? "border-primary bg-primary/10 scale-[1.02]" : "border-slate-300 hover:border-primary hover:bg-slate-50"
             }`}
@@ -1041,9 +1899,52 @@ function QuestionEditor({ question, onChange, blockLabel, isAudioBlock }: {
               e.target.value = "";
             }} />
             <Upload className="w-7 h-7 text-slate-400 mb-1" />
-            <span className="text-xs text-slate-500 font-medium">
-              {dragOver ? "Drop here!" : `Drag & drop or click to upload ${type}`}
+            <span className="text-xs text-slate-500 font-medium text-center px-2">
+              {dragOver ? "Drop here!" : `Drag & drop file, or paste URL`}
             </span>
+            <span className="text-[10px] text-slate-400 mt-0.5">
+              e.g. https://api.dreamkoreaubttest.com/...mp3
+            </span>
+          </div>
+        )}
+
+        {/* URL input — paste/type a URL directly */}
+        {!url && (
+          <div className="flex gap-2">
+            <Input
+              placeholder="Or paste URL here…"
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  const val = (e.target as HTMLInputElement).value.trim();
+                  if (val.startsWith("http")) {
+                    setLocalUrl(val); // instant display
+                    onUpload(val); // save to parent state
+                    toast.success("URL added");
+                    (e.target as HTMLInputElement).value = "";
+                  }
+                }
+              }}
+              className="text-xs"
+            />
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              onClick={(e) => {
+                const input = (e.currentTarget.previousElementSibling as HTMLInputElement);
+                const val = input?.value?.trim();
+                if (val && val.startsWith("http")) {
+                  setLocalUrl(val); // instant display
+                  onUpload(val); // save to parent state
+                  toast.success("URL added");
+                  input.value = "";
+                } else {
+                  toast.error("Enter a valid URL (starts with http)");
+                }
+              }}
+            >
+              Add URL
+            </Button>
           </div>
         )}
       </div>
@@ -1115,12 +2016,56 @@ function QuestionEditor({ question, onChange, blockLabel, isAudioBlock }: {
             />
           )}
 
-          {/* Question text */}
+          {/* Question Title — optional. Shows at the TOP of the question in the exam. */}
           <div className="space-y-1">
-            <Label className="text-sm font-semibold">Question <span className="text-red-500">*</span></Label>
-            <Textarea rows={3} value={question.stem} onChange={(e) => onChange({ ...question, stem: e.target.value })} placeholder="What is the question?" className="text-base" />
+            <Label className="text-sm font-semibold">Title <span className="text-muted-foreground font-normal">(optional — shows at top)</span></Label>
+            <Input
+              value={question.title || ""}
+              onChange={(e) => onChange({ ...question, title: e.target.value })}
+              placeholder="e.g. Question 1 — Vocabulary, or 어휘 (Vocabulary)"
+              className="text-base"
+              maxLength={200}
+            />
           </div>
 
+          {/* Question — optional. Shows BELOW the title. Admin can type the
+              question text here, or use Question Media (image/audio) instead. */}
+          <div className="space-y-1">
+            <Label className="text-sm font-semibold">Question <span className="text-muted-foreground font-normal">(optional — shows below title)</span></Label>
+            <Textarea
+              rows={2}
+              value={question.stem || ""}
+              onChange={(e) => onChange({ ...question, stem: e.target.value })}
+              placeholder="Type the question… e.g. What does '안녕하세요' mean?"
+              className="text-base"
+              maxLength={500}
+            />
+          </div>
+
+          {/* Free / Paid toggle — free questions show at the top of QBank + Batch packages */}
+          <div className="flex items-center gap-3 p-3 rounded-lg border bg-slate-50">
+            <input
+              type="checkbox"
+              id="isFree"
+              checked={question.isFree || false}
+              onChange={(e) => onChange({ ...question, isFree: e.target.checked })}
+              className="w-5 h-5 rounded accent-emerald-600 cursor-pointer"
+            />
+            <div className="flex-1">
+              <Label htmlFor="isFree" className="text-sm font-semibold cursor-pointer flex items-center gap-2">
+                Free / Demo Question
+                {(question.isFree) && (
+                  <Badge className="bg-emerald-500 text-white text-[10px]">FREE</Badge>
+                )}
+              </Label>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Free questions appear at the TOP of Question Bank + Batch packages so students can try them before paying.
+              </p>
+            </div>
+          </div>
+
+          {/* Question text — REMOVED. Question media (text/image/audio) serves
+              as the question. Title below is used as the question label. */}
           {/* Question Media Type */}
           <div className="space-y-2">
             <Label className="text-sm font-semibold">Question Media (shows in exam)</Label>
@@ -1167,6 +2112,38 @@ function QuestionEditor({ question, onChange, blockLabel, isAudioBlock }: {
               type="audio"
             />
           )}
+          {/* Audio play count — how many times the audio plays when student taps play.
+              Shows for BOTH question media audio AND option audios. */}
+          {(question.mediaType === "audio" || question.answerType === "audio") && (
+            <div className="flex items-center gap-3 p-3 rounded-lg border bg-blue-50">
+              <div className="flex-1">
+                <Label className="text-sm font-semibold">Audio Play Count</Label>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  How many times the audio plays when the student taps the play button.
+                  {question.answerType === "audio" && " Applies to option audios too."}
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => onChange({ ...question, audioLoop: Math.max(1, (question.audioLoop || 1) - 1) })}
+                >
+                  −
+                </Button>
+                <span className="text-lg font-bold w-12 text-center">{question.audioLoop || 1}</span>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => onChange({ ...question, audioLoop: Math.min(100, (question.audioLoop || 1) + 1) })}
+                >
+                  +
+                </Button>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* ─── RIGHT COLUMN: Answer type + options ────────────────────────── */}
@@ -1195,26 +2172,56 @@ function QuestionEditor({ question, onChange, blockLabel, isAudioBlock }: {
               <Label className="text-sm font-semibold">4 Options — click circle to mark correct</Label>
               <div className="space-y-2">
                 {[0, 1, 2, 3].map((i) => (
-                  <div key={i} className="flex items-center gap-3">
-                    <button
-                      onClick={() => onChange({ ...question, correctOption: i })}
-                      className={`w-8 h-8 rounded-full border-2 flex items-center justify-center text-sm font-bold flex-shrink-0 ${
-                        question.correctOption === i ? "bg-green-500 text-white border-green-500" : "border-slate-300 text-slate-400"
-                      }`}
-                      title="Mark as correct"
-                    >
-                      {question.correctOption === i ? "✓" : String.fromCharCode(65 + i)}
-                    </button>
-                    <Input
-                      value={question.options[i] || ""}
-                      onChange={(e) => {
-                        const opts = [...question.options];
-                        opts[i] = e.target.value;
-                        onChange({ ...question, options: opts });
-                      }}
-                      placeholder={`Option ${String.fromCharCode(65 + i)}`}
-                      className="flex-1"
-                    />
+                  <div key={i} className="space-y-1">
+                    <div className="flex items-center gap-3">
+                      <button
+                        onClick={() => onChange({ ...question, correctOption: i })}
+                        className={`w-8 h-8 rounded-full border-2 flex items-center justify-center text-sm font-bold flex-shrink-0 ${
+                          question.correctOption === i ? "bg-green-500 text-white border-green-500" : "border-slate-300 text-slate-400"
+                        }`}
+                        title="Mark as correct"
+                      >
+                        {question.correctOption === i ? "✓" : String.fromCharCode(65 + i)}
+                      </button>
+                      <Input
+                        value={question.options[i] || ""}
+                        onChange={(e) => {
+                          const opts = [...question.options];
+                          opts[i] = e.target.value;
+                          onChange({ ...question, options: opts });
+                        }}
+                        placeholder={`Option ${String.fromCharCode(65 + i)}`}
+                        className="flex-1"
+                      />
+                    </div>
+                    {/* Underline bar — admin types a word that gets underlined in the option */}
+                    <div className="flex items-center gap-2 pl-11">
+                      <span className="text-xs text-slate-400 whitespace-nowrap">underline:</span>
+                      <Input
+                        value={question.optionBlanks[i] || ""}
+                        onChange={(e) => {
+                          const blanks = [...question.optionBlanks];
+                          blanks[i] = e.target.value;
+                          onChange({ ...question, optionBlanks: blanks });
+                        }}
+                        placeholder="word to underline (optional)"
+                        className="h-7 text-xs flex-1 border-dashed border-slate-300"
+                      />
+                      {/* Live preview of the underlined option */}
+                      {question.optionBlanks[i] && question.options[i] && (
+                        <span className="text-xs text-slate-500 whitespace-nowrap">
+                          Preview:{" "}
+                          <span
+                            dangerouslySetInnerHTML={{
+                              __html: question.options[i].replace(
+                                new RegExp(`(${question.optionBlanks[i].replace(/[.*+?^${}()|[\]\\]/g, "\\$&")})`, "i"),
+                                "<u>$1</u>"
+                              ),
+                            }}
+                          />
+                        </span>
+                      )}
+                    </div>
                   </div>
                 ))}
               </div>
