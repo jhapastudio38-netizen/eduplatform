@@ -785,19 +785,43 @@ function ExamEditor({ test, testCategory, onClose }: { test: Test; testCategory:
   }
 
   function doPaste() {
+    // Read paste code directly from the input (more reliable than React state)
+    const input = document.querySelector('input[placeholder="DK-TEXT-1-XXXX"]') as HTMLInputElement;
+    const code = (input?.value || pasteCode).trim();
+    if (!code) { toast.error("Enter a paste code"); return; }
+
     const allCopies = JSON.parse(localStorage.getItem("dk_copies") || "{}");
-    const data = allCopies[pasteCode.trim()];
+    const data = allCopies[code];
     if (!data) { toast.error("Invalid paste code"); return; }
+
     const parsed = JSON.parse(data);
-    const q = parsed.question as QuestionData;
-    // Paste into current slot — keep current block number/type
-    const pasted: QuestionData = {
-      ...q,
-      blockType: activeBlock,
-      blockNumber: activeNumber,
-    };
-    updateQuestion(pasted);
-    toast.success("Question pasted — click Save to persist");
+
+    // Handle Copy All (multiple questions) vs Copy (single question)
+    if (parsed.allQuestions && Array.isArray(parsed.allQuestions)) {
+      // Copy All — paste ALL questions
+      const next = { ...questions };
+      let count = 0;
+      for (const q of parsed.allQuestions) {
+        const k = key(q.blockType, q.blockNumber);
+        next[k] = { ...q };
+        count++;
+      }
+      setQuestions(next);
+      toast.success(`Pasted ${count} questions — click Save on each to persist`);
+    } else if (parsed.question) {
+      // Copy single question — paste into current slot
+      const q = parsed.question as QuestionData;
+      const pasted: QuestionData = {
+        ...q,
+        blockType: activeBlock,
+        blockNumber: activeNumber,
+      };
+      updateQuestion(pasted);
+      toast.success("Question pasted — click Save to persist");
+    } else {
+      toast.error("Invalid paste data format");
+    }
+
     setShowPasteDialog(false);
     setPasteCode("");
   }
