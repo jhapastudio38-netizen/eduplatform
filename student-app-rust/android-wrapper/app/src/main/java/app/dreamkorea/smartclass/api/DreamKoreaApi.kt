@@ -90,14 +90,15 @@ data class QuestionDetail(
     val type: String,
     val difficulty: String,
     val stem: String,
-    val title: String? = null,
-    val isFree: Boolean = false,
+    val title: String? = null, // optional per-question title shown at top of question
+    val isFree: Boolean = false, // free questions show at top of QBank/Batch
     val options: List<String>?,
-    val optionBlanks: List<String> = emptyList(),
+    // Legacy fields
     val imageUrl: String?,
     val audioUrl: String?,
     val audioLoop: Int = 0,
     val audioLoopDelay: Int = 0,
+    // New block-based fields
     val blockType: String = "text",
     val blockNumber: Int = 0,
     val descType: String = "none",
@@ -111,6 +112,7 @@ data class QuestionDetail(
     val answerType: String = "text",
     val optionImages: List<String> = emptyList(),
     val optionAudios: List<String> = emptyList(),
+    val optionBlanks: List<String> = emptyList(), // word to underline in each option
     val correctOption: Int = 0,
     val explanation: String? = null
 )
@@ -127,11 +129,13 @@ data class TestDetail(
     val durationMin: Int,
     val isExam: Boolean,
     val passScore: Int,
-    val textBlockCount: Int = 20,
-    val audioBlockCount: Int = 20,
+    // Block flags + counts — exposed so the pre-exam info screen can show
+    // "X text + Y audio questions" and the app can lay out the block grid.
+    val textBlockCount: Int = 0,
+    val audioBlockCount: Int = 0,
     val textBlockEnabled: Boolean = true,
     val audioBlockEnabled: Boolean = true,
-    val showAllBlocks: Boolean = true,
+    val showAllBlocks: Boolean = true, // true = show all blocks (added+blank), false = only created
     val items: List<TestItemDetail>
 )
 data class TestDetailResponse(val test: TestDetail)
@@ -141,12 +145,11 @@ data class SubmitRequest(val answers: Map<String, Any>)
 data class ReviewItem(
     val questionId: String,
     val stem: String,
-    val title: String? = null,
+    val title: String? = null, // optional per-question title
     val type: String,
     val options: List<String>?,
     val optionImages: List<String> = emptyList(),
     val optionAudios: List<String> = emptyList(),
-    val optionBlanks: List<String> = emptyList(),
     val imageUrl: String?,
     val audioUrl: String?,
     val audioLoop: Int = 0,
@@ -158,10 +161,8 @@ data class ReviewItem(
 )
 data class EyeVisionRecommendation(
     val show: Boolean = false,
-    val numbers: List<List<Int>> = emptyList(),
-    val message: String? = null,
     val count: Int = 0,
-    val reason: String? = null,
+    val reason: String = ""
 )
 
 data class SubmitResponse(
@@ -170,8 +171,11 @@ data class SubmitResponse(
     val graded: Boolean,
     val submissionId: String,
     val review: List<ReviewItem> = emptyList(),
+    // Eye vision auto-trigger — server recommends eye vision tests based
+    // on the student's mistake rate. The app reads this after submit.
     val eyeVision: EyeVisionRecommendation = EyeVisionRecommendation(),
-    val completed: Boolean = false,
+    // Marks the exam as completed — used to show "Completed" badge on cards.
+    val completed: Boolean = false
 )
 
 data class Book(
@@ -206,6 +210,8 @@ data class VideoLesson(
     val title: String,
     val description: String?,
     val youtubeId: String,
+    val videoUrl: String? = null,
+    val videoSource: String = "youtube",
     val thumbnailUrl: String?,
     val durationMin: Int,
     val level: String?,
@@ -235,6 +241,18 @@ interface DreamKoreaApi {
     @POST("api/auth/credentials")
     suspend fun loginCredentials(@Body body: Map<String, String>): CredentialsResponse
 
+    // Student signup with email + password (no OTP needed)
+    @POST("api/auth/signup")
+    suspend fun signup(@Body body: Map<String, String>): CredentialsResponse
+
+    // Forgot password — request a 6-digit reset code via email
+    @POST("api/auth/request-reset")
+    suspend fun requestReset(@Body body: Map<String, String>): SimpleResponse
+
+    // Forgot password — verify the reset code + set a new password
+    @POST("api/auth/reset-password")
+    suspend fun resetPassword(@Body body: Map<String, String>): SimpleResponse
+
     @POST("api/auth/set-password")
     suspend fun setPassword(@Body body: Map<String, String>): SimpleResponse
 
@@ -260,7 +278,7 @@ interface DreamKoreaApi {
     suspend fun getLessons(@Path("id") id: String): LessonsResponse
 
     @GET("api/student/tests")
-    suspend fun getTests(@Query("filter") filter: String = "all", @Query("category") category: String? = null): TestsResponse
+    suspend fun getTests(@Query("category") category: String = "all", @Query("filter") filter: String? = null): TestsResponse
 
     @GET("api/student/tests/{id}")
     suspend fun getTestDetail(@Path("id") id: String): TestDetailResponse
@@ -292,11 +310,18 @@ interface DreamKoreaApi {
     @POST("api/student/live-sessions/join")
     suspend fun joinLiveSession(@Body body: Map<String, String>): LiveSessionJoinResponse
 
-    @GET("api/student/tests/{id}/completion-status")
-    suspend fun getCompletionStatus(@Path("id") testId: String): CompletionStatus
+    @GET("api/student/eye-vision")
+    suspend fun getEyeVisionTests(@Query("adaptive") adaptive: String? = null): EyeVisionResponse
 
-    @GET("api/student/subscription")
-    suspend fun getSubscriptionStatus(): SubscriptionStatus
+    @POST("api/student/eye-vision/{testId}/check")
+    @Headers("Content-Type: application/json")
+    suspend fun checkEyeVisionAnswer(
+        @Path("testId") testId: String,
+        @Body body: Map<String, String>
+    ): EyeVisionCheckResponse
+
+    @GET("api/student/bundles")
+    suspend fun getStudentBundles(@Query("kind") kind: String? = null): BundlesResponse
 
     @GET("api/student/qbank-combined")
     suspend fun getQBankCombined(): TestDetailResponse
@@ -304,9 +329,45 @@ interface DreamKoreaApi {
     @GET("api/student/bundles/{bundleId}/combined")
     suspend fun getBundleCombined(@Path("bundleId") bundleId: String): TestDetailResponse
 
-    @GET("api/student/bundles")
-    suspend fun getStudentBundles(): StudentBundlesResponse
+    @GET("api/student/completed-tests")
+    suspend fun getCompletedTests(): CompletedTestsResponse
+
+    @GET("api/student/tests/{id}/completion-status")
+    suspend fun getCompletionStatus(@Path("id") id: String): CompletionStatusResponse
+
+    @GET("api/student/subscription")
+    suspend fun getSubscriptionStatus(): SubscriptionStatusResponse
 }
+
+// ─── Subscription ─────────────────────────────────────────────────────────────
+data class SubscriptionStatusResponse(
+    val isSubscribed: Boolean = false,
+    val subscriptionType: String? = null,
+    val subscribedUntil: String? = null,
+)
+
+// ─── Completion Status ────────────────────────────────────────────────────────
+data class CompletionStatusResponse(
+    val completed: Boolean = false,
+    val canRetake: Boolean = true,
+    val isSubscribed: Boolean = false,
+    val submittedAt: String? = null,
+    val score: Int? = null,
+    val maxScore: Int? = null,
+)
+
+// ─── Completed Tests ──────────────────────────────────────────────────────────
+// Maps testId (including combined IDs like "qbank-combined" or "bundle-{id}")
+// to submission info, so the app can show a "Completed" badge.
+data class CompletedTestInfo(
+    val submittedAt: String = "",
+    val score: Int? = null,
+    val maxScore: Int? = null
+)
+data class CompletedTestsResponse(
+    val completed: Map<String, CompletedTestInfo> = emptyMap(),
+    val total: Int = 0
+)
 
 // ─── Notifications ────────────────────────────────────────────────────────────
 data class AppNotification(
@@ -331,6 +392,39 @@ data class LiveSessionJoinResponse(
     val ok: Boolean = false,
     val session: LiveSessionData? = null,
     val error: String? = null
+)
+
+// ─── Eye Vision ──────────────────────────────────────────────────────────────
+data class EyeVisionTestItem(
+    val id: String,
+    val title: String,
+    val description: String? = null,
+    val imageUrl: String,
+    val category: String? = null,
+    val level: Int = 1
+)
+data class EyeVisionStats(
+    val totalAttempts: Int = 0,
+    val correctAttempts: Int = 0,
+    val accuracy: Int = 0,
+    val consecutiveCorrect: Int = 0
+)
+data class EyeVisionResponse(
+    val tests: List<EyeVisionTestItem> = emptyList(),
+    val level: Int = 1,
+    val recommendedLevel: Int = 1,
+    val stats: EyeVisionStats = EyeVisionStats()
+)
+data class EyeVisionCheckResponse(
+    val correct: Boolean = false,
+    val correctAnswer: String = "",
+    val level: Int = 1,
+    val nextLevel: Int = 1,
+    val leveledUp: Boolean = false,
+    val leveledDown: Boolean = false,
+    val consecutiveCorrect: Int = 0,
+    val consecutiveWrong: Int = 0,
+    val stats: EyeVisionStats = EyeVisionStats()
 )
 
 // ─── Question Bank ────────────────────────────────────────────────────────────
@@ -374,33 +468,32 @@ data class LiveRoomJoinResponse(
     val error: String? = null
 )
 
-// ─── Completion status + subscription ────────────────────────────────────────
-data class CompletionStatus(
-    val completed: Boolean = false,
-    val isSubscribed: Boolean = false,
-    val score: Int? = null,
-    val maxScore: Int? = null,
-)
-data class SubscriptionStatus(
-    val isSubscribed: Boolean = false,
-    val expiresAt: String? = null,
-)
-
-// ─── Student bundles ─────────────────────────────────────────────────────────
-data class StudentBundleItem(
-    val id: String,
-    val testId: String,
-    val title: String = "",
-    val durationMin: Int = 30,
-    val test: TestItem? = null,
-)
-data class StudentBundle(
+// ─── Question Bank / Batch / Exam / Chapter packages ─────────────────────────
+// A bundle is a curated collection of tests the student can browse as a
+// single package. Each bundle has a kind (qbank, batch, exam, chapter) and
+// a list of tests inside it.
+data class BundleTestSummary(
     val id: String,
     val title: String,
+    val testCategory: String? = null,
+    val examType: String = "REGULAR",
+    val durationMin: Int = 0,
+    val passScore: Int = 40,
+    val featuredImage: String? = null
+)
+data class BundleItem(
+    val sortOrder: Int = 0,
+    val test: BundleTestSummary
+)
+data class BundleSummary(
+    val id: String,
+    val title: String,
+    val slug: String,
     val description: String? = null,
     val kind: String = "qbank",
-    val items: List<StudentBundleItem> = emptyList(),
+    val coverUrl: String? = null,
+    val price: Int = 0,
+    val createdAt: String = "",
+    val items: List<BundleItem> = emptyList()
 )
-data class StudentBundlesResponse(
-    val bundles: List<StudentBundle> = emptyList(),
-)
+data class BundlesResponse(val bundles: List<BundleSummary> = emptyList())

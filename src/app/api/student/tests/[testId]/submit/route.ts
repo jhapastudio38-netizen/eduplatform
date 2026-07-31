@@ -131,8 +131,11 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ testId: st
     return {
       questionId: q.id,
       stem: q.stem,
+      title: q.title || null,
       type: q.type,
       options: q.options ? JSON.parse(q.options) : null,
+      optionImages: q.optionImages ? JSON.parse(q.optionImages) : [],
+      optionAudios: q.optionAudios ? JSON.parse(q.optionAudios) : [],
       imageUrl: q.imageUrl,
       audioUrl: q.audioUrl,
       audioLoop: q.audioLoop,

@@ -74,9 +74,6 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
     // Persistent audio play counts per question ID — survives navigation.
     // Prevents cheat where student navigates away and back to reset plays.
     val audioPlayCounts = remember { mutableStateMapOf<String, Int>() }
-    // Submit confirmation dialog — at function level so both the question
-    // view and the grid view can trigger it.
-    var showSubmitDialog by remember { mutableStateOf(false) }
     var submitResult by remember { mutableStateOf<SubmitResponse?>(null) }
     var submitting by remember { mutableStateOf(false) }
     // Per-question feedback (after answering, before moving on)
@@ -306,7 +303,7 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
     val item = t.items.getOrNull(currentIdx) ?: return
     val q = item.question
     val options = q.options ?: emptyList()
-    val textItems = t.items.filter { it.question.blockType != "audio" }
+    val textItems = t.items.filter { it.question.blockType == "text" }
     val readingCount = if (textItems.isNotEmpty()) textItems.size else t.items.size
     val listeningCount = if (textItems.isNotEmpty()) t.items.size - textItems.size else 0
     val answeredCount = answers.size
@@ -544,10 +541,10 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
                     Text("सबै प्रश्नहरू (All)", color = Color(0xFF003478), fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
                 }
                 Box(modifier = Modifier.width(1.dp).fillMaxHeight(0.6f).background(Color(0xFFE2E8F0)))
-                // Next (अर्को) or Submit — shows confirmation dialog on last question
+                // Next (अर्को) or Submit
                 Box(modifier = Modifier.weight(1f).fillMaxHeight().clickable {
                     if (currentIdx < t.items.size - 1) { currentIdx++; sound.click() }
-                    else { sound.click(); showSubmitDialog = true }
+                    else { sound.swoosh(); submitting = true; scope.launch { try { submitResult = submitExamWithFallback(t, answers.toMap()); sound.success() } catch (e: Exception) { error = "Submit failed." }; submitting = false } }
                 }, contentAlignment = Alignment.Center) {
                     if (submitting) { CircularProgressIndicator(color = Color(0xFF003478), modifier = Modifier.size(16.dp), strokeWidth = 2.dp) }
                     else if (currentIdx < t.items.size - 1) { Text("अर्को (Next)", color = Color(0xFF003478), fontSize = 13.sp, fontWeight = FontWeight.SemiBold) }
@@ -555,50 +552,6 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
                 }
             }
         }
-    }
-
-    // ── Submit confirmation dialog (accessible from both question view and grid view) ──
-    if (showSubmitDialog && test != null) {
-        val t = test!!
-        val totalAnswered = answers.size
-        val totalQuestions = t.items.size
-        val totalUnsolved = totalQuestions - totalAnswered
-        val warning = when {
-            totalUnsolved == 0 -> "You answered all $totalQuestions questions. Ready to submit!"
-            totalUnsolved <= 5 -> "You have $totalUnsolved unanswered question(s). Submit anyway?"
-            else -> "Warning: $totalUnsolved questions are still unanswered! Submit anyway?"
-        }
-        val warningColor = when {
-            totalUnsolved == 0 -> Color(0xFF16A34A)
-            totalUnsolved <= 5 -> Color(0xFFD97706)
-            else -> Color(0xFFDC2626)
-        }
-        AlertDialog(
-            onDismissRequest = { showSubmitDialog = false },
-            title = { Text("Submit Exam?") },
-            text = {
-                Column {
-                    Text(warning, color = warningColor, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
-                }
-            },
-            confirmButton = {
-                Button(
-                    onClick = {
-                        showSubmitDialog = false
-                        if (!submitting) {
-                            sound.swoosh(); submitting = true
-                            scope.launch {
-                                try { submitResult = submitExamWithFallback(t, answers.toMap()); sound.success() }
-                                catch (e: Exception) { error = "Submit failed." }
-                                submitting = false
-                            }
-                        }
-                    },
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF003F73))
-                ) { if (submitting) { CircularProgressIndicator(color = Color.White, modifier = Modifier.size(16.dp), strokeWidth = 2.dp) } else { Text("Submit", color = Color.White) } }
-            },
-            dismissButton = { OutlinedButton(onClick = { showSubmitDialog = false }) { Text("Cancel") } }
-        )
     }
 
             // ── QUESTION GRID PAGE ── matches HTML reference (4-col square grid, blue #1a56ff)
@@ -610,6 +563,7 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
         val isQBank = testId == "qbank-combined" || testId.startsWith("bundle-")
         // showAllBlocks: true = show all blocks (added + blank), false = only show created questions
         val showAllBlocks = t.showAllBlocks
+        var showSubmitDialog by remember { mutableStateOf(false) }
         val haptic = LocalHapticFeedback.current
         // Filter: null = all, true = solved only, false = unsolved only
         var filterMode by remember { mutableStateOf<Boolean?>(null) }
@@ -816,6 +770,48 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
             }
         }
 
+        // Submit confirmation dialog
+        if (showSubmitDialog) {
+            val warning = when {
+                totalUnsolved == 0 -> "You answered all $totalQuestions questions. Ready to submit!"
+                totalUnsolved <= 5 -> "You have $totalUnsolved unanswered question(s). Submit anyway?"
+                else -> "Warning: $totalUnsolved questions are still unanswered! Submit anyway?"
+            }
+            val warningColor = when {
+                totalUnsolved == 0 -> Color(0xFF16A34A)
+                totalUnsolved <= 5 -> Color(0xFFD97706)
+                else -> Color(0xFFDC2626)
+            }
+            AlertDialog(
+                onDismissRequest = { showSubmitDialog = false },
+                title = { Text("Submit Exam?") },
+                text = {
+                    Column {
+                        Text(warning, color = warningColor, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                        Spacer(Modifier.height(6.dp))
+                        Text("Reading: $readingAnswered/${readingItems.size} • Listening: $listeningAnswered/${listeningItems.size}",
+                            color = Color(0xFF64748B), fontSize = 11.sp)
+                    }
+                },
+                confirmButton = {
+                    Button(
+                        onClick = {
+                            showSubmitDialog = false
+                            if (!submitting) {
+                                sound.swoosh(); submitting = true
+                                scope.launch {
+                                    try { submitResult = submitExamWithFallback(t, answers.toMap()); sound.success() }
+                                    catch (e: Exception) { error = "Submit failed." }
+                                    submitting = false
+                                }
+                            }
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = accentBlue)
+                    ) { if (submitting) { CircularProgressIndicator(color = Color.White, modifier = Modifier.size(16.dp), strokeWidth = 2.dp) } else { Text("Submit", color = Color.White) } }
+                },
+                dismissButton = { OutlinedButton(onClick = { showSubmitDialog = false }) { Text("Cancel") } }
+            )
+        }
         return
     }
 }
@@ -897,7 +893,7 @@ private fun QuestionGridRef(
                 for (colIdx in 0 until cols) {
                     val localIdx = rowIdx * cols + colIdx
                     if (localIdx < items.size) {
-                        val globalIdx = globalIndices.getOrElse(localIdx) { localIdx }
+                        val globalIdx = globalIndices[localIdx]
                         // DISPLAY NUMBER: Reading shows 1-20, Listening shows 21-40
                         // Uses blockNumber (1-20 within each block) + 20 offset for audio
                         val q = items[localIdx].question
@@ -946,7 +942,6 @@ private fun QuestionGridRef(
                     } else if (showAllBlocks) {
                         // Empty placeholder cell — perfect square
                         // Reading placeholders: 1-20, Listening placeholders: 21-40
-                        // Determine per-cell based on which panel we're in (passed via items[0])
                         val isAudioGrid = items.isNotEmpty() && items[0].question.blockType == "audio"
                         val placeholderNum = if (isAudioGrid) localIdx + 21 else localIdx + 1
                         Box(
@@ -1028,11 +1023,9 @@ fun AudioPlayerCard(
 
     // PERSISTENT play count — stored in parent map (survives navigation).
     // Prevents cheat where student navigates away and back to reset plays.
-    // Only applies during the exam (when playCounts is provided).
-    // During review (playCounts = null), audio is freely replayable.
-    val persistentCount = if (playCounts != null && questionId != null) (playCounts[questionId] ?: 0) else 0
+    val persistentCount = playCounts?.get(questionId) ?: 0
     val maxPlays = loopCount.coerceAtLeast(1)
-    val disabled = playCounts != null && questionId != null && persistentCount >= maxPlays
+    val disabled = persistentCount >= maxPlays
     val scope = rememberCoroutineScope()
 
     fun incrementPlayCount() {
@@ -1656,7 +1649,7 @@ fun ReviewCard(theme: AppTheme, review: ReviewItem, questionNumber: Int = 0, sou
             if (!review.audioUrl.isNullOrBlank()) {
                 Spacer(Modifier.height(8.dp))
                 val audAbs = review.audioUrl!!.toAbsoluteUrl()
-                AudioPlayerCard(theme = theme, url = audAbs, loopCount = review.audioLoop, loopDelaySec = review.audioLoopDelay, sound = sound ?: rememberSoundManager())
+                AudioPlayerCard(theme = theme, url = audAbs, loopCount = review.audioLoop.coerceAtLeast(1), loopDelaySec = review.audioLoopDelay, sound = sound)
             }
             Spacer(Modifier.height(8.dp))
 
@@ -1676,7 +1669,7 @@ fun ReviewCard(theme: AppTheme, review: ReviewItem, questionNumber: Int = 0, sou
                         isUserAns && !isCorrectAns -> theme.errorRed
                         else -> Color(0xFFE0E0E0)
                     }
-                    // Check if this option is an image URL
+                    // Check if this option is an image URL or audio URL
                     val optImg = review.optionImages.getOrNull(i)?.takeIf { it.isNotBlank() }
                     val optAud = review.optionAudios.getOrNull(i)?.takeIf { it.isNotBlank() }
                     val isImageUrl = optImg != null || opt.startsWith("http") || opt.startsWith("/api/files") || opt.startsWith("/uploads")
@@ -1691,7 +1684,6 @@ fun ReviewCard(theme: AppTheme, review: ReviewItem, questionNumber: Int = 0, sou
                             Text("${'A' + i}.", color = theme.subText, fontSize = 12.sp, fontWeight = FontWeight.Bold)
                             Spacer(Modifier.width(8.dp))
                             if (isAudioUrl) {
-                                // Render as audio player
                                 val audUrl = optAud!!.toAbsoluteUrl()
                                 AudioPlayerCard(theme = theme, url = audUrl, loopCount = 1, loopDelaySec = 0, sound = sound ?: rememberSoundManager())
                             } else if (isImageUrl) {
@@ -1773,7 +1765,6 @@ private fun formatAnswer(answer: Any?): String? {
 }
 
 /// Renders an answer — shows media (image/audio) for URL answers, text otherwise.
-/// Fixes the bug where raw URLs were displayed as text in the review screen.
 @Composable
 private fun AnswerDisplay(answer: Any?, theme: AppTheme, sound: SoundManager? = null) {
     if (answer == null) {
@@ -1783,28 +1774,20 @@ private fun AnswerDisplay(answer: Any?, theme: AppTheme, sound: SoundManager? = 
     when (answer) {
         is String -> {
             val url = answer.trim()
-            if (url.startsWith("http") && (url.contains(".jpg") || url.contains(".jpeg") || url.contains(".png") || url.contains(".gif") || url.contains(".webp") || url.contains("/image"))) {
-                // Image answer — render the image
+            if (url.startsWith("http") && (url.contains(".jpg") || url.contains(".jpeg") || url.contains(".png") || url.contains(".gif") || url.contains(".webp"))) {
                 coil.compose.AsyncImage(
-                    model = url,
-                    contentDescription = "Your answer image",
+                    model = url, contentDescription = "Answer image",
                     modifier = Modifier.fillMaxWidth().heightIn(max = 80.dp).clip(RoundedCornerShape(6.dp)),
                     contentScale = ContentScale.Fit
                 )
-            } else if (url.startsWith("http") && (url.contains(".mp3") || url.contains(".wav") || url.contains(".ogg") || url.contains(".m4a") || url.contains("/audio"))) {
-                // Audio answer — render audio player
+            } else if (url.startsWith("http") && (url.contains(".mp3") || url.contains(".wav") || url.contains(".ogg") || url.contains(".m4a"))) {
                 AudioPlayerCard(theme = theme, url = url, loopCount = 1, loopDelaySec = 0, sound = sound ?: rememberSoundManager())
             } else {
-                // Text answer
                 Text(url, color = theme.darkText, fontSize = 12.sp, fontWeight = FontWeight.Medium)
             }
         }
         is List<*> -> {
-            Column {
-                answer.forEach { item ->
-                    Text(item?.toString() ?: "", color = theme.darkText, fontSize = 12.sp, fontWeight = FontWeight.Medium)
-                }
-            }
+            Column { answer.forEach { Text(it?.toString() ?: "", color = theme.darkText, fontSize = 12.sp) } }
         }
         else -> Text(answer.toString(), color = theme.darkText, fontSize = 12.sp)
     }
@@ -2010,20 +1993,12 @@ private fun gradeCombinedExamClientSide(
         val ans = normalizeUrl(answers[q.id])
         var isCorrect = false
 
-        // Get the correct answer based on answerType — fixes the bug where
-        // image/audio questions were always marked wrong because q.options
-        // doesn't contain the URL.
-        val correctIdx = q.correctOption
-        val correctAns: String = when (q.answerType) {
-            "image" -> normalizeUrl(q.optionImages.getOrNull(correctIdx) ?: "") as? String ?: ""
-            "audio" -> normalizeUrl(q.optionAudios.getOrNull(correctIdx) ?: "") as? String ?: ""
-            else -> normalizeUrl(q.options?.getOrNull(correctIdx)
-                ?: q.options?.getOrNull(0)
-                ?: "") as? String ?: ""
-        }
-
         when (q.type) {
             "SINGLE_CHOICE", "TRUE_FALSE", "ONE_WORD", "FILL_BLANK" -> {
+                val correctIdx = q.correctOption
+                val correctAns = normalizeUrl(q.options?.getOrNull(correctIdx)
+                    ?: q.options?.getOrNull(0)
+                    ?: "") as? String ?: ""
                 if (ans is String && correctAns.isNotEmpty() &&
                     ans.trim().equals(correctAns.trim(), ignoreCase = true)) {
                     isCorrect = true
@@ -2031,11 +2006,8 @@ private fun gradeCombinedExamClientSide(
                 }
             }
             "MULTIPLE_CHOICE" -> {
-                // For multiple choice, ans is a List<String> of selected options
-                val selectedList = (answers[q.id] as? List<*>)?.filterIsInstance<String>() ?: emptyList()
-                // Compare with the correct option text (for text type)
-                val correctText = q.options?.getOrNull(correctIdx) ?: ""
-                if (selectedList.size == 1 && selectedList[0].trim().equals(correctText.trim(), ignoreCase = true)) {
+                val correctIdx = q.correctOption
+                if (ans is String && ans.toIntOrNull() == correctIdx) {
                     isCorrect = true
                     score++
                 }
@@ -2056,7 +2028,7 @@ private fun gradeCombinedExamClientSide(
                 audioLoop = q.audioLoop,
                 audioLoopDelay = q.audioLoopDelay,
                 userAnswer = ans,
-                correctAnswer = correctAns,
+                correctAnswer = q.options?.getOrNull(q.correctOption),
                 explanation = q.explanation,
                 isCorrect = isCorrect,
             )

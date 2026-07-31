@@ -24,27 +24,29 @@ import app.dreamkorea.smartclass.data.AppState
 import kotlinx.coroutines.withTimeoutOrNull
 
 /**
- * Question Bank Screen — shows admin-created QBank bundles.
+ * BundlesScreen — lists all published packages of a given kind (qbank / batch).
  *
- * Each QBank bundle is a curated set of tests (the admin can pick tests from
- * ANY category: batch, exam, demo, chapter, etc.). The system extracts all
- * questions from those tests and combines them into ONE big exam the student
- * can solve.
+ * The student sees each package as a card with:
+ *   • Cover image on the LEFT (140dp wide × full card height — so images are
+ *     clearly visible and not tiny)
+ *   • Title + description on the right
+ *   • Set count
+ *   • "View All Questions" button → opens the combined exam (extracts all
+ *     questions from all sets in the package and combines them into ONE exam)
+ *   • "Completed" badge if already submitted
  *
- * UI per bundle card (horizontal layout — image on the left, content on the
- * right — so images get more screen space):
- *   • Cover image (left, 140dp wide × full card height)
- *   • Title + description (right)
- *   • "View All Questions" button → opens the combined exam
- *   • "Completed" badge if the student has already submitted this combined exam
+ * The combined exam ID format is `bundle-{bundleId}` — ExamEntryScreen and
+ * ExamScreen both detect this prefix and fetch from
+ * /api/student/bundles/{bundleId}/combined.
  */
 @Composable
-fun QuestionBankScreen(
+fun BundlesScreen(
     theme: AppTheme,
     sound: SoundManager,
     onBack: () -> Unit,
-    onStartExam: (String) -> Unit,
-    onOpenPackages: () -> Unit = {}
+    onOpenBundle: (String, String) -> Unit,
+    onOpenTest: (String) -> Unit,
+    initialKind: String? = null
 ) {
     var bundles by remember { mutableStateOf<List<BundleSummary>>(emptyList()) }
     var completedMap by remember { mutableStateOf<Map<String, CompletedTestInfo>>(emptyMap()) }
@@ -52,29 +54,36 @@ fun QuestionBankScreen(
     var error by remember { mutableStateOf("") }
     var retryCount by remember { mutableStateOf(0) }
 
+    // Title based on kind filter
+    val screenTitle = when (initialKind) {
+        "qbank" -> "Question Bank"
+        "batch" -> "Batch Packages"
+        else -> "Packages"
+    }
+    val screenSubtitle = when (initialKind) {
+        "batch" -> "All batch exam questions combined"
+        "qbank" -> "All question sets combined"
+        else -> "Browse all packages"
+    }
+
     LaunchedEffect(retryCount) {
         loading = true
         error = ""
         try {
-            // Fetch QBank bundles (admin-created) — these contain tests the
-            // admin chose from any category. Each bundle becomes ONE combined
-            // exam on the student side.
-            val bundlesResult = withTimeoutOrNull(20_000L) {
-                AppState.cachedFresh("bundles_qbank") {
-                    AppState.api.getStudentBundles("qbank").bundles
+            val result = withTimeoutOrNull(20_000L) {
+                AppState.cachedFresh("bundles_${initialKind ?: "all"}") {
+                    AppState.api.getStudentBundles(initialKind).bundles
                 }
             }
-
-            // Fetch completed tests to mark bundles as "Completed"
             val completedResult = try {
                 withTimeoutOrNull(10_000L) { AppState.api.getCompletedTests() }
             } catch (_: Exception) { null }
 
-            if (bundlesResult != null) {
-                bundles = bundlesResult
+            if (result != null) {
+                bundles = result
                 completedMap = completedResult?.completed ?: emptyMap()
             } else {
-                error = "Could not load question bank. Check your connection."
+                error = "The request timed out. Check your internet and try again."
             }
         } catch (e: retrofit2.HttpException) {
             error = when (e.code()) {
@@ -84,14 +93,14 @@ fun QuestionBankScreen(
         } catch (e: java.io.IOException) {
             error = "No internet connection."
         } catch (e: Exception) {
-            error = "Could not load question bank."
+            error = "Could not load."
         } finally {
             loading = false
         }
     }
 
     Column(modifier = Modifier.fillMaxSize().background(theme.background)) {
-        ScreenHeader(theme, sound, "Question Bank", "Pick a set and start solving", onBack)
+        ScreenHeader(theme, sound, screenTitle, screenSubtitle, onBack)
 
         if (loading) {
             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -124,10 +133,10 @@ fun QuestionBankScreen(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Center
             ) {
-                Icon(Icons.Default.Quiz, null, tint = theme.subText, modifier = Modifier.size(48.dp))
+                Icon(Icons.Default.Inventory2, null, tint = theme.subText, modifier = Modifier.size(48.dp))
                 Spacer(Modifier.height(12.dp))
-                Text("No question banks yet", color = theme.darkText, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
-                Text("Your teacher will publish question banks here soon.", color = theme.subText, fontSize = 13.sp, textAlign = TextAlign.Center)
+                Text("No packages yet", color = theme.darkText, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+                Text("Your teacher will publish packages here soon.", color = theme.subText, fontSize = 12.sp, textAlign = TextAlign.Center)
             }
             return
         }
@@ -138,7 +147,7 @@ fun QuestionBankScreen(
             verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
             items(bundles) { bundle ->
-                QBankBundleCard(
+                BundleCardCombined(
                     theme = theme,
                     sound = sound,
                     bundle = bundle,
@@ -146,7 +155,8 @@ fun QuestionBankScreen(
                     completedInfo = completedMap["bundle-${bundle.id}"],
                     onStart = {
                         sound.swoosh()
-                        onStartExam("bundle-${bundle.id}")
+                        // Open the combined exam — uses special "bundle-{id}" test ID
+                        onOpenTest("bundle-${bundle.id}")
                     }
                 )
             }
@@ -155,7 +165,7 @@ fun QuestionBankScreen(
 }
 
 @Composable
-private fun QBankBundleCard(
+private fun BundleCardCombined(
     theme: AppTheme,
     sound: SoundManager,
     bundle: BundleSummary,
@@ -164,6 +174,18 @@ private fun QBankBundleCard(
     onStart: () -> Unit
 ) {
     val totalSets = bundle.items.size
+    val kindLabel = when (bundle.kind) {
+        "qbank" -> "Question Bank"
+        "batch" -> "Batch"
+        "exam" -> "Exam"
+        "chapter" -> "Chapter"
+        else -> bundle.kind
+    }
+    val kindColor = when (bundle.kind) {
+        "batch" -> Color(0xFFEF6C00)
+        "qbank" -> theme.primary
+        else -> Color(0xFF6A1B9A)
+    }
 
     Surface(
         color = theme.cardBg,
@@ -171,7 +193,7 @@ private fun QBankBundleCard(
         modifier = Modifier.fillMaxWidth(),
         shadowElevation = 3.dp
     ) {
-        // Horizontal layout — image on the LEFT (large), content on the RIGHT
+        // Horizontal layout — image LEFT (large), content RIGHT
         Row(modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min)) {
             // ── LEFT: Cover image — wider so images are clearly visible ─────
             Box(
@@ -190,11 +212,10 @@ private fun QBankBundleCard(
                         contentScale = ContentScale.Crop
                     )
                 } else {
-                    // Icon placeholder when no image
                     Icon(
-                        Icons.Default.Quiz,
+                        Icons.Default.Inventory2,
                         null,
-                        tint = theme.primary,
+                        tint = kindColor,
                         modifier = Modifier.size(48.dp)
                     )
                 }
@@ -225,10 +246,10 @@ private fun QBankBundleCard(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Surface(color = theme.primary.copy(alpha = 0.12f), shape = RoundedCornerShape(6.dp)) {
+                    Surface(color = kindColor.copy(alpha = 0.12f), shape = RoundedCornerShape(6.dp)) {
                         Text(
-                            "Question Bank",
-                            color = theme.primary,
+                            kindLabel,
+                            color = kindColor,
                             fontSize = 9.sp,
                             fontWeight = FontWeight.Bold,
                             modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
@@ -241,6 +262,10 @@ private fun QBankBundleCard(
                             fontSize = 11.sp,
                             fontWeight = FontWeight.SemiBold
                         )
+                    } else if (bundle.price > 0) {
+                        Text("₩${bundle.price}", color = theme.darkText, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                    } else {
+                        Text("Free", color = theme.subText, fontSize = 10.sp)
                     }
                 }
                 Spacer(Modifier.height(6.dp))
@@ -267,7 +292,7 @@ private fun QBankBundleCard(
                 }
                 Spacer(Modifier.height(10.dp))
 
-                // Stats row: set count + price
+                // Stats row: set count
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Surface(color = Color(0xFF6A1B9A).copy(alpha = 0.12f), shape = RoundedCornerShape(6.dp)) {
                         Row(
@@ -278,12 +303,6 @@ private fun QBankBundleCard(
                             Spacer(Modifier.width(4.dp))
                             Text("$totalSets sets combined", color = Color(0xFF6A1B9A), fontSize = 10.sp, fontWeight = FontWeight.Bold)
                         }
-                    }
-                    Spacer(Modifier.width(8.dp))
-                    if (bundle.price > 0) {
-                        Text("₩${bundle.price}", color = theme.darkText, fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                    } else {
-                        Text("Free", color = theme.subText, fontSize = 10.sp)
                     }
                 }
                 Spacer(Modifier.height(12.dp))
@@ -309,5 +328,21 @@ private fun QBankBundleCard(
                 }
             }
         }
+    }
+}
+
+// ─── Bundle Detail — fallback screen (kept for compatibility, but no longer
+// used since the BundlesScreen now opens combined exams directly) ──────────
+@Composable
+fun BundleDetailScreen(theme: AppTheme, sound: SoundManager, bundleId: String, bundleTitle: String, onBack: () -> Unit, onOpenTest: (String) -> Unit) {
+    // If somehow routed here, just open the combined exam directly.
+    LaunchedEffect(bundleId) {
+        sound.swoosh()
+        onOpenTest("bundle-$bundleId")
+    }
+    Column(modifier = Modifier.fillMaxSize().background(theme.background), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
+        CircularProgressIndicator(color = theme.primary)
+        Spacer(Modifier.height(8.dp))
+        Text("Loading combined exam…", color = theme.subText, fontSize = 13.sp)
     }
 }

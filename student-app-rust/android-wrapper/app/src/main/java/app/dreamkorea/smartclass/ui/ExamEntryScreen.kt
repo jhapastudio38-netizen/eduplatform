@@ -419,13 +419,13 @@ internal suspend fun buildBundleCombinedClientSide(bundleId: String): TestDetail
         ?: throw retrofit2.HttpException(
             retrofit2.Response.error<Any>(404, okhttp3.ResponseBody.create(null, "Bundle not found"))
         )
-    val testIds = bundle.items.mapNotNull { it.test?.id }
+    val testIds = bundle.items.map { it.test.id }
     return combineTestsClientSide(
         testId = "bundle-$bundleId",
         title = bundle.title,
         description = bundle.description ?: "${testIds.size} sets combined",
         testIds = testIds,
-        durationMin = bundle.items.sumOf { it.test?.durationMin ?: 30 }.coerceAtLeast(60),
+        durationMin = bundle.items.sumOf { it.test.durationMin }.coerceAtLeast(60),
     )
 }
 
