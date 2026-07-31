@@ -197,6 +197,10 @@ model Question {
   // Question Bank: standalone practice questions (not tied to a test)
   inQuestionBank Boolean @default(false)
   category    String?  // e.g. "Vocabulary", "Grammar", "Listening", "Reading"
+  // Per-question title (optional — shown at top of question in exam)
+  title       String?
+  // Free/demo question flag
+  isFree      Boolean  @default(false)
   // ─── New block-based exam fields ────────────────────────────────────────
   blockType   String?  // "text" | "audio" — which block this question belongs to
   blockNumber Int?     // 1-40 (1-20 text block, 21-40 audio block)
@@ -216,6 +220,8 @@ model Question {
   optionImages String? // JSON: ["url1", "url2", "url3", "url4"]
   // For audio answers: JSON array of 4 audio URLs
   optionAudios String? // JSON: ["url1", "url2", "url3", "url4"]
+  // For text answers: JSON array of words to underline in each option
+  optionBlanks String? // JSON: ["word1", "word2", "word3", "word4"]
   // Which option is correct (0-3 index)
   correctOption Int?   @default(0)
   createdAt   DateTime @default(now())
@@ -264,6 +270,11 @@ model Test {
   // Block configuration (only for "exam" and "demo" categories)
   textBlockCount  Int? @default(20) // number of text questions (default 20)
   audioBlockCount Int? @default(20) // number of audio questions (default 20)
+  // Per-block enable/disable — admin can hide the audio or text section
+  textBlockEnabled  Boolean? @default(true)
+  audioBlockEnabled Boolean? @default(true)
+  // Grid display mode: true = show all blocks (added + blank), false = only created
+  showAllBlocks     Boolean? @default(true)
 
   chapter     Chapter? @relation(fields: [chapterId], references: [id], onDelete: SetNull)
   items       TestItem[]
