@@ -74,6 +74,9 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
     // Persistent audio play counts per question ID — survives navigation.
     // Prevents cheat where student navigates away and back to reset plays.
     val audioPlayCounts = remember { mutableStateMapOf<String, Int>() }
+    // Submit confirmation dialog — at function level so both the question
+    // view and the grid view can trigger it.
+    var showSubmitDialog by remember { mutableStateOf(false) }
     var submitResult by remember { mutableStateOf<SubmitResponse?>(null) }
     var submitting by remember { mutableStateOf(false) }
     // Per-question feedback (after answering, before moving on)
@@ -554,6 +557,50 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
         }
     }
 
+    // ── Submit confirmation dialog (accessible from both question view and grid view) ──
+    if (showSubmitDialog && test != null) {
+        val t = test!!
+        val totalAnswered = answers.size
+        val totalQuestions = t.items.size
+        val totalUnsolved = totalQuestions - totalAnswered
+        val warning = when {
+            totalUnsolved == 0 -> "You answered all $totalQuestions questions. Ready to submit!"
+            totalUnsolved <= 5 -> "You have $totalUnsolved unanswered question(s). Submit anyway?"
+            else -> "Warning: $totalUnsolved questions are still unanswered! Submit anyway?"
+        }
+        val warningColor = when {
+            totalUnsolved == 0 -> Color(0xFF16A34A)
+            totalUnsolved <= 5 -> Color(0xFFD97706)
+            else -> Color(0xFFDC2626)
+        }
+        AlertDialog(
+            onDismissRequest = { showSubmitDialog = false },
+            title = { Text("Submit Exam?") },
+            text = {
+                Column {
+                    Text(warning, color = warningColor, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showSubmitDialog = false
+                        if (!submitting) {
+                            sound.swoosh(); submitting = true
+                            scope.launch {
+                                try { submitResult = submitExamWithFallback(t, answers.toMap()); sound.success() }
+                                catch (e: Exception) { error = "Submit failed." }
+                                submitting = false
+                            }
+                        }
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF003F73))
+                ) { if (submitting) { CircularProgressIndicator(color = Color.White, modifier = Modifier.size(16.dp), strokeWidth = 2.dp) } else { Text("Submit", color = Color.White) } }
+            },
+            dismissButton = { OutlinedButton(onClick = { showSubmitDialog = false }) { Text("Cancel") } }
+        )
+    }
+
             // ── QUESTION GRID PAGE ── matches HTML reference (4-col square grid, blue #1a56ff)
     if (showGrid) {
         val readingItems = t.items.filter { it.question.blockType != "audio" }
@@ -563,7 +610,6 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
         val isQBank = testId == "qbank-combined" || testId.startsWith("bundle-")
         // showAllBlocks: true = show all blocks (added + blank), false = only show created questions
         val showAllBlocks = t.showAllBlocks
-        var showSubmitDialog by remember { mutableStateOf(false) }
         val haptic = LocalHapticFeedback.current
         // Filter: null = all, true = solved only, false = unsolved only
         var filterMode by remember { mutableStateOf<Boolean?>(null) }
@@ -770,48 +816,6 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
             }
         }
 
-        // Submit confirmation dialog
-        if (showSubmitDialog) {
-            val warning = when {
-                totalUnsolved == 0 -> "You answered all $totalQuestions questions. Ready to submit!"
-                totalUnsolved <= 5 -> "You have $totalUnsolved unanswered question(s). Submit anyway?"
-                else -> "Warning: $totalUnsolved questions are still unanswered! Submit anyway?"
-            }
-            val warningColor = when {
-                totalUnsolved == 0 -> Color(0xFF16A34A)
-                totalUnsolved <= 5 -> Color(0xFFD97706)
-                else -> Color(0xFFDC2626)
-            }
-            AlertDialog(
-                onDismissRequest = { showSubmitDialog = false },
-                title = { Text("Submit Exam?") },
-                text = {
-                    Column {
-                        Text(warning, color = warningColor, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
-                        Spacer(Modifier.height(6.dp))
-                        Text("Reading: $readingAnswered/${readingItems.size} • Listening: $listeningAnswered/${listeningItems.size}",
-                            color = Color(0xFF64748B), fontSize = 11.sp)
-                    }
-                },
-                confirmButton = {
-                    Button(
-                        onClick = {
-                            showSubmitDialog = false
-                            if (!submitting) {
-                                sound.swoosh(); submitting = true
-                                scope.launch {
-                                    try { submitResult = submitExamWithFallback(t, answers.toMap()); sound.success() }
-                                    catch (e: Exception) { error = "Submit failed." }
-                                    submitting = false
-                                }
-                            }
-                        },
-                        colors = ButtonDefaults.buttonColors(containerColor = accentBlue)
-                    ) { if (submitting) { CircularProgressIndicator(color = Color.White, modifier = Modifier.size(16.dp), strokeWidth = 2.dp) } else { Text("Submit", color = Color.White) } }
-                },
-                dismissButton = { OutlinedButton(onClick = { showSubmitDialog = false }) { Text("Cancel") } }
-            )
-        }
         return
     }
 }
