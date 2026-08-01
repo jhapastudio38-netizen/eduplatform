@@ -41,6 +41,11 @@ const questionSchema = z.object({
   optionAudios: z.array(z.string()).optional().default([]),
   correctOption: z.number().int().min(0).max(3).default(0),
   explanation: z.string().optional().or(z.literal("")),
+  audioLoop: z.number().int().min(0).max(100).default(2),
+  audioLoopDelay: z.number().int().min(0).max(60).default(0),
+  title: z.string().optional().or(z.literal("")),
+  isFree: z.boolean().optional().default(false),
+  optionBlanks: z.array(z.string()).optional().default([]),
 });
 
 export async function GET(req: NextRequest, ctx: { params: Promise<{ testId: string }> }) {
@@ -141,7 +146,7 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ testId: st
           explanation: d.explanation || null,
           imageUrl: d.mediaType === "image" ? d.mediaImageUrl : null,
           audioUrl: d.mediaType === "audio" ? d.mediaAudioUrl : null,
-          audioLoop: d.blockType === "audio" ? 1 : 0,
+          audioLoop: d.audioLoop ?? 2,
           descType: d.descType,
           descText: d.descText || null,
           descImageUrl: d.descImageUrl || null,
@@ -168,8 +173,8 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ testId: st
           explanation: d.explanation || null,
           imageUrl: d.mediaType === "image" ? d.mediaImageUrl : null,
           audioUrl: d.mediaType === "audio" ? d.mediaAudioUrl : null,
-          audioLoop: d.blockType === "audio" ? 1 : 0,
-          audioLoopDelay: 0,
+          audioLoop: d.audioLoop ?? 2,
+          audioLoopDelay: d.audioLoopDelay ?? 0,
           blockType: d.blockType,
           blockNumber: d.blockNumber,
           descType: d.descType,

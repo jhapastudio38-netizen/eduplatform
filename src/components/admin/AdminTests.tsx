@@ -68,7 +68,7 @@ function emptyQuestion(blockType: "text" | "audio", blockNumber: number): Questi
     stem: "",
     title: "",
     isFree: false,
-    audioLoop: 1,
+    audioLoop: 2,
     audioLoopDelay: 0,
     descType: "none",
     descText: "",
@@ -966,18 +966,55 @@ function ExamEditor({ test, testCategory, onClose }: { test: Test; testCategory:
             </Button>
             {/* Set audio play count for ALL questions at once — default 2 */}
             <Button
-              onClick={() => {
+              onClick={async () => {
                 const next = { ...questions };
                 for (const k of Object.keys(next)) {
                   next[k] = { ...next[k], audioLoop: 2 };
                 }
                 setQuestions(next);
-                toast.success("Set all audio to play 2 times");
+                // Also save to server
+                try {
+                  for (const q of Object.values(next)) {
+                    if (q.stem?.trim() || q.mediaImageUrl?.trim() || q.mediaAudioUrl?.trim()) {
+                      await fetch(`/api/admin/tests/${test.id}/questions`, {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                          blockType: q.blockType,
+                          blockNumber: q.blockNumber,
+                          stem: q.stem,
+                          title: q.title || "",
+                          isFree: q.isFree || false,
+                          audioLoop: 2,
+                          audioLoopDelay: q.audioLoopDelay || 0,
+                          descType: q.descType,
+                          descText: q.descText || "",
+                          descImageUrl: q.descImageUrl || "",
+                          descAudioUrl: q.descAudioUrl || "",
+                          mediaType: q.mediaType,
+                          mediaText: q.mediaText || "",
+                          mediaImageUrl: q.mediaImageUrl || "",
+                          mediaAudioUrl: q.mediaAudioUrl || "",
+                          answerType: q.answerType,
+                          options: q.options || [],
+                          optionImages: q.optionImages || [],
+                          optionAudios: q.optionAudios || [],
+                          optionBlanks: q.optionBlanks || [],
+                          correctOption: q.correctOption,
+                          explanation: q.explanation || "",
+                        }),
+                      });
+                    }
+                  }
+                  toast.success("All audio set to play 2 times — saved!");
+                } catch {
+                  toast.success("Set locally — click Save on each to persist");
+                }
               }}
               variant="outline"
               size="lg"
               className="text-amber-600 hover:text-amber-700 border-amber-300 hover:border-amber-400"
-              title="Set all audio (question + options) to play 2 times"
+              title="Set all audio (question + options) to play 2 times and save"
             >
               <Headphones className="w-4 h-4 mr-1" /> Audio ×2 All
             </Button>

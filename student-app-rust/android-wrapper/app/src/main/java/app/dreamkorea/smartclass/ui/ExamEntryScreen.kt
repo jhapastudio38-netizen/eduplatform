@@ -118,8 +118,11 @@ fun ExamEntryScreen(theme: AppTheme, sound: SoundManager, testId: String, onStar
                     error = "This exam has no questions yet."
                 } else {
                     test = result
-                    // Check completion status (for non-practice exams only)
-                    if (testId != "qbank-combined" && !testId.startsWith("bundle-")) {
+                    // Check completion status — graded exams can only be taken once
+                    // Practice exams (question_bank, bundles, demo) can be retaken
+                    val isPractice = testId == "qbank-combined" || testId.startsWith("bundle-") ||
+                        result.isExam == false
+                    if (!isPractice) {
                         try {
                             val status = AppState.api.getCompletionStatus(testId)
                             alreadyCompleted = status.completed
@@ -337,16 +340,16 @@ fun ExamEntryScreen(theme: AppTheme, sound: SoundManager, testId: String, onStar
 
                                 Spacer(Modifier.height(20.dp))
 
-                // Get Started button (or "Retake" if already completed)
+                // Get Started button — graded exams lock after 1 attempt, practice can retake
                 Button(
                     onClick = { sound.swoosh(); onStart() },
                     modifier = Modifier.fillMaxWidth(0.7f).height(44.dp),
                     colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF003478)),
                     shape = RoundedCornerShape(10.dp),
-                    enabled = !(alreadyCompleted && !isSubscribed)
+                    enabled = !alreadyCompleted
                 ) {
                     Text(
-                        if (alreadyCompleted && !isSubscribed) "Already Completed" else if (alreadyCompleted) "Retake Exam" else "Get Started",
+                        if (alreadyCompleted) "Already Completed" else "Get Started",
                         color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Bold
                     )
                 }

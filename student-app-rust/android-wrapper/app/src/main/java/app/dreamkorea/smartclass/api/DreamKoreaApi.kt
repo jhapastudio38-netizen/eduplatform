@@ -96,7 +96,7 @@ data class QuestionDetail(
     // Legacy fields
     val imageUrl: String?,
     val audioUrl: String?,
-    val audioLoop: Int = 0,
+    val audioLoop: Int = 2,
     val audioLoopDelay: Int = 0,
     // New block-based fields
     val blockType: String = "text",
@@ -152,7 +152,7 @@ data class ReviewItem(
     val optionAudios: List<String> = emptyList(),
     val imageUrl: String?,
     val audioUrl: String?,
-    val audioLoop: Int = 0,
+    val audioLoop: Int = 2,
     val audioLoopDelay: Int = 0,
     val userAnswer: Any?, // String or List<String>
     val correctAnswer: Any?, // String or List<String>
@@ -438,7 +438,7 @@ data class QuestionBankQuestion(
     val explanation: String? = null,
     val imageUrl: String? = null,
     val audioUrl: String? = null,
-    val audioLoop: Int = 0,
+    val audioLoop: Int = 2,
     val audioLoopDelay: Int = 0,
     val category: String = "General"
 )

@@ -1003,7 +1003,7 @@ fun AudioPlayerCard(
     // PERSISTENT play count — stored in parent map (survives navigation).
     // Prevents cheat where student navigates away and back to reset plays.
     val persistentCount = playCounts?.get(questionId) ?: 0
-    val maxPlays = loopCount.coerceAtLeast(1)
+    val maxPlays = if (loopCount <= 0) 2 else loopCount
     val disabled = persistentCount >= maxPlays
     val scope = rememberCoroutineScope()
 
@@ -1041,22 +1041,14 @@ fun AudioPlayerCard(
                 }
             }
             Spacer(Modifier.width(12.dp))
-            // Play count info
+            // Simple label — no play count shown
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    if (disabled) "Audio played ($maxPlays/$maxPlays)" else "Audio — Play $persistentCount / $maxPlays",
+                    if (disabled) "Audio locked" else "Tap to play",
                     color = if (disabled) Color(0xFF94A3B8) else theme.darkText,
                     fontSize = 13.sp,
                     fontWeight = FontWeight.SemiBold
                 )
-                if (!disabled) {
-                    Text(
-                        if (maxPlays == 1) "Tap to listen (1 time only)" else "Tap to listen ($maxPlays times)",
-                        color = theme.subText, fontSize = 11.sp
-                    )
-                } else {
-                    Text("No more plays left", color = Color(0xFF94A3B8), fontSize = 11.sp)
-                }
             }
             // Play/Pause button — DISABLED after all plays used
             IconButton(
