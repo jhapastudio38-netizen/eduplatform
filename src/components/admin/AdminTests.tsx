@@ -519,6 +519,8 @@ function ExamEditor({ test, testCategory, onClose }: { test: Test; testCategory:
   const [pasteCode, setPasteCode] = useState("");
   const [showAppPasteDialog, setShowAppPasteDialog] = useState(false);
   const [appPasteJson, setAppPasteJson] = useState("");
+  const pasteCodeRef = useRef("");
+  const appPasteJsonRef = useRef("");
   const [pushing, setPushing] = useState(false);
   const [isPublished, setIsPublished] = useState(test.isPublished);
 
@@ -628,7 +630,7 @@ function ExamEditor({ test, testCategory, onClose }: { test: Test; testCategory:
 
   // ─── Paste from App — decode JSON from the other DreamKorea app ──────────
   function pasteFromApp(rawInput?: string) {
-    const raw = (rawInput || appPasteJson).trim();
+    const raw = (rawInput || appPasteJsonRef.current).trim();
     if (!raw) { toast.error("Paste the JSON from your other app first"); return; }
     try {
       const lines = raw.split("\n").filter((l) => l.trim().startsWith("{"));
@@ -690,6 +692,7 @@ function ExamEditor({ test, testCategory, onClose }: { test: Test; testCategory:
     toast.success("Question imported from app JSON!");
     setShowAppPasteDialog(false);
     setAppPasteJson("");
+    appPasteJsonRef.current = "";
   }
 
   function importMultipleFromApp(items: any[]) {
@@ -727,6 +730,7 @@ function ExamEditor({ test, testCategory, onClose }: { test: Test; testCategory:
     toast.success(`Imported ${imported} questions! Click Save on each to persist.`);
     setShowAppPasteDialog(false);
     setAppPasteJson("");
+    appPasteJsonRef.current = "";
   }
 
   async function pushToApp() {
@@ -785,7 +789,8 @@ function ExamEditor({ test, testCategory, onClose }: { test: Test; testCategory:
   }
 
   function doPaste() {
-    const code = pasteCode.trim();
+    // Use ref for the most up-to-date value (state may be stale in event handlers)
+    const code = pasteCodeRef.current.trim();
     if (!code) { toast.error("Enter a paste code first"); return; }
 
     const allCopies = JSON.parse(localStorage.getItem("dk_copies") || "{}");
@@ -815,6 +820,7 @@ function ExamEditor({ test, testCategory, onClose }: { test: Test; testCategory:
       setQuestions(next);
       setShowPasteDialog(false);
       setPasteCode("");
+      pasteCodeRef.current = "";
       toast.success(`Pasted ${count} questions! Switch blocks to see them. Click Save on each to persist.`);
     } else if (parsed.question) {
       // Copy single question — paste into current slot
@@ -827,6 +833,7 @@ function ExamEditor({ test, testCategory, onClose }: { test: Test; testCategory:
       updateQuestion(pasted);
       setShowPasteDialog(false);
       setPasteCode("");
+      pasteCodeRef.current = "";
       toast.success("Question pasted — click Save to persist");
     } else {
       toast.error("Unknown paste data format");
@@ -1041,7 +1048,7 @@ function ExamEditor({ test, testCategory, onClose }: { test: Test; testCategory:
             <DialogHeader><DialogTitle>Paste Question</DialogTitle></DialogHeader>
             <div className="space-y-3">
               <Label>Enter paste code</Label>
-              <Input value={pasteCode} onChange={(e) => setPasteCode(e.target.value)} placeholder="DK-TEXT-1-XXXX" />
+              <Input value={pasteCode} onChange={(e) => { setPasteCode(e.target.value); pasteCodeRef.current = e.target.value; }} placeholder="DK-TEXT-1-XXXX" />
               <p className="text-xs text-muted-foreground">Paste the code you got from "Copy Question" to duplicate that question here.</p>
             </div>
             <div className="flex justify-end gap-2">
@@ -1062,7 +1069,7 @@ function ExamEditor({ test, testCategory, onClose }: { test: Test; testCategory:
               <Textarea
                 rows={10}
                 value={appPasteJson}
-                onChange={(e) => setAppPasteJson(e.target.value)}
+                onChange={(e) => { setAppPasteJson(e.target.value); appPasteJsonRef.current = e.target.value; }}
                 placeholder={`{"question_number":"21","question":"들은 것을 고르십시오.","question_media":"https://api.dreamkoreaubttest.com/...mp3","question_media_type":"audio","option_1":"불이","option_2":"부리","option_3":"물리","option_4":"무리","correct_answer":"option 4","answer_media_type":"text"}`}
                 className="font-mono text-xs"
               />
@@ -1074,7 +1081,7 @@ function ExamEditor({ test, testCategory, onClose }: { test: Test; testCategory:
             </div>
             <div className="flex justify-end gap-2">
               <Button variant="outline" onClick={() => setShowAppPasteDialog(false)}>Cancel</Button>
-              <Button onClick={() => pasteFromApp(appPasteJson)} className="bg-blue-600 hover:bg-blue-700">
+              <Button onClick={() => pasteFromApp()} className="bg-blue-600 hover:bg-blue-700">
                 <ClipboardPaste className="w-4 h-4 mr-1" /> Import
               </Button>
             </div>
