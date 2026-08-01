@@ -824,8 +824,13 @@ function ExamEditor({ test, testCategory, onClose }: { test: Test; testCategory:
   }
 
   function doPaste() {
-    const code = pasteCodeRef.current.trim();
-    if (!code) { toast.error("Enter a paste code first"); return; }
+    // Try ref first, then DOM, then state — belt and suspenders
+    let code = pasteCodeRef.current.trim();
+    if (!code) {
+      const input = document.querySelector('input[placeholder*="Paste code or JSON"]') as HTMLInputElement;
+      code = (input?.value || pasteCode).trim();
+    }
+    if (!code) { toast.error("Nothing to paste — copy a question first, then click Paste"); return; }
 
     // Check if it's raw JSON (from clipboard copy)
     if (code.startsWith("[")) {
@@ -849,24 +854,29 @@ function ExamEditor({ test, testCategory, onClose }: { test: Test; testCategory:
           toast.success(`Pasted ${count} questions! Click Save on each to persist.`);
           return;
         }
-      } catch {}
+      } catch (e: any) { toast.error("Invalid JSON: " + e.message); return; }
     }
-    if (code.startsWith("{") && code.includes("blockType")) {
-      // Single question JSON (from Copy)
+    if (code.startsWith("{")) {
+      // JSON object (from Copy or direct question)
       try {
         const parsed = JSON.parse(code);
+        // Could be a direct question object or wrapped {question: ...}
+        const qData = parsed.question || parsed;
         const pasted: QuestionData = {
-          ...parsed,
+          ...qData,
           blockType: activeBlock,
           blockNumber: activeNumber,
         };
+        // Remove fields that shouldn't be copied
+        delete (pasted as any).id;
+        delete (pasted as any).testItemId;
         updateQuestion(pasted);
         setShowPasteDialog(false);
         setPasteCode("");
         pasteCodeRef.current = "";
         toast.success("Question pasted! Click Save to persist.");
         return;
-      } catch {}
+      } catch (e: any) { toast.error("Invalid JSON: " + e.message); return; }
     }
 
     // Not JSON — treat as a code (old-style localStorage)
@@ -904,18 +914,21 @@ function ExamEditor({ test, testCategory, onClose }: { test: Test; testCategory:
         blockType: activeBlock,
         blockNumber: activeNumber,
       };
+      delete (pasted as any).id;
+      delete (pasted as any).testItemId;
       updateQuestion(pasted);
       setShowPasteDialog(false);
       setPasteCode("");
       pasteCodeRef.current = "";
       toast.success("Question pasted! Click Save to persist.");
     } else if (parsed.blockType) {
-      // Direct question object
       const pasted: QuestionData = {
         ...parsed,
         blockType: activeBlock,
         blockNumber: activeNumber,
       };
+      delete (pasted as any).id;
+      delete (pasted as any).testItemId;
       updateQuestion(pasted);
       setShowPasteDialog(false);
       setPasteCode("");
@@ -1134,7 +1147,7 @@ function ExamEditor({ test, testCategory, onClose }: { test: Test; testCategory:
             <DialogHeader><DialogTitle>Paste Question</DialogTitle></DialogHeader>
             <div className="space-y-3">
               <Label>Enter paste code</Label>
-              <Input value={pasteCode} onChange={(e) => { setPasteCode(e.target.value); pasteCodeRef.current = e.target.value; }} placeholder="Paste code or JSON here…" />
+              <Input value={pasteCode} onChange={(e) => { setPasteCode(e.target.value); pasteCodeRef.current = e.target.value; }} placeholder="Paste code or JSON here…" autoFocus />
               <p className="text-xs text-muted-foreground">
                 Click Copy or Copy All first, then click Paste. The question data is automatically read from your clipboard.
                 You can also paste a code or JSON manually here.
