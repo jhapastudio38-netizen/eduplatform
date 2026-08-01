@@ -964,6 +964,23 @@ function ExamEditor({ test, testCategory, onClose }: { test: Test; testCategory:
             <Button onClick={copyAll} variant="outline" size="lg" className="text-purple-600 hover:text-purple-700">
               <Copy className="w-4 h-4 mr-1" /> Copy All
             </Button>
+            {/* Set audio play count for ALL questions at once — default 2 */}
+            <Button
+              onClick={() => {
+                const next = { ...questions };
+                for (const k of Object.keys(next)) {
+                  next[k] = { ...next[k], audioLoop: 2 };
+                }
+                setQuestions(next);
+                toast.success("Set all audio to play 2 times");
+              }}
+              variant="outline"
+              size="lg"
+              className="text-amber-600 hover:text-amber-700 border-amber-300 hover:border-amber-400"
+              title="Set all audio (question + options) to play 2 times"
+            >
+              <Headphones className="w-4 h-4 mr-1" /> Audio ×2 All
+            </Button>
             {isSimple && (
               <Button onClick={deleteActiveQuestion} variant="outline" size="lg" className="text-rose-600 hover:text-rose-700">
                 <Trash2 className="w-4 h-4 mr-1" /> Delete
