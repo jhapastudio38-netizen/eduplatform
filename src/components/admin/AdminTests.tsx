@@ -629,7 +629,9 @@ function ExamEditor({ test, testCategory, onClose }: { test: Test; testCategory:
   // ─── Paste from App — decode JSON from the other DreamKorea app ──────────
   function pasteFromApp() {
     // Read textarea value directly from DOM — React state is stale in onClick
-    const taEl = document.querySelector('textarea.font-mono') as HTMLTextAreaElement;
+    // Find the textarea by its placeholder (starts with {"question_number)
+    const textareas = Array.from(document.querySelectorAll('textarea'));
+    const taEl = textareas.find((ta) => ta.placeholder && ta.placeholder.includes('question_number')) || null;
     const raw = (taEl?.value || appPasteJson || "").trim();
     if (!raw) { toast.error("Paste the JSON from your other app first"); return; }
     try {
