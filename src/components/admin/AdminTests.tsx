@@ -1029,7 +1029,7 @@ function ExamEditor({ test, testCategory, onClose }: { test: Test; testCategory:
             <DialogHeader><DialogTitle>Paste Question</DialogTitle></DialogHeader>
             <div className="space-y-3">
               <Label>Enter paste code</Label>
-              <Input ref={pasteInputRef} value={pasteCode} onChange={(e) => setPasteCode(e.target.value)} placeholder="DK-TEXT-1-XXXX" autoFocus />
+              <Input ref={pasteInputRef} defaultValue={pasteCode} onChange={(e) => setPasteCode(e.target.value)} placeholder="DK-TEXT-1-XXXX" autoFocus />
               <p className="text-xs text-muted-foreground">Paste the code you got from "Copy Question" to duplicate that question here.</p>
             </div>
             <div className="flex justify-end gap-2">
@@ -1050,7 +1050,7 @@ function ExamEditor({ test, testCategory, onClose }: { test: Test; testCategory:
               <Textarea
                 ref={appPasteTaRef}
                 rows={10}
-                value={appPasteJson}
+                defaultValue={appPasteJson}
                 onChange={(e) => setAppPasteJson(e.target.value)}
                 placeholder={`{"question_number":"21","question":"들은 것을 고르십시오.","question_media":"https://api.dreamkoreaubttest.com/...mp3","question_media_type":"audio","option_1":"불이","option_2":"부리","option_3":"물리","option_4":"무리","correct_answer":"option 4","answer_media_type":"text"}`}
                 className="font-mono text-xs"
