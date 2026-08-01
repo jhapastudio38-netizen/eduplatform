@@ -517,8 +517,10 @@ function ExamEditor({ test, testCategory, onClose }: { test: Test; testCategory:
   const [clipboard, setClipboard] = useState<string>("");
   const [showPasteDialog, setShowPasteDialog] = useState(false);
   const [pasteCode, setPasteCode] = useState("");
+  const pasteInputRef = useRef<HTMLInputElement>(null);
   const [showAppPasteDialog, setShowAppPasteDialog] = useState(false);
   const [appPasteJson, setAppPasteJson] = useState("");
+  const appPasteTaRef = useRef<HTMLTextAreaElement>(null);
   const [pushing, setPushing] = useState(false);
   const [isPublished, setIsPublished] = useState(test.isPublished);
 
@@ -592,8 +594,7 @@ function ExamEditor({ test, testCategory, onClose }: { test: Test; testCategory:
 
   function copyQuestion() {
     const q = currentQuestion;
-    if (!q.stem.trim()) { toast.error("Nothing to copy — question is empty"); return; }
-    // Generate a copy code — admin can define their own prefix
+    // Question text is optional — can copy with just media
     const code = `DK-${activeBlock.toUpperCase()}-${q.blockNumber}-${Date.now().toString(36).toUpperCase()}`;
     const data = JSON.stringify({ code, question: q });
     // Store in localStorage so admin can paste later
@@ -628,10 +629,8 @@ function ExamEditor({ test, testCategory, onClose }: { test: Test; testCategory:
 
   // ─── Paste from App — decode JSON from the other DreamKorea app ──────────
   function pasteFromApp() {
-    // Read from DOM first (for direct paste), fall back to React state
-    const textareas = Array.from(document.querySelectorAll('textarea'));
-    const taEl = textareas.find((ta) => ta.placeholder && ta.placeholder.includes('question_number')) || null;
-    const raw = (taEl?.value || appPasteJson || "").trim();
+    // Read from ref (always has the latest DOM value)
+    const raw = (appPasteTaRef.current?.value || appPasteJson || "").trim();
     if (!raw) { toast.error("Paste the JSON from your other app first"); return; }
     try {
       const lines = raw.split("\n").filter((l) => l.trim().startsWith("{"));
@@ -783,9 +782,8 @@ function ExamEditor({ test, testCategory, onClose }: { test: Test; testCategory:
   }
 
   function doPaste() {
-    // Read input value directly from DOM — React state is stale in onClick
-    const inputEl = document.querySelector('input[placeholder="DK-TEXT-1-XXXX"]') as HTMLInputElement;
-    const code = (inputEl?.value || pasteCode || "").trim();
+    // Read from ref (always has the latest DOM value)
+    const code = (pasteInputRef.current?.value || pasteCode || "").trim();
     if (!code) { toast.error("Enter the paste code first"); return; }
 
     const allCopies = JSON.parse(localStorage.getItem("dk_copies") || "{}");
@@ -797,7 +795,6 @@ function ExamEditor({ test, testCategory, onClose }: { test: Test; testCategory:
     catch { toast.error("Corrupted data — try copying again"); return; }
 
     if (parsed.allQuestions && Array.isArray(parsed.allQuestions)) {
-      // Copy All — paste ALL questions
       const next = { ...questions };
       let count = 0;
       for (const q of parsed.allQuestions) {
@@ -808,7 +805,6 @@ function ExamEditor({ test, testCategory, onClose }: { test: Test; testCategory:
       setQuestions(next);
       toast.success(`Pasted ${count} questions! Click Save on each to persist.`);
     } else if (parsed.question) {
-      // Copy single question
       const q = parsed.question as QuestionData;
       const pasted: QuestionData = {
         ...q,
@@ -1033,7 +1029,7 @@ function ExamEditor({ test, testCategory, onClose }: { test: Test; testCategory:
             <DialogHeader><DialogTitle>Paste Question</DialogTitle></DialogHeader>
             <div className="space-y-3">
               <Label>Enter paste code</Label>
-              <Input value={pasteCode} onChange={(e) => setPasteCode(e.target.value)} placeholder="DK-TEXT-1-XXXX" />
+              <Input ref={pasteInputRef} value={pasteCode} onChange={(e) => setPasteCode(e.target.value)} placeholder="DK-TEXT-1-XXXX" autoFocus />
               <p className="text-xs text-muted-foreground">Paste the code you got from "Copy Question" to duplicate that question here.</p>
             </div>
             <div className="flex justify-end gap-2">
@@ -1052,6 +1048,7 @@ function ExamEditor({ test, testCategory, onClose }: { test: Test; testCategory:
             <div className="space-y-3">
               <Label>Paste the JSON from your other DreamKorea app</Label>
               <Textarea
+                ref={appPasteTaRef}
                 rows={10}
                 value={appPasteJson}
                 onChange={(e) => setAppPasteJson(e.target.value)}
@@ -1308,7 +1305,7 @@ function QuestionEditor({ question, onChange, blockLabel, isAudioBlock }: {
 
           {/* Question text */}
           <div className="space-y-1">
-            <Label className="text-sm font-semibold">Question <span className="text-red-500">*</span></Label>
+            <Label className="text-sm font-semibold">Question <span className="text-muted-foreground font-normal text-xs">(optional — leave empty if using media below)</span></Label>
             <Textarea rows={3} value={question.stem} onChange={(e) => onChange({ ...question, stem: e.target.value })} placeholder="What is the question?" className="text-base" />
           </div>
 
