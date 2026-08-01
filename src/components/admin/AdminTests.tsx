@@ -627,13 +627,20 @@ function ExamEditor({ test, testCategory, onClose }: { test: Test; testCategory:
   }
 
   function doPaste() {
+    // Read the input value directly from the DOM — React state may be stale
+    const inputEl = document.querySelector('input[placeholder="DK-TEXT-1-XXXX"]') as HTMLInputElement;
+    const code = (inputEl?.value || pasteCode || "").trim();
+    if (!code) { toast.error("Enter the paste code first"); return; }
+
     const allCopies = JSON.parse(localStorage.getItem("dk_copies") || "{}");
-    const data = allCopies[pasteCode.trim()];
-    if (!data) { toast.error("Invalid paste code — copy a question first"); return; }
-    const parsed = JSON.parse(data);
+    const data = allCopies[code];
+    if (!data) { toast.error("Code not found — copy a question first using Copy button"); return; }
+
+    let parsed;
+    try { parsed = JSON.parse(data); }
+    catch { toast.error("Corrupted data — try copying again"); return; }
 
     if (parsed.allQuestions && Array.isArray(parsed.allQuestions)) {
-      // Copy All — paste ALL questions
       const next = { ...questions };
       let count = 0;
       for (const q of parsed.allQuestions) {
@@ -644,7 +651,6 @@ function ExamEditor({ test, testCategory, onClose }: { test: Test; testCategory:
       setQuestions(next);
       toast.success(`Pasted ${count} questions! Click Save on each to persist.`);
     } else if (parsed.question) {
-      // Copy single question
       const q = parsed.question as QuestionData;
       const pasted: QuestionData = {
         ...q,
@@ -662,7 +668,9 @@ function ExamEditor({ test, testCategory, onClose }: { test: Test; testCategory:
   }
 
   function doPasteFromApp() {
-    const raw = appPasteJson.trim();
+    // Read textarea value directly from DOM — React state may be stale
+    const taEl = document.querySelector('textarea.font-mono') as HTMLTextAreaElement;
+    const raw = (taEl?.value || appPasteJson || "").trim();
     if (!raw) { toast.error("Paste the JSON from your other app first"); return; }
     try {
       const lines = raw.split("\n").filter((l) => l.trim().startsWith("{"));
