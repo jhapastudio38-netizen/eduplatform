@@ -88,6 +88,9 @@ function emptyQuestion(blockType: "text" | "audio", blockNumber: number): Questi
   };
 }
 
+// Module-level clipboard — simple, reliable, no state/ref issues
+let _clipboardData: { type: "single" | "all"; data: any } | null = null;
+
 // Categories that use the simple "flat list" question editor
 // (instead of the 20+20 block grid used by exam & demo).
 const SIMPLE_CATEGORIES = ["batch", "chapter", "question_bank"];
@@ -514,10 +517,6 @@ function ExamEditor({ test, testCategory, onClose }: { test: Test; testCategory:
   const [activeNumber, setActiveNumber] = useState(1);
   const [questions, setQuestions] = useState<Record<string, QuestionData>>({});
   const [loading, setLoading] = useState(true);
-  const [clipboard, setClipboard] = useState<string>("");
-  const [showPasteDialog, setShowPasteDialog] = useState(false);
-  const [pasteCode, setPasteCode] = useState("");
-  const pasteInputRef = useRef<HTMLInputElement>(null);
   const [showAppPasteDialog, setShowAppPasteDialog] = useState(false);
   const [appPasteJson, setAppPasteJson] = useState("");
   const appPasteTaRef = useRef<HTMLTextAreaElement>(null);
@@ -592,45 +591,60 @@ function ExamEditor({ test, testCategory, onClose }: { test: Test; testCategory:
     }
   }
 
+  // ─── COPY: saves current question to module-level variable ──────────────
   function copyQuestion() {
     const q = currentQuestion;
-    // Question text is optional — can copy with just media
-    const code = `DK-${activeBlock.toUpperCase()}-${q.blockNumber}-${Date.now().toString(36).toUpperCase()}`;
-    const data = JSON.stringify({ code, question: q });
-    // Store in localStorage so admin can paste later
-    const allCopies = JSON.parse(localStorage.getItem("dk_copies") || "{}");
-    allCopies[code] = data;
-    localStorage.setItem("dk_copies", JSON.stringify(allCopies));
-    setClipboard(code);
-    // Copy code to clipboard
-    navigator.clipboard.writeText(code);
-    toast.success(`Copied! Code: ${code}`);
+    _clipboardData = { type: "single", data: { ...q } };
+    toast.success("Question copied! Click Paste in any block to import.");
   }
 
+  // ─── PASTE: reads from module-level variable, fills current block ────────
   function pasteQuestion() {
-    setShowPasteDialog(true);
+    if (!_clipboardData) {
+      toast.error("Nothing copied \u2014 click Copy first");
+      return;
+    }
+    if (_clipboardData.type === "single") {
+      const q = _clipboardData.data as QuestionData;
+      const pasted: QuestionData = {
+        ...q,
+        blockType: activeBlock,
+        blockNumber: activeNumber,
+      };
+      delete (pasted as any).id;
+      delete (pasted as any).testItemId;
+      updateQuestion(pasted);
+      toast.success("Question pasted! Click Save to persist.");
+    } else if (_clipboardData.type === "all") {
+      const allQs = _clipboardData.data as QuestionData[];
+      const next = { ...questions };
+      let count = 0;
+      for (const q of allQs) {
+        const k = key(q.blockType, q.blockNumber);
+        const copy = { ...q };
+        delete (copy as any).id;
+        delete (copy as any).testItemId;
+        next[k] = copy;
+        count++;
+      }
+      setQuestions(next);
+      toast.success(`Pasted ${count} questions! Click Save on each to persist.`);
+    }
   }
 
-  // ─── Copy ALL questions — generates a single code that bundles every filled question ──
+  // ─── COPY ALL: saves all filled questions to module-level variable ────────
   function copyAll() {
     const filled = Object.values(questions).filter(q => {
-      return q.stem?.trim() || q.title?.trim() || q.mediaImageUrl?.trim() || q.mediaAudioUrl?.trim() || q.descImageUrl?.trim();
+      return q.stem?.trim() || q.title?.trim() || q.mediaImageUrl?.trim() || q.mediaAudioUrl?.trim() || q.descImageUrl?.trim() || q.options?.some((o: string) => o?.trim());
     });
-    if (filled.length === 0) { toast.error("No questions to copy — add some first"); return; }
-    const code = `DK-ALL-${test.id.slice(-4).toUpperCase()}-${Date.now().toString(36).toUpperCase()}`;
-    const data = JSON.stringify({ code, allQuestions: filled, sourceTestId: test.id, sourceTitle: test.title });
-    const allCopies = JSON.parse(localStorage.getItem("dk_copies") || "{}");
-    allCopies[code] = data;
-    localStorage.setItem("dk_copies", JSON.stringify(allCopies));
-    setClipboard(code);
-    navigator.clipboard.writeText(code);
-    toast.success(`Copied ${filled.length} questions! Code: ${code}`);
+    if (filled.length === 0) { toast.error("No questions to copy \u2014 add some first"); return; }
+    _clipboardData = { type: "all", data: filled.map(q => ({ ...q })) };
+    toast.success(`Copied ${filled.length} questions! Open another test and click Paste.`);
   }
 
-  // ─── Paste from App — decode JSON from the other DreamKorea app ──────────
+  // ─── PASTE FROM APP: reads JSON from textarea ref ─────────────────────────
   function pasteFromApp() {
-    // Read from ref (always has the latest DOM value)
-    const raw = (appPasteTaRef.current?.value || appPasteJson || "").trim();
+    const raw = (appPasteTaRef.current?.value || "").trim();
     if (!raw) { toast.error("Paste the JSON from your other app first"); return; }
     try {
       const lines = raw.split("\n").filter((l) => l.trim().startsWith("{"));
@@ -779,46 +793,6 @@ function ExamEditor({ test, testCategory, onClose }: { test: Test; testCategory:
     } finally {
       setPushing(false);
     }
-  }
-
-  function doPaste() {
-    // Read from ref (always has the latest DOM value)
-    const code = (pasteInputRef.current?.value || pasteCode || "").trim();
-    if (!code) { toast.error("Enter the paste code first"); return; }
-
-    const allCopies = JSON.parse(localStorage.getItem("dk_copies") || "{}");
-    const data = allCopies[code];
-    if (!data) { toast.error("Code not found — copy a question first"); return; }
-
-    let parsed;
-    try { parsed = JSON.parse(data); }
-    catch { toast.error("Corrupted data — try copying again"); return; }
-
-    if (parsed.allQuestions && Array.isArray(parsed.allQuestions)) {
-      const next = { ...questions };
-      let count = 0;
-      for (const q of parsed.allQuestions) {
-        const k = key(q.blockType, q.blockNumber);
-        next[k] = { ...q };
-        count++;
-      }
-      setQuestions(next);
-      toast.success(`Pasted ${count} questions! Click Save on each to persist.`);
-    } else if (parsed.question) {
-      const q = parsed.question as QuestionData;
-      const pasted: QuestionData = {
-        ...q,
-        blockType: activeBlock,
-        blockNumber: activeNumber,
-      };
-      updateQuestion(pasted);
-      toast.success("Question pasted — click Save to persist");
-    } else {
-      toast.error("Unknown paste data format");
-    }
-
-    setShowPasteDialog(false);
-    setPasteCode("");
   }
 
   const blockNumbers = activeBlock === "text"
@@ -1021,24 +995,6 @@ function ExamEditor({ test, testCategory, onClose }: { test: Test; testCategory:
           </div>
         </div>
       </DialogContent>
-
-      {/* Paste dialog */}
-      {showPasteDialog && (
-        <Dialog open={true} onOpenChange={setShowPasteDialog}>
-          <DialogContent className="max-w-md">
-            <DialogHeader><DialogTitle>Paste Question</DialogTitle></DialogHeader>
-            <div className="space-y-3">
-              <Label>Enter paste code</Label>
-              <Input ref={pasteInputRef} defaultValue={pasteCode} onChange={(e) => setPasteCode(e.target.value)} placeholder="DK-TEXT-1-XXXX" autoFocus />
-              <p className="text-xs text-muted-foreground">Paste the code you got from "Copy Question" to duplicate that question here.</p>
-            </div>
-            <div className="flex justify-end gap-2">
-              <Button variant="outline" onClick={() => setShowPasteDialog(false)}>Cancel</Button>
-              <Button onClick={doPaste}>Paste</Button>
-            </div>
-          </DialogContent>
-        </Dialog>
-      )}
 
       {/* Paste from App dialog */}
       {showAppPasteDialog && (
