@@ -560,6 +560,10 @@ function ExamEditor({ test, testCategory, onClose }: { test: Test; testCategory:
         blockType: q.blockType,
         blockNumber: q.blockNumber,
         stem: q.stem,
+        title: q.title || "",
+        isFree: q.isFree ?? false,
+        audioLoop: q.audioLoop ?? 2,
+        audioLoopDelay: q.audioLoopDelay ?? 0,
         descType: q.descType,
         descText: q.descText || "",
         descImageUrl: q.descImageUrl || "",
@@ -572,6 +576,7 @@ function ExamEditor({ test, testCategory, onClose }: { test: Test; testCategory:
         options: q.options || [],
         optionImages: q.optionImages || [],
         optionAudios: q.optionAudios || [],
+        optionBlanks: q.optionBlanks || [],
         correctOption: q.correctOption,
         explanation: q.explanation || "",
       };
@@ -1404,9 +1409,9 @@ function QuestionEditor({ question, onChange, blockLabel, isAudioBlock }: {
                       {question.correctOption === i ? "✓" : String.fromCharCode(65 + i)}
                     </button>
                     <Input
-                      value={question.options[i] || ""}
+                      value={(question.options || [])[i] || ""}
                       onChange={(e) => {
-                        const opts = [...question.options];
+                        const opts = [...(question.options || ["", "", "", ""])];
                         opts[i] = e.target.value;
                         onChange({ ...question, options: opts });
                       }}
@@ -1414,7 +1419,7 @@ function QuestionEditor({ question, onChange, blockLabel, isAudioBlock }: {
                       className="flex-1"
                     />
                     <Input
-                      value={question.optionBlanks[i] || ""}
+                      value={(question.optionBlanks || [])[i] || ""}
                       onChange={(e) => {
                         const blanks = [...(question.optionBlanks || ["", "", "", ""])];
                         blanks[i] = e.target.value;
@@ -1450,13 +1455,13 @@ function QuestionEditor({ question, onChange, blockLabel, isAudioBlock }: {
                     <MediaUpload
                       label=""
                       accept="image/*"
-                      url={question.optionImages[i] || ""}
+                      url={(question.optionImages || [])[i] || ""}
                       onUpload={(url) => {
-                        const imgs = [...question.optionImages]; imgs[i] = url;
+                        const imgs = [...(question.optionImages || ["", "", "", ""])]; imgs[i] = url;
                         onChange({ ...question, optionImages: imgs });
                       }}
                       onClear={() => {
-                        const imgs = [...question.optionImages]; imgs[i] = "";
+                        const imgs = [...(question.optionImages || ["", "", "", ""])]; imgs[i] = "";
                         onChange({ ...question, optionImages: imgs });
                       }}
                       type="image"
@@ -1487,13 +1492,13 @@ function QuestionEditor({ question, onChange, blockLabel, isAudioBlock }: {
                     <MediaUpload
                       label=""
                       accept="audio/*"
-                      url={question.optionAudios[i] || ""}
+                      url={(question.optionAudios || [])[i] || ""}
                       onUpload={(url) => {
-                        const auds = [...question.optionAudios]; auds[i] = url;
+                        const auds = [...(question.optionAudios || ["", "", "", ""])]; auds[i] = url;
                         onChange({ ...question, optionAudios: auds });
                       }}
                       onClear={() => {
-                        const auds = [...question.optionAudios]; auds[i] = "";
+                        const auds = [...(question.optionAudios || ["", "", "", ""])]; auds[i] = "";
                         onChange({ ...question, optionAudios: auds });
                       }}
                       type="audio"
