@@ -1413,6 +1413,17 @@ function QuestionEditor({ question, onChange, blockLabel, isAudioBlock }: {
                       placeholder={`Option ${String.fromCharCode(65 + i)}`}
                       className="flex-1"
                     />
+                    <Input
+                      value={question.optionBlanks[i] || ""}
+                      onChange={(e) => {
+                        const blanks = [...(question.optionBlanks || ["", "", "", ""])];
+                        blanks[i] = e.target.value;
+                        onChange({ ...question, optionBlanks: blanks });
+                      }}
+                      placeholder="underline word"
+                      className="w-32 text-xs"
+                      title="Type a word from the option to underline it in the app"
+                    />
                   </div>
                 ))}
               </div>

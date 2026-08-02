@@ -74,6 +74,8 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
     // Persistent audio play counts per question ID — survives navigation.
     // Prevents cheat where student navigates away and back to reset plays.
     val audioPlayCounts = remember { mutableStateMapOf<String, Int>() }
+    // When audio is playing, disable navigation buttons
+    var audioPlaying by remember { mutableStateOf(false) }
     var submitResult by remember { mutableStateOf<SubmitResponse?>(null) }
     var submitting by remember { mutableStateOf(false) }
     // Per-question feedback (after answering, before moving on)
@@ -300,14 +302,19 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
     }
 
     // ═══ EXAM UI — spec-compliant landscape layout ═══
-    val item = t.items.getOrNull(currentIdx) ?: return
+    // Sort items: Reading (text) first, then Listening (audio)
+    val sortedItems = t.items.sortedWith(compareBy(
+        { if (it.question.blockType == "audio") 1 else 0 },
+        { it.question.blockNumber }
+    ))
+    val item = sortedItems.getOrNull(currentIdx) ?: return
     val q = item.question
     val options = q.options ?: emptyList()
-    val textItems = t.items.filter { it.question.blockType == "text" }
-    val readingCount = if (textItems.isNotEmpty()) textItems.size else t.items.size
-    val listeningCount = if (textItems.isNotEmpty()) t.items.size - textItems.size else 0
+    val textItems = sortedItems.filter { it.question.blockType != "audio" }
+    val readingCount = if (textItems.isNotEmpty()) textItems.size else sortedItems.size
+    val listeningCount = if (textItems.isNotEmpty()) sortedItems.size - textItems.size else 0
     val answeredCount = answers.size
-    val remainingCount = t.items.size - answeredCount
+    val remainingCount = sortedItems.size - answeredCount
     // Start with the grid view so the student can pick which question to answer
     // first. They tap a number → answer → return to grid → pick next → submit.
     var showGrid by remember { mutableStateOf(true) }
@@ -380,7 +387,17 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
                 verticalArrangement = Arrangement.Center,
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                // Question text (stem) — shown in a card with border/shadow, no blue title bar
+                // Question title (if set by admin) — shown at the top
+                if (!q.title.isNullOrBlank()) {
+                    Text(
+                        q.title,
+                        color = Color(0xFF003478),
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.fillMaxWidth(0.92f).padding(bottom = 4.dp)
+                    )
+                }
+                // Question text (stem) — shown in a card with border/shadow
                 val questionText = q.stem.ifBlank { q.mediaText ?: "" }
                 if (questionText.isNotBlank()) {
                     Surface(
@@ -423,7 +440,7 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
                     // the question changes — state (playCount, disabled) resets completely.
                     // This fixes the bug where audio was locked from the previous question.
                     key(q.id) {
-                        AudioPlayerCard(theme = theme, url = mediaAudUrl, loopCount = q.audioLoop, loopDelaySec = q.audioLoopDelay, sound = sound, questionId = q.id, playCounts = audioPlayCounts)
+                        AudioPlayerCard(theme = theme, url = mediaAudUrl, loopCount = q.audioLoop, loopDelaySec = q.audioLoopDelay, sound = sound, questionId = q.id, playCounts = audioPlayCounts, onPlayingChange = { audioPlaying = it })
                     }
                 }
             }
@@ -494,7 +511,7 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
                                 Spacer(Modifier.width(4.dp))
                                 // key(q.id, i) — recreate when question changes so play count resets
                                 key(q.id, i) {
-                                    AudioPlayerCard(theme = theme, url = absUrl, loopCount = q.audioLoop.coerceAtLeast(1), loopDelaySec = q.audioLoopDelay, sound = sound, questionId = "${q.id}-opt-$i", playCounts = audioPlayCounts)
+                                    AudioPlayerCard(theme = theme, url = absUrl, loopCount = q.audioLoop.coerceAtLeast(1), loopDelaySec = q.audioLoopDelay, sound = sound, questionId = "${q.id}-opt-$i", playCounts = audioPlayCounts, onPlayingChange = { audioPlaying = it })
                                 }
                             }
                         }
@@ -510,24 +527,24 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
             border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFE2E8F0)),
         ) {
             Row(modifier = Modifier.fillMaxWidth().height(48.dp), verticalAlignment = Alignment.CenterVertically) {
-                // Previous (अघिल्लो)
-                Box(modifier = Modifier.weight(1f).fillMaxHeight().clickable { if (currentIdx > 0) { currentIdx--; sound.click() } }, contentAlignment = Alignment.Center) {
-                    Text("अघिल्लो (Prev)", color = if (currentIdx > 0) Color(0xFF003478) else Color(0xFFCBD5E1), fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                // Previous (अघिल्लो) — disabled when audio playing
+                Box(modifier = Modifier.weight(1f).fillMaxHeight().clickable(enabled = !audioPlaying) { if (currentIdx > 0) { currentIdx--; sound.click() } }, contentAlignment = Alignment.Center) {
+                    Text("अघिल्लो (Prev)", color = if (currentIdx > 0 && !audioPlaying) Color(0xFF003478) else Color(0xFFCBD5E1), fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
                 }
                 Box(modifier = Modifier.width(1.dp).fillMaxHeight(0.6f).background(Color(0xFFE2E8F0)))
-                // All questions (सबै प्रश्नहरू)
-                Box(modifier = Modifier.weight(1f).fillMaxHeight().clickable { sound.click(); showGrid = true }, contentAlignment = Alignment.Center) {
-                    Text("सबै प्रश्नहरू (All)", color = Color(0xFF003478), fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                // All questions (सबै प्रश्नहरू) — disabled when audio playing
+                Box(modifier = Modifier.weight(1f).fillMaxHeight().clickable(enabled = !audioPlaying) { sound.click(); showGrid = true }, contentAlignment = Alignment.Center) {
+                    Text("सबै प्रश्नहरू (All)", color = if (audioPlaying) Color(0xFFCBD5E1) else Color(0xFF003478), fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
                 }
                 Box(modifier = Modifier.width(1.dp).fillMaxHeight(0.6f).background(Color(0xFFE2E8F0)))
-                // Next (अर्को) or Submit
-                Box(modifier = Modifier.weight(1f).fillMaxHeight().clickable {
-                    if (currentIdx < t.items.size - 1) { currentIdx++; sound.click() }
+                // Next (अर्को) or Submit — disabled when audio playing
+                Box(modifier = Modifier.weight(1f).fillMaxHeight().clickable(enabled = !audioPlaying) {
+                    if (currentIdx < sortedItems.size - 1) { currentIdx++; sound.click() }
                     else { sound.swoosh(); submitting = true; scope.launch { try { submitResult = submitExamWithFallback(t, answers.toMap()); sound.success() } catch (e: Exception) { error = "Submit failed." }; submitting = false } }
                 }, contentAlignment = Alignment.Center) {
                     if (submitting) { CircularProgressIndicator(color = Color(0xFF003478), modifier = Modifier.size(16.dp), strokeWidth = 2.dp) }
-                    else if (currentIdx < t.items.size - 1) { Text("अर्को (Next)", color = Color(0xFF003478), fontSize = 13.sp, fontWeight = FontWeight.SemiBold) }
-                    else { Text("सबमिट (Submit)", color = Color(0xFF22C55E), fontSize = 11.sp, fontWeight = FontWeight.Bold) }
+                    else if (currentIdx < sortedItems.size - 1) { Text("अर्को (Next)", color = if (audioPlaying) Color(0xFFCBD5E1) else Color(0xFF003478), fontSize = 13.sp, fontWeight = FontWeight.SemiBold) }
+                    else { Text("सबमिट (Submit)", color = if (audioPlaying) Color(0xFFCBD5E1) else Color(0xFF22C55E), fontSize = 11.sp, fontWeight = FontWeight.Bold) }
                 }
             }
         }
@@ -535,8 +552,8 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
 
             // ── QUESTION GRID PAGE ── matches HTML reference (4-col square grid, blue #1a56ff)
     if (showGrid) {
-        val readingItems = t.items.filter { it.question.blockType != "audio" }
-        val listeningItems = t.items.filter { it.question.blockType == "audio" }
+        val readingItems = sortedItems.filter { it.question.blockType != "audio" }
+        val listeningItems = sortedItems.filter { it.question.blockType == "audio" }
         // Question Bank / combined exams: show ALL questions in ONE panel (no Reading/Listening split)
         // Regular exams/tests: show Reading LEFT | Listening RIGHT
         val isQBank = testId == "qbank-combined" || testId.startsWith("bundle-")
@@ -995,6 +1012,7 @@ fun AudioPlayerCard(
     sound: SoundManager,
     questionId: String? = null,
     playCounts: SnapshotStateMap<String, Int>? = null,
+    onPlayingChange: ((Boolean) -> Unit)? = null,
 ) {
     val context = LocalContext.current
     var mediaPlayer by remember { mutableStateOf<android.media.MediaPlayer?>(null) }
@@ -1003,6 +1021,11 @@ fun AudioPlayerCard(
     // PERSISTENT play count — stored in parent map (survives navigation).
     // Prevents cheat where student navigates away and back to reset plays.
     val persistentCount = playCounts?.get(questionId) ?: 0
+    // Sync isPlaying with parent callback
+    LaunchedEffect(isPlaying) {
+        onPlayingChange?.invoke(isPlaying)
+    }
+
     val maxPlays = if (loopCount <= 0) 2 else loopCount
     val disabled = persistentCount >= maxPlays
     val scope = rememberCoroutineScope()
