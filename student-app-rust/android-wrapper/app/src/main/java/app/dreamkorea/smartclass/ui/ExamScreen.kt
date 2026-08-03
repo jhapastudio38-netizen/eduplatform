@@ -350,11 +350,14 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
             }
         }
 
-        // ── 2. INSTRUCTION ROW ── compact question number + title + FREE badge
+        // ── 2. INSTRUCTION ROW ── compact question number + title (or stem) + FREE badge
+        // If admin set a title → show "21. Title"
+        // If no title → show "21. Stem" (question text, truncated)
+        // This is INDEPENDENT from the question area below which shows stem separately.
         Surface(modifier = Modifier.fillMaxWidth().padding(horizontal = 6.dp, vertical = 2.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text("${currentIdx + 1}. ", color = Color(0xFF003478), fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                val displayText = q.stem.take(80)
+                val displayText = (if (!q.title.isNullOrBlank()) q.title else q.stem).take(80)
                 Text(displayText, color = Color(0xFF1E293B), fontSize = 11.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
                 if (q.isFree) {
                     Spacer(Modifier.width(4.dp))
@@ -1935,6 +1938,9 @@ fun String.toAbsoluteUrl(): String {
  * Builds an AnnotatedString where the [blankWord] is underlined within [text].
  * If blankWord is null/empty, returns the plain text.
  * The underlined word is case-insensitive matched.
+ *
+ * The underlined word is also made BOLD and BLUE so it's clearly visible —
+ * TextDecoration.Underline alone is too thin to see at small font sizes.
  */
 fun buildUnderlinedText(text: String, blankWord: String?): androidx.compose.ui.text.AnnotatedString {
     if (blankWord.isNullOrBlank()) return androidx.compose.ui.text.AnnotatedString(text)
@@ -1942,7 +1948,11 @@ fun buildUnderlinedText(text: String, blankWord: String?): androidx.compose.ui.t
     if (idx < 0) return androidx.compose.ui.text.AnnotatedString(text)
     return androidx.compose.ui.text.buildAnnotatedString {
         append(text.substring(0, idx))
-        withStyle(androidx.compose.ui.text.SpanStyle(textDecoration = androidx.compose.ui.text.style.TextDecoration.Underline)) {
+        withStyle(androidx.compose.ui.text.SpanStyle(
+            textDecoration = androidx.compose.ui.text.style.TextDecoration.Underline,
+            fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
+            color = Color(0xFF003478)
+        )) {
             append(text.substring(idx, idx + blankWord.length))
         }
         append(text.substring(idx + blankWord.length))

@@ -1272,6 +1272,17 @@ function QuestionEditor({ question, onChange, blockLabel, isAudioBlock }: {
         {/* ─── LEFT COLUMN: Description + Question ─────────────────────────── */}
         <div className="space-y-5">
 
+          {/* Question Title (optional — shown at top of question in app) */}
+          <div className="space-y-1">
+            <Label className="text-sm font-semibold">Question Title <span className="text-muted-foreground font-normal text-xs">(optional — shows in app next to question number, e.g. "21. Hello")</span></Label>
+            <Input
+              value={question.title || ""}
+              onChange={(e) => onChange({ ...question, title: e.target.value })}
+              placeholder="e.g. Hello, Question 3, 문법 1…"
+              className="text-base font-semibold"
+            />
+          </div>
+
           {/* Description Type */}
           <div className="space-y-2">
             <Label className="text-sm font-semibold">Description Type</Label>
@@ -1515,19 +1526,34 @@ function QuestionEditor({ question, onChange, blockLabel, isAudioBlock }: {
             <Textarea rows={2} value={question.explanation} onChange={(e) => onChange({ ...question, explanation: e.target.value })} placeholder="Explanation shown after answering…" />
           </div>
 
-          {/* Audio Play Count — shows for question audio AND option audios */}
+          {/* Audio Play Count + Gap — shows for question audio AND option audios */}
           {(question.mediaType === "audio" || question.answerType === "audio") && (
-            <div className="flex items-center gap-3 p-3 rounded-lg border bg-blue-50">
-              <div className="flex-1">
-                <Label className="text-sm font-semibold">Audio Play Count</Label>
-                <p className="text-xs text-muted-foreground mt-0.5">
-                  How many times the audio plays when the student taps play. Applies to both question audio and option audios.
-                </p>
+            <div className="flex flex-col gap-3 p-3 rounded-lg border bg-blue-50">
+              <div className="flex items-center gap-3">
+                <div className="flex-1">
+                  <Label className="text-sm font-semibold">Audio Play Count</Label>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    How many times the audio plays when the student taps play. Applies to both question audio and option audios.
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button type="button" variant="outline" size="sm" onClick={() => onChange({ ...question, audioLoop: Math.max(1, (question.audioLoop || 1) - 1) })}>−</Button>
+                  <span className="text-lg font-bold w-12 text-center">{question.audioLoop || 1}</span>
+                  <Button type="button" variant="outline" size="sm" onClick={() => onChange({ ...question, audioLoop: Math.min(100, (question.audioLoop || 1) + 1) })}>+</Button>
+                </div>
               </div>
-              <div className="flex items-center gap-2">
-                <Button type="button" variant="outline" size="sm" onClick={() => onChange({ ...question, audioLoop: Math.max(1, (question.audioLoop || 1) - 1) })}>−</Button>
-                <span className="text-lg font-bold w-12 text-center">{question.audioLoop || 1}</span>
-                <Button type="button" variant="outline" size="sm" onClick={() => onChange({ ...question, audioLoop: Math.min(100, (question.audioLoop || 1) + 1) })}>+</Button>
+              <div className="flex items-center gap-3 pt-2 border-t border-blue-200">
+                <div className="flex-1">
+                  <Label className="text-sm font-semibold">Audio Gap (seconds)</Label>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Pause between audio plays. E.g. 2 = 2-second silence between play 1 and play 2.
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button type="button" variant="outline" size="sm" onClick={() => onChange({ ...question, audioLoopDelay: Math.max(0, (question.audioLoopDelay || 0) - 1) })}>−</Button>
+                  <span className="text-lg font-bold w-12 text-center">{question.audioLoopDelay || 0}s</span>
+                  <Button type="button" variant="outline" size="sm" onClick={() => onChange({ ...question, audioLoopDelay: Math.min(60, (question.audioLoopDelay || 0) + 1) })}>+</Button>
+                </div>
               </div>
             </div>
           )}
