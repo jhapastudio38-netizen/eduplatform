@@ -385,21 +385,13 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
             )
             Row(modifier = Modifier.fillMaxSize()) {
             // LEFT: Question content (60%) — scrollable so long titles/stems/images don't get cut
+            // NOTE: Title is NOT shown here — it only appears in the top instruction bar
+            // (e.g. "1. Hello bro"). This area shows only the question stem + media.
             Column(
                 modifier = Modifier.weight(0.6f).fillMaxHeight().padding(8.dp).verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.Center,
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                // Question title (if set by admin) — shown at the top
-                if (!q.title.isNullOrBlank()) {
-                    Text(
-                        q.title,
-                        color = Color(0xFF003478),
-                        fontSize = 13.sp,
-                        fontWeight = FontWeight.Bold,
-                        modifier = Modifier.fillMaxWidth(0.92f).padding(bottom = 4.dp)
-                    )
-                }
                 // Question text (stem) — shown in a card with border/shadow
                 val questionText = q.stem.ifBlank { q.mediaText ?: "" }
                 if (questionText.isNotBlank()) {
@@ -1935,12 +1927,12 @@ fun String.toAbsoluteUrl(): String {
 }
 
 /**
- * Builds an AnnotatedString where the [blankWord] is underlined within [text].
+ * Builds an AnnotatedString where the [blankWord] is highlighted within [text].
  * If blankWord is null/empty, returns the plain text.
  * The underlined word is case-insensitive matched.
  *
- * The underlined word is also made BOLD and BLUE so it's clearly visible —
- * TextDecoration.Underline alone is too thin to see at small font sizes.
+ * The highlighted word is BOLD + UNDERLINED + has a YELLOW background
+ * so it clearly stands out from the rest of the option text.
  */
 fun buildUnderlinedText(text: String, blankWord: String?): androidx.compose.ui.text.AnnotatedString {
     if (blankWord.isNullOrBlank()) return androidx.compose.ui.text.AnnotatedString(text)
@@ -1951,7 +1943,8 @@ fun buildUnderlinedText(text: String, blankWord: String?): androidx.compose.ui.t
         withStyle(androidx.compose.ui.text.SpanStyle(
             textDecoration = androidx.compose.ui.text.style.TextDecoration.Underline,
             fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
-            color = Color(0xFF003478)
+            color = Color(0xFF003478),
+            background = Color(0xFFFFF59D)
         )) {
             append(text.substring(idx, idx + blankWord.length))
         }
