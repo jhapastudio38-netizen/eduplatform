@@ -481,30 +481,78 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
             ) {
                 when (q.answerType) {
                     "text", "choose" -> {
-                        (0 until minOf(4, options.size)).forEach { i ->
-                            val isSelected = answers[q.id] == options.getOrNull(i)
-                            val optText = options.getOrNull(i) ?: ""
-                            val blankWord = q.optionBlanks.getOrNull(i)?.takeIf { it.isNotBlank() }
-                            Row(
-                                modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp).clickable { sound.click(); answers[q.id] = optText },
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Surface(
-                                    color = if (isSelected) theme.primary else Color.White,
-                                    border = androidx.compose.foundation.BorderStroke(2.dp, Color.Black),
-                                    shape = androidx.compose.foundation.shape.CircleShape,
-                                    modifier = Modifier.size(40.dp)
-                                ) {
-                                    Box(contentAlignment = Alignment.Center) { Text("${i+1}", color = if (isSelected) Color.White else Color.Black, fontSize = 15.sp, fontWeight = FontWeight.Bold) }
+                        // Detect if text options are actually image URLs
+                        val optionsList = options ?: emptyList()
+                        val isImageUrl = { s: String -> s.startsWith("http") && (s.contains(".jpg") || s.contains(".jpeg") || s.contains(".png") || s.contains(".webp") || s.contains(".gif")) }
+                        val isImageOptions = optionsList.isNotEmpty() && optionsList.all { it.isBlank() || isImageUrl(it) }
+                        if (isImageOptions && optionsList.any { it.isNotBlank() }) {
+                            // Render as image grid (2-col, big images)
+                            val imgCount = minOf(4, optionsList.size)
+                            Column(modifier = Modifier.fillMaxWidth().fillMaxHeight(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                val rows = (imgCount + 1) / 2
+                                for (rowIdx in 0 until rows) {
+                                    Row(modifier = Modifier.fillMaxWidth().weight(1f), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                        for (colIdx in 0..1) {
+                                            val i = rowIdx * 2 + colIdx
+                                            if (i < imgCount && optionsList[i].isNotBlank()) {
+                                                val absUrl = optionsList[i].toAbsoluteUrl()
+                                                val isSelected = answers[q.id] == absUrl || answers[q.id] == optionsList[i]
+                                                Box(
+                                                    modifier = Modifier.weight(1f).fillMaxHeight()
+                                                        .clip(RoundedCornerShape(6.dp))
+                                                        .border(if (isSelected) 3.dp else 1.dp, if (isSelected) theme.primary else Color(0xFFCCCCCC), RoundedCornerShape(6.dp))
+                                                        .background(if (isSelected) theme.primary.copy(alpha = 0.05f) else Color.White)
+                                                        .clickable { sound.click(); answers[q.id] = absUrl }
+                                                ) {
+                                                    Surface(
+                                                        color = if (isSelected) theme.primary else Color.White,
+                                                        border = androidx.compose.foundation.BorderStroke(1.dp, Color.Black),
+                                                        shape = androidx.compose.foundation.shape.CircleShape,
+                                                        modifier = Modifier.align(Alignment.TopStart).padding(3.dp).size(16.dp)
+                                                    ) {
+                                                        Box(contentAlignment = Alignment.Center) {
+                                                            Text("${i+1}", color = if (isSelected) Color.White else Color.Black, fontSize = 8.sp, fontWeight = FontWeight.Bold)
+                                                        }
+                                                    }
+                                                    coil.compose.AsyncImage(
+                                                        model = absUrl, contentDescription = "Option ${i+1}",
+                                                        modifier = Modifier.fillMaxSize().padding(4.dp).clickable { FullScreenImageViewer.show(absUrl) },
+                                                        contentScale = ContentScale.Fit
+                                                    )
+                                                }
+                                            } else {
+                                                Spacer(modifier = Modifier.weight(1f).fillMaxHeight())
+                                            }
+                                        }
+                                    }
                                 }
-                                Spacer(Modifier.width(8.dp))
-                                // Render option text with underlined blank word (if set by admin)
-                                Text(
-                                    text = buildUnderlinedText(optText, blankWord),
-                                    color = Color.Black,
-                                    fontSize = 13.sp,
-                                    modifier = Modifier.weight(1f)
-                                )
+                            }
+                        } else {
+                            // Normal text options
+                            (0 until minOf(4, optionsList.size)).forEach { i ->
+                                val isSelected = answers[q.id] == optionsList.getOrNull(i)
+                                val optText = optionsList.getOrNull(i) ?: ""
+                                val blankWord = q.optionBlanks.getOrNull(i)?.takeIf { it.isNotBlank() }
+                                Row(
+                                    modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp).clickable { sound.click(); answers[q.id] = optText },
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Surface(
+                                        color = if (isSelected) theme.primary else Color.White,
+                                        border = androidx.compose.foundation.BorderStroke(2.dp, Color.Black),
+                                        shape = androidx.compose.foundation.shape.CircleShape,
+                                        modifier = Modifier.size(40.dp)
+                                    ) {
+                                        Box(contentAlignment = Alignment.Center) { Text("${i+1}", color = if (isSelected) Color.White else Color.Black, fontSize = 15.sp, fontWeight = FontWeight.Bold) }
+                                    }
+                                    Spacer(Modifier.width(8.dp))
+                                    Text(
+                                        text = buildUnderlinedText(optText, blankWord),
+                                        color = Color.Black,
+                                        fontSize = 13.sp,
+                                        modifier = Modifier.weight(1f)
+                                    )
+                                }
                             }
                         }
                     }
