@@ -76,6 +76,9 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
     val audioPlayCounts = remember { mutableStateMapOf<String, Int>() }
     // When audio is playing, disable navigation buttons
     var audioPlaying by remember { mutableStateOf(false) }
+    // Track WHICH audio is currently playing (by questionId) so only THAT one
+    // is "playing" and ALL others are blocked.
+    var currentlyPlayingId by remember { mutableStateOf<String?>(null) }
     var submitResult by remember { mutableStateOf<SubmitResponse?>(null) }
     var submitting by remember { mutableStateOf(false) }
     // Per-question feedback (after answering, before moving on)
@@ -384,16 +387,16 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
             Row(modifier = Modifier.fillMaxSize()) {
             // LEFT: Question content (60%) — scrollable
             // LAYOUT ORDER (top to bottom):
-            //   1. Question text (stem) — at TOP, bold, in a nice bordered card
-            //   2. Description text (descText) — below question, smaller, left-aligned
-            //   3. Question media (image/audio) — at the BOTTOM
-            //   If question text is empty, media/description move up.
+            //   1. Question text (stem) — at TOP, bold, blue border card
+            //   2. Question media (image/audio/text) — BELOW the question text
+            //   Description text (descText) only shows if set separately.
+            //   If no question text, media shows at top.
             Column(
                 modifier = Modifier.weight(0.6f).fillMaxHeight().padding(8.dp).verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.Center,
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                // 1. QUESTION TEXT (stem) — at top, bold, in a nice card
+                // 1. QUESTION TEXT (stem) — at top, bold, blue border
                 if (!q.stem.isNullOrBlank()) {
                     Surface(
                         color = Color.White,
@@ -412,9 +415,9 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
                     }
                     Spacer(Modifier.height(8.dp))
                 }
-                // 2. DESCRIPTION TEXT — below question, smaller, left-aligned in a subtle card
-                val descText = q.descText ?: q.mediaText ?: ""
-                if (descText.isNotBlank() && descText != q.stem) {
+                // 2. DESCRIPTION TEXT (descText only) — below question, small
+                //    Does NOT use mediaText as fallback — mediaText shows in media section
+                if (!q.descText.isNullOrBlank() && q.descType == "text") {
                     Surface(
                         color = Color(0xFFF8FAFC),
                         shape = RoundedCornerShape(8.dp),
@@ -422,7 +425,7 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
                         modifier = Modifier.fillMaxWidth(0.94f)
                     ) {
                         Text(
-                            descText,
+                            q.descText,
                             color = Color(0xFF475569),
                             fontSize = 12.sp,
                             fontWeight = FontWeight.Normal,
@@ -431,8 +434,8 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
                     }
                     Spacer(Modifier.height(8.dp))
                 }
-                // 3. QUESTION MEDIA — at the bottom
-                //    Description image (if set)
+                // 3. QUESTION MEDIA — below question text (and description if set)
+                //    Description image (if descType = image)
                 if (q.descType == "image" && !q.descImageUrl.isNullOrBlank()) {
                     val url = q.descImageUrl!!.toAbsoluteUrl()
                     coil.compose.AsyncImage(
@@ -440,6 +443,40 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
                         modifier = Modifier.fillMaxWidth(0.94f).heightIn(max = 120.dp).clip(RoundedCornerShape(8.dp)).clickable { FullScreenImageViewer.show(url) },
                         contentScale = ContentScale.Fit
                     )
+                }
+                //    Description audio (if descType = audio)
+                if (q.descType == "audio" && !q.descAudioUrl.isNullOrBlank()) {
+                    val descAudUrl = q.descAudioUrl!!.toAbsoluteUrl()
+                    key("desc-${q.id}") {
+                        AudioPlayerCard(
+                            theme = theme, url = descAudUrl, loopCount = q.audioLoop,
+                            loopDelaySec = q.audioLoopDelay, sound = sound,
+                            questionId = "${q.id}-desc", playCounts = audioPlayCounts,
+                            onPlayingChange = { playing ->
+                                audioPlaying = playing
+                                currentlyPlayingId = if (playing) "${q.id}-desc" else null
+                            },
+                            blocked = currentlyPlayingId != null && currentlyPlayingId != "${q.id}-desc"
+                        )
+                    }
+                }
+                //    Question media text (mediaText when mediaType = text)
+                if (q.mediaType == "text" && !q.mediaText.isNullOrBlank()) {
+                    Surface(
+                        color = Color(0xFFF8FAFC),
+                        shape = RoundedCornerShape(8.dp),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFE2E8F0)),
+                        modifier = Modifier.fillMaxWidth(0.94f)
+                    ) {
+                        Text(
+                            q.mediaText,
+                            color = Color(0xFF475569),
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Normal,
+                            modifier = Modifier.padding(10.dp)
+                        )
+                    }
+                    Spacer(Modifier.height(8.dp))
                 }
                 //    Question image (mediaImageUrl)
                 val mediaImgUrl = (q.mediaImageUrl ?: q.imageUrl)?.toAbsoluteUrl()
@@ -455,7 +492,16 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
                 val mediaAudUrl = (q.mediaAudioUrl ?: q.audioUrl)?.toAbsoluteUrl()
                 if (!mediaAudUrl.isNullOrBlank()) {
                     key(q.id) {
-                        AudioPlayerCard(theme = theme, url = mediaAudUrl, loopCount = q.audioLoop, loopDelaySec = q.audioLoopDelay, sound = sound, questionId = q.id, playCounts = audioPlayCounts, onPlayingChange = { audioPlaying = it }, blocked = audioPlaying)
+                        AudioPlayerCard(
+                            theme = theme, url = mediaAudUrl, loopCount = q.audioLoop,
+                            loopDelaySec = q.audioLoopDelay, sound = sound, questionId = q.id,
+                            playCounts = audioPlayCounts,
+                            onPlayingChange = { playing ->
+                                audioPlaying = playing
+                                currentlyPlayingId = if (playing) q.id else null
+                            },
+                            blocked = currentlyPlayingId != null && currentlyPlayingId != q.id
+                        )
                     }
                 }
             }
@@ -574,7 +620,18 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
                                 Spacer(Modifier.width(4.dp))
                                 // key(q.id, i) — recreate when question changes so play count resets
                                 key(q.id, i) {
-                                    AudioPlayerCard(theme = theme, url = absUrl, loopCount = q.audioLoop.coerceAtLeast(1), loopDelaySec = q.audioLoopDelay, sound = sound, questionId = "${q.id}-opt-$i", playCounts = audioPlayCounts, onPlayingChange = { audioPlaying = it }, blocked = audioPlaying)
+                                    val optId = "${q.id}-opt-$i"
+                                    AudioPlayerCard(
+                                        theme = theme, url = absUrl,
+                                        loopCount = q.audioLoop.coerceAtLeast(1),
+                                        loopDelaySec = q.audioLoopDelay, sound = sound,
+                                        questionId = optId, playCounts = audioPlayCounts,
+                                        onPlayingChange = { playing ->
+                                            audioPlaying = playing
+                                            currentlyPlayingId = if (playing) optId else null
+                                        },
+                                        blocked = currentlyPlayingId != null && currentlyPlayingId != optId
+                                    )
                                 }
                             }
                         }
