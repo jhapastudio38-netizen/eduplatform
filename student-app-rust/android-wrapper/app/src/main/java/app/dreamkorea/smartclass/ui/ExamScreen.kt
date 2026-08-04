@@ -474,10 +474,10 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
             // Vertical divider
             Box(modifier = Modifier.width(2.dp).fillMaxHeight().background(Color.Black))
 
-            // RIGHT: Answer options (40%) — scrollable so long options don't get cut
+            // RIGHT: Answer options (40%) — NO scroll, fits in viewport
             Column(
-                modifier = Modifier.weight(0.4f).fillMaxHeight().padding(8.dp).verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.Center
+                modifier = Modifier.weight(0.4f).fillMaxHeight().padding(6.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp)
             ) {
                 when (q.answerType) {
                     "text", "choose" -> {
@@ -528,13 +528,14 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
                                 }
                             }
                         } else {
-                            // Normal text options
+                            // Normal text options — fill height, no scroll
+                            Column(modifier = Modifier.fillMaxWidth().fillMaxHeight(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                             (0 until minOf(4, optionsList.size)).forEach { i ->
                                 val isSelected = answers[q.id] == optionsList.getOrNull(i)
                                 val optText = optionsList.getOrNull(i) ?: ""
                                 val blankWord = q.optionBlanks.getOrNull(i)?.takeIf { it.isNotBlank() }
                                 Row(
-                                    modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp).clickable { sound.click(); answers[q.id] = optText },
+                                    modifier = Modifier.fillMaxWidth().weight(1f).padding(vertical = 2.dp).clickable { sound.click(); answers[q.id] = optText },
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
                                     Surface(
@@ -553,6 +554,7 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
                                         modifier = Modifier.weight(1f)
                                     )
                                 }
+                            }
                             }
                         }
                     }
