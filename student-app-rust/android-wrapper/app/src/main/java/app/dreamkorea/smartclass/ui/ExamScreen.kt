@@ -1005,17 +1005,22 @@ private fun QuestionGridRef(
     showAllBlocks: Boolean,
     onPick: (Int) -> Unit,
 ) {
-    // Determine if this is the audio (Listening) grid
+    // Build a map: (blockType, blockNumber) → item, so clicking number N opens
+    // the EXACT question with that blockType+blockNumber combination.
+    // This fixes the mismatch where Reading Q1 and Listening Q1 both have blockNumber=1.
     val isAudioGrid = items.isNotEmpty() && items[0].question.blockType == "audio"
+    val blockTypeKey = if (isAudioGrid) "audio" else "text"
 
-    // Build a map: blockNumber → item, so clicking number N opens the question
-    // with blockNumber=N (not the Nth item in the list).
-    // Reading: blockNumber 1-20 → display 1-20
-    // Listening: blockNumber 1-20 → display 21-40 (blockNumber + 20)
+    // Map: blockNumber → item (only for THIS grid's blockType)
     val itemsByBlockNumber = items.associateBy { it.question.blockNumber }
 
     // Map: blockNumber → index in sortedItems (for onPick callback)
-    val sortedIndexByBlockNumber = sortedItems.mapIndexed { idx, item -> item.question.blockNumber to idx }.toMap()
+    // Must match BOTH blockType AND blockNumber to get the correct index
+    val sortedIndexByBlockNumber = sortedItems.mapIndexedNotNull { idx, item ->
+        if (item.question.blockType == blockTypeKey) {
+            item.question.blockNumber to idx
+        } else null
+    }.toMap()
 
     val cols = 5
     val rowsCount = 4  // Always 4 rows × 5 cols = 20 cells
@@ -1185,6 +1190,7 @@ fun AudioPlayerCard(
 
     // COMPACT audio player — just a small play button
     // BLOCKED when another audio is playing OR disabled OR already playing
+    // Check blocked at CLICK time (not composition time) to prevent race conditions
     val isBlocked = disabled || isPlaying || blocked
     Surface(
         color = if (disabled || blocked) Color(0xFFF1F5F9) else theme.primary.copy(alpha = 0.08f),
@@ -1193,17 +1199,21 @@ fun AudioPlayerCard(
     ) {
         Box(
             contentAlignment = Alignment.Center,
-            modifier = Modifier.fillMaxSize().clickable(enabled = !isBlocked) {
-                if (disabled || blocked) return@clickable
-                sound.click()
+            modifier = Modifier.fillMaxSize().clickable {
+                // CHECK AT CLICK TIME — prevent playing if blocked/disabled/playing
+                if (disabled) return@clickable
+                if (blocked) return@clickable
                 if (isPlaying) return@clickable
+                sound.click()
+                // IMMEDIATELY set isPlaying + notify parent so other buttons block
+                isPlaying = true
+                onPlayingChange?.invoke(true)
                 try {
                     mediaPlayer?.release()
                     val mp = android.media.MediaPlayer().apply {
                         setDataSource(url)
                         setOnPreparedListener {
                             start()
-                            isPlaying = true
                             incrementPlayCount()
                         }
                         setOnCompletionListener {
