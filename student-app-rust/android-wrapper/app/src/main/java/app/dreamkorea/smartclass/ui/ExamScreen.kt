@@ -306,7 +306,18 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
 
     // ═══ EXAM UI — spec-compliant landscape layout ═══
     // Sort items: Reading (text) first, then Listening (audio)
-    val sortedItems = t.items.sortedWith(compareBy(
+    // FILTER OUT empty questions (no stem, no media, no options) so they don't
+    // appear in the exam or get wrong question numbers
+    val sortedItems = t.items.filter { item ->
+        val q = item.question
+        !q.stem.isNullOrBlank() ||
+        !q.mediaImageUrl.isNullOrBlank() ||
+        !q.mediaAudioUrl.isNullOrBlank() ||
+        !q.mediaText.isNullOrBlank() ||
+        (q.options?.any { it.isNotBlank() } == true) ||
+        (q.optionImages?.any { it.isNotBlank() } == true) ||
+        (q.optionAudios?.any { it.isNotBlank() } == true)
+    }.sortedWith(compareBy(
         { if (it.question.blockType == "audio") 1 else 0 },
         { it.question.blockNumber }
     ))
@@ -1048,8 +1059,19 @@ private fun QuestionGridRef(
                     val item = itemsByBlockNumber[blockNumber]
                     val globalIdx = sortedIndexByBlockNumber[blockNumber]
 
-                    if (item != null && globalIdx != null) {
-                        // Question exists — show as active button
+                    // Check if the question actually has content (stem, media, or options)
+                    val hasContent = item != null && (
+                        !item.question.stem.isNullOrBlank() ||
+                        !item.question.mediaImageUrl.isNullOrBlank() ||
+                        !item.question.mediaAudioUrl.isNullOrBlank() ||
+                        !item.question.mediaText.isNullOrBlank() ||
+                        (item.question.options?.any { it.isNotBlank() } == true) ||
+                        (item.question.optionImages?.any { it.isNotBlank() } == true) ||
+                        (item.question.optionAudios?.any { it.isNotBlank() } == true)
+                    )
+
+                    if (item != null && globalIdx != null && hasContent) {
+                        // Question exists WITH content — show as active button
                         val isAnswered = answers.containsKey(item.question.id)
                         val isCurrent = globalIdx == currentIdx
                         val isFilteredOut = when (filterMode) {
