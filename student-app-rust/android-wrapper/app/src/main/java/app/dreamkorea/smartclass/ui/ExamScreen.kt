@@ -660,6 +660,7 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
             }
 
             // ── MAIN AREA: Reading LEFT | Listening RIGHT ────────────────
+            // Uses weight(1f) to fill remaining height — no scroll
             Box(
                 modifier = Modifier
                     .weight(1f)
@@ -671,25 +672,24 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
                     painter = painterResource(id = app.dreamkorea.smartclass.R.drawable.dreamkorea_logo),
                     contentDescription = null,
                     modifier = Modifier
-                        .size(160.dp)
+                        .size(140.dp)
                         .align(Alignment.Center)
-                        .alpha(0.06f),
+                        .alpha(0.05f),
                     contentScale = ContentScale.Fit
                 )
 
                 if (isQBank) {
                     // QBANK: single panel with ALL questions
                     Column(
-                        modifier = Modifier.fillMaxSize().padding(8.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally
+                        modifier = Modifier.fillMaxSize().padding(6.dp),
                     ) {
                         Column(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .fillMaxHeight()
-                                .border(3.dp, Color.Black, RoundedCornerShape(16.dp))
+                                .border(2.dp, Color.Black, RoundedCornerShape(12.dp))
                                 .background(Color.White)
-                                .padding(12.dp)
+                                .padding(8.dp)
                         ) {
                             QuestionGridRef(
                                 test = t,
@@ -709,36 +709,36 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
                         }
                     }
                 } else {
-                    // EXAM: Reading LEFT | Listening RIGHT
+                    // EXAM: Reading LEFT | Listening RIGHT — compact, no scroll
                     Row(
-                        modifier = Modifier.fillMaxSize().padding(8.dp),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        modifier = Modifier.fillMaxSize().padding(6.dp),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
                         // Reading panel (left)
                         Column(modifier = Modifier.weight(1f).fillMaxHeight()) {
-                            // Section label in a bordered box
+                            // Section label — compact
                             Surface(
                                 color = Color.White,
                                 shape = RoundedCornerShape(4.dp),
                                 border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFCCCCCC)),
-                                modifier = Modifier.fillMaxWidth().padding(bottom = 4.dp)
+                                modifier = Modifier.fillMaxWidth().padding(bottom = 2.dp)
                             ) {
                                 Text(
                                     "Reading",
                                     color = Color.Black,
-                                    fontSize = 13.sp,
+                                    fontSize = 11.sp,
                                     fontWeight = FontWeight.Bold,
-                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
                                 )
                             }
-                            // Grid with black border, rounded corners
+                            // Grid — fills remaining height, no scroll
                             Column(
                                 modifier = Modifier
                                     .weight(1f)
                                     .fillMaxWidth()
-                                    .border(3.dp, Color.Black, RoundedCornerShape(16.dp))
+                                    .border(2.dp, Color.Black, RoundedCornerShape(12.dp))
                                     .background(Color.White)
-                                    .padding(10.dp)
+                                    .padding(6.dp)
                             ) {
                                 QuestionGridRef(
                                     test = t,
@@ -764,23 +764,23 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
                                 color = Color.White,
                                 shape = RoundedCornerShape(4.dp),
                                 border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFCCCCCC)),
-                                modifier = Modifier.fillMaxWidth().padding(bottom = 4.dp)
+                                modifier = Modifier.fillMaxWidth().padding(bottom = 2.dp)
                             ) {
                                 Text(
                                     "Listening",
                                     color = Color.Black,
-                                    fontSize = 13.sp,
+                                    fontSize = 11.sp,
                                     fontWeight = FontWeight.Bold,
-                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
                                 )
                             }
                             Column(
                                 modifier = Modifier
                                     .weight(1f)
                                     .fillMaxWidth()
-                                    .border(3.dp, Color.Black, RoundedCornerShape(16.dp))
+                                    .border(2.dp, Color.Black, RoundedCornerShape(12.dp))
                                     .background(Color.White)
-                                    .padding(10.dp)
+                                    .padding(6.dp)
                             ) {
                                 QuestionGridRef(
                                     test = t,
@@ -803,24 +803,25 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
                 }
             }
 
-            // ── SUBMIT BUTTON (blue, centered, at bottom) ────────────────
+            // ── SUBMIT BUTTON (blue, centered, at bottom) — compact ─────
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .background(Color.White)
-                    .padding(vertical = 6.dp),
+                    .padding(vertical = 4.dp),
                 contentAlignment = Alignment.Center
             ) {
                 Button(
                     onClick = { showSubmitDialog = true },
-                    modifier = Modifier.fillMaxWidth(0.5f).height(40.dp),
+                    modifier = Modifier.fillMaxWidth(0.45f).height(34.dp),
                     colors = ButtonDefaults.buttonColors(containerColor = accentBlue),
-                    shape = RoundedCornerShape(12.dp)
+                    shape = RoundedCornerShape(10.dp),
+                    contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 8.dp, vertical = 0.dp)
                 ) {
                     Text(
                         "Submit and Finish Exam",
                         color = Color.White,
-                        fontSize = 13.sp,
+                        fontSize = 11.sp,
                         fontWeight = FontWeight.Bold
                     )
                 }
@@ -922,45 +923,38 @@ private fun QuestionGridRef(
     showAllBlocks: Boolean,
     onPick: (Int) -> Unit,
 ) {
-    // Map each item to its index in sortedItems (not test.items) so clicking
-    // Q22 opens Q22, not Q4.
+    // Map each item to its index in sortedItems so clicking opens the right question
     val globalIndices = items.mapNotNull { item ->
         val sortedIdx = sortedItems.indexOfFirst { it.question.id == item.question.id }
         sortedIdx.takeIf { it >= 0 }
     }
-    val cols = 5  // 5 columns per the screenshot spec (5x4 grid = 20 per section)
 
-    // Determine total cells to render
-    val expectedTotal = if (showAllBlocks) {
-        val isAudio = items.isNotEmpty() && items[0].question.blockType == "audio"
-        val blockCount = if (isAudio) test.audioBlockCount else test.textBlockCount
-        maxOf(blockCount, items.size)
-    } else {
-        items.size
-    }
-    val rowsCount = (expectedTotal + cols - 1) / cols
+    // Determine if this is the audio (Listening) grid — for number offset
+    val isAudioGrid = items.isNotEmpty() && items[0].question.blockType == "audio"
+
+    // Always show 20 cells (5 cols × 4 rows) — generated sequential numbers
+    // Reading: 1-20, Listening: 21-40
+    // Use the item's POSITION in the list (not blockNumber from DB) to avoid duplicates
+    val cols = 5
+    val rowsCount = 4  // Always 4 rows × 5 cols = 20 cells
 
     // NO scroll — grid fills available space, all 20 buttons visible at once
-    // Uses weight(1f) per row so rows expand to fill height
     Column(
         modifier = Modifier.fillMaxWidth().fillMaxHeight(),
-        verticalArrangement = Arrangement.spacedBy(4.dp)
+        verticalArrangement = Arrangement.spacedBy(3.dp)
     ) {
         for (rowIdx in 0 until rowsCount) {
             Row(
                 modifier = Modifier.fillMaxWidth().weight(1f),
-                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                horizontalArrangement = Arrangement.spacedBy(3.dp)
             ) {
                 for (colIdx in 0 until cols) {
                     val localIdx = rowIdx * cols + colIdx
+                    // Generated display number: 1-20 for Reading, 21-40 for Listening
+                    val displayNum = if (isAudioGrid) localIdx + 21 else localIdx + 1
+
                     if (localIdx < items.size) {
                         val globalIdx = globalIndices[localIdx]
-                        val q = items[localIdx].question
-                        val displayNum = if (q.blockType == "audio") {
-                            (q.blockNumber.takeIf { it > 0 } ?: (localIdx + 1)) + 20
-                        } else {
-                            q.blockNumber.takeIf { it > 0 } ?: (localIdx + 1)
-                        }
                         val isAnswered = answers.containsKey(items[localIdx].question.id)
                         val isCurrent = globalIdx == currentIdx
                         val isFilteredOut = when (filterMode) {
@@ -998,10 +992,8 @@ private fun QuestionGridRef(
                                 fontWeight = if (isCurrent) FontWeight.Bold else FontWeight.Medium,
                             )
                         }
-                    } else if (showAllBlocks) {
-                        // Empty placeholder cell — fills height like other cells
-                        val isAudioGrid = items.isNotEmpty() && items[0].question.blockType == "audio"
-                        val placeholderNum = if (isAudioGrid) localIdx + 21 else localIdx + 1
+                    } else {
+                        // Empty placeholder — generated number, greyed out
                         Box(
                             modifier = Modifier
                                 .weight(1f)
@@ -1012,15 +1004,12 @@ private fun QuestionGridRef(
                             contentAlignment = Alignment.Center
                         ) {
                             Text(
-                                "$placeholderNum",
+                                "$displayNum",
                                 color = Color(0xFFCCCCCC),
                                 fontSize = 11.sp,
                                 fontWeight = FontWeight.Normal,
                             )
                         }
-                    } else {
-                        // showAllBlocks=false, no question — invisible spacer
-                        Spacer(modifier = Modifier.weight(1f).fillMaxHeight())
                     }
                 }
             }
