@@ -257,125 +257,113 @@ fun ExamEntryScreen(theme: AppTheme, sound: SoundManager, testId: String, onStar
         Box(
             modifier = Modifier.weight(1f).padding(16.dp)
         ) {
-            // Layout matching screenshot:
-            // LEFT (60%): Exam description (vertically centered) + buttons at bottom
-            // RIGHT (40%): Exam title (top) → Profile icon → Name → Email (vertically centered)
-            Row(
-                modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()),
-                horizontalArrangement = Arrangement.spacedBy(20.dp),
-                verticalAlignment = Alignment.CenterVertically
+            // VERTICAL layout matching screenshot (top to bottom):
+            // 1. Exam title (centered, bold, large)
+            // 2. Profile icon (centered, large circle)
+            // 3. Student name + email (centered, bold)
+            // 4. Exam description (left-aligned, heading + paragraph)
+            // 5. Get Started button (blue, centered)
+            // 6. Cancel button (outlined, centered)
+            Column(
+                modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 16.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                // ── LEFT: Exam description + Buttons ──────────────────────
-                Column(
-                    modifier = Modifier.weight(0.6f).fillMaxHeight(),
-                    verticalArrangement = Arrangement.SpaceBetween
-                ) {
-                    // Exam description (top/middle area)
-                    Column {
-                        if (!t.description.isNullOrBlank()) {
-                            Text(
-                                "Exam description",
-                                color = Color.Black,
-                                fontSize = 14.sp,
-                                fontWeight = FontWeight.Bold
-                            )
-                            Spacer(Modifier.height(6.dp))
-                            Text(
-                                t.description!!,
-                                color = Color(0xFF333333),
-                                fontSize = 13.sp,
-                                fontWeight = FontWeight.Normal,
-                                lineHeight = 18.sp
-                            )
-                        }
-                    }
-                    // Buttons at bottom: Cancel (left) + Get Started (right)
-                    Row(
-                        modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
-                        horizontalArrangement = Arrangement.spacedBy(10.dp)
-                    ) {
-                        // Cancel button (outlined)
-                        OutlinedButton(
-                            onClick = { sound.click(); onBack() },
-                            modifier = Modifier.weight(1f).height(44.dp),
-                            shape = RoundedCornerShape(10.dp),
-                            colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.Black),
-                            border = BorderStroke(1.5.dp, Color.Black)
-                        ) {
-                            Text("Cancel", fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
-                        }
-                        // Get Started button (blue)
-                        Button(
-                            onClick = { sound.swoosh(); onStart() },
-                            modifier = Modifier.weight(1f).height(44.dp),
-                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2563EB)),
-                            shape = RoundedCornerShape(10.dp),
-                            enabled = !alreadyCompleted
-                        ) {
-                            Text(
-                                if (alreadyCompleted) "Already Completed" else "Get Started",
-                                color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Bold
-                            )
-                        }
-                    }
-                }
+                Spacer(Modifier.height(12.dp))
 
-                // ── Vertical divider ──────────────────────────────────────
+                // 1. EXAM TITLE — centered, bold, large
+                Text(
+                    t.title,
+                    color = Color.Black,
+                    fontSize = 24.sp,
+                    fontWeight = FontWeight.Bold,
+                    textAlign = TextAlign.Center,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Spacer(Modifier.height(8.dp))
+
+                // 2. PROFILE ICON — large circle, centered
                 Box(
                     modifier = Modifier
-                        .width(1.dp)
-                        .fillMaxHeight(0.7f)
-                        .background(Color(0xFFCCCCCC))
-                )
-
-                // ── RIGHT: Exam title (top) + Profile + Name + Email ──────
-                Column(
-                    modifier = Modifier.weight(0.4f).fillMaxHeight(),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.Center
+                        .size(90.dp)
+                        .clip(CircleShape)
+                        .border(2.dp, Color.Black, CircleShape)
+                        .background(Color.White),
+                    contentAlignment = Alignment.Center
                 ) {
-                    // Exam title at TOP (bold)
-                    Text(
-                        t.title,
-                        color = Color.Black,
-                        fontSize = 16.sp,
-                        fontWeight = FontWeight.Bold,
-                        textAlign = TextAlign.Center,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                    Spacer(Modifier.height(16.dp))
+                    Icon(Icons.Default.Person, null, tint = Color.Black, modifier = Modifier.size(52.dp))
+                }
+                Spacer(Modifier.height(4.dp))
 
-                    // Profile icon (circle with person)
-                    Box(
-                        modifier = Modifier
-                            .size(64.dp)
-                            .clip(CircleShape)
-                            .border(2.dp, Color.Black, CircleShape)
-                            .background(Color.White),
-                        contentAlignment = Alignment.Center
+                // 3. STUDENT NAME + EMAIL — centered, bold
+                Text(
+                    "Name of Student: $studentName",
+                    color = Color.Black,
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Bold,
+                    textAlign = TextAlign.Center
+                )
+                Text(
+                    "Student Email: $studentEmail",
+                    color = Color.Black,
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Bold,
+                    textAlign = TextAlign.Center
+                )
+                Spacer(Modifier.height(16.dp))
+
+                // 4. EXAM DESCRIPTION — left-aligned, heading + paragraph
+                if (!t.description.isNullOrBlank()) {
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalAlignment = Alignment.Start
                     ) {
-                        Icon(Icons.Default.Person, null, tint = Color.Black, modifier = Modifier.size(36.dp))
+                        Text(
+                            "Exam description",
+                            color = Color.Black,
+                            fontSize = 18.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Spacer(Modifier.height(6.dp))
+                        Text(
+                            t.description!!,
+                            color = Color(0xFF333333),
+                            fontSize = 15.sp,
+                            fontWeight = FontWeight.Normal,
+                            lineHeight = 20.sp
+                        )
                     }
-                    Spacer(Modifier.height(8.dp))
+                }
 
-                    // Student name
+                Spacer(Modifier.weight(1f))
+
+                // 5. GET STARTED button (blue, centered, wide)
+                Button(
+                    onClick = { sound.swoosh(); onStart() },
+                    modifier = Modifier.fillMaxWidth(0.7f).height(52.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2563EB)),
+                    shape = RoundedCornerShape(16.dp),
+                    enabled = !alreadyCompleted
+                ) {
                     Text(
-                        studentName,
-                        color = Color.Black,
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.Bold,
-                        textAlign = TextAlign.Center
-                    )
-                    // Student email
-                    Text(
-                        studentEmail,
-                        color = Color.Gray,
-                        fontSize = 11.sp,
-                        textAlign = TextAlign.Center
+                        if (alreadyCompleted) "Already Completed" else "Get Started",
+                        color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Bold
                     )
                 }
+                Spacer(Modifier.height(10.dp))
+
+                // 6. CANCEL button (outlined, centered, same width)
+                OutlinedButton(
+                    onClick = { sound.click(); onBack() },
+                    modifier = Modifier.fillMaxWidth(0.7f).height(52.dp),
+                    shape = RoundedCornerShape(16.dp),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.Black),
+                    border = BorderStroke(1.5.dp, Color.Black)
+                ) {
+                    Text("Cancel", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                }
+                Spacer(Modifier.height(16.dp))
             }
         }
     }
