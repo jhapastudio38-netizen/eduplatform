@@ -590,7 +590,8 @@ function ExamEditor({ test, testCategory, onClose }: { test: Test; testCategory:
         toast.error(d.error || `Save failed (HTTP ${res.status})`);
         return;
       }
-      toast.success(`Question ${q.blockNumber} saved`);
+      const displayNum = q.blockType === "audio" ? q.blockNumber + 20 : q.blockNumber;
+      toast.success(`Question ${displayNum} saved`);
     } catch (e: any) {
       toast.error("Save failed: " + (e.message || "network error"));
     }
@@ -899,16 +900,22 @@ function ExamEditor({ test, testCategory, onClose }: { test: Test; testCategory:
     .sort((a, b) => a.blockNumber - b.blockNumber);
 
   function addQuestion() {
-    // Pick the next free block number for the "text" block type
-    const used = new Set(Object.values(questions).map((q) => q.blockNumber));
+    // Pick the next free block number for the CURRENT block type only
+    // (not across all block types — audio and text have separate 1-20 ranges)
+    const targetBlock = activeBlock;
+    const used = new Set(
+      Object.values(questions)
+        .filter((q) => q.blockType === targetBlock)
+        .map((q) => q.blockNumber)
+    );
     let next = 1;
     while (used.has(next)) next++;
-    setActiveBlock("text");
+    setActiveBlock(targetBlock);
     setActiveNumber(next);
     // Pre-seed an empty question so it appears in the list immediately
-    const k = key("text", next);
+    const k = key(targetBlock, next);
     if (!questions[k]) {
-      setQuestions((prev) => ({ ...prev, [k]: emptyQuestion("text", next) }));
+      setQuestions((prev) => ({ ...prev, [k]: emptyQuestion(targetBlock, next) }));
     }
   }
 

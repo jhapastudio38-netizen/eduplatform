@@ -572,7 +572,7 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
                         }
                     }
                     "audio" -> {
-                        // Audio options — just a play icon + number, nice and clean
+                        // Audio options — visible row with number + "Option N" label + play button
                         Column(
                             modifier = Modifier.fillMaxWidth().fillMaxHeight(),
                             verticalArrangement = Arrangement.spacedBy(4.dp)
@@ -585,26 +585,34 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
                                     modifier = Modifier
                                         .fillMaxWidth()
                                         .weight(1f)
-                                        .clip(RoundedCornerShape(6.dp))
-                                        .border(if (isSelected) 2.dp else 1.dp, if (isSelected) theme.primary else Color(0xFFCCCCCC), RoundedCornerShape(6.dp))
-                                        .background(if (isSelected) theme.primary.copy(alpha = 0.05f) else Color.White)
-                                        .padding(horizontal = 8.dp)
+                                        .clip(RoundedCornerShape(8.dp))
+                                        .border(2.dp, if (isSelected) theme.primary else Color.Black, RoundedCornerShape(8.dp))
+                                        .background(if (isSelected) theme.primary.copy(alpha = 0.1f) else Color(0xFFF8FAFC))
+                                        .padding(horizontal = 10.dp, vertical = 4.dp)
                                         .clickable { sound.click(); answers[q.id] = absUrl },
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    // Number circle
+                                    // Number circle — BIG and visible
                                     Surface(
                                         color = if (isSelected) theme.primary else Color.White,
-                                        border = androidx.compose.foundation.BorderStroke(1.5.dp, Color.Black),
+                                        border = androidx.compose.foundation.BorderStroke(2.dp, Color.Black),
                                         shape = androidx.compose.foundation.shape.CircleShape,
-                                        modifier = Modifier.size(24.dp)
+                                        modifier = Modifier.size(32.dp)
                                     ) {
                                         Box(contentAlignment = Alignment.Center) {
-                                            Text("${i+1}", color = if (isSelected) Color.White else Color.Black, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                                            Text("${i+1}", color = if (isSelected) Color.White else Color.Black, fontSize = 14.sp, fontWeight = FontWeight.Bold)
                                         }
                                     }
-                                    Spacer(Modifier.width(6.dp))
-                                    // Just a play icon — nice and good
+                                    Spacer(Modifier.width(10.dp))
+                                    // "Option N" label — VISIBLE text so user knows it's there
+                                    Text(
+                                        "Option ${i+1}",
+                                        color = if (isSelected) theme.primary else Color.Black,
+                                        fontSize = 13.sp,
+                                        fontWeight = FontWeight.SemiBold,
+                                        modifier = Modifier.weight(1f)
+                                    )
+                                    // Play button — BIGGER and clearly visible
                                     key(q.id, i) {
                                         AudioPlayerCard(
                                             theme = theme, url = absUrl,
