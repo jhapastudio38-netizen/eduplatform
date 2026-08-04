@@ -414,7 +414,13 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
                         border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFE2E8F0)),
                         modifier = Modifier.fillMaxWidth(0.92f)
                     ) {
-                        Text(q.descText, color = Color(0xFF475569), fontSize = 12.sp, modifier = Modifier.padding(10.dp))
+                        Text(
+                            q.descText,
+                            color = Color(0xFF1E293B),
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            modifier = Modifier.padding(10.dp)
+                        )
                     }
                     Spacer(Modifier.height(6.dp))
                 }
