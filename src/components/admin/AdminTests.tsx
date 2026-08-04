@@ -887,9 +887,11 @@ function ExamEditor({ test, testCategory, onClose }: { test: Test; testCategory:
     }
   }
 
+  // Block numbers: Reading shows 1-20, Listening shows 21-40
+  // This matches what the student sees in the app
   const blockNumbers = activeBlock === "text"
-    ? Array.from({ length: textCount }, (_, i) => i + 1)
-    : Array.from({ length: audioCount }, (_, i) => i + 1);
+    ? Array.from({ length: textCount }, (_, i) => i + 1)        // 1-20
+    : Array.from({ length: audioCount }, (_, i) => i + 21);     // 21-40
 
   // Simple-mode list of saved questions (sorted by block number)
   const simpleList = Object.values(questions)
@@ -964,16 +966,20 @@ function ExamEditor({ test, testCategory, onClose }: { test: Test; testCategory:
         )}
 
         {/* Block number selector — grid of numbered buttons (exam & demo only) */}
+        {/* Reading: 1-20, Listening: 21-40 (display) → stored as 1-20 internally */}
         {!isSimple && (
           <div className="grid grid-cols-10 gap-1 max-h-24 overflow-y-auto p-1 bg-slate-50 rounded">
             {blockNumbers.map((num) => {
-              const k = key(activeBlock, num);
+              // Convert display number to internal blockNumber
+              // Reading: 1-20 → 1-20, Listening: 21-40 → 1-20
+              const internalBlockNumber = activeBlock === "audio" ? num - 20 : num;
+              const k = key(activeBlock, internalBlockNumber);
               const isFilled = questions[k] && questions[k].stem.trim();
-              const isActive = num === activeNumber;
+              const isActive = internalBlockNumber === activeNumber;
               return (
                 <button
                   key={num}
-                  onClick={() => setActiveNumber(num)}
+                  onClick={() => setActiveNumber(internalBlockNumber)}
                   className={`h-8 rounded text-xs font-medium transition-colors ${
                     isActive ? "bg-primary text-primary-foreground" :
                     isFilled ? "bg-green-100 text-green-700 border border-green-300" :
@@ -1032,7 +1038,7 @@ function ExamEditor({ test, testCategory, onClose }: { test: Test; testCategory:
             <QuestionEditor
               question={currentQuestion}
               onChange={updateQuestion}
-              blockLabel={`Question ${activeBlock === "audio" ? textCount + activeNumber : activeNumber}`}
+              blockLabel={`Question ${activeBlock === "audio" ? activeNumber + 20 : activeNumber}`}
               isAudioBlock={activeBlock === "audio"}
             />
           )}
