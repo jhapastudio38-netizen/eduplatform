@@ -694,6 +694,25 @@ function ExamEditor({ test, testCategory, onClose }: { test: Test; testCategory:
     const qNum = parseInt(data.question_number || "0");
     const detectedBlockType: "text" | "audio" = qNum >= 21 ? "audio" : "text";
     const detectedBlockNumber = qNum >= 21 ? qNum - 20 : qNum;
+
+    // Collect raw options from app JSON
+    const rawOptions = [data.option_1 || "", data.option_2 || "", data.option_3 || "", data.option_4 || ""];
+    // Detect if options are image URLs (start with http and end with image extension)
+    const isImageUrl = (s: string) => s && s.startsWith("http") && /\.(jpeg|jpg|png|webp|gif)/i.test(s);
+    const isAudioUrl = (s: string) => s && s.startsWith("http") && /\.(mp3|wav|ogg|m4a|aac)/i.test(s);
+    const allImages = rawOptions.every(o => !o || isImageUrl(o));
+    const allAudios = rawOptions.every(o => !o || isAudioUrl(o));
+
+    // Determine answerType: if options are all image URLs → "image", all audio URLs → "audio", else "text"
+    let detectedAnswerType = (data.answer_media_type || "text") as "text" | "image" | "audio" | "choose";
+    if (allImages && rawOptions.some(o => o)) detectedAnswerType = "image";
+    else if (allAudios && rawOptions.some(o => o)) detectedAnswerType = "audio";
+
+    // Route options to the correct array based on type
+    const textOptions = detectedAnswerType === "text" ? rawOptions : ["", "", "", ""];
+    const imageOptions = detectedAnswerType === "image" ? rawOptions : ["", "", "", ""];
+    const audioOptions = detectedAnswerType === "audio" ? rawOptions : ["", "", ""];
+
     const updated: QuestionData = {
       ...q,
       blockType: detectedBlockType,
@@ -706,12 +725,17 @@ function ExamEditor({ test, testCategory, onClose }: { test: Test; testCategory:
       mediaAudioUrl: data.question_media_type === "audio" ? (data.question_media || "") : (q.mediaAudioUrl || ""),
       descType: (data.question_description_type || "none") as "none" | "text" | "image" | "audio",
       descText: data.question_description || "",
-      options: [data.option_1 || "", data.option_2 || "", data.option_3 || "", data.option_4 || ""].filter((o) => o !== undefined),
+      descImageUrl: data.question_description_type === "image" ? (data.question_description_media || "") : (q.descImageUrl || ""),
+      descAudioUrl: data.question_description_type === "audio" ? (data.question_description_media || "") : (q.descAudioUrl || ""),
+      options: textOptions,
+      optionImages: imageOptions,
+      optionAudios: audioOptions,
+      optionBlanks: ["", "", "", ""],
       correctOption: data.correct_answer ? (() => {
         const m = data.correct_answer.match(/option\s*(\d+)/i);
         return m ? parseInt(m[1]) - 1 : 0;
       })() : (q.correctOption || 0),
-      answerType: (data.answer_media_type || "text") as "text" | "image" | "audio" | "choose",
+      answerType: detectedAnswerType,
       explanation: data.answer_description || "",
     };
     updateQuestion(updated);
@@ -730,6 +754,17 @@ function ExamEditor({ test, testCategory, onClose }: { test: Test; testCategory:
       const blockNumber = qNum >= 21 ? qNum - 20 : qNum;
       const k = key(blockType, blockNumber);
       const existing = next[k] || emptyQuestion(blockType, blockNumber);
+
+      // Detect option types (image/audio URLs vs text)
+      const rawOptions = [data.option_1 || "", data.option_2 || "", data.option_3 || "", data.option_4 || ""];
+      const isImageUrl = (s: string) => s && s.startsWith("http") && /\.(jpeg|jpg|png|webp|gif)/i.test(s);
+      const isAudioUrl = (s: string) => s && s.startsWith("http") && /\.(mp3|wav|ogg|m4a|aac)/i.test(s);
+      const allImages = rawOptions.every(o => !o || isImageUrl(o));
+      const allAudios = rawOptions.every(o => !o || isAudioUrl(o));
+      let answerType = (data.answer_media_type || "text") as "text" | "image" | "audio" | "choose";
+      if (allImages && rawOptions.some(o => o)) answerType = "image";
+      else if (allAudios && rawOptions.some(o => o)) answerType = "audio";
+
       next[k] = {
         ...existing,
         blockType, blockNumber,
@@ -741,12 +776,17 @@ function ExamEditor({ test, testCategory, onClose }: { test: Test; testCategory:
         mediaAudioUrl: data.question_media_type === "audio" ? (data.question_media || "") : "",
         descType: (data.question_description_type || "none") as "none" | "text" | "image" | "audio",
         descText: data.question_description || "",
-        options: [data.option_1 || "", data.option_2 || "", data.option_3 || "", data.option_4 || ""].filter((o) => o !== undefined),
+        descImageUrl: data.question_description_type === "image" ? (data.question_description_media || "") : "",
+        descAudioUrl: data.question_description_type === "audio" ? (data.question_description_media || "") : "",
+        options: answerType === "text" ? rawOptions : ["", "", "", ""],
+        optionImages: answerType === "image" ? rawOptions : ["", "", "", ""],
+        optionAudios: answerType === "audio" ? rawOptions : ["", "", "", ""],
+        optionBlanks: ["", "", "", ""],
         correctOption: data.correct_answer ? (() => {
           const m = data.correct_answer.match(/option\s*(\d+)/i);
           return m ? parseInt(m[1]) - 1 : 0;
         })() : 0,
-        answerType: (data.answer_media_type || "text") as "text" | "image" | "audio" | "choose",
+        answerType,
         explanation: data.answer_description || "",
       };
       imported++;
