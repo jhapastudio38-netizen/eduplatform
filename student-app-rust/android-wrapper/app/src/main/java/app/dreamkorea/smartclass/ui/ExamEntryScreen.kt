@@ -25,6 +25,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.dreamkorea.smartclass.api.TestDetail
@@ -256,118 +257,124 @@ fun ExamEntryScreen(theme: AppTheme, sound: SoundManager, testId: String, onStar
         Box(
             modifier = Modifier.weight(1f).padding(16.dp)
         ) {
-            // Landscape-friendly layout: Row with LEFT (student) + RIGHT (exam)
+            // Landscape layout matching screenshot:
+            // LEFT: Student info (profile icon + name + email)
+            // RIGHT: Exam title + Exam description + Cancel/Get Started buttons
             Row(
                 modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()),
-                horizontalArrangement = Arrangement.spacedBy(24.dp),
+                horizontalArrangement = Arrangement.spacedBy(20.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 // ── LEFT: Student info ────────────────────────────────────
                 Column(
-                    modifier = Modifier.weight(0.4f),
+                    modifier = Modifier.weight(0.35f),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    // Title at top
-                Text(
-                    t.title,
-                    color = Color.Black,
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.Bold,
-                    textAlign = TextAlign.Center,
-                    maxLines = 2
-                )
-                Spacer(Modifier.height(16.dp))
-
-                // Profile icon
-                Box(
-                    modifier = Modifier
-                        .size(64.dp)
-                        .clip(CircleShape)
-                        .background(Color(0xFF003478)),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(Icons.Default.Person, null, tint = Color.White, modifier = Modifier.size(36.dp))
-                }
-                Spacer(Modifier.height(8.dp))
-
-                // Student name
-                Text(
-                    studentName,
-                    color = Color.Black,
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    textAlign = TextAlign.Center
-                )
-                // Student email
-                Text(
-                    studentEmail,
-                    color = Color.Gray,
-                    fontSize = 11.sp,
-                    textAlign = TextAlign.Center
-                )
-            }
-
-            // ── Vertical divider ──────────────────────────────────────────
-            Box(
-                modifier = Modifier
-                    .width(1.dp)
-                    .fillMaxHeight(0.7f)
-                    .background(Color(0xFFCCCCCC))
-            )
-
-            // ── RIGHT: Exam info + buttons ────────────────────────────────
-            Column(
-                modifier = Modifier.weight(0.6f),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                // Exam description
-                if (!t.description.isNullOrBlank()) {
-                    Surface(
-                        color = Color(0xFFF5F5F5),
-                        shape = RoundedCornerShape(8.dp),
-                        border = BorderStroke(1.dp, Color(0xFFCCCCCC)),
-                        modifier = Modifier.fillMaxWidth()
+                    // Profile icon (large circle with person icon)
+                    Box(
+                        modifier = Modifier
+                            .size(72.dp)
+                            .clip(CircleShape)
+                            .border(2.dp, Color.Black, CircleShape)
+                            .background(Color.White),
+                        contentAlignment = Alignment.Center
                     ) {
-                        Text(
-                            t.description!!,
-                            color = Color.Black,
-                            fontSize = 12.sp,
-                            modifier = Modifier.padding(12.dp)
-                        )
+                        Icon(Icons.Default.Person, null, tint = Color.Black, modifier = Modifier.size(40.dp))
                     }
-                    Spacer(Modifier.height(12.dp))
-                }
+                    Spacer(Modifier.height(10.dp))
 
-                                Spacer(Modifier.height(20.dp))
-
-                // Get Started button — graded exams lock after 1 attempt, practice can retake
-                Button(
-                    onClick = { sound.swoosh(); onStart() },
-                    modifier = Modifier.fillMaxWidth(0.7f).height(44.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF003478)),
-                    shape = RoundedCornerShape(10.dp),
-                    enabled = !alreadyCompleted
-                ) {
+                    // Student name
                     Text(
-                        if (alreadyCompleted) "Already Completed" else "Get Started",
-                        color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Bold
+                        studentName,
+                        color = Color.Black,
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Bold,
+                        textAlign = TextAlign.Center
+                    )
+                    // Student email
+                    Text(
+                        studentEmail,
+                        color = Color.Gray,
+                        fontSize = 11.sp,
+                        textAlign = TextAlign.Center
                     )
                 }
 
-                Spacer(Modifier.height(8.dp))
+                // ── Vertical divider ──────────────────────────────────────
+                Box(
+                    modifier = Modifier
+                        .width(1.dp)
+                        .fillMaxHeight(0.7f)
+                        .background(Color(0xFFCCCCCC))
+                )
 
-                // Cancel button
-                OutlinedButton(
-                    onClick = { sound.click(); onBack() },
-                    modifier = Modifier.fillMaxWidth(0.7f).height(40.dp),
-                    shape = RoundedCornerShape(10.dp),
-                    colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.Black),
-                    border = BorderStroke(1.dp, Color.Black)
+                // ── RIGHT: Exam title + description + buttons ─────────────
+                Column(
+                    modifier = Modifier.weight(0.65f),
+                    horizontalAlignment = Alignment.Start
                 ) {
-                    Text("Cancel", fontSize = 13.sp)
+                    // Exam title (bold, top-right)
+                    Text(
+                        t.title,
+                        color = Color.Black,
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    Spacer(Modifier.height(12.dp))
+
+                    // "Exam description" label (bold)
+                    if (!t.description.isNullOrBlank()) {
+                        Text(
+                            "Exam description",
+                            color = Color.Black,
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Spacer(Modifier.height(4.dp))
+                        // Description body text (regular weight, readable)
+                        Text(
+                            t.description!!,
+                            color = Color(0xFF333333),
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Normal,
+                            lineHeight = 18.sp
+                        )
+                        Spacer(Modifier.height(16.dp))
+                    }
+
+                    // Buttons: Cancel (outlined) + Get Started (blue) — side by side
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        // Cancel button (outlined)
+                        OutlinedButton(
+                            onClick = { sound.click(); onBack() },
+                            modifier = Modifier.weight(1f).height(44.dp),
+                            shape = RoundedCornerShape(10.dp),
+                            colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.Black),
+                            border = BorderStroke(1.5.dp, Color.Black)
+                        ) {
+                            Text("Cancel", fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+                        }
+                        // Get Started button (blue)
+                        Button(
+                            onClick = { sound.swoosh(); onStart() },
+                            modifier = Modifier.weight(1f).height(44.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2563EB)),
+                            shape = RoundedCornerShape(10.dp),
+                            enabled = !alreadyCompleted
+                        ) {
+                            Text(
+                                if (alreadyCompleted) "Already Completed" else "Get Started",
+                                color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
                 }
             }
-        }
         }
     }
 }
