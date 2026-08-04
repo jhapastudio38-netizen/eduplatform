@@ -257,96 +257,41 @@ fun ExamEntryScreen(theme: AppTheme, sound: SoundManager, testId: String, onStar
         Box(
             modifier = Modifier.weight(1f).padding(16.dp)
         ) {
-            // Landscape layout matching screenshot:
-            // LEFT: Student info (profile icon + name + email)
-            // RIGHT: Exam title + Exam description + Cancel/Get Started buttons
+            // Layout matching screenshot:
+            // LEFT (60%): Exam description (vertically centered) + buttons at bottom
+            // RIGHT (40%): Exam title (top) → Profile icon → Name → Email (vertically centered)
             Row(
                 modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()),
                 horizontalArrangement = Arrangement.spacedBy(20.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // ── LEFT: Student info ────────────────────────────────────
+                // ── LEFT: Exam description + Buttons ──────────────────────
                 Column(
-                    modifier = Modifier.weight(0.35f),
-                    horizontalAlignment = Alignment.CenterHorizontally
+                    modifier = Modifier.weight(0.6f).fillMaxHeight(),
+                    verticalArrangement = Arrangement.SpaceBetween
                 ) {
-                    // Profile icon (large circle with person icon)
-                    Box(
-                        modifier = Modifier
-                            .size(72.dp)
-                            .clip(CircleShape)
-                            .border(2.dp, Color.Black, CircleShape)
-                            .background(Color.White),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(Icons.Default.Person, null, tint = Color.Black, modifier = Modifier.size(40.dp))
+                    // Exam description (top/middle area)
+                    Column {
+                        if (!t.description.isNullOrBlank()) {
+                            Text(
+                                "Exam description",
+                                color = Color.Black,
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Spacer(Modifier.height(6.dp))
+                            Text(
+                                t.description!!,
+                                color = Color(0xFF333333),
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Normal,
+                                lineHeight = 18.sp
+                            )
+                        }
                     }
-                    Spacer(Modifier.height(10.dp))
-
-                    // Student name
-                    Text(
-                        studentName,
-                        color = Color.Black,
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.Bold,
-                        textAlign = TextAlign.Center
-                    )
-                    // Student email
-                    Text(
-                        studentEmail,
-                        color = Color.Gray,
-                        fontSize = 11.sp,
-                        textAlign = TextAlign.Center
-                    )
-                }
-
-                // ── Vertical divider ──────────────────────────────────────
-                Box(
-                    modifier = Modifier
-                        .width(1.dp)
-                        .fillMaxHeight(0.7f)
-                        .background(Color(0xFFCCCCCC))
-                )
-
-                // ── RIGHT: Exam title + description + buttons ─────────────
-                Column(
-                    modifier = Modifier.weight(0.65f),
-                    horizontalAlignment = Alignment.Start
-                ) {
-                    // Exam title (bold, top-right)
-                    Text(
-                        t.title,
-                        color = Color.Black,
-                        fontSize = 18.sp,
-                        fontWeight = FontWeight.Bold,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                    Spacer(Modifier.height(12.dp))
-
-                    // "Exam description" label (bold)
-                    if (!t.description.isNullOrBlank()) {
-                        Text(
-                            "Exam description",
-                            color = Color.Black,
-                            fontSize = 14.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                        Spacer(Modifier.height(4.dp))
-                        // Description body text (regular weight, readable)
-                        Text(
-                            t.description!!,
-                            color = Color(0xFF333333),
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.Normal,
-                            lineHeight = 18.sp
-                        )
-                        Spacer(Modifier.height(16.dp))
-                    }
-
-                    // Buttons: Cancel (outlined) + Get Started (blue) — side by side
+                    // Buttons at bottom: Cancel (left) + Get Started (right)
                     Row(
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
                         horizontalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
                         // Cancel button (outlined)
@@ -373,6 +318,63 @@ fun ExamEntryScreen(theme: AppTheme, sound: SoundManager, testId: String, onStar
                             )
                         }
                     }
+                }
+
+                // ── Vertical divider ──────────────────────────────────────
+                Box(
+                    modifier = Modifier
+                        .width(1.dp)
+                        .fillMaxHeight(0.7f)
+                        .background(Color(0xFFCCCCCC))
+                )
+
+                // ── RIGHT: Exam title (top) + Profile + Name + Email ──────
+                Column(
+                    modifier = Modifier.weight(0.4f).fillMaxHeight(),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center
+                ) {
+                    // Exam title at TOP (bold)
+                    Text(
+                        t.title,
+                        color = Color.Black,
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Bold,
+                        textAlign = TextAlign.Center,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    Spacer(Modifier.height(16.dp))
+
+                    // Profile icon (circle with person)
+                    Box(
+                        modifier = Modifier
+                            .size(64.dp)
+                            .clip(CircleShape)
+                            .border(2.dp, Color.Black, CircleShape)
+                            .background(Color.White),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(Icons.Default.Person, null, tint = Color.Black, modifier = Modifier.size(36.dp))
+                    }
+                    Spacer(Modifier.height(8.dp))
+
+                    // Student name
+                    Text(
+                        studentName,
+                        color = Color.Black,
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Bold,
+                        textAlign = TextAlign.Center
+                    )
+                    // Student email
+                    Text(
+                        studentEmail,
+                        color = Color.Gray,
+                        fontSize = 11.sp,
+                        textAlign = TextAlign.Center
+                    )
                 }
             }
         }
