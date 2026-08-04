@@ -255,65 +255,61 @@ fun ExamEntryScreen(theme: AppTheme, sound: SoundManager, testId: String, onStar
         }
 
         Box(
-            modifier = Modifier.weight(1f).padding(16.dp)
+            modifier = Modifier.weight(1f).padding(10.dp)
         ) {
-            // VERTICAL layout matching screenshot (top to bottom):
-            // 1. Exam title (centered, bold, large)
-            // 2. Profile icon (centered, large circle)
-            // 3. Student name + email (centered, bold)
-            // 4. Exam description (left-aligned, heading + paragraph)
-            // 5. Get Started button (blue, centered)
-            // 6. Cancel button (outlined, centered)
+            // VERTICAL layout — NO scroll, everything fits on screen
+            // Compact spacing so all 6 elements fit in landscape view
             Column(
-                modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 16.dp),
+                modifier = Modifier.fillMaxSize().padding(horizontal = 12.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(8.dp)
+                verticalArrangement = Arrangement.spacedBy(4.dp)
             ) {
-                Spacer(Modifier.height(12.dp))
+                Spacer(Modifier.height(2.dp))
 
-                // 1. EXAM TITLE — centered, bold, large
+                // 1. EXAM TITLE — centered, bold
                 Text(
                     t.title,
                     color = Color.Black,
-                    fontSize = 24.sp,
+                    fontSize = 16.sp,
                     fontWeight = FontWeight.Bold,
                     textAlign = TextAlign.Center,
-                    maxLines = 2,
+                    maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
-                Spacer(Modifier.height(8.dp))
 
-                // 2. PROFILE ICON — large circle, centered
+                // 2. PROFILE ICON — smaller circle to save space
                 Box(
                     modifier = Modifier
-                        .size(90.dp)
+                        .size(48.dp)
                         .clip(CircleShape)
-                        .border(2.dp, Color.Black, CircleShape)
+                        .border(1.5.dp, Color.Black, CircleShape)
                         .background(Color.White),
                     contentAlignment = Alignment.Center
                 ) {
-                    Icon(Icons.Default.Person, null, tint = Color.Black, modifier = Modifier.size(52.dp))
+                    Icon(Icons.Default.Person, null, tint = Color.Black, modifier = Modifier.size(28.dp))
                 }
-                Spacer(Modifier.height(4.dp))
 
-                // 3. STUDENT NAME + EMAIL — centered, bold
+                // 3. STUDENT NAME + EMAIL — centered, bold, compact
                 Text(
                     "Name of Student: $studentName",
                     color = Color.Black,
-                    fontSize = 16.sp,
+                    fontSize = 11.sp,
                     fontWeight = FontWeight.Bold,
-                    textAlign = TextAlign.Center
+                    textAlign = TextAlign.Center,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
                 )
                 Text(
                     "Student Email: $studentEmail",
                     color = Color.Black,
-                    fontSize = 16.sp,
+                    fontSize = 11.sp,
                     fontWeight = FontWeight.Bold,
-                    textAlign = TextAlign.Center
+                    textAlign = TextAlign.Center,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
                 )
-                Spacer(Modifier.height(16.dp))
 
-                // 4. EXAM DESCRIPTION — left-aligned, heading + paragraph
+                // 4. EXAM DESCRIPTION — left-aligned, compact
                 if (!t.description.isNullOrBlank()) {
                     Column(
                         modifier = Modifier.fillMaxWidth(),
@@ -322,48 +318,50 @@ fun ExamEntryScreen(theme: AppTheme, sound: SoundManager, testId: String, onStar
                         Text(
                             "Exam description",
                             color = Color.Black,
-                            fontSize = 18.sp,
+                            fontSize = 12.sp,
                             fontWeight = FontWeight.Bold
                         )
-                        Spacer(Modifier.height(6.dp))
                         Text(
                             t.description!!,
                             color = Color(0xFF333333),
-                            fontSize = 15.sp,
+                            fontSize = 10.sp,
                             fontWeight = FontWeight.Normal,
-                            lineHeight = 20.sp
+                            lineHeight = 13.sp,
+                            maxLines = 4,
+                            overflow = TextOverflow.Ellipsis
                         )
                     }
                 }
 
                 Spacer(Modifier.weight(1f))
 
-                // 5. GET STARTED button (blue, centered, wide)
+                // 5. GET STARTED button (blue, centered)
                 Button(
                     onClick = { sound.swoosh(); onStart() },
-                    modifier = Modifier.fillMaxWidth(0.7f).height(52.dp),
+                    modifier = Modifier.fillMaxWidth(0.6f).height(36.dp),
                     colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2563EB)),
-                    shape = RoundedCornerShape(16.dp),
-                    enabled = !alreadyCompleted
+                    shape = RoundedCornerShape(10.dp),
+                    enabled = !alreadyCompleted,
+                    contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 12.dp, vertical = 0.dp)
                 ) {
                     Text(
                         if (alreadyCompleted) "Already Completed" else "Get Started",
-                        color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Bold
+                        color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold
                     )
                 }
-                Spacer(Modifier.height(10.dp))
 
-                // 6. CANCEL button (outlined, centered, same width)
+                // 6. CANCEL button (outlined, centered)
                 OutlinedButton(
                     onClick = { sound.click(); onBack() },
-                    modifier = Modifier.fillMaxWidth(0.7f).height(52.dp),
-                    shape = RoundedCornerShape(16.dp),
+                    modifier = Modifier.fillMaxWidth(0.6f).height(32.dp),
+                    shape = RoundedCornerShape(10.dp),
                     colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.Black),
-                    border = BorderStroke(1.5.dp, Color.Black)
+                    border = BorderStroke(1.dp, Color.Black),
+                    contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 12.dp, vertical = 0.dp)
                 ) {
-                    Text("Cancel", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                    Text("Cancel", fontSize = 12.sp, fontWeight = FontWeight.Bold)
                 }
-                Spacer(Modifier.height(16.dp))
+                Spacer(Modifier.height(4.dp))
             }
         }
     }

@@ -929,7 +929,6 @@ private fun QuestionGridRef(
         sortedIdx.takeIf { it >= 0 }
     }
     val cols = 5  // 5 columns per the screenshot spec (5x4 grid = 20 per section)
-    val gridScrollState = rememberScrollState()
 
     // Determine total cells to render
     val expectedTotal = if (showAllBlocks) {
@@ -941,24 +940,21 @@ private fun QuestionGridRef(
     }
     val rowsCount = (expectedTotal + cols - 1) / cols
 
-    // Scrollable grid — cells are PERFECT SQUARES (aspectRatio 1f)
+    // NO scroll — grid fills available space, all 20 buttons visible at once
+    // Uses weight(1f) per row so rows expand to fill height
     Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .verticalScroll(gridScrollState),
-        verticalArrangement = Arrangement.spacedBy(8.dp)
+        modifier = Modifier.fillMaxWidth().fillMaxHeight(),
+        verticalArrangement = Arrangement.spacedBy(4.dp)
     ) {
         for (rowIdx in 0 until rowsCount) {
             Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                modifier = Modifier.fillMaxWidth().weight(1f),
+                horizontalArrangement = Arrangement.spacedBy(4.dp)
             ) {
                 for (colIdx in 0 until cols) {
                     val localIdx = rowIdx * cols + colIdx
                     if (localIdx < items.size) {
                         val globalIdx = globalIndices[localIdx]
-                        // DISPLAY NUMBER: Reading shows 1-20, Listening shows 21-40
-                        // Uses blockNumber (1-20 within each block) + 20 offset for audio
                         val q = items[localIdx].question
                         val displayNum = if (q.blockType == "audio") {
                             (q.blockNumber.takeIf { it > 0 } ?: (localIdx + 1)) + 20
@@ -975,16 +971,16 @@ private fun QuestionGridRef(
                         Box(
                             modifier = Modifier
                                 .weight(1f)
-                                .aspectRatio(1f)  // PERFECT SQUARE — always 1:1
-                                .clip(RoundedCornerShape(6.dp))
+                                .fillMaxHeight()
+                                .clip(RoundedCornerShape(4.dp))
                                 .border(
-                                    width = if (isCurrent) 2.5.dp else 1.5.dp,
+                                    width = if (isCurrent) 2.dp else 1.dp,
                                     color = when {
                                         isCurrent -> accentBlue
                                         isAnswered -> accentBlue
                                         else -> Color(0xFF111111)
                                     },
-                                    shape = RoundedCornerShape(6.dp)
+                                    shape = RoundedCornerShape(4.dp)
                                 )
                                 .background(if (isAnswered) accentBlue else Color.White)
                                 .alpha(if (isFilteredOut) 0.15f else 1f)
@@ -998,34 +994,33 @@ private fun QuestionGridRef(
                             Text(
                                 "$displayNum",
                                 color = if (isAnswered) Color.White else Color(0xFF111111),
-                                fontSize = 15.sp,
+                                fontSize = 12.sp,
                                 fontWeight = if (isCurrent) FontWeight.Bold else FontWeight.Medium,
                             )
                         }
                     } else if (showAllBlocks) {
-                        // Empty placeholder cell — perfect square
-                        // Reading placeholders: 1-20, Listening placeholders: 21-40
+                        // Empty placeholder cell — fills height like other cells
                         val isAudioGrid = items.isNotEmpty() && items[0].question.blockType == "audio"
                         val placeholderNum = if (isAudioGrid) localIdx + 21 else localIdx + 1
                         Box(
                             modifier = Modifier
                                 .weight(1f)
-                                .aspectRatio(1f)  // PERFECT SQUARE
-                                .clip(RoundedCornerShape(6.dp))
-                                .border(1.5.dp, Color(0xFFEEEEEE), RoundedCornerShape(6.dp))
+                                .fillMaxHeight()
+                                .clip(RoundedCornerShape(4.dp))
+                                .border(1.dp, Color(0xFFEEEEEE), RoundedCornerShape(4.dp))
                                 .background(Color(0xFFFAFAFA)),
                             contentAlignment = Alignment.Center
                         ) {
                             Text(
                                 "$placeholderNum",
                                 color = Color(0xFFCCCCCC),
-                                fontSize = 13.sp,
+                                fontSize = 11.sp,
                                 fontWeight = FontWeight.Normal,
                             )
                         }
                     } else {
-                        // showAllBlocks=false, no question — invisible spacer (perfect square)
-                        Spacer(modifier = Modifier.weight(1f).aspectRatio(1f))
+                        // showAllBlocks=false, no question — invisible spacer
+                        Spacer(modifier = Modifier.weight(1f).fillMaxHeight())
                     }
                 }
             }
@@ -2009,7 +2004,11 @@ fun buildUnderlinedText(text: String, blankWord: String?): androidx.compose.ui.t
     if (idx < 0) return androidx.compose.ui.text.AnnotatedString(text)
     return androidx.compose.ui.text.buildAnnotatedString {
         append(text.substring(0, idx))
-        withStyle(androidx.compose.ui.text.SpanStyle(textDecoration = androidx.compose.ui.text.style.TextDecoration.Underline)) {
+        withStyle(androidx.compose.ui.text.SpanStyle(
+            textDecoration = androidx.compose.ui.text.style.TextDecoration.Underline,
+            fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
+            color = Color(0xFF003478)
+        )) {
             append(text.substring(idx, idx + blankWord.length))
         }
         append(text.substring(idx + blankWord.length))
