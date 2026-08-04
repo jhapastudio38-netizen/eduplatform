@@ -350,13 +350,12 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
             }
         }
 
-        // ── 2. INSTRUCTION ROW ── question number + title (BIG, BOLD) or stem
-        // If admin set a title → show "21. Title" (big and bold)
-        // If no title → show "21. Stem" (question text, truncated)
+        // ── 2. INSTRUCTION ROW ── question number + question text (stem)
+        // Shows "21. Question text..." (truncated) — title field was removed from admin
         Surface(modifier = Modifier.fillMaxWidth().padding(horizontal = 6.dp, vertical = 2.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text("${currentIdx + 1}. ", color = Color(0xFF003478), fontSize = 16.sp, fontWeight = FontWeight.ExtraBold)
-                val displayText = (if (!q.title.isNullOrBlank()) q.title else q.stem).take(80)
+                val displayText = q.stem.take(80)
                 Text(displayText, color = Color(0xFF1E293B), fontSize = 15.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
                 if (q.isFree) {
                     Spacer(Modifier.width(4.dp))
@@ -384,54 +383,61 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
             )
             Row(modifier = Modifier.fillMaxSize()) {
             // LEFT: Question content (60%) — scrollable
-            // LAYOUT ORDER:
-            //   1. Title (top, bold) — if set by admin
-            //   2. Description text (below title, small) — stem or descText
-            //   3. Question media (image/audio) at the bottom
-            //   If no description text, media moves up to fill the space.
+            // LAYOUT ORDER (top to bottom):
+            //   1. Question text (stem) — at TOP, bold, in a nice bordered card
+            //   2. Description text (descText) — below question, smaller, left-aligned
+            //   3. Question media (image/audio) — at the BOTTOM
+            //   If question text is empty, media/description move up.
             Column(
                 modifier = Modifier.weight(0.6f).fillMaxHeight().padding(8.dp).verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.Center,
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                // 1. TITLE — at top, bold and noticeable
-                if (!q.title.isNullOrBlank()) {
-                    Text(
-                        q.title,
-                        color = Color(0xFF003478),
-                        fontSize = 15.sp,
-                        fontWeight = FontWeight.Bold,
-                        modifier = Modifier.fillMaxWidth(0.92f).padding(bottom = 6.dp)
-                    )
-                }
-                // 2. DESCRIPTION TEXT — below title, smaller text
-                //    Uses stem (question text) as the description, or descText if stem is empty
-                val descText = q.stem.ifBlank { q.descText ?: q.mediaText ?: "" }
-                if (descText.isNotBlank()) {
+                // 1. QUESTION TEXT (stem) — at top, bold, in a nice card
+                if (!q.stem.isNullOrBlank()) {
                     Surface(
                         color = Color.White,
-                        shape = RoundedCornerShape(10.dp),
-                        shadowElevation = 1.dp,
+                        shape = RoundedCornerShape(12.dp),
+                        shadowElevation = 2.dp,
+                        border = androidx.compose.foundation.BorderStroke(2.dp, Color(0xFF003478)),
+                        modifier = Modifier.fillMaxWidth(0.94f)
+                    ) {
+                        Text(
+                            q.stem,
+                            color = Color(0xFF1E293B),
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.padding(12.dp)
+                        )
+                    }
+                    Spacer(Modifier.height(8.dp))
+                }
+                // 2. DESCRIPTION TEXT — below question, smaller, left-aligned in a subtle card
+                val descText = q.descText ?: q.mediaText ?: ""
+                if (descText.isNotBlank() && descText != q.stem) {
+                    Surface(
+                        color = Color(0xFFF8FAFC),
+                        shape = RoundedCornerShape(8.dp),
                         border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFE2E8F0)),
-                        modifier = Modifier.fillMaxWidth(0.92f)
+                        modifier = Modifier.fillMaxWidth(0.94f)
                     ) {
                         Text(
                             descText,
-                            color = Color(0xFF1E293B),
+                            color = Color(0xFF475569),
                             fontSize = 12.sp,
                             fontWeight = FontWeight.Normal,
                             modifier = Modifier.padding(10.dp)
                         )
                     }
-                    Spacer(Modifier.height(6.dp))
+                    Spacer(Modifier.height(8.dp))
                 }
                 // 3. QUESTION MEDIA — at the bottom
-                //    Description image (if set) shows first
+                //    Description image (if set)
                 if (q.descType == "image" && !q.descImageUrl.isNullOrBlank()) {
                     val url = q.descImageUrl!!.toAbsoluteUrl()
                     coil.compose.AsyncImage(
                         model = url, contentDescription = null,
-                        modifier = Modifier.fillMaxWidth(0.92f).heightIn(max = 120.dp).clip(RoundedCornerShape(8.dp)).clickable { FullScreenImageViewer.show(url) },
+                        modifier = Modifier.fillMaxWidth(0.94f).heightIn(max = 120.dp).clip(RoundedCornerShape(8.dp)).clickable { FullScreenImageViewer.show(url) },
                         contentScale = ContentScale.Fit
                     )
                 }
@@ -440,7 +446,7 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
                 if (!mediaImgUrl.isNullOrBlank()) {
                     coil.compose.AsyncImage(
                         model = mediaImgUrl, contentDescription = null,
-                        modifier = Modifier.fillMaxWidth(0.92f).heightIn(max = 140.dp).clip(RoundedCornerShape(8.dp)).clickable { FullScreenImageViewer.show(mediaImgUrl) },
+                        modifier = Modifier.fillMaxWidth(0.94f).heightIn(max = 160.dp).clip(RoundedCornerShape(8.dp)).clickable { FullScreenImageViewer.show(mediaImgUrl) },
                         contentScale = ContentScale.Fit
                     )
                     Spacer(Modifier.height(4.dp))
@@ -449,7 +455,7 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
                 val mediaAudUrl = (q.mediaAudioUrl ?: q.audioUrl)?.toAbsoluteUrl()
                 if (!mediaAudUrl.isNullOrBlank()) {
                     key(q.id) {
-                        AudioPlayerCard(theme = theme, url = mediaAudUrl, loopCount = q.audioLoop, loopDelaySec = q.audioLoopDelay, sound = sound, questionId = q.id, playCounts = audioPlayCounts, onPlayingChange = { audioPlaying = it })
+                        AudioPlayerCard(theme = theme, url = mediaAudUrl, loopCount = q.audioLoop, loopDelaySec = q.audioLoopDelay, sound = sound, questionId = q.id, playCounts = audioPlayCounts, onPlayingChange = { audioPlaying = it }, blocked = audioPlaying)
                     }
                 }
             }
@@ -492,19 +498,67 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
                         }
                     }
                     "image" -> {
-                        (0 until minOf(4, q.optionImages.size)).forEach { i ->
-                            val imgUrl = q.optionImages[i]; if (imgUrl.isBlank()) return@forEach
-                            val absUrl = imgUrl.toAbsoluteUrl()
-                            val isSelected = answers[q.id] == absUrl
-                            Row(
-                                modifier = Modifier.fillMaxWidth().padding(vertical = 3.dp).clickable { sound.click(); answers[q.id] = absUrl },
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Surface(color = if (isSelected) theme.primary else Color.White, border = androidx.compose.foundation.BorderStroke(2.dp, Color.Black), shape = androidx.compose.foundation.shape.CircleShape, modifier = Modifier.size(28.dp)) {
-                                    Box(contentAlignment = Alignment.Center) { Text("${i+1}", color = if (isSelected) Color.White else Color.Black, fontSize = 10.sp, fontWeight = FontWeight.Bold) }
+                        // 2-column grid for images — bigger images, fills available space
+                        val imgs = q.optionImages.filter { it.isNotBlank() }
+                        val imgCount = minOf(4, imgs.size)
+                        Column(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            val rows = (imgCount + 1) / 2
+                            for (rowIdx in 0 until rows) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    for (colIdx in 0..1) {
+                                        val i = rowIdx * 2 + colIdx
+                                        if (i < imgCount) {
+                                            val imgUrl = imgs[i]
+                                            val absUrl = imgUrl.toAbsoluteUrl()
+                                            val isSelected = answers[q.id] == absUrl
+                                            Box(
+                                                modifier = Modifier
+                                                    .weight(1f)
+                                                    .aspectRatio(1f)
+                                                    .clip(RoundedCornerShape(8.dp))
+                                                    .border(
+                                                        if (isSelected) 3.dp else 1.dp,
+                                                        if (isSelected) theme.primary else Color(0xFFE2E8F0),
+                                                        RoundedCornerShape(8.dp)
+                                                    )
+                                                    .background(if (isSelected) theme.primary.copy(alpha = 0.1f) else Color.White)
+                                                    .clickable { sound.click(); answers[q.id] = absUrl }
+                                            ) {
+                                                // Number badge at top-left
+                                                Surface(
+                                                    color = if (isSelected) theme.primary else Color.White,
+                                                    border = androidx.compose.foundation.BorderStroke(1.5.dp, Color.Black),
+                                                    shape = androidx.compose.foundation.shape.CircleShape,
+                                                    modifier = Modifier
+                                                        .align(Alignment.TopStart)
+                                                        .padding(4.dp)
+                                                        .size(20.dp)
+                                                ) {
+                                                    Box(contentAlignment = Alignment.Center) {
+                                                        Text("${i+1}", color = if (isSelected) Color.White else Color.Black, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                                                    }
+                                                }
+                                                coil.compose.AsyncImage(
+                                                    model = absUrl,
+                                                    contentDescription = "Option ${i+1}",
+                                                    modifier = Modifier
+                                                        .fillMaxSize()
+                                                        .padding(8.dp)
+                                                        .clickable { FullScreenImageViewer.show(absUrl) },
+                                                    contentScale = ContentScale.Fit
+                                                )
+                                            }
+                                        } else {
+                                            Spacer(modifier = Modifier.weight(1f))
+                                        }
+                                    }
                                 }
-                                Spacer(Modifier.width(4.dp))
-                                coil.compose.AsyncImage(model = absUrl, contentDescription = "Option ${i+1}", modifier = Modifier.size(48.dp).clip(RoundedCornerShape(4.dp)).clickable { FullScreenImageViewer.show(absUrl) }, contentScale = ContentScale.Fit)
                             }
                         }
                     }
@@ -520,7 +574,7 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
                                 Spacer(Modifier.width(4.dp))
                                 // key(q.id, i) — recreate when question changes so play count resets
                                 key(q.id, i) {
-                                    AudioPlayerCard(theme = theme, url = absUrl, loopCount = q.audioLoop.coerceAtLeast(1), loopDelaySec = q.audioLoopDelay, sound = sound, questionId = "${q.id}-opt-$i", playCounts = audioPlayCounts, onPlayingChange = { audioPlaying = it })
+                                    AudioPlayerCard(theme = theme, url = absUrl, loopCount = q.audioLoop.coerceAtLeast(1), loopDelaySec = q.audioLoopDelay, sound = sound, questionId = "${q.id}-opt-$i", playCounts = audioPlayCounts, onPlayingChange = { audioPlaying = it }, blocked = audioPlaying)
                                 }
                             }
                         }
@@ -676,20 +730,29 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
                     }
                 } else {
                     // ── EXAM: Reading LEFT | Listening RIGHT ──
+                    // Matches screenshot: section labels in bordered boxes, 5-col grid
                     Row(
                         modifier = Modifier.fillMaxSize().padding(8.dp),
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        // Reading panel (left)
+                        // Reading panel (left) — label in a box + grid in a box
                         Column(modifier = Modifier.weight(1f).fillMaxHeight()) {
-                            Text(
-                                "Reading",
-                                color = Color(0xFF333333),
-                                fontSize = 13.sp,
-                                fontWeight = FontWeight.Medium,
-                                modifier = Modifier.padding(start = 4.dp, bottom = 6.dp)
-                            )
-                        // Scrollable grid with border — fills full panel
+                            // Section label in a bordered box
+                            Surface(
+                                color = Color.White,
+                                shape = RoundedCornerShape(6.dp),
+                                border = androidx.compose.foundation.BorderStroke(1.5.dp, Color(0xFF333333)),
+                                modifier = Modifier.fillMaxWidth().padding(bottom = 6.dp)
+                            ) {
+                                Text(
+                                    "Reading",
+                                    color = Color(0xFF333333),
+                                    fontSize = 13.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
+                                )
+                            }
+                            // Scrollable grid with border
                             Column(
                                 modifier = Modifier
                                     .weight(1f)
@@ -718,13 +781,20 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
 
                         // Listening panel (right)
                         Column(modifier = Modifier.weight(1f).fillMaxHeight()) {
-                            Text(
-                                "Listening",
-                                color = Color(0xFF333333),
-                                fontSize = 13.sp,
-                                fontWeight = FontWeight.Medium,
-                                modifier = Modifier.padding(start = 4.dp, bottom = 6.dp)
-                            )
+                            Surface(
+                                color = Color.White,
+                                shape = RoundedCornerShape(6.dp),
+                                border = androidx.compose.foundation.BorderStroke(1.5.dp, Color(0xFF333333)),
+                                modifier = Modifier.fillMaxWidth().padding(bottom = 6.dp)
+                            ) {
+                                Text(
+                                    "Listening",
+                                    color = Color(0xFF333333),
+                                    fontSize = 13.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
+                                )
+                            }
                             Column(
                                 modifier = Modifier
                                     .weight(1f)
@@ -1033,6 +1103,7 @@ fun AudioPlayerCard(
     questionId: String? = null,
     playCounts: SnapshotStateMap<String, Int>? = null,
     onPlayingChange: ((Boolean) -> Unit)? = null,
+    blocked: Boolean = false,  // TRUE when another audio is playing — disables this button
 ) {
     val context = LocalContext.current
     var mediaPlayer by remember { mutableStateOf<android.media.MediaPlayer?>(null) }
@@ -1064,16 +1135,17 @@ fun AudioPlayerCard(
     }
 
     // COMPACT audio player — just a small circular play button, no big card
-    // Blocks ALL audio buttons when any audio is playing (via onPlayingChange callback)
+    // BLOCKED when another audio is playing (blocked=true) OR disabled OR already playing
+    val isBlocked = disabled || isPlaying || blocked
     Surface(
-        color = if (disabled) Color(0xFFF1F5F9) else theme.primary.copy(alpha = 0.08f),
+        color = if (disabled) Color(0xFFF1F5F9) else if (blocked) Color(0xFFF1F5F9) else theme.primary.copy(alpha = 0.08f),
         shape = RoundedCornerShape(8.dp),
         modifier = Modifier.size(36.dp)
     ) {
         Box(
             contentAlignment = Alignment.Center,
-            modifier = Modifier.fillMaxSize().clickable(enabled = !disabled && !isPlaying) {
-                if (disabled) return@clickable
+            modifier = Modifier.fillMaxSize().clickable(enabled = !isBlocked) {
+                if (disabled || blocked) return@clickable
                 sound.click()
                 if (isPlaying) return@clickable
                 try {
@@ -1118,10 +1190,11 @@ fun AudioPlayerCard(
                 when {
                     disabled -> Icons.Default.Lock
                     isPlaying -> Icons.Default.VolumeUp
+                    blocked -> Icons.Default.PlayArrow
                     else -> Icons.Default.PlayArrow
                 },
                 null,
-                tint = if (disabled) Color(0xFFCBD5E1) else theme.primary,
+                tint = if (disabled || blocked) Color(0xFFCBD5E1) else theme.primary,
                 modifier = Modifier.size(20.dp)
             )
         }
