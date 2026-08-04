@@ -516,30 +516,91 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
             ) {
                 when (q.answerType) {
                     "text", "choose" -> {
-                        (0 until minOf(4, options.size)).forEach { i ->
-                            val isSelected = answers[q.id] == options.getOrNull(i)
-                            val optText = options.getOrNull(i) ?: ""
-                            val blankWord = q.optionBlanks.getOrNull(i)?.takeIf { it.isNotBlank() }
-                            Row(
-                                modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp).clickable { sound.click(); answers[q.id] = optText },
-                                verticalAlignment = Alignment.CenterVertically
+                        // Detect if options are actually image URLs (not text)
+                        val optionsList = options ?: emptyList()
+                        val isImageOptions = optionsList.isNotEmpty() && optionsList.all { it.startsWith("http") && (it.endsWith(".jpg") || it.endsWith(".jpeg") || it.endsWith(".png") || it.endsWith(".webp")) }
+                        if (isImageOptions) {
+                            // Render as image options (2-col grid, bigger)
+                            val imgCount = minOf(4, optionsList.size)
+                            Column(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalArrangement = Arrangement.spacedBy(6.dp)
                             ) {
-                                Surface(
-                                    color = if (isSelected) theme.primary else Color.White,
-                                    border = androidx.compose.foundation.BorderStroke(2.dp, Color.Black),
-                                    shape = androidx.compose.foundation.shape.CircleShape,
-                                    modifier = Modifier.size(40.dp)
-                                ) {
-                                    Box(contentAlignment = Alignment.Center) { Text("${i+1}", color = if (isSelected) Color.White else Color.Black, fontSize = 15.sp, fontWeight = FontWeight.Bold) }
+                                val rows = (imgCount + 1) / 2
+                                for (rowIdx in 0 until rows) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                    ) {
+                                        for (colIdx in 0..1) {
+                                            val i = rowIdx * 2 + colIdx
+                                            if (i < imgCount) {
+                                                val imgUrl = optionsList[i]
+                                                val absUrl = imgUrl.toAbsoluteUrl()
+                                                val isSelected = answers[q.id] == absUrl || answers[q.id] == imgUrl
+                                                Box(
+                                                    modifier = Modifier
+                                                        .weight(1f)
+                                                        .aspectRatio(1f)
+                                                        .clip(RoundedCornerShape(8.dp))
+                                                        .border(
+                                                            if (isSelected) 3.dp else 1.dp,
+                                                            if (isSelected) theme.primary else Color(0xFFE2E8F0),
+                                                            RoundedCornerShape(8.dp)
+                                                        )
+                                                        .background(if (isSelected) theme.primary.copy(alpha = 0.1f) else Color.White)
+                                                        .clickable { sound.click(); answers[q.id] = absUrl }
+                                                ) {
+                                                    Surface(
+                                                        color = if (isSelected) theme.primary else Color.White,
+                                                        border = androidx.compose.foundation.BorderStroke(1.5.dp, Color.Black),
+                                                        shape = androidx.compose.foundation.shape.CircleShape,
+                                                        modifier = Modifier.align(Alignment.TopStart).padding(4.dp).size(20.dp)
+                                                    ) {
+                                                        Box(contentAlignment = Alignment.Center) {
+                                                            Text("${i+1}", color = if (isSelected) Color.White else Color.Black, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                                                        }
+                                                    }
+                                                    coil.compose.AsyncImage(
+                                                        model = absUrl,
+                                                        contentDescription = "Option ${i+1}",
+                                                        modifier = Modifier.fillMaxSize().padding(8.dp).clickable { FullScreenImageViewer.show(absUrl) },
+                                                        contentScale = ContentScale.Fit
+                                                    )
+                                                }
+                                            } else {
+                                                Spacer(modifier = Modifier.weight(1f))
+                                            }
+                                        }
+                                    }
                                 }
-                                Spacer(Modifier.width(8.dp))
-                                // Render option text with underlined blank word (if set by admin)
-                                Text(
-                                    text = buildUnderlinedText(optText, blankWord),
-                                    color = Color.Black,
-                                    fontSize = 13.sp,
-                                    modifier = Modifier.weight(1f)
-                                )
+                            }
+                        } else {
+                            // Normal text options
+                            (0 until minOf(4, optionsList.size)).forEach { i ->
+                                val isSelected = answers[q.id] == optionsList.getOrNull(i)
+                                val optText = optionsList.getOrNull(i) ?: ""
+                                val blankWord = q.optionBlanks.getOrNull(i)?.takeIf { it.isNotBlank() }
+                                Row(
+                                    modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp).clickable { sound.click(); answers[q.id] = optText },
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Surface(
+                                        color = if (isSelected) theme.primary else Color.White,
+                                        border = androidx.compose.foundation.BorderStroke(2.dp, Color.Black),
+                                        shape = androidx.compose.foundation.shape.CircleShape,
+                                        modifier = Modifier.size(40.dp)
+                                    ) {
+                                        Box(contentAlignment = Alignment.Center) { Text("${i+1}", color = if (isSelected) Color.White else Color.Black, fontSize = 15.sp, fontWeight = FontWeight.Bold) }
+                                    }
+                                    Spacer(Modifier.width(8.dp))
+                                    Text(
+                                        text = buildUnderlinedText(optText, blankWord),
+                                        color = Color.Black,
+                                        fontSize = 13.sp,
+                                        modifier = Modifier.weight(1f)
+                                    )
+                                }
                             }
                         }
                     }
@@ -697,39 +758,57 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
         val accentBlue = Color(0xFF1A56FF)
 
         Column(modifier = Modifier.fillMaxSize().background(Color(0xFFF5F5F5))) {
-            // ── TABS ROW: All | Solved | UnSolved (with blue underline on active) ──
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(Color.White)
-                    .height(42.dp),
-                verticalAlignment = Alignment.CenterVertically
+            // ── TOP HEADER: DreamKorea logo + exam title + timer (matches screenshot) ──
+            Surface(
+                color = Color.White,
+                border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFE2E8F0))
             ) {
-                RefTab("All", filterMode == null, accentBlue, Modifier.weight(1f)) { filterMode = null }
-                RefTab("Solved", filterMode == true, accentBlue, Modifier.weight(1f)) { filterMode = true }
-                RefTab("UnSolved", filterMode == false, accentBlue, Modifier.weight(1f)) { filterMode = false }
+                Row(
+                    modifier = Modifier.fillMaxWidth().height(44.dp).padding(horizontal = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    // DreamKorea logo + name
+                    Image(
+                        painter = painterResource(id = app.dreamkorea.smartclass.R.drawable.dreamkorea_logo),
+                        contentDescription = null,
+                        modifier = Modifier.size(28.dp),
+                        contentScale = ContentScale.Fit
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    Text("DREAMKOREA", color = Color(0xFF003478), fontSize = 12.sp, fontWeight = FontWeight.ExtraBold)
+                    Spacer(Modifier.width(12.dp))
+                    // Exam title
+                    Text(t.title, color = Color(0xFF333333), fontSize = 12.sp, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+                    Spacer(Modifier.width(8.dp))
+                    // Timer
+                    Text(timeStr, color = timerColor, fontSize = 13.sp, fontWeight = FontWeight.Bold, fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace)
+                }
             }
-            // Thin border under tabs
-            Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(Color(0xFFE2E2E2)))
 
-            // ── TIMER (large, centered, monospace) ──────────────────────
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(Color.White)
-                    .padding(vertical = 8.dp),
-                contentAlignment = Alignment.Center
+            // ── SUB-HEADER: Filter tabs (All | Solved | UnSolved) in a bordered box ──
+            Surface(
+                color = Color.White,
+                border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFE2E8F0))
             ) {
-                Text(
-                    timeStr,
-                    color = timerColor,
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.Medium,
-                    letterSpacing = 1.sp,
-                    fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
-                )
+                Row(
+                    modifier = Modifier.fillMaxWidth().height(36.dp).padding(horizontal = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    // Filter tabs
+                    RefTab("All", filterMode == null, accentBlue, Modifier.weight(1f)) { filterMode = null }
+                    RefTab("Solved", filterMode == true, accentBlue, Modifier.weight(1f)) { filterMode = true }
+                    RefTab("UnSolved", filterMode == false, accentBlue, Modifier.weight(1f)) { filterMode = false }
+                    // Stats on the right
+                    Box(modifier = Modifier.width(1.dp).fillMaxHeight(0.6f).background(Color(0xFFE2E8F0)))
+                    Box(modifier = Modifier.weight(1f).fillMaxHeight(), contentAlignment = Alignment.Center) {
+                        Text("Total: $totalQuestions", color = Color(0xFF64748B), fontSize = 10.sp, fontWeight = FontWeight.Medium)
+                    }
+                    Box(modifier = Modifier.width(1.dp).fillMaxHeight(0.6f).background(Color(0xFFE2E8F0)))
+                    Box(modifier = Modifier.weight(1f).fillMaxHeight(), contentAlignment = Alignment.Center) {
+                        Text("Left: $totalUnsolved", color = Color(0xFF64748B), fontSize = 10.sp, fontWeight = FontWeight.Medium)
+                    }
+                }
             }
-            Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(Color(0xFFE2E2E2)))
 
             // ── MAIN AREA ──────────────────────────────────────────────────
             // QBank: single panel with ALL questions (no Reading/Listening labels)
