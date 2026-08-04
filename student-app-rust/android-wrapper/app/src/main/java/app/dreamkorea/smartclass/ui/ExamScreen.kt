@@ -354,9 +354,12 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
         }
 
         // ── 2. INSTRUCTION ROW ── question number + question text (BIG, readable)
+        // Display number = blockNumber for Reading, blockNumber + 20 for Listening
+        // This MUST match the block page grid numbers exactly
+        val displayQNum = if (q.blockType == "audio") q.blockNumber + 20 else q.blockNumber
         Surface(modifier = Modifier.fillMaxWidth().padding(horizontal = 6.dp, vertical = 2.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("${currentIdx + 1}. ", color = Color(0xFF003478), fontSize = 16.sp, fontWeight = FontWeight.ExtraBold)
+                Text("$displayQNum. ", color = Color(0xFF003478), fontSize = 16.sp, fontWeight = FontWeight.ExtraBold)
                 val displayText = q.stem.take(80)
                 Text(displayText, color = Color(0xFF1E293B), fontSize = 14.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
                 if (q.isFree) {
