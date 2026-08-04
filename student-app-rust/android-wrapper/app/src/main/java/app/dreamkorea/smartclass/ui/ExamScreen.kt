@@ -383,43 +383,50 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
                 contentScale = ContentScale.Fit
             )
             Row(modifier = Modifier.fillMaxSize()) {
-            // LEFT: Question content (60%) — scrollable so long titles/stems/images don't get cut
+            // LEFT: Question content (60%) — scrollable
+            // LAYOUT ORDER:
+            //   1. Title (top, bold) — if set by admin
+            //   2. Description text (below title, small) — stem or descText
+            //   3. Question media (image/audio) at the bottom
+            //   If no description text, media moves up to fill the space.
             Column(
                 modifier = Modifier.weight(0.6f).fillMaxHeight().padding(8.dp).verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.Center,
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                // Question title (if set by admin) — shown at the top
+                // 1. TITLE — at top, bold and noticeable
                 if (!q.title.isNullOrBlank()) {
                     Text(
                         q.title,
                         color = Color(0xFF003478),
-                        fontSize = 13.sp,
+                        fontSize = 15.sp,
                         fontWeight = FontWeight.Bold,
-                        modifier = Modifier.fillMaxWidth(0.92f).padding(bottom = 4.dp)
+                        modifier = Modifier.fillMaxWidth(0.92f).padding(bottom = 6.dp)
                     )
                 }
-                // Question text (stem) — shown in a card with border/shadow
-                val questionText = q.stem.ifBlank { q.mediaText ?: "" }
-                if (questionText.isNotBlank()) {
+                // 2. DESCRIPTION TEXT — below title, smaller text
+                //    Uses stem (question text) as the description, or descText if stem is empty
+                val descText = q.stem.ifBlank { q.descText ?: q.mediaText ?: "" }
+                if (descText.isNotBlank()) {
                     Surface(
                         color = Color.White,
-                        shape = RoundedCornerShape(14.dp),
-                        shadowElevation = 2.dp,
+                        shape = RoundedCornerShape(10.dp),
+                        shadowElevation = 1.dp,
                         border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFE2E8F0)),
                         modifier = Modifier.fillMaxWidth(0.92f)
                     ) {
                         Text(
-                            questionText,
+                            descText,
                             color = Color(0xFF1E293B),
-                            fontSize = 14.sp,
-                            fontWeight = FontWeight.Medium,
-                            modifier = Modifier.padding(14.dp)
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Normal,
+                            modifier = Modifier.padding(10.dp)
                         )
                     }
                     Spacer(Modifier.height(6.dp))
                 }
-                // Media images — ContentScale.Fit (contain, not cover)
+                // 3. QUESTION MEDIA — at the bottom
+                //    Description image (if set) shows first
                 if (q.descType == "image" && !q.descImageUrl.isNullOrBlank()) {
                     val url = q.descImageUrl!!.toAbsoluteUrl()
                     coil.compose.AsyncImage(
@@ -428,6 +435,7 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
                         contentScale = ContentScale.Fit
                     )
                 }
+                //    Question image (mediaImageUrl)
                 val mediaImgUrl = (q.mediaImageUrl ?: q.imageUrl)?.toAbsoluteUrl()
                 if (!mediaImgUrl.isNullOrBlank()) {
                     coil.compose.AsyncImage(
@@ -435,12 +443,11 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
                         modifier = Modifier.fillMaxWidth(0.92f).heightIn(max = 140.dp).clip(RoundedCornerShape(8.dp)).clickable { FullScreenImageViewer.show(mediaImgUrl) },
                         contentScale = ContentScale.Fit
                     )
+                    Spacer(Modifier.height(4.dp))
                 }
+                //    Question audio (mediaAudioUrl)
                 val mediaAudUrl = (q.mediaAudioUrl ?: q.audioUrl)?.toAbsoluteUrl()
                 if (!mediaAudUrl.isNullOrBlank()) {
-                    // key(q.id) ensures the AudioPlayerCard is FULLY RECREATED when
-                    // the question changes — state (playCount, disabled) resets completely.
-                    // This fixes the bug where audio was locked from the previous question.
                     key(q.id) {
                         AudioPlayerCard(theme = theme, url = mediaAudUrl, loopCount = q.audioLoop, loopDelaySec = q.audioLoopDelay, sound = sound, questionId = q.id, playCounts = audioPlayCounts, onPlayingChange = { audioPlaying = it })
                     }
