@@ -596,11 +596,23 @@ function ExamEditor({ test, testCategory, onClose }: { test: Test; testCategory:
     }
   }
 
-  // ─── COPY: saves current question to module-level variable ──────────────
+  // ─── DEEP COPY: ensures arrays (options, optionImages, optionAudios, optionBlanks)
+  // are copied by VALUE not reference, so editing pasted question doesn't affect original ──
+  function deepCopyQuestion(q: QuestionData): QuestionData {
+    return {
+      ...q,
+      options: [...(q.options || ["", "", "", ""])],
+      optionImages: [...(q.optionImages || ["", "", "", ""])],
+      optionAudios: [...(q.optionAudios || ["", "", "", ""])],
+      optionBlanks: [...(q.optionBlanks || ["", "", "", ""])],
+    };
+  }
+
+  // ─── COPY: saves current question (ALL fields) to module-level variable ──
   function copyQuestion() {
     const q = currentQuestion;
-    _clipboardData = { type: "single", data: { ...q } };
-    toast.success("Question copied! Click Paste in any block to import.");
+    _clipboardData = { type: "single", data: deepCopyQuestion(q) };
+    toast.success("Question copied (all fields)! Click Paste in any block to import.");
   }
 
   // ─── PASTE: reads from module-level variable, fills current block ────────
@@ -612,39 +624,39 @@ function ExamEditor({ test, testCategory, onClose }: { test: Test; testCategory:
     if (_clipboardData.type === "single") {
       const q = _clipboardData.data as QuestionData;
       const pasted: QuestionData = {
-        ...q,
+        ...deepCopyQuestion(q),
         blockType: activeBlock,
         blockNumber: activeNumber,
       };
       delete (pasted as any).id;
       delete (pasted as any).testItemId;
       updateQuestion(pasted);
-      toast.success("Question pasted! Click Save to persist.");
+      toast.success("Question pasted (all fields)! Click Save to persist.");
     } else if (_clipboardData.type === "all") {
       const allQs = _clipboardData.data as QuestionData[];
       const next = { ...questions };
       let count = 0;
       for (const q of allQs) {
         const k = key(q.blockType, q.blockNumber);
-        const copy = { ...q };
+        const copy = deepCopyQuestion(q);
         delete (copy as any).id;
         delete (copy as any).testItemId;
         next[k] = copy;
         count++;
       }
       setQuestions(next);
-      toast.success(`Pasted ${count} questions! Click Save on each to persist.`);
+      toast.success(`Pasted ${count} questions (all fields)! Click Save on each to persist.`);
     }
   }
 
-  // ─── COPY ALL: saves all filled questions to module-level variable ────────
+  // ─── COPY ALL: saves all filled questions (ALL fields) to module-level variable ──
   function copyAll() {
     const filled = Object.values(questions).filter(q => {
-      return q.stem?.trim() || q.title?.trim() || q.mediaImageUrl?.trim() || q.mediaAudioUrl?.trim() || q.descImageUrl?.trim() || q.options?.some((o: string) => o?.trim());
+      return q.stem?.trim() || q.title?.trim() || q.mediaImageUrl?.trim() || q.mediaAudioUrl?.trim() || q.descImageUrl?.trim() || q.descAudioUrl?.trim() || q.options?.some((o: string) => o?.trim()) || q.optionAudios?.some((a: string) => a?.trim()) || q.optionImages?.some((img: string) => img?.trim());
     });
     if (filled.length === 0) { toast.error("No questions to copy \u2014 add some first"); return; }
-    _clipboardData = { type: "all", data: filled.map(q => ({ ...q })) };
-    toast.success(`Copied ${filled.length} questions! Open another test and click Paste.`);
+    _clipboardData = { type: "all", data: filled.map(q => deepCopyQuestion(q)) };
+    toast.success(`Copied ${filled.length} questions (all fields including audio/images)! Open another test and click Paste.`);
   }
 
   // ─── PASTE FROM APP: reads JSON from textarea ref ─────────────────────────

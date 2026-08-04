@@ -387,37 +387,10 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
                 verticalArrangement = Arrangement.Center,
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                // Question title (if set by admin) — shown at the top
-                if (!q.title.isNullOrBlank()) {
-                    Text(
-                        q.title,
-                        color = Color(0xFF003478),
-                        fontSize = 13.sp,
-                        fontWeight = FontWeight.Bold,
-                        modifier = Modifier.fillMaxWidth(0.92f).padding(bottom = 4.dp)
-                    )
-                }
-                // Question text (stem) — shown in a card with border/shadow
-                val questionText = q.stem.ifBlank { q.mediaText ?: "" }
-                if (questionText.isNotBlank()) {
-                    Surface(
-                        color = Color.White,
-                        shape = RoundedCornerShape(14.dp),
-                        shadowElevation = 2.dp,
-                        border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFE2E8F0)),
-                        modifier = Modifier.fillMaxWidth(0.92f)
-                    ) {
-                        Text(
-                            questionText,
-                            color = Color(0xFF1E293B),
-                            fontSize = 14.sp,
-                            fontWeight = FontWeight.Medium,
-                            modifier = Modifier.padding(14.dp)
-                        )
-                    }
-                    Spacer(Modifier.height(6.dp))
-                }
-                // Media images — ContentScale.Fit (contain, not cover)
+                // NOTE: Question text (stem) is NOT shown here — it only appears in the top bar.
+                // This area shows ONLY media (description image/audio + question image/audio).
+                //
+                // Description media (if set by admin)
                 if (q.descType == "image" && !q.descImageUrl.isNullOrBlank()) {
                     val url = q.descImageUrl!!.toAbsoluteUrl()
                     coil.compose.AsyncImage(
@@ -425,22 +398,52 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
                         modifier = Modifier.fillMaxWidth(0.92f).heightIn(max = 120.dp).clip(RoundedCornerShape(8.dp)).clickable { FullScreenImageViewer.show(url) },
                         contentScale = ContentScale.Fit
                     )
+                    Spacer(Modifier.height(6.dp))
                 }
-                val mediaImgUrl = (q.mediaImageUrl ?: q.imageUrl)?.toAbsoluteUrl()
-                if (!mediaImgUrl.isNullOrBlank()) {
+                if (q.descType == "audio" && !q.descAudioUrl.isNullOrBlank()) {
+                    val descAudUrl = q.descAudioUrl!!.toAbsoluteUrl()
+                    key("desc-${q.id}") {
+                        AudioPlayerCard(theme = theme, url = descAudUrl, loopCount = q.audioLoop, loopDelaySec = q.audioLoopDelay, sound = sound, questionId = "${q.id}-desc", playCounts = audioPlayCounts, onPlayingChange = { audioPlaying = it })
+                    }
+                    Spacer(Modifier.height(6.dp))
+                }
+                if (q.descType == "text" && !q.descText.isNullOrBlank()) {
+                    Surface(
+                        color = Color(0xFFF8FAFC),
+                        shape = RoundedCornerShape(8.dp),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFE2E8F0)),
+                        modifier = Modifier.fillMaxWidth(0.92f)
+                    ) {
+                        Text(q.descText, color = Color(0xFF475569), fontSize = 12.sp, modifier = Modifier.padding(10.dp))
+                    }
+                    Spacer(Modifier.height(6.dp))
+                }
+                // Question media — ONLY show if mediaType matches the media field
+                // This prevents audio/image from showing when admin didn't add them
+                if (q.mediaType == "image" && !q.mediaImageUrl.isNullOrBlank()) {
+                    val mediaImgUrl = q.mediaImageUrl!!.toAbsoluteUrl()
                     coil.compose.AsyncImage(
                         model = mediaImgUrl, contentDescription = null,
-                        modifier = Modifier.fillMaxWidth(0.92f).heightIn(max = 140.dp).clip(RoundedCornerShape(8.dp)).clickable { FullScreenImageViewer.show(mediaImgUrl) },
+                        modifier = Modifier.fillMaxWidth(0.92f).heightIn(max = 160.dp).clip(RoundedCornerShape(8.dp)).clickable { FullScreenImageViewer.show(mediaImgUrl) },
                         contentScale = ContentScale.Fit
                     )
+                    Spacer(Modifier.height(4.dp))
                 }
-                val mediaAudUrl = (q.mediaAudioUrl ?: q.audioUrl)?.toAbsoluteUrl()
-                if (!mediaAudUrl.isNullOrBlank()) {
-                    // key(q.id) ensures the AudioPlayerCard is FULLY RECREATED when
-                    // the question changes — state (playCount, disabled) resets completely.
-                    // This fixes the bug where audio was locked from the previous question.
+                if (q.mediaType == "audio" && !q.mediaAudioUrl.isNullOrBlank()) {
+                    val mediaAudUrl = q.mediaAudioUrl!!.toAbsoluteUrl()
                     key(q.id) {
                         AudioPlayerCard(theme = theme, url = mediaAudUrl, loopCount = q.audioLoop, loopDelaySec = q.audioLoopDelay, sound = sound, questionId = q.id, playCounts = audioPlayCounts, onPlayingChange = { audioPlaying = it })
+                    }
+                }
+                // If mediaType is "text", show mediaText
+                if (q.mediaType == "text" && !q.mediaText.isNullOrBlank()) {
+                    Surface(
+                        color = Color(0xFFF8FAFC),
+                        shape = RoundedCornerShape(8.dp),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFE2E8F0)),
+                        modifier = Modifier.fillMaxWidth(0.92f)
+                    ) {
+                        Text(q.mediaText, color = Color(0xFF475569), fontSize = 13.sp, fontWeight = FontWeight.Medium, modifier = Modifier.padding(10.dp))
                     }
                 }
             }
