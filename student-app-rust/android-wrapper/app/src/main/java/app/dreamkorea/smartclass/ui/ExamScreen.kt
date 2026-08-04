@@ -76,6 +76,9 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
     val audioPlayCounts = remember { mutableStateMapOf<String, Int>() }
     // When audio is playing, disable navigation buttons
     var audioPlaying by remember { mutableStateOf(false) }
+    // Track WHICH audio is currently playing (by questionId) so only THAT one
+    // is "playing" and ALL others are blocked.
+    var currentlyPlayingId by remember { mutableStateOf<String?>(null) }
     var submitResult by remember { mutableStateOf<SubmitResponse?>(null) }
     var submitting by remember { mutableStateOf(false) }
     // Per-question feedback (after answering, before moving on)
@@ -350,12 +353,12 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
             }
         }
 
-        // ── 2. INSTRUCTION ROW ── compact question number + title + FREE badge
+        // ── 2. INSTRUCTION ROW ── question number + question text (BIG, readable)
         Surface(modifier = Modifier.fillMaxWidth().padding(horizontal = 6.dp, vertical = 2.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("${currentIdx + 1}. ", color = Color(0xFF003478), fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                Text("${currentIdx + 1}. ", color = Color(0xFF003478), fontSize = 16.sp, fontWeight = FontWeight.ExtraBold)
                 val displayText = q.stem.take(80)
-                Text(displayText, color = Color(0xFF1E293B), fontSize = 11.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
+                Text(displayText, color = Color(0xFF1E293B), fontSize = 14.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
                 if (q.isFree) {
                     Spacer(Modifier.width(4.dp))
                     Surface(color = Color(0xFF22C55E), shape = RoundedCornerShape(3.dp)) {
@@ -438,7 +441,7 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
                 if (q.mediaType == "audio" && !q.mediaAudioUrl.isNullOrBlank()) {
                     val mediaAudUrl = q.mediaAudioUrl!!.toAbsoluteUrl()
                     key(q.id) {
-                        AudioPlayerCard(theme = theme, url = mediaAudUrl, loopCount = q.audioLoop, loopDelaySec = q.audioLoopDelay, sound = sound, questionId = q.id, playCounts = audioPlayCounts, onPlayingChange = { audioPlaying = it })
+                        AudioPlayerCard(theme = theme, url = mediaAudUrl, loopCount = q.audioLoop, loopDelaySec = q.audioLoopDelay, sound = sound, questionId = q.id, playCounts = audioPlayCounts, onPlayingChange = { playing -> audioPlaying = playing; currentlyPlayingId = if (playing) q.id else null }, blocked = currentlyPlayingId != null && currentlyPlayingId != q.id)
                     }
                 }
                 // If mediaType is "text", show mediaText
@@ -492,35 +495,115 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
                         }
                     }
                     "image" -> {
-                        (0 until minOf(4, q.optionImages.size)).forEach { i ->
-                            val imgUrl = q.optionImages[i]; if (imgUrl.isBlank()) return@forEach
-                            val absUrl = imgUrl.toAbsoluteUrl()
-                            val isSelected = answers[q.id] == absUrl
-                            Row(
-                                modifier = Modifier.fillMaxWidth().padding(vertical = 3.dp).clickable { sound.click(); answers[q.id] = absUrl },
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Surface(color = if (isSelected) theme.primary else Color.White, border = androidx.compose.foundation.BorderStroke(2.dp, Color.Black), shape = androidx.compose.foundation.shape.CircleShape, modifier = Modifier.size(28.dp)) {
-                                    Box(contentAlignment = Alignment.Center) { Text("${i+1}", color = if (isSelected) Color.White else Color.Black, fontSize = 10.sp, fontWeight = FontWeight.Bold) }
+                        // 2-column grid for images — BIG images so text in them is readable
+                        val imgs = q.optionImages.filter { it.isNotBlank() }
+                        val imgCount = minOf(4, imgs.size)
+                        Column(
+                            modifier = Modifier.fillMaxWidth().fillMaxHeight(),
+                            verticalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            val rows = (imgCount + 1) / 2
+                            for (rowIdx in 0 until rows) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth().weight(1f),
+                                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                ) {
+                                    for (colIdx in 0..1) {
+                                        val i = rowIdx * 2 + colIdx
+                                        if (i < imgCount) {
+                                            val imgUrl = imgs[i]
+                                            val absUrl = imgUrl.toAbsoluteUrl()
+                                            val isSelected = answers[q.id] == absUrl
+                                            Box(
+                                                modifier = Modifier
+                                                    .weight(1f)
+                                                    .fillMaxHeight()
+                                                    .clip(RoundedCornerShape(6.dp))
+                                                    .border(
+                                                        if (isSelected) 3.dp else 1.dp,
+                                                        if (isSelected) theme.primary else Color(0xFFCCCCCC),
+                                                        RoundedCornerShape(6.dp)
+                                                    )
+                                                    .background(if (isSelected) theme.primary.copy(alpha = 0.05f) else Color.White)
+                                                    .clickable { sound.click(); answers[q.id] = absUrl }
+                                            ) {
+                                                // Number badge at top-left
+                                                Surface(
+                                                    color = if (isSelected) theme.primary else Color.White,
+                                                    border = androidx.compose.foundation.BorderStroke(1.dp, Color.Black),
+                                                    shape = androidx.compose.foundation.shape.CircleShape,
+                                                    modifier = Modifier.align(Alignment.TopStart).padding(3.dp).size(16.dp)
+                                                ) {
+                                                    Box(contentAlignment = Alignment.Center) {
+                                                        Text("${i+1}", color = if (isSelected) Color.White else Color.Black, fontSize = 8.sp, fontWeight = FontWeight.Bold)
+                                                    }
+                                                }
+                                                // Image fills the box — BIG so text is readable
+                                                coil.compose.AsyncImage(
+                                                    model = absUrl,
+                                                    contentDescription = "Option ${i+1}",
+                                                    modifier = Modifier
+                                                        .fillMaxSize()
+                                                        .padding(4.dp)
+                                                        .clickable { FullScreenImageViewer.show(absUrl) },
+                                                    contentScale = ContentScale.Fit
+                                                )
+                                            }
+                                        } else {
+                                            Spacer(modifier = Modifier.weight(1f).fillMaxHeight())
+                                        }
+                                    }
                                 }
-                                Spacer(Modifier.width(4.dp))
-                                coil.compose.AsyncImage(model = absUrl, contentDescription = "Option ${i+1}", modifier = Modifier.size(48.dp).clip(RoundedCornerShape(4.dp)).clickable { FullScreenImageViewer.show(absUrl) }, contentScale = ContentScale.Fit)
                             }
                         }
                     }
                     "audio" -> {
-                        (0 until minOf(4, q.optionAudios.size)).forEach { i ->
-                            val audUrl = q.optionAudios[i]; if (audUrl.isBlank()) return@forEach
-                            val absUrl = audUrl.toAbsoluteUrl()
-                            val isSelected = answers[q.id] == absUrl
-                            Row(modifier = Modifier.fillMaxWidth().padding(vertical = 3.dp).clickable { sound.click(); answers[q.id] = absUrl }, verticalAlignment = Alignment.CenterVertically) {
-                                Surface(color = if (isSelected) theme.primary else Color.White, border = androidx.compose.foundation.BorderStroke(2.dp, Color.Black), shape = androidx.compose.foundation.shape.CircleShape, modifier = Modifier.size(28.dp)) {
-                                    Box(contentAlignment = Alignment.Center) { Text("${i+1}", color = if (isSelected) Color.White else Color.Black, fontSize = 10.sp, fontWeight = FontWeight.Bold) }
-                                }
-                                Spacer(Modifier.width(4.dp))
-                                // key(q.id, i) — recreate when question changes so play count resets
-                                key(q.id, i) {
-                                    AudioPlayerCard(theme = theme, url = absUrl, loopCount = q.audioLoop.coerceAtLeast(1), loopDelaySec = q.audioLoopDelay, sound = sound, questionId = "${q.id}-opt-$i", playCounts = audioPlayCounts, onPlayingChange = { audioPlaying = it })
+                        // Audio options — just a play icon + number, nice and clean
+                        Column(
+                            modifier = Modifier.fillMaxWidth().fillMaxHeight(),
+                            verticalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            (0 until minOf(4, q.optionAudios.size)).forEach { i ->
+                                val audUrl = q.optionAudios[i]; if (audUrl.isBlank()) return@forEach
+                                val absUrl = audUrl.toAbsoluteUrl()
+                                val isSelected = answers[q.id] == absUrl
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .weight(1f)
+                                        .clip(RoundedCornerShape(6.dp))
+                                        .border(if (isSelected) 2.dp else 1.dp, if (isSelected) theme.primary else Color(0xFFCCCCCC), RoundedCornerShape(6.dp))
+                                        .background(if (isSelected) theme.primary.copy(alpha = 0.05f) else Color.White)
+                                        .padding(horizontal = 8.dp)
+                                        .clickable { sound.click(); answers[q.id] = absUrl },
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    // Number circle
+                                    Surface(
+                                        color = if (isSelected) theme.primary else Color.White,
+                                        border = androidx.compose.foundation.BorderStroke(1.5.dp, Color.Black),
+                                        shape = androidx.compose.foundation.shape.CircleShape,
+                                        modifier = Modifier.size(24.dp)
+                                    ) {
+                                        Box(contentAlignment = Alignment.Center) {
+                                            Text("${i+1}", color = if (isSelected) Color.White else Color.Black, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                                        }
+                                    }
+                                    Spacer(Modifier.width(6.dp))
+                                    // Just a play icon — nice and good
+                                    key(q.id, i) {
+                                        AudioPlayerCard(
+                                            theme = theme, url = absUrl,
+                                            loopCount = q.audioLoop.coerceAtLeast(1),
+                                            loopDelaySec = q.audioLoopDelay, sound = sound,
+                                            questionId = "${q.id}-opt-$i", playCounts = audioPlayCounts,
+                                            onPlayingChange = { playing ->
+                                                audioPlaying = playing
+                                                currentlyPlayingId = if (playing) "${q.id}-opt-$i" else null
+                                            },
+                                            blocked = currentlyPlayingId != null && currentlyPlayingId != "${q.id}-opt-$i"
+                                        )
+                                    }
                                 }
                             }
                         }
@@ -923,22 +1006,22 @@ private fun QuestionGridRef(
     showAllBlocks: Boolean,
     onPick: (Int) -> Unit,
 ) {
-    // Map each item to its index in sortedItems so clicking opens the right question
-    val globalIndices = items.mapNotNull { item ->
-        val sortedIdx = sortedItems.indexOfFirst { it.question.id == item.question.id }
-        sortedIdx.takeIf { it >= 0 }
-    }
-
-    // Determine if this is the audio (Listening) grid — for number offset
+    // Determine if this is the audio (Listening) grid
     val isAudioGrid = items.isNotEmpty() && items[0].question.blockType == "audio"
 
-    // Always show 20 cells (5 cols × 4 rows) — generated sequential numbers
-    // Reading: 1-20, Listening: 21-40
-    // Use the item's POSITION in the list (not blockNumber from DB) to avoid duplicates
+    // Build a map: blockNumber → item, so clicking number N opens the question
+    // with blockNumber=N (not the Nth item in the list).
+    // Reading: blockNumber 1-20 → display 1-20
+    // Listening: blockNumber 1-20 → display 21-40 (blockNumber + 20)
+    val itemsByBlockNumber = items.associateBy { it.question.blockNumber }
+
+    // Map: blockNumber → index in sortedItems (for onPick callback)
+    val sortedIndexByBlockNumber = sortedItems.mapIndexed { idx, item -> item.question.blockNumber to idx }.toMap()
+
     val cols = 5
     val rowsCount = 4  // Always 4 rows × 5 cols = 20 cells
 
-    // NO scroll — grid fills available space, all 20 buttons visible at once
+    // NO scroll — grid fills available space, all 20 buttons visible
     Column(
         modifier = Modifier.fillMaxWidth().fillMaxHeight(),
         verticalArrangement = Arrangement.spacedBy(3.dp)
@@ -949,13 +1032,18 @@ private fun QuestionGridRef(
                 horizontalArrangement = Arrangement.spacedBy(3.dp)
             ) {
                 for (colIdx in 0 until cols) {
-                    val localIdx = rowIdx * cols + colIdx
-                    // Generated display number: 1-20 for Reading, 21-40 for Listening
-                    val displayNum = if (isAudioGrid) localIdx + 21 else localIdx + 1
+                    // blockNumber is 1-20 for both Reading and Listening
+                    val blockNumber = rowIdx * cols + colIdx + 1
+                    // Display number: 1-20 for Reading, 21-40 for Listening
+                    val displayNum = if (isAudioGrid) blockNumber + 20 else blockNumber
 
-                    if (localIdx < items.size) {
-                        val globalIdx = globalIndices[localIdx]
-                        val isAnswered = answers.containsKey(items[localIdx].question.id)
+                    // Find the question with this blockNumber
+                    val item = itemsByBlockNumber[blockNumber]
+                    val globalIdx = sortedIndexByBlockNumber[blockNumber]
+
+                    if (item != null && globalIdx != null) {
+                        // Question exists — show as active button
+                        val isAnswered = answers.containsKey(item.question.id)
                         val isCurrent = globalIdx == currentIdx
                         val isFilteredOut = when (filterMode) {
                             true -> !isAnswered
@@ -993,19 +1081,20 @@ private fun QuestionGridRef(
                             )
                         }
                     } else {
-                        // Empty placeholder — generated number, greyed out
+                        // No question added for this number — show BLANK (not disabled)
+                        // Just a number with light border, no background fill, not clickable
                         Box(
                             modifier = Modifier
                                 .weight(1f)
                                 .fillMaxHeight()
                                 .clip(RoundedCornerShape(4.dp))
-                                .border(1.dp, Color(0xFFEEEEEE), RoundedCornerShape(4.dp))
-                                .background(Color(0xFFFAFAFA)),
+                                .border(1.dp, Color(0xFFDDDDDD), RoundedCornerShape(4.dp))
+                                .background(Color.White),
                             contentAlignment = Alignment.Center
                         ) {
                             Text(
                                 "$displayNum",
-                                color = Color(0xFFCCCCCC),
+                                color = Color(0xFF999999),
                                 fontSize = 11.sp,
                                 fontWeight = FontWeight.Normal,
                             )
@@ -1064,6 +1153,7 @@ fun AudioPlayerCard(
     questionId: String? = null,
     playCounts: SnapshotStateMap<String, Int>? = null,
     onPlayingChange: ((Boolean) -> Unit)? = null,
+    blocked: Boolean = false,  // TRUE when another audio is playing — disables this button
 ) {
     val context = LocalContext.current
     var mediaPlayer by remember { mutableStateOf<android.media.MediaPlayer?>(null) }
@@ -1094,96 +1184,68 @@ fun AudioPlayerCard(
         }
     }
 
-    Surface(color = theme.cardBg, shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth(), shadowElevation = 1.dp) {
-        Row(
-            modifier = Modifier.padding(14.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            // Audio icon
-            Surface(
-                color = if (disabled) Color(0xFFE2E8F0) else theme.primary.copy(alpha = 0.15f),
-                shape = RoundedCornerShape(10.dp),
-                modifier = Modifier.size(44.dp)
-            ) {
-                Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
-                    Icon(
-                        Icons.Default.Headphones,
-                        null,
-                        tint = if (disabled) Color(0xFF94A3B8) else theme.primary,
-                        modifier = Modifier.size(22.dp)
-                    )
-                }
-            }
-            Spacer(Modifier.width(12.dp))
-            // Simple label — no play count shown
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    if (disabled) "Audio locked" else "Tap to play",
-                    color = if (disabled) Color(0xFF94A3B8) else theme.darkText,
-                    fontSize = 13.sp,
-                    fontWeight = FontWeight.SemiBold
-                )
-            }
-            // Play/Pause button — DISABLED after all plays used
-            IconButton(
-                onClick = {
-                    if (disabled) return@IconButton
-                    sound.click()
-                    if (isPlaying) {
-                        // Don't pause — let it finish. Only allow play, not pause.
-                        return@IconButton
-                    } else {
-                        try {
-                            mediaPlayer?.release()
-                            val mp = android.media.MediaPlayer().apply {
-                                setDataSource(url)
-                                setOnPreparedListener {
-                                    start()
-                                    isPlaying = true
-                                    incrementPlayCount()
-                                }
-                                setOnCompletionListener {
-                                    val currentCount = playCounts?.get(questionId) ?: 0
-                                    if (currentCount < maxPlays) {
-                                        scope.launch {
-                                            if (loopDelaySec > 0) delay(loopDelaySec * 1000L)
-                                            val latestCount = playCounts?.get(questionId) ?: 0
-                                            if (latestCount < maxPlays) {
-                                                incrementPlayCount()
-                                                start()
-                                            } else {
-                                                isPlaying = false
-                                            }
-                                        }
+    // COMPACT audio player — just a small play button
+    // BLOCKED when another audio is playing OR disabled OR already playing
+    val isBlocked = disabled || isPlaying || blocked
+    Surface(
+        color = if (disabled || blocked) Color(0xFFF1F5F9) else theme.primary.copy(alpha = 0.08f),
+        shape = RoundedCornerShape(8.dp),
+        modifier = Modifier.size(36.dp)
+    ) {
+        Box(
+            contentAlignment = Alignment.Center,
+            modifier = Modifier.fillMaxSize().clickable(enabled = !isBlocked) {
+                if (disabled || blocked) return@clickable
+                sound.click()
+                if (isPlaying) return@clickable
+                try {
+                    mediaPlayer?.release()
+                    val mp = android.media.MediaPlayer().apply {
+                        setDataSource(url)
+                        setOnPreparedListener {
+                            start()
+                            isPlaying = true
+                            incrementPlayCount()
+                        }
+                        setOnCompletionListener {
+                            val currentCount = playCounts?.get(questionId) ?: 0
+                            if (currentCount < maxPlays) {
+                                scope.launch {
+                                    if (loopDelaySec > 0) delay(loopDelaySec * 1000L)
+                                    val latestCount = playCounts?.get(questionId) ?: 0
+                                    if (latestCount < maxPlays) {
+                                        incrementPlayCount()
+                                        start()
                                     } else {
                                         isPlaying = false
                                     }
                                 }
-                                setOnErrorListener { _, _, _ ->
-                                    isPlaying = false
-                                    true
-                                }
-                                prepareAsync()
+                            } else {
+                                isPlaying = false
                             }
-                            mediaPlayer = mp
-                        } catch (_: Exception) {
-                            isPlaying = false
                         }
+                        setOnErrorListener { _, _, _ ->
+                            isPlaying = false
+                            true
+                        }
+                        prepareAsync()
                     }
-                },
-                enabled = !disabled && !isPlaying
-            ) {
-                Icon(
-                    when {
-                        disabled -> Icons.Default.Lock
-                        isPlaying -> Icons.Default.VolumeUp
-                        else -> Icons.Default.PlayArrow
-                    },
-                    null,
-                    tint = if (disabled) Color(0xFFCBD5E1) else theme.primary,
-                    modifier = Modifier.size(32.dp)
-                )
+                    mediaPlayer = mp
+                } catch (_: Exception) {
+                    isPlaying = false
+                }
             }
+        ) {
+            Icon(
+                when {
+                    disabled -> Icons.Default.Lock
+                    isPlaying -> Icons.Default.VolumeUp
+                    else -> Icons.Default.PlayArrow
+                },
+                null,
+                tint = if (disabled || blocked) Color(0xFFCBD5E1) else theme.primary,
+                modifier = Modifier.size(20.dp)
+            )
         }
     }
 }
