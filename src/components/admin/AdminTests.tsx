@@ -697,21 +697,39 @@ function ExamEditor({ test, testCategory, onClose }: { test: Test; testCategory:
 
     // Collect raw options from app JSON
     const rawOptions = [data.option_1 || "", data.option_2 || "", data.option_3 || "", data.option_4 || ""];
-    // Detect if options are image URLs (start with http and end with image extension)
+
+    // Use answer_media_type from JSON (most reliable) — fallback to URL extension detection
     const isImageUrl = (s: string) => s && s.startsWith("http") && /\.(jpeg|jpg|png|webp|gif)/i.test(s);
     const isAudioUrl = (s: string) => s && s.startsWith("http") && /\.(mp3|wav|ogg|m4a|aac)/i.test(s);
     const allImages = rawOptions.every(o => !o || isImageUrl(o));
     const allAudios = rawOptions.every(o => !o || isAudioUrl(o));
 
-    // Determine answerType: if options are all image URLs → "image", all audio URLs → "audio", else "text"
-    let detectedAnswerType = (data.answer_media_type || "text") as "text" | "image" | "audio" | "choose";
-    if (allImages && rawOptions.some(o => o)) detectedAnswerType = "image";
+    let detectedAnswerType = "text" as "text" | "image" | "audio" | "choose";
+    // Priority 1: explicit answer_media_type from JSON
+    if (data.answer_media_type === "image") detectedAnswerType = "image";
+    else if (data.answer_media_type === "audio") detectedAnswerType = "audio";
+    // Priority 2: detect from URL extensions
+    else if (allImages && rawOptions.some(o => o)) detectedAnswerType = "image";
     else if (allAudios && rawOptions.some(o => o)) detectedAnswerType = "audio";
 
     // Route options to the correct array based on type
     const textOptions = detectedAnswerType === "text" ? rawOptions : ["", "", "", ""];
     const imageOptions = detectedAnswerType === "image" ? rawOptions : ["", "", "", ""];
-    const audioOptions = detectedAnswerType === "audio" ? rawOptions : ["", "", ""];
+    const audioOptions = detectedAnswerType === "audio" ? rawOptions : ["", "", "", ""];
+
+    // Description: question_description field holds the URL when type is image/audio
+    const descType = (data.question_description_type || "none") as "none" | "text" | "image" | "audio";
+    const descUrl = data.question_description || "";  // This is the URL for image/audio, or text for text
+    const descText = descType === "text" ? descUrl : "";
+    const descImageUrl = descType === "image" ? descUrl : "";
+    const descAudioUrl = descType === "audio" ? descUrl : "";
+
+    // Question media: question_media field holds the URL
+    const mediaType = (data.question_media_type || "none") as "none" | "text" | "image" | "audio";
+    const mediaUrl = data.question_media || "";
+    const mediaText = data.question_text || (mediaType === "text" ? mediaUrl : "");
+    const mediaImageUrl = mediaType === "image" ? mediaUrl : "";
+    const mediaAudioUrl = mediaType === "audio" ? mediaUrl : "";
 
     const updated: QuestionData = {
       ...q,
@@ -719,14 +737,14 @@ function ExamEditor({ test, testCategory, onClose }: { test: Test; testCategory:
       blockNumber: detectedBlockNumber || q.blockNumber,
       stem: data.question || data.question_text || "",
       title: data.question_number ? `Question ${data.question_number}` : q.title,
-      mediaType: (data.question_media_type || "none") as "none" | "text" | "image" | "audio",
-      mediaText: data.question_text || "",
-      mediaImageUrl: data.question_media_type === "image" ? (data.question_media || "") : (q.mediaImageUrl || ""),
-      mediaAudioUrl: data.question_media_type === "audio" ? (data.question_media || "") : (q.mediaAudioUrl || ""),
-      descType: (data.question_description_type || "none") as "none" | "text" | "image" | "audio",
-      descText: data.question_description || "",
-      descImageUrl: data.question_description_type === "image" ? (data.question_description_media || "") : (q.descImageUrl || ""),
-      descAudioUrl: data.question_description_type === "audio" ? (data.question_description_media || "") : (q.descAudioUrl || ""),
+      mediaType,
+      mediaText,
+      mediaImageUrl,
+      mediaAudioUrl,
+      descType,
+      descText,
+      descImageUrl,
+      descAudioUrl,
       options: textOptions,
       optionImages: imageOptions,
       optionAudios: audioOptions,
@@ -755,29 +773,46 @@ function ExamEditor({ test, testCategory, onClose }: { test: Test; testCategory:
       const k = key(blockType, blockNumber);
       const existing = next[k] || emptyQuestion(blockType, blockNumber);
 
-      // Detect option types (image/audio URLs vs text)
+      // Detect option types — use answer_media_type first, fallback to URL extension
       const rawOptions = [data.option_1 || "", data.option_2 || "", data.option_3 || "", data.option_4 || ""];
       const isImageUrl = (s: string) => s && s.startsWith("http") && /\.(jpeg|jpg|png|webp|gif)/i.test(s);
       const isAudioUrl = (s: string) => s && s.startsWith("http") && /\.(mp3|wav|ogg|m4a|aac)/i.test(s);
       const allImages = rawOptions.every(o => !o || isImageUrl(o));
       const allAudios = rawOptions.every(o => !o || isAudioUrl(o));
-      let answerType = (data.answer_media_type || "text") as "text" | "image" | "audio" | "choose";
-      if (allImages && rawOptions.some(o => o)) answerType = "image";
+
+      let answerType = "text" as "text" | "image" | "audio" | "choose";
+      if (data.answer_media_type === "image") answerType = "image";
+      else if (data.answer_media_type === "audio") answerType = "audio";
+      else if (allImages && rawOptions.some(o => o)) answerType = "image";
       else if (allAudios && rawOptions.some(o => o)) answerType = "audio";
+
+      // Description: question_description holds URL for image/audio
+      const descType = (data.question_description_type || "none") as "none" | "text" | "image" | "audio";
+      const descUrl = data.question_description || "";
+      const descText = descType === "text" ? descUrl : "";
+      const descImageUrl = descType === "image" ? descUrl : "";
+      const descAudioUrl = descType === "audio" ? descUrl : "";
+
+      // Question media
+      const mediaType = (data.question_media_type || "none") as "none" | "text" | "image" | "audio";
+      const mediaUrl = data.question_media || "";
+      const mediaText = data.question_text || (mediaType === "text" ? mediaUrl : "");
+      const mediaImageUrl = mediaType === "image" ? mediaUrl : "";
+      const mediaAudioUrl = mediaType === "audio" ? mediaUrl : "";
 
       next[k] = {
         ...existing,
         blockType, blockNumber,
         stem: data.question || data.question_text || "",
         title: `Question ${qNum}`,
-        mediaType: (data.question_media_type || "none") as "none" | "text" | "image" | "audio",
-        mediaText: data.question_text || "",
-        mediaImageUrl: data.question_media_type === "image" ? (data.question_media || "") : "",
-        mediaAudioUrl: data.question_media_type === "audio" ? (data.question_media || "") : "",
-        descType: (data.question_description_type || "none") as "none" | "text" | "image" | "audio",
-        descText: data.question_description || "",
-        descImageUrl: data.question_description_type === "image" ? (data.question_description_media || "") : "",
-        descAudioUrl: data.question_description_type === "audio" ? (data.question_description_media || "") : "",
+        mediaType,
+        mediaText,
+        mediaImageUrl,
+        mediaAudioUrl,
+        descType,
+        descText,
+        descImageUrl,
+        descAudioUrl,
         options: answerType === "text" ? rawOptions : ["", "", "", ""],
         optionImages: answerType === "image" ? rawOptions : ["", "", "", ""],
         optionAudios: answerType === "audio" ? rawOptions : ["", "", "", ""],
