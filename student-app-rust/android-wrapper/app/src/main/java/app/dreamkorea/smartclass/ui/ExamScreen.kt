@@ -394,42 +394,13 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
                 contentScale = ContentScale.Fit
             )
             Row(modifier = Modifier.fillMaxSize()) {
-            // LEFT: Question content (60%) — scrollable so long titles/stems/images don't get cut
+            // LEFT: Question content (60%) — ONLY description + media
+            // Question text (stem) is NOT shown here — it only appears in the top bar.
             Column(
                 modifier = Modifier.weight(0.6f).fillMaxHeight().padding(8.dp).verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.Center,
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                // Question title (if set by admin) — shown at the top
-                if (!q.title.isNullOrBlank()) {
-                    Text(
-                        q.title,
-                        color = Color(0xFF003478),
-                        fontSize = 13.sp,
-                        fontWeight = FontWeight.Bold,
-                        modifier = Modifier.fillMaxWidth(0.92f).padding(bottom = 4.dp)
-                    )
-                }
-                // Question text (stem) — BIGGER font, shown in a card
-                val questionText = q.stem.ifBlank { q.mediaText ?: "" }
-                if (questionText.isNotBlank()) {
-                    Surface(
-                        color = Color.White,
-                        shape = RoundedCornerShape(10.dp),
-                        shadowElevation = 2.dp,
-                        border = androidx.compose.foundation.BorderStroke(2.dp, Color(0xFF003478)),
-                        modifier = Modifier.fillMaxWidth(0.94f)
-                    ) {
-                        Text(
-                            questionText,
-                            color = Color(0xFF1E293B),
-                            fontSize = 15.sp,
-                            fontWeight = FontWeight.Bold,
-                            modifier = Modifier.padding(12.dp)
-                        )
-                    }
-                    Spacer(Modifier.height(8.dp))
-                }
                 // Description text — BIGGER, DARKER
                 val descText = q.descText ?: ""
                 if (descText.isNotBlank() && q.descType == "text") {
