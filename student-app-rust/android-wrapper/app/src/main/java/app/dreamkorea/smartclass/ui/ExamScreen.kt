@@ -76,12 +76,14 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
     val audioPlayCounts = remember { mutableStateMapOf<String, Int>() }
     // When audio is playing, disable navigation buttons
     var audioPlaying by remember { mutableStateOf(false) }
+    var currentlyPlayingId by remember { mutableStateOf<String?>(null) }
     var submitResult by remember { mutableStateOf<SubmitResponse?>(null) }
     var submitting by remember { mutableStateOf(false) }
     // Per-question feedback (after answering, before moving on)
     var questionFeedback by remember { mutableStateOf<QuestionFeedback?>(null) }
-    // Timer
-    var timeLeft by remember { mutableStateOf(0) }
+    // Timer — persists via SharedPreferences
+    val prefs = context.getSharedPreferences("exam_timer", android.content.Context.MODE_PRIVATE)
+    var timeLeft by remember { mutableStateOf(prefs.getInt("timeLeft_$testId", 0)) }
 
     // ── ORIENTATION ── FORCE LANDSCAPE. No onDispose PORTRAIT —
     // MainScreen handles portrait when screen changes to non-exam.
@@ -146,7 +148,8 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
             }
             if (result != null) {
                 test = result
-                timeLeft = (result.durationMin.coerceAtLeast(1)) * 60
+                if (timeLeft == 0) { timeLeft = (result.durationMin.coerceAtLeast(1)) * 60 }
+                prefs.edit().putInt("timeLeft_$testId", timeLeft).apply()
             } else {
                 error = "The request timed out. Check your internet connection and try again."
             }
@@ -180,6 +183,7 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
             while (timeLeft > 0) {
                 delay(1000)
                 timeLeft--
+                prefs.edit().putInt("timeLeft_$testId", timeLeft).apply()
             }
             // Auto-submit when timer reaches zero
             val currentTest = test
@@ -303,7 +307,7 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
 
     // ═══ EXAM UI — spec-compliant landscape layout ═══
     // Sort items: Reading (text) first, then Listening (audio)
-    val sortedItems = t.items.sortedWith(compareBy(
+    val sortedItems = t.items.distinctBy { it.question.id }.sortedWith(compareBy(
         { if (it.question.blockType == "audio") 1 else 0 },
         { it.question.blockNumber }
     ))
@@ -353,9 +357,10 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
         // ── 2. INSTRUCTION ROW ── compact question number + title + FREE badge
         Surface(modifier = Modifier.fillMaxWidth().padding(horizontal = 6.dp, vertical = 2.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("${currentIdx + 1}. ", color = Color(0xFF003478), fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                val displayQNum = if (q.blockType == "audio") q.blockNumber + 20 else q.blockNumber
+                Text("$displayQNum. ", color = Color(0xFF003478), fontSize = 16.sp, fontWeight = FontWeight.ExtraBold)
                 val displayText = q.stem.take(80)
-                Text(displayText, color = Color(0xFF1E293B), fontSize = 11.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
+                Text(displayText, color = Color(0xFF1E293B), fontSize = 14.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
                 if (q.isFree) {
                     Spacer(Modifier.width(4.dp))
                     Surface(color = Color(0xFF22C55E), shape = RoundedCornerShape(3.dp)) {
@@ -440,7 +445,8 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
                     // the question changes — state (playCount, disabled) resets completely.
                     // This fixes the bug where audio was locked from the previous question.
                     key(q.id) {
-                        AudioPlayerCard(theme = theme, url = mediaAudUrl, loopCount = q.audioLoop, loopDelaySec = q.audioLoopDelay, sound = sound, questionId = q.id, playCounts = audioPlayCounts, onPlayingChange = { audioPlaying = it })
+                        val effectiveGap = if (q.audioLoopDelay > 0) q.audioLoopDelay else 2
+                        AudioPlayerCard(theme = theme, url = mediaAudUrl, loopCount = q.audioLoop, loopDelaySec = effectiveGap, sound = sound, questionId = q.id, playCounts = audioPlayCounts, onPlayingChange = { audioPlaying = it })
                     }
                 }
             }
@@ -495,7 +501,7 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
                                     Box(contentAlignment = Alignment.Center) { Text("${i+1}", color = if (isSelected) Color.White else Color.Black, fontSize = 10.sp, fontWeight = FontWeight.Bold) }
                                 }
                                 Spacer(Modifier.width(4.dp))
-                                coil.compose.AsyncImage(model = absUrl, contentDescription = "Option ${i+1}", modifier = Modifier.size(48.dp).clip(RoundedCornerShape(4.dp)).clickable { FullScreenImageViewer.show(absUrl) }, contentScale = ContentScale.Fit)
+                                coil.compose.AsyncImage(model = absUrl, contentDescription = "Option ${i+1}", modifier = Modifier.size(64.dp).clip(RoundedCornerShape(4.dp)).clickable { FullScreenImageViewer.show(absUrl) }, contentScale = ContentScale.Fit)
                             }
                         }
                     }
@@ -511,7 +517,9 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
                                 Spacer(Modifier.width(4.dp))
                                 // key(q.id, i) — recreate when question changes so play count resets
                                 key(q.id, i) {
-                                    AudioPlayerCard(theme = theme, url = absUrl, loopCount = q.audioLoop.coerceAtLeast(1), loopDelaySec = q.audioLoopDelay, sound = sound, questionId = "${q.id}-opt-$i", playCounts = audioPlayCounts, onPlayingChange = { audioPlaying = it })
+                                    val effectiveGap = if (q.audioLoopDelay > 0) q.audioLoopDelay else 2
+                                    val optId = "${q.id}-opt-$i"
+                                    AudioPlayerCard(theme = theme, url = absUrl, loopCount = q.audioLoop.coerceAtLeast(1), loopDelaySec = effectiveGap, sound = sound, questionId = optId, playCounts = audioPlayCounts, onPlayingChange = { playing -> audioPlaying = playing; currentlyPlayingId = if (playing) optId else null }, blocked = currentlyPlayingId != null && currentlyPlayingId != optId)
                                 }
                             }
                         }
@@ -1013,6 +1021,7 @@ fun AudioPlayerCard(
     questionId: String? = null,
     playCounts: SnapshotStateMap<String, Int>? = null,
     onPlayingChange: ((Boolean) -> Unit)? = null,
+    blocked: Boolean = false,
 ) {
     val context = LocalContext.current
     var mediaPlayer by remember { mutableStateOf<android.media.MediaPlayer?>(null) }
@@ -1120,16 +1129,15 @@ fun AudioPlayerCard(
                         }
                     }
                 },
-                enabled = !disabled && !isPlaying
+                enabled = !disabled && !isPlaying && !blocked && !blocked
             ) {
                 Icon(
                     when {
-                        disabled -> Icons.Default.Lock
                         isPlaying -> Icons.Default.VolumeUp
                         else -> Icons.Default.PlayArrow
                     },
                     null,
-                    tint = if (disabled) Color(0xFFCBD5E1) else theme.primary,
+                    tint = if (disabled || blocked) Color(0xFFCBD5E1) else if (isPlaying) theme.primary.copy(alpha = 0.4f) else theme.primary,
                     modifier = Modifier.size(32.dp)
                 )
             }
