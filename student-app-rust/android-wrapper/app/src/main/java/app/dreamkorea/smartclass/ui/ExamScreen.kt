@@ -425,12 +425,12 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
                         modifier = Modifier.fillMaxWidth(0.95f).padding(bottom = 6.dp)
                     )
                 }
-                // Description image (descType == "image") — smaller so it doesn't dominate the screen
+                // Description image (descType == "image") — medium size, fits screen, text inside still readable
                 if (q.descType == "image" && !q.descImageUrl.isNullOrBlank()) {
                     val url = q.descImageUrl!!.toAbsoluteUrl()
                     coil.compose.AsyncImage(
                         model = url, contentDescription = null,
-                        modifier = Modifier.fillMaxWidth(0.85f).heightIn(max = 160.dp).clip(RoundedCornerShape(8.dp)).clickable { FullScreenImageViewer.show(url) },
+                        modifier = Modifier.fillMaxWidth(0.88f).heightIn(max = 200.dp).clip(RoundedCornerShape(8.dp)).clickable { FullScreenImageViewer.show(url) },
                         contentScale = ContentScale.Fit
                     )
                     Spacer(Modifier.height(6.dp))
@@ -455,12 +455,12 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
                     }
                     Spacer(Modifier.height(8.dp))
                 }
-                // Media image (mediaImageUrl / imageUrl) — smaller so it doesn't dominate
+                // Media image (mediaImageUrl / imageUrl) — medium size, text inside still readable
                 val mediaImgUrl = (q.mediaImageUrl ?: q.imageUrl)?.toAbsoluteUrl()
                 if (!mediaImgUrl.isNullOrBlank()) {
                     coil.compose.AsyncImage(
                         model = mediaImgUrl, contentDescription = null,
-                        modifier = Modifier.fillMaxWidth(0.85f).heightIn(max = 180.dp).clip(RoundedCornerShape(8.dp)).clickable { FullScreenImageViewer.show(mediaImgUrl) },
+                        modifier = Modifier.fillMaxWidth(0.88f).heightIn(max = 220.dp).clip(RoundedCornerShape(8.dp)).clickable { FullScreenImageViewer.show(mediaImgUrl) },
                         contentScale = ContentScale.Fit
                     )
                 }
@@ -496,15 +496,15 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
                                     color = if (isSelected) theme.primary else Color.White,
                                     border = androidx.compose.foundation.BorderStroke(2.dp, Color.Black),
                                     shape = androidx.compose.foundation.shape.CircleShape,
-                                    modifier = Modifier.size(44.dp)
+                                    modifier = Modifier.size(40.dp)
                                 ) {
-                                    Box(contentAlignment = Alignment.Center) { Text("${i+1}", color = if (isSelected) Color.White else Color.Black, fontSize = 18.sp, fontWeight = FontWeight.Bold) }
+                                    Box(contentAlignment = Alignment.Center) { Text("${i+1}", color = if (isSelected) Color.White else Color.Black, fontSize = 15.sp, fontWeight = FontWeight.Bold) }
                                 }
-                                Spacer(Modifier.width(10.dp))
+                                Spacer(Modifier.width(8.dp))
                                 Text(
                                     text = buildUnderlinedText(optText, blankWord),
                                     color = Color.Black,
-                                    fontSize = 16.sp,
+                                    fontSize = 13.sp,
                                     modifier = Modifier.weight(1f)
                                 )
                             }
@@ -519,11 +519,11 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
                                 modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp).clickable { sound.click(); answers[q.id] = absUrl },
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Surface(color = if (isSelected) theme.primary else Color.White, border = androidx.compose.foundation.BorderStroke(2.dp, Color.Black), shape = androidx.compose.foundation.shape.CircleShape, modifier = Modifier.size(34.dp)) {
-                                    Box(contentAlignment = Alignment.Center) { Text("${i+1}", color = if (isSelected) Color.White else Color.Black, fontSize = 14.sp, fontWeight = FontWeight.Bold) }
+                                Surface(color = if (isSelected) theme.primary else Color.White, border = androidx.compose.foundation.BorderStroke(2.dp, Color.Black), shape = androidx.compose.foundation.shape.CircleShape, modifier = Modifier.size(28.dp)) {
+                                    Box(contentAlignment = Alignment.Center) { Text("${i+1}", color = if (isSelected) Color.White else Color.Black, fontSize = 10.sp, fontWeight = FontWeight.Bold) }
                                 }
-                                Spacer(Modifier.width(8.dp))
-                                coil.compose.AsyncImage(model = absUrl, contentDescription = "Option ${i+1}", modifier = Modifier.size(96.dp).clip(RoundedCornerShape(6.dp)).clickable { FullScreenImageViewer.show(absUrl) }, contentScale = ContentScale.Fit)
+                                Spacer(Modifier.width(4.dp))
+                                coil.compose.AsyncImage(model = absUrl, contentDescription = "Option ${i+1}", modifier = Modifier.size(72.dp).clip(RoundedCornerShape(4.dp)).clickable { FullScreenImageViewer.show(absUrl) }, contentScale = ContentScale.Fit)
                             }
                         }
                     }
@@ -533,10 +533,10 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
                             val absUrl = audUrl.toAbsoluteUrl()
                             val isSelected = answers[q.id] == absUrl
                             Row(modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp).clickable { sound.click(); answers[q.id] = absUrl }, verticalAlignment = Alignment.CenterVertically) {
-                                Surface(color = if (isSelected) theme.primary else Color.White, border = androidx.compose.foundation.BorderStroke(2.dp, Color.Black), shape = androidx.compose.foundation.shape.CircleShape, modifier = Modifier.size(34.dp)) {
-                                    Box(contentAlignment = Alignment.Center) { Text("${i+1}", color = if (isSelected) Color.White else Color.Black, fontSize = 14.sp, fontWeight = FontWeight.Bold) }
+                                Surface(color = if (isSelected) theme.primary else Color.White, border = androidx.compose.foundation.BorderStroke(2.dp, Color.Black), shape = androidx.compose.foundation.shape.CircleShape, modifier = Modifier.size(28.dp)) {
+                                    Box(contentAlignment = Alignment.Center) { Text("${i+1}", color = if (isSelected) Color.White else Color.Black, fontSize = 10.sp, fontWeight = FontWeight.Bold) }
                                 }
-                                Spacer(Modifier.width(8.dp))
+                                Spacer(Modifier.width(4.dp))
                                 key(q.id, i) {
                                     val effectiveGap = if (q.audioLoopDelay > 0) q.audioLoopDelay else 2
                                     val optId = "${q.id}-opt-$i"
@@ -916,6 +916,7 @@ fun AudioPlayerCard(
     questionId: String? = null,
     playCounts: SnapshotStateMap<String, Int>? = null,
     onPlayingChange: ((Boolean) -> Unit)? = null,
+    blocked: Boolean = false,
     unlimited: Boolean = false, // REVIEW mode: user can replay as many times as wanted
 ) {
     val context = LocalContext.current
@@ -936,6 +937,7 @@ fun AudioPlayerCard(
 
     val maxPlays = if (unlimited) Int.MAX_VALUE else (if (loopCount <= 0) 2 else loopCount)
     val disabled = if (unlimited) false else effectiveCount >= maxPlays
+    val isBlocked = disabled || isPlaying || blocked
     val scope = rememberCoroutineScope()
 
     fun incrementPlayCount() {
@@ -945,12 +947,6 @@ fun AudioPlayerCard(
             localPlayCount++
         }
     }
-    fun currentCount(): Int = if (playCounts != null && questionId != null) {
-        playCounts[questionId] ?: 0
-    } else {
-        localPlayCount
-    }
-
     fun currentCount(): Int = if (playCounts != null && questionId != null) {
         playCounts[questionId] ?: 0
     } else {
@@ -997,7 +993,7 @@ fun AudioPlayerCard(
             // Play/Pause button — DISABLED after all plays used (unless unlimited)
             IconButton(
                 onClick = {
-                    if (disabled) return@IconButton
+                    if (disabled || blocked) return@IconButton
                     sound.click()
                     if (isPlaying) {
                         return@IconButton
@@ -1013,7 +1009,6 @@ fun AudioPlayerCard(
                                 }
                                 setOnCompletionListener {
                                     if (unlimited) {
-                                        // Review mode: play once, then stop. User can click again to replay.
                                         isPlaying = false
                                     } else {
                                         val cc = currentCount()
@@ -1032,22 +1027,27 @@ fun AudioPlayerCard(
                                             isPlaying = false
                                         }
                                     }
-                                } else { isPlaying = false }
+                                }
+                                setOnErrorListener { _, _, _ -> isPlaying = false; true }
+                                prepareAsync()
                             }
-                        }
-                        setOnErrorListener { _, _, _ -> isPlaying = false; true }
-                        prepareAsync()
+                            mediaPlayer = mp
+                        } catch (_: Exception) { isPlaying = false }
                     }
-                    mediaPlayer = mp
-                } catch (_: Exception) { isPlaying = false }
+                },
+                enabled = !isBlocked
+            ) {
+                Icon(
+                    when {
+                        disabled -> Icons.Default.Lock
+                        isPlaying -> Icons.Default.VolumeUp
+                        else -> Icons.Default.PlayArrow
+                    },
+                    null,
+                    tint = if (disabled || blocked) Color(0xFFCBD5E1) else theme.primary,
+                    modifier = Modifier.size(32.dp)
+                )
             }
-        ) {
-            Icon(
-                Icons.Default.PlayArrow,
-                null,
-                tint = if (disabled || blocked) Color(0xFFCBD5E1) else if (isPlaying) theme.primary.copy(alpha = 0.4f) else theme.primary,
-                modifier = Modifier.size(20.dp)
-            )
         }
     }
 }
