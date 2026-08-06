@@ -145,8 +145,17 @@ data class SubmitRequest(val answers: Map<String, Any>)
 data class ReviewItem(
     val questionId: String,
     val stem: String,
-    val title: String? = null, // optional per-question title
+    val title: String? = null,
     val type: String,
+    val answerType: String? = null,
+    val blockType: String? = null,
+    val descType: String? = null,
+    val descText: String? = null,
+    val descImageUrl: String? = null,
+    val mediaType: String? = null,
+    val mediaText: String? = null,
+    val mediaImageUrl: String? = null,
+    val mediaAudioUrl: String? = null,
     val options: List<String>?,
     val optionImages: List<String> = emptyList(),
     val optionAudios: List<String> = emptyList(),
@@ -154,8 +163,8 @@ data class ReviewItem(
     val audioUrl: String?,
     val audioLoop: Int = 2,
     val audioLoopDelay: Int = 0,
-    val userAnswer: Any?, // String or List<String>
-    val correctAnswer: Any?, // String or List<String>
+    val userAnswer: Any?,
+    val correctAnswer: Any?,
     val explanation: String?,
     val isCorrect: Boolean
 )
