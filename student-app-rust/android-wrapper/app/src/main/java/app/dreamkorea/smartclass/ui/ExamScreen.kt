@@ -914,92 +914,50 @@ fun AudioPlayerCard(
         }
     }
 
-    Surface(color = theme.cardBg, shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth(), shadowElevation = 1.dp) {
-        Row(
-            modifier = Modifier.padding(14.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            // Audio icon
-            Surface(
-                color = if (disabled) Color(0xFFE2E8F0) else theme.primary.copy(alpha = 0.15f),
-                shape = RoundedCornerShape(10.dp),
-                modifier = Modifier.size(44.dp)
-            ) {
-                Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
-                    Icon(
-                        Icons.Default.PlayArrow,
-                        null,
-                        tint = if (disabled) Color(0xFF94A3B8) else theme.primary,
-                        modifier = Modifier.size(22.dp)
-                    )
-                }
-            }
-            Spacer(Modifier.width(12.dp))
-            // Simple label — no play count shown
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    if (disabled) "Audio locked" else "Tap to play",
-                    color = if (disabled) Color(0xFF94A3B8) else theme.darkText,
-                    fontSize = 13.sp,
-                    fontWeight = FontWeight.SemiBold
-                )
-            }
-            // Play/Pause button — DISABLED after all plays used
-            IconButton(
-                onClick = {
-                    if (disabled) return@IconButton
-                    sound.click()
-                    if (isPlaying) {
-                        // Don't pause — let it finish. Only allow play, not pause.
-                        return@IconButton
-                    } else {
-                        try {
-                            mediaPlayer?.release()
-                            val mp = android.media.MediaPlayer().apply {
-                                setDataSource(url)
-                                setOnPreparedListener {
-                                    start()
-                                    isPlaying = true
-                                    incrementPlayCount()
+    // ONLY a play icon button — no card, no text, no headphones
+    val isBlocked = disabled || isPlaying || blocked
+    Surface(
+        color = if (disabled || blocked) Color(0xFFF1F5F9) else theme.primary.copy(alpha = 0.08f),
+        shape = RoundedCornerShape(8.dp),
+        modifier = Modifier.size(36.dp)
+    ) {
+        Box(
+            contentAlignment = Alignment.Center,
+            modifier = Modifier.fillMaxSize().clickable(enabled = !isBlocked) {
+                if (disabled || blocked) return@clickable
+                if (isPlaying) return@clickable
+                sound.click()
+                isPlaying = true
+                onPlayingChange?.invoke(true)
+                try {
+                    mediaPlayer?.release()
+                    val mp = android.media.MediaPlayer().apply {
+                        setDataSource(url)
+                        setOnPreparedListener { start(); incrementPlayCount() }
+                        setOnCompletionListener {
+                            val currentCount = playCounts?.get(questionId) ?: 0
+                            if (currentCount < maxPlays) {
+                                scope.launch {
+                                    if (loopDelaySec > 0) delay(loopDelaySec * 1000L)
+                                    val latestCount = playCounts?.get(questionId) ?: 0
+                                    if (latestCount < maxPlays) { incrementPlayCount(); start() }
+                                    else { isPlaying = false }
                                 }
-                                setOnCompletionListener {
-                                    val currentCount = playCounts?.get(questionId) ?: 0
-                                    if (currentCount < maxPlays) {
-                                        scope.launch {
-                                            if (loopDelaySec > 0) delay(loopDelaySec * 1000L)
-                                            val latestCount = playCounts?.get(questionId) ?: 0
-                                            if (latestCount < maxPlays) {
-                                                incrementPlayCount()
-                                                start()
-                                            } else {
-                                                isPlaying = false
-                                            }
-                                        }
-                                    } else {
-                                        isPlaying = false
-                                    }
-                                }
-                                setOnErrorListener { _, _, _ ->
-                                    isPlaying = false
-                                    true
-                                }
-                                prepareAsync()
-                            }
-                            mediaPlayer = mp
-                        } catch (_: Exception) {
-                            isPlaying = false
+                            } else { isPlaying = false }
                         }
+                        setOnErrorListener { _, _, _ -> isPlaying = false; true }
+                        prepareAsync()
                     }
-                },
-                enabled = !disabled && !isPlaying && !blocked
-            ) {
-                Icon(
-                    Icons.Default.PlayArrow,
-                    null,
-                    tint = if (disabled || blocked) Color(0xFFCBD5E1) else if (isPlaying) theme.primary.copy(alpha = 0.4f) else theme.primary,
-                    modifier = Modifier.size(32.dp)
-                )
+                    mediaPlayer = mp
+                } catch (_: Exception) { isPlaying = false }
             }
+        ) {
+            Icon(
+                Icons.Default.PlayArrow,
+                null,
+                tint = if (disabled || blocked) Color(0xFFCBD5E1) else if (isPlaying) theme.primary.copy(alpha = 0.4f) else theme.primary,
+                modifier = Modifier.size(20.dp)
+            )
         }
     }
 }
