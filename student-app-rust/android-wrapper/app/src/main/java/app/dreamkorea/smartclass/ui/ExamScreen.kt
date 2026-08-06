@@ -404,11 +404,20 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
             )
             Row(modifier = Modifier.fillMaxSize()) {
             // LEFT: ONLY description + media (question text is at top bar only)
-            Column(
-                modifier = Modifier.weight(0.6f).fillMaxHeight().padding(8.dp).verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.Top,
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
+            // Content is CENTERED vertically when short (nice fit), scrolls from TOP when long.
+            // BoxWithConstraints gives us the viewport height so we can set heightIn(min = viewport)
+            // which makes Arrangement.Center work in a scrollable column.
+            BoxWithConstraints(modifier = Modifier.weight(0.6f).fillMaxHeight()) {
+                val viewportHeight = maxHeight
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(min = viewportHeight)
+                        .verticalScroll(rememberScrollState())
+                        .padding(8.dp),
+                    verticalArrangement = Arrangement.Center,
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
                 Spacer(Modifier.height(4.dp))
                 // Question title (if set by admin) — shown in left section as a heading.
                 // The question STEM text is NOT here — it lives only in the top instruction row.
@@ -469,7 +478,8 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
                         AudioPlayerCard(theme = theme, url = mediaAudUrl, loopCount = q.audioLoop, loopDelaySec = effectiveGap, sound = sound, questionId = q.id, playCounts = audioPlayCounts, onPlayingChange = { playing -> audioPlaying = playing; currentlyPlayingId = if (playing) q.id else null }, blocked = currentlyPlayingId != null && currentlyPlayingId != q.id)
                     }
                 }
-            }
+                } // end Column
+            } // end BoxWithConstraints
 
             // Vertical divider
             Box(modifier = Modifier.width(2.dp).fillMaxHeight().background(Color.Black))
@@ -918,6 +928,7 @@ fun AudioPlayerCard(
     playCounts: SnapshotStateMap<String, Int>? = null,
     onPlayingChange: ((Boolean) -> Unit)? = null,
     blocked: Boolean = false,
+    unlimited: Boolean = false, // REVIEW mode: user can replay as many times as wanted
 ) {
     val context = LocalContext.current
     var mediaPlayer by remember { mutableStateOf<android.media.MediaPlayer?>(null) }
@@ -938,8 +949,9 @@ fun AudioPlayerCard(
         onPlayingChange?.invoke(isPlaying)
     }
 
-    val maxPlays = if (loopCount <= 0) 2 else loopCount
-    val disabled = effectiveCount >= maxPlays
+    // In unlimited (review) mode: no max plays, button never disables
+    val maxPlays = if (unlimited) Int.MAX_VALUE else (if (loopCount <= 0) 2 else loopCount)
+    val disabled = if (unlimited) false else effectiveCount >= maxPlays
     val scope = rememberCoroutineScope()
 
     fun incrementPlayCount() {
@@ -984,15 +996,20 @@ fun AudioPlayerCard(
                         setDataSource(url)
                         setOnPreparedListener { start(); incrementPlayCount() }
                         setOnCompletionListener {
-                            val cc = currentCount()
-                            if (cc < maxPlays) {
-                                scope.launch {
-                                    if (loopDelaySec > 0) delay(loopDelaySec * 1000L)
-                                    val latestCount = currentCount()
-                                    if (latestCount < maxPlays) { incrementPlayCount(); start() }
-                                    else { isPlaying = false }
-                                }
-                            } else { isPlaying = false }
+                            if (unlimited) {
+                                // Review mode: play once, then stop. User can click again to replay.
+                                isPlaying = false
+                            } else {
+                                val cc = currentCount()
+                                if (cc < maxPlays) {
+                                    scope.launch {
+                                        if (loopDelaySec > 0) delay(loopDelaySec * 1000L)
+                                        val latestCount = currentCount()
+                                        if (latestCount < maxPlays) { incrementPlayCount(); start() }
+                                        else { isPlaying = false }
+                                    }
+                                } else { isPlaying = false }
+                            }
                         }
                         setOnErrorListener { _, _, _ -> isPlaying = false; true }
                         prepareAsync()
@@ -1566,7 +1583,7 @@ fun ReviewCard(theme: AppTheme, review: ReviewItem, questionNumber: Int = 0, sou
             if (!review.audioUrl.isNullOrBlank()) {
                 Spacer(Modifier.height(8.dp))
                 val audAbs = review.audioUrl!!.toAbsoluteUrl()
-                AudioPlayerCard(theme = theme, url = audAbs, loopCount = 1, loopDelaySec = 0, sound = sound ?: rememberSoundManager())
+                AudioPlayerCard(theme = theme, url = audAbs, loopCount = 1, loopDelaySec = 0, sound = sound ?: rememberSoundManager(), unlimited = true)
             }
             Spacer(Modifier.height(8.dp))
 
@@ -1632,7 +1649,7 @@ fun ReviewCard(theme: AppTheme, review: ReviewItem, questionNumber: Int = 0, sou
                                 answerType == "audio" && optAud != null -> {
                                     val audUrl = optAud.toAbsoluteUrl()
                                     // Audio option in review — plays only once per click
-                                    AudioPlayerCard(theme = theme, url = audUrl, loopCount = 1, loopDelaySec = 0, sound = sound ?: rememberSoundManager())
+                                    AudioPlayerCard(theme = theme, url = audUrl, loopCount = 1, loopDelaySec = 0, sound = sound ?: rememberSoundManager(), unlimited = true)
                                 }
                                 answerType == "image" && optImg != null -> {
                                     val imgUrl = optImg.toAbsoluteUrl()
@@ -1645,7 +1662,7 @@ fun ReviewCard(theme: AppTheme, review: ReviewItem, questionNumber: Int = 0, sou
                                 }
                                 optAud != null -> {
                                     val audUrl = optAud.toAbsoluteUrl()
-                                    AudioPlayerCard(theme = theme, url = audUrl, loopCount = 1, loopDelaySec = 0, sound = sound ?: rememberSoundManager())
+                                    AudioPlayerCard(theme = theme, url = audUrl, loopCount = 1, loopDelaySec = 0, sound = sound ?: rememberSoundManager(), unlimited = true)
                                 }
                                 optImg != null || opt.startsWith("http") || opt.startsWith("/api/files") || opt.startsWith("/uploads") -> {
                                     val imgUrl = (optImg ?: opt).toAbsoluteUrl()
@@ -1742,7 +1759,7 @@ private fun AnswerDisplay(answer: Any?, theme: AppTheme, sound: SoundManager? = 
                     contentScale = ContentScale.Fit
                 )
             } else if (url.startsWith("http") && (url.contains(".mp3") || url.contains(".wav") || url.contains(".ogg") || url.contains(".m4a"))) {
-                AudioPlayerCard(theme = theme, url = url, loopCount = 1, loopDelaySec = 0, sound = sound ?: rememberSoundManager())
+                AudioPlayerCard(theme = theme, url = url, loopCount = 1, loopDelaySec = 0, sound = sound ?: rememberSoundManager(), unlimited = true)
             } else {
                 Text(url, color = theme.darkText, fontSize = 12.sp, fontWeight = FontWeight.Medium)
             }
