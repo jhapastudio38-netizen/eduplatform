@@ -432,9 +432,22 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
                     Spacer(Modifier.height(6.dp))
                 }
                 // Question media text (mediaText when mediaType = text)
+                // Center-aligned + width wraps to text length (does not fill full width) — nice fit on screen.
                 if (q.mediaType == "text" && !q.mediaText.isNullOrBlank()) {
-                    Surface(color = Color(0xFFF8FAFC), shape = RoundedCornerShape(8.dp), border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFE2E8F0)), modifier = Modifier.fillMaxWidth(0.94f)) {
-                        Text(q.mediaText, color = Color(0xFF1E293B), fontSize = 14.sp, fontWeight = FontWeight.Medium, modifier = Modifier.padding(10.dp))
+                    Surface(
+                        color = Color(0xFFF8FAFC),
+                        shape = RoundedCornerShape(8.dp),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFE2E8F0)),
+                        modifier = Modifier.padding(vertical = 4.dp)
+                    ) {
+                        Text(
+                            q.mediaText,
+                            color = Color(0xFF1E293B),
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Medium,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp)
+                        )
                     }
                     Spacer(Modifier.height(8.dp))
                 }
@@ -912,20 +925,35 @@ fun AudioPlayerCard(
 
     // PERSISTENT play count — stored in parent map (survives navigation).
     // Prevents cheat where student navigates away and back to reset plays.
-    val persistentCount = playCounts?.get(questionId) ?: 0
+    // In REVIEW mode (playCounts == null), we use a LOCAL count instead so the
+    // audio plays the correct number of times and then stops.
+    var localPlayCount by remember { mutableStateOf(0) }
+    val effectiveCount = if (playCounts != null && questionId != null) {
+        playCounts[questionId] ?: 0
+    } else {
+        localPlayCount
+    }
     // Sync isPlaying with parent callback
     LaunchedEffect(isPlaying) {
         onPlayingChange?.invoke(isPlaying)
     }
 
     val maxPlays = if (loopCount <= 0) 2 else loopCount
-    val disabled = persistentCount >= maxPlays
+    val disabled = effectiveCount >= maxPlays
     val scope = rememberCoroutineScope()
 
     fun incrementPlayCount() {
         if (questionId != null && playCounts != null) {
             playCounts[questionId] = (playCounts[questionId] ?: 0) + 1
+        } else {
+            localPlayCount++
         }
+    }
+
+    fun currentCount(): Int = if (playCounts != null && questionId != null) {
+        playCounts[questionId] ?: 0
+    } else {
+        localPlayCount
     }
 
     DisposableEffect(url) {
@@ -956,11 +984,11 @@ fun AudioPlayerCard(
                         setDataSource(url)
                         setOnPreparedListener { start(); incrementPlayCount() }
                         setOnCompletionListener {
-                            val currentCount = playCounts?.get(questionId) ?: 0
-                            if (currentCount < maxPlays) {
+                            val cc = currentCount()
+                            if (cc < maxPlays) {
                                 scope.launch {
                                     if (loopDelaySec > 0) delay(loopDelaySec * 1000L)
-                                    val latestCount = playCounts?.get(questionId) ?: 0
+                                    val latestCount = currentCount()
                                     if (latestCount < maxPlays) { incrementPlayCount(); start() }
                                     else { isPlaying = false }
                                 }
