@@ -150,6 +150,22 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
                 test = result
                 if (timeLeft == 0) { timeLeft = (result.durationMin.coerceAtLeast(1)) * 60 }
                 prefs.edit().putInt("timeLeft_$testId", timeLeft).apply()
+                // Preload all images for smooth exam experience
+                result.items.forEach { item ->
+                    val q = item.question
+                    val imageLoader = coil.Coil.imageLoader(context)
+                    q.mediaImageUrl?.takeIf { it.isNotBlank() }?.let {
+                        imageLoader.enqueue(coil.request.ImageRequest.Builder(context).data(it).build())
+                    }
+                    q.descImageUrl?.takeIf { it.isNotBlank() }?.let {
+                        imageLoader.enqueue(coil.request.ImageRequest.Builder(context).data(it).build())
+                    }
+                    q.optionImages?.forEach { img ->
+                        if (img.isNotBlank()) {
+                            imageLoader.enqueue(coil.request.ImageRequest.Builder(context).data(img).build())
+                        }
+                    }
+                }
             } else {
                 error = "The request timed out. Check your internet connection and try again."
             }
@@ -1768,9 +1784,7 @@ fun buildUnderlinedText(text: String, blankWord: String?): androidx.compose.ui.t
     return androidx.compose.ui.text.buildAnnotatedString {
         append(text.substring(0, idx))
         withStyle(androidx.compose.ui.text.SpanStyle(
-            textDecoration = androidx.compose.ui.text.style.TextDecoration.Underline,
-            fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
-            color = Color(0xFF003478)
+            textDecoration = androidx.compose.ui.text.style.TextDecoration.Underline
         )) {
             append(text.substring(idx, idx + blankWord.length))
         }
