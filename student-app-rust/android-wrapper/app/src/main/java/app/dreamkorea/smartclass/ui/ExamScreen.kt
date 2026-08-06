@@ -370,19 +370,21 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
             }
         }
 
-        // ── 2. INSTRUCTION ROW ── question number + title + FREE badge (bigger fonts for clarity)
+        // ── 2. INSTRUCTION ROW ── question number + FULL question text + FREE badge
+        // The full question stem lives HERE at the top — it is NOT repeated in the left section.
         Surface(modifier = Modifier.fillMaxWidth().padding(horizontal = 6.dp, vertical = 2.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
+            Row(verticalAlignment = Alignment.Top) {
                 Text("${currentIdx + 1}. ", color = Color(0xFF003478), fontSize = 16.sp, fontWeight = FontWeight.Bold)
-                val displayText = q.stem.take(80)
-                Text(displayText, color = Color(0xFF1E293B), fontSize = 14.sp, fontWeight = FontWeight.SemiBold, maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
+                // Show the FULL question stem (no truncation) so the user can read the entire question at the top.
+                // Allow up to 6 lines so long questions are fully visible; the section scrolls if extremely long.
+                val displayText = q.stem.ifBlank { q.mediaText ?: "" }
+                Text(displayText, color = Color(0xFF1E293B), fontSize = 15.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f, fill = true))
                 if (q.isFree) {
                     Spacer(Modifier.width(4.dp))
                     Surface(color = Color(0xFF22C55E), shape = RoundedCornerShape(3.dp)) {
                         Text("FREE", color = Color.White, fontSize = 9.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp))
                     }
                 }
-                Spacer(Modifier.weight(1f))
                 IconButton(onClick = { showGrid = true }, modifier = Modifier.size(28.dp)) {
                     Icon(Icons.Default.GridView, null, tint = Color(0xFF64748B), modifier = Modifier.size(18.dp))
                 }
@@ -408,7 +410,8 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 Spacer(Modifier.height(4.dp))
-                // Question title (if set by admin) — bigger font for clarity
+                // Question title (if set by admin) — shown in left section as a heading.
+                // The question STEM text is NOT here — it lives only in the top instruction row.
                 if (!q.title.isNullOrBlank()) {
                     Text(
                         q.title,
@@ -417,26 +420,6 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
                         fontWeight = FontWeight.Bold,
                         modifier = Modifier.fillMaxWidth(0.95f).padding(bottom = 6.dp)
                     )
-                }
-                // Question text (stem) — bigger font so user can read clearly
-                val questionText = q.stem.ifBlank { q.mediaText ?: "" }
-                if (questionText.isNotBlank()) {
-                    Surface(
-                        color = Color.White,
-                        shape = RoundedCornerShape(14.dp),
-                        shadowElevation = 2.dp,
-                        border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFE2E8F0)),
-                        modifier = Modifier.fillMaxWidth(0.95f)
-                    ) {
-                        Text(
-                            questionText,
-                            color = Color(0xFF1E293B),
-                            fontSize = 17.sp,
-                            fontWeight = FontWeight.Medium,
-                            modifier = Modifier.padding(16.dp)
-                        )
-                    }
-                    Spacer(Modifier.height(8.dp))
                 }
                 // Media images — bigger max height so text inside images is readable; scroll handles overflow
                 if (q.descType == "image" && !q.descImageUrl.isNullOrBlank()) {
