@@ -404,9 +404,10 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
             // LEFT: ONLY description + media (question text is at top bar only)
             Column(
                 modifier = Modifier.weight(0.6f).fillMaxHeight().padding(8.dp).verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.Center,
+                verticalArrangement = Arrangement.Top,
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
+                Spacer(Modifier.height(4.dp))
                 // Question title (if set by admin) — bigger font for clarity
                 if (!q.title.isNullOrBlank()) {
                     Text(
@@ -1371,6 +1372,16 @@ fun ExamResultScreen(
 
         // ── Per-question review (collapsible) ─────────────────────────────
         if (showReviewSection) {
+            // Sort review: Reading questions first (blockType != "audio"),
+            // then Listening questions (blockType == "audio").
+            // Each group preserves original question order.
+            val sortedReview = remember(result.review) {
+                val reading = result.review.filter { it.blockType != "audio" }
+                val listening = result.review.filter { it.blockType == "audio" }
+                reading + listening
+            }
+            val readingCount = sortedReview.count { it.blockType != "audio" }
+            val listeningCount = sortedReview.size - readingCount
             item {
                 Row(
                     modifier = Modifier.fillMaxWidth().alpha(reviewAlpha),
@@ -1386,8 +1397,49 @@ fun ExamResultScreen(
                     )
                 }
             }
-            itemsIndexed(result.review) { idx, review ->
+            // Reading section header (if any reading questions)
+            if (readingCount > 0) {
+                item {
+                    Surface(
+                        color = Color(0xFF003478).copy(alpha = 0.08f),
+                        shape = RoundedCornerShape(8.dp),
+                        modifier = Modifier.fillMaxWidth().alpha(reviewAlpha).padding(vertical = 4.dp)
+                    ) {
+                        Text(
+                            "Reading ($readingCount)",
+                            color = Color(0xFF003478),
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
+                        )
+                    }
+                }
+            }
+            // Reading questions
+            itemsIndexed(sortedReview.filter { it.blockType != "audio" }) { idx, review ->
                 ReviewCard(theme, review, idx + 1, sound)
+            }
+            // Listening section header (if any listening questions)
+            if (listeningCount > 0) {
+                item {
+                    Surface(
+                        color = Color(0xFF7C3AED).copy(alpha = 0.08f),
+                        shape = RoundedCornerShape(8.dp),
+                        modifier = Modifier.fillMaxWidth().alpha(reviewAlpha).padding(vertical = 4.dp)
+                    ) {
+                        Text(
+                            "Listening ($listeningCount)",
+                            color = Color(0xFF7C3AED),
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
+                        )
+                    }
+                }
+            }
+            // Listening questions (numbering continues after reading)
+            itemsIndexed(sortedReview.filter { it.blockType == "audio" }) { idx, review ->
+                ReviewCard(theme, review, readingCount + idx + 1, sound)
             }
         }
     }
@@ -1501,20 +1553,54 @@ fun ReviewCard(theme: AppTheme, review: ReviewItem, questionNumber: Int = 0, sou
                     contentScale = ContentScale.Fit,
                 )
             }
-            // Audio (if any) — let student replay the question audio during review
+            // Audio (if any) — let student replay the question audio during review.
+            // In review mode, audio plays only ONCE per click — student can click again to replay.
             if (!review.audioUrl.isNullOrBlank()) {
                 Spacer(Modifier.height(8.dp))
                 val audAbs = review.audioUrl!!.toAbsoluteUrl()
-                AudioPlayerCard(theme = theme, url = audAbs, loopCount = review.audioLoop.coerceAtLeast(1), loopDelaySec = review.audioLoopDelay, sound = sound ?: rememberSoundManager())
+                AudioPlayerCard(theme = theme, url = audAbs, loopCount = 1, loopDelaySec = 0, sound = sound ?: rememberSoundManager())
             }
             Spacer(Modifier.height(8.dp))
 
             // ── Options with correct/wrong highlighting ──────────────────
             // If option is an image URL, render as image; otherwise render as text.
-            review.options?.let { opts ->
-                opts.forEachIndexed { i, opt ->
-                    val isUserAns = (review.userAnswer == opt) || ((review.userAnswer as? List<*>)?.contains(opt) == true)
-                    val isCorrectAns = (review.correctAnswer == opt) || ((review.correctAnswer as? List<*>)?.contains(opt) == true)
+            // Handle BOTH cases:
+            //   1. Text/choose options: review.options is populated
+            //   2. Image/audio options: review.options may be null — iterate optionImages/optionAudios instead
+            val answerType = review.answerType ?: "text"
+            val optionCount = when (answerType) {
+                "image" -> review.optionImages.size
+                "audio" -> review.optionAudios.size
+                else -> review.options?.size ?: 0
+            }
+            if (optionCount > 0) {
+                (0 until optionCount).forEach { i ->
+                    val opt = review.options?.getOrNull(i) ?: ""
+                    val optImg = review.optionImages.getOrNull(i)?.takeIf { it.isNotBlank() }
+                    val optAud = review.optionAudios.getOrNull(i)?.takeIf { it.isNotBlank() }
+                    // For image/audio answer types, compare against the image/audio URL
+                    val userUrl = when (answerType) {
+                        "image" -> optImg
+                        "audio" -> optAud
+                        else -> opt
+                    }
+                    val correctUrl = when (answerType) {
+                        "image" -> optImg
+                        "audio" -> optAud
+                        else -> opt
+                    }
+                    val isUserAns = review.userAnswer != null && (
+                        review.userAnswer == userUrl ||
+                        review.userAnswer == opt ||
+                        ((review.userAnswer as? List<*>)?.contains(userUrl) == true) ||
+                        ((review.userAnswer as? List<*>)?.contains(opt) == true)
+                    )
+                    val isCorrectAns = review.correctAnswer != null && (
+                        review.correctAnswer == correctUrl ||
+                        review.correctAnswer == opt ||
+                        ((review.correctAnswer as? List<*>)?.contains(correctUrl) == true) ||
+                        ((review.correctAnswer as? List<*>)?.contains(opt) == true)
+                    )
                     val bg = when {
                         isCorrectAns -> Color(0xFFD4EDDA)
                         isUserAns && !isCorrectAns -> Color(0xFFFFCDD2)
@@ -1525,11 +1611,6 @@ fun ReviewCard(theme: AppTheme, review: ReviewItem, questionNumber: Int = 0, sou
                         isUserAns && !isCorrectAns -> theme.errorRed
                         else -> Color(0xFFE0E0E0)
                     }
-                    // Check if this option is an image URL or audio URL
-                    val optImg = review.optionImages.getOrNull(i)?.takeIf { it.isNotBlank() }
-                    val optAud = review.optionAudios.getOrNull(i)?.takeIf { it.isNotBlank() }
-                    val isImageUrl = optImg != null || opt.startsWith("http") || opt.startsWith("/api/files") || opt.startsWith("/uploads")
-                    val isAudioUrl = optAud != null
                     Surface(
                         color = bg,
                         shape = RoundedCornerShape(6.dp),
@@ -1539,21 +1620,37 @@ fun ReviewCard(theme: AppTheme, review: ReviewItem, questionNumber: Int = 0, sou
                         Row(modifier = Modifier.padding(8.dp), verticalAlignment = Alignment.CenterVertically) {
                             Text("${'A' + i}.", color = theme.subText, fontSize = 12.sp, fontWeight = FontWeight.Bold)
                             Spacer(Modifier.width(8.dp))
-                            if (isAudioUrl) {
-                                val audUrl = optAud!!.toAbsoluteUrl()
-                                AudioPlayerCard(theme = theme, url = audUrl, loopCount = 1, loopDelaySec = 0, sound = sound ?: rememberSoundManager())
-                            } else if (isImageUrl) {
-                                // Render as image — use optionImages if available, otherwise the option text IS the URL
-                                val imgUrl = (optImg ?: opt).toAbsoluteUrl()
-                                coil.compose.AsyncImage(
-                                    model = imgUrl,
-                                    contentDescription = "Option ${'A' + i}",
-                                    modifier = Modifier.weight(1f).heightIn(max = 120.dp).clip(RoundedCornerShape(6.dp)),
-                                    contentScale = ContentScale.Fit,
-                                )
-                            } else {
-                                // Render as text
-                                Text(opt, color = theme.darkText, fontSize = 13.sp, fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f))
+                            when {
+                                answerType == "audio" && optAud != null -> {
+                                    val audUrl = optAud.toAbsoluteUrl()
+                                    // Audio option in review — plays only once per click
+                                    AudioPlayerCard(theme = theme, url = audUrl, loopCount = 1, loopDelaySec = 0, sound = sound ?: rememberSoundManager())
+                                }
+                                answerType == "image" && optImg != null -> {
+                                    val imgUrl = optImg.toAbsoluteUrl()
+                                    coil.compose.AsyncImage(
+                                        model = imgUrl,
+                                        contentDescription = "Option ${'A' + i}",
+                                        modifier = Modifier.weight(1f).heightIn(max = 140.dp).clip(RoundedCornerShape(6.dp)).clickable { FullScreenImageViewer.show(imgUrl) },
+                                        contentScale = ContentScale.Fit,
+                                    )
+                                }
+                                optAud != null -> {
+                                    val audUrl = optAud.toAbsoluteUrl()
+                                    AudioPlayerCard(theme = theme, url = audUrl, loopCount = 1, loopDelaySec = 0, sound = sound ?: rememberSoundManager())
+                                }
+                                optImg != null || opt.startsWith("http") || opt.startsWith("/api/files") || opt.startsWith("/uploads") -> {
+                                    val imgUrl = (optImg ?: opt).toAbsoluteUrl()
+                                    coil.compose.AsyncImage(
+                                        model = imgUrl,
+                                        contentDescription = "Option ${'A' + i}",
+                                        modifier = Modifier.weight(1f).heightIn(max = 140.dp).clip(RoundedCornerShape(6.dp)).clickable { FullScreenImageViewer.show(imgUrl) },
+                                        contentScale = ContentScale.Fit,
+                                    )
+                                }
+                                else -> {
+                                    Text(opt, color = theme.darkText, fontSize = 13.sp, fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f))
+                                }
                             }
                             if (isCorrectAns) {
                                 Icon(Icons.Default.Check, null, tint = Color(0xFF28A745), modifier = Modifier.size(14.dp))
@@ -1878,6 +1975,8 @@ private fun gradeCombinedExamClientSide(
                 stem = q.stem,
                 title = q.title,
                 type = q.type,
+                answerType = q.answerType,
+                blockType = q.blockType,
                 options = q.options,
                 optionImages = q.optionImages,
                 optionAudios = q.optionAudios,

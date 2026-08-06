@@ -133,6 +133,8 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ testId: st
       stem: q.stem,
       title: q.title || null,
       type: q.type,
+      answerType: q.answerType || "text",
+      blockType: q.blockType || "text",
       options: q.options ? JSON.parse(q.options) : null,
       optionImages: q.optionImages ? JSON.parse(q.optionImages) : [],
       optionAudios: q.optionAudios ? JSON.parse(q.optionAudios) : [],

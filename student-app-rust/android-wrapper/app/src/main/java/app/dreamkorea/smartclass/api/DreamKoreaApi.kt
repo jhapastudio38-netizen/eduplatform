@@ -147,6 +147,8 @@ data class ReviewItem(
     val stem: String,
     val title: String? = null, // optional per-question title
     val type: String,
+    val answerType: String? = null, // "text" | "image" | "audio" | "choose"
+    val blockType: String? = null,  // "text" (Reading) | "audio" (Listening)
     val options: List<String>?,
     val optionImages: List<String> = emptyList(),
     val optionAudios: List<String> = emptyList(),
