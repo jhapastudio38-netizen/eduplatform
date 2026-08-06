@@ -149,6 +149,12 @@ data class ReviewItem(
     val type: String,
     val answerType: String? = null, // "text" | "image" | "audio" | "choose"
     val blockType: String? = null,  // "text" (Reading) | "audio" (Listening)
+    val descType: String? = null,   // "image" | "text"
+    val descImageUrl: String? = null,
+    val mediaType: String? = null,  // "image" | "text" | "audio"
+    val mediaText: String? = null,
+    val mediaImageUrl: String? = null,
+    val mediaAudioUrl: String? = null,
     val options: List<String>?,
     val optionImages: List<String> = emptyList(),
     val optionAudios: List<String> = emptyList(),

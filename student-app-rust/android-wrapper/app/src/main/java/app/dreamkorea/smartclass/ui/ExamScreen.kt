@@ -375,8 +375,6 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
         Surface(modifier = Modifier.fillMaxWidth().padding(horizontal = 6.dp, vertical = 2.dp)) {
             Row(verticalAlignment = Alignment.Top) {
                 Text("${currentIdx + 1}. ", color = Color(0xFF003478), fontSize = 16.sp, fontWeight = FontWeight.Bold)
-                // Show the FULL question stem (no truncation) so the user can read the entire question at the top.
-                // Allow up to 6 lines so long questions are fully visible; the section scrolls if extremely long.
                 val displayText = q.stem.ifBlank { q.mediaText ?: "" }
                 Text(displayText, color = Color(0xFF1E293B), fontSize = 15.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f, fill = true))
                 if (q.isFree) {
@@ -405,8 +403,6 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
             Row(modifier = Modifier.fillMaxSize()) {
             // LEFT: ONLY description + media (question text is at top bar only)
             // Content is CENTERED vertically when short (nice fit), scrolls from TOP when long.
-            // BoxWithConstraints gives us the viewport height so we can set heightIn(min = viewport)
-            // which makes Arrangement.Center work in a scrollable column.
             BoxWithConstraints(modifier = Modifier.weight(0.6f).fillMaxHeight()) {
                 val viewportHeight = maxHeight
                 Column(
@@ -420,7 +416,6 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
                 ) {
                 Spacer(Modifier.height(4.dp))
                 // Question title (if set by admin) — shown in left section as a heading.
-                // The question STEM text is NOT here — it lives only in the top instruction row.
                 if (!q.title.isNullOrBlank()) {
                     Text(
                         q.title,
@@ -430,19 +425,18 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
                         modifier = Modifier.fillMaxWidth(0.95f).padding(bottom = 6.dp)
                     )
                 }
-                // Media images — bigger max height so text inside images is readable; scroll handles overflow
+                // Description image (descType == "image") — smaller so it doesn't dominate the screen
                 if (q.descType == "image" && !q.descImageUrl.isNullOrBlank()) {
                     val url = q.descImageUrl!!.toAbsoluteUrl()
                     coil.compose.AsyncImage(
                         model = url, contentDescription = null,
-                        modifier = Modifier.fillMaxWidth(0.95f).heightIn(max = 260.dp).clip(RoundedCornerShape(8.dp)).clickable { FullScreenImageViewer.show(url) },
+                        modifier = Modifier.fillMaxWidth(0.85f).heightIn(max = 160.dp).clip(RoundedCornerShape(8.dp)).clickable { FullScreenImageViewer.show(url) },
                         contentScale = ContentScale.Fit
                     )
                     Spacer(Modifier.height(6.dp))
                 }
                 // Question media text (mediaText when mediaType = text)
-                // Center-aligned + width wraps to text length (does not fill full width) — nice fit on screen.
-                // Bigger font (17sp) so Korean-learning students can read the description clearly.
+                // Center-aligned + width wraps to text length. Bigger font for Korean-learning students.
                 if (q.mediaType == "text" && !q.mediaText.isNullOrBlank()) {
                     Surface(
                         color = Color(0xFFF8FAFC),
@@ -461,19 +455,17 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
                     }
                     Spacer(Modifier.height(8.dp))
                 }
+                // Media image (mediaImageUrl / imageUrl) — smaller so it doesn't dominate
                 val mediaImgUrl = (q.mediaImageUrl ?: q.imageUrl)?.toAbsoluteUrl()
                 if (!mediaImgUrl.isNullOrBlank()) {
                     coil.compose.AsyncImage(
                         model = mediaImgUrl, contentDescription = null,
-                        modifier = Modifier.fillMaxWidth(0.95f).heightIn(max = 280.dp).clip(RoundedCornerShape(8.dp)).clickable { FullScreenImageViewer.show(mediaImgUrl) },
+                        modifier = Modifier.fillMaxWidth(0.85f).heightIn(max = 180.dp).clip(RoundedCornerShape(8.dp)).clickable { FullScreenImageViewer.show(mediaImgUrl) },
                         contentScale = ContentScale.Fit
                     )
                 }
                 val mediaAudUrl = (q.mediaAudioUrl ?: q.audioUrl)?.toAbsoluteUrl()
                 if (!mediaAudUrl.isNullOrBlank()) {
-                    // key(q.id) ensures the AudioPlayerCard is FULLY RECREATED when
-                    // the question changes — state (playCount, disabled) resets completely.
-                    // This fixes the bug where audio was locked from the previous question.
                     key(q.id) {
                         val effectiveGap = if (q.audioLoopDelay > 0) q.audioLoopDelay else 2
                         AudioPlayerCard(theme = theme, url = mediaAudUrl, loopCount = q.audioLoop, loopDelaySec = effectiveGap, sound = sound, questionId = q.id, playCounts = audioPlayCounts, onPlayingChange = { playing -> audioPlaying = playing; currentlyPlayingId = if (playing) q.id else null }, blocked = currentlyPlayingId != null && currentlyPlayingId != q.id)
@@ -485,7 +477,7 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
             // Vertical divider
             Box(modifier = Modifier.width(2.dp).fillMaxHeight().background(Color.Black))
 
-            // RIGHT: Answer options (40%) — scrollable so long options don't get cut; bigger fonts/images for clarity
+            // RIGHT: Answer options (40%) — scrollable so long options don't get cut; bigger fonts/images
             Column(
                 modifier = Modifier.weight(0.4f).fillMaxHeight().padding(8.dp).verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.Center
@@ -509,7 +501,6 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
                                     Box(contentAlignment = Alignment.Center) { Text("${i+1}", color = if (isSelected) Color.White else Color.Black, fontSize = 18.sp, fontWeight = FontWeight.Bold) }
                                 }
                                 Spacer(Modifier.width(10.dp))
-                                // Render option text with underlined blank word (if set by admin) — bigger font
                                 Text(
                                     text = buildUnderlinedText(optText, blankWord),
                                     color = Color.Black,
@@ -532,7 +523,6 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
                                     Box(contentAlignment = Alignment.Center) { Text("${i+1}", color = if (isSelected) Color.White else Color.Black, fontSize = 14.sp, fontWeight = FontWeight.Bold) }
                                 }
                                 Spacer(Modifier.width(8.dp))
-                                // Bigger option image so user can see content clearly; column scrolls if needed
                                 coil.compose.AsyncImage(model = absUrl, contentDescription = "Option ${i+1}", modifier = Modifier.size(96.dp).clip(RoundedCornerShape(6.dp)).clickable { FullScreenImageViewer.show(absUrl) }, contentScale = ContentScale.Fit)
                             }
                         }
@@ -547,7 +537,6 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
                                     Box(contentAlignment = Alignment.Center) { Text("${i+1}", color = if (isSelected) Color.White else Color.Black, fontSize = 14.sp, fontWeight = FontWeight.Bold) }
                                 }
                                 Spacer(Modifier.width(8.dp))
-                                // key(q.id, i) — recreate when question changes so play count resets
                                 key(q.id, i) {
                                     val effectiveGap = if (q.audioLoopDelay > 0) q.audioLoopDelay else 2
                                     val optId = "${q.id}-opt-$i"
@@ -563,24 +552,19 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
 
         // ── 4. BOTTOM NAVIGATION ── compact white bar with thin border
         // On the LAST question: only show "Previous" + "All Questions" (no Next/Submit button).
-        // On other questions: show "Previous" + "All Questions" + "Next".
         Surface(
             color = Color.White,
             border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFE2E8F0)),
         ) {
             val isLastQuestion = currentIdx >= sortedItems.size - 1
             Row(modifier = Modifier.fillMaxWidth().height(48.dp), verticalAlignment = Alignment.CenterVertically) {
-                // Previous (अघिल्लो) — disabled when audio playing
                 Box(modifier = Modifier.weight(1f).fillMaxHeight().clickable(enabled = !audioPlaying) { if (currentIdx > 0) { currentIdx--; sound.click() } }, contentAlignment = Alignment.Center) {
                     Text("अघिल्लो (Prev)", color = if (currentIdx > 0 && !audioPlaying) Color(0xFF003478) else Color(0xFFCBD5E1), fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
                 }
                 Box(modifier = Modifier.width(1.dp).fillMaxHeight(0.6f).background(Color(0xFFE2E8F0)))
-                // All questions (सबै प्रश्नहरू) — disabled when audio playing
                 Box(modifier = Modifier.weight(1f).fillMaxHeight().clickable(enabled = !audioPlaying) { sound.click(); showGrid = true }, contentAlignment = Alignment.Center) {
                     Text("सबै प्रश्नहरू (All)", color = if (audioPlaying) Color(0xFFCBD5E1) else Color(0xFF003478), fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
                 }
-                // Next (अर्को) — only shown when NOT on the last question.
-                // On the last question, there is NO third button (no Submit, no Next).
                 if (!isLastQuestion) {
                     Box(modifier = Modifier.width(1.dp).fillMaxHeight(0.6f).background(Color(0xFFE2E8F0)))
                     Box(modifier = Modifier.weight(1f).fillMaxHeight().clickable(enabled = !audioPlaying) {
@@ -932,7 +916,6 @@ fun AudioPlayerCard(
     questionId: String? = null,
     playCounts: SnapshotStateMap<String, Int>? = null,
     onPlayingChange: ((Boolean) -> Unit)? = null,
-    blocked: Boolean = false,
     unlimited: Boolean = false, // REVIEW mode: user can replay as many times as wanted
 ) {
     val context = LocalContext.current
@@ -940,21 +923,17 @@ fun AudioPlayerCard(
     var isPlaying by remember { mutableStateOf(false) }
 
     // PERSISTENT play count — stored in parent map (survives navigation).
-    // Prevents cheat where student navigates away and back to reset plays.
-    // In REVIEW mode (playCounts == null), we use a LOCAL count instead so the
-    // audio plays the correct number of times and then stops.
+    // In REVIEW mode (playCounts == null), use a LOCAL count instead.
     var localPlayCount by remember { mutableStateOf(0) }
     val effectiveCount = if (playCounts != null && questionId != null) {
         playCounts[questionId] ?: 0
     } else {
         localPlayCount
     }
-    // Sync isPlaying with parent callback
     LaunchedEffect(isPlaying) {
         onPlayingChange?.invoke(isPlaying)
     }
 
-    // In unlimited (review) mode: no max plays, button never disables
     val maxPlays = if (unlimited) Int.MAX_VALUE else (if (loopCount <= 0) 2 else loopCount)
     val disabled = if (unlimited) false else effectiveCount >= maxPlays
     val scope = rememberCoroutineScope()
@@ -965,6 +944,11 @@ fun AudioPlayerCard(
         } else {
             localPlayCount++
         }
+    }
+    fun currentCount(): Int = if (playCounts != null && questionId != null) {
+        playCounts[questionId] ?: 0
+    } else {
+        localPlayCount
     }
 
     fun currentCount(): Int = if (playCounts != null && questionId != null) {
@@ -980,38 +964,73 @@ fun AudioPlayerCard(
         }
     }
 
-    // ONLY a play icon button — no card, no text, no headphones
-    val isBlocked = disabled || isPlaying || blocked
-    Surface(
-        color = if (disabled || blocked) Color(0xFFF1F5F9) else theme.primary.copy(alpha = 0.08f),
-        shape = RoundedCornerShape(8.dp),
-        modifier = Modifier.size(36.dp)
-    ) {
-        Box(
-            contentAlignment = Alignment.Center,
-            modifier = Modifier.fillMaxSize().clickable(enabled = !isBlocked) {
-                if (disabled || blocked) return@clickable
-                if (isPlaying) return@clickable
-                sound.click()
-                isPlaying = true
-                onPlayingChange?.invoke(true)
-                try {
-                    mediaPlayer?.release()
-                    val mp = android.media.MediaPlayer().apply {
-                        setDataSource(url)
-                        setOnPreparedListener { start(); incrementPlayCount() }
-                        setOnCompletionListener {
-                            if (unlimited) {
-                                // Review mode: play once, then stop. User can click again to replay.
-                                isPlaying = false
-                            } else {
-                                val cc = currentCount()
-                                if (cc < maxPlays) {
-                                    scope.launch {
-                                        if (loopDelaySec > 0) delay(loopDelaySec * 1000L)
-                                        val latestCount = currentCount()
-                                        if (latestCount < maxPlays) { incrementPlayCount(); start() }
-                                        else { isPlaying = false }
+    Surface(color = theme.cardBg, shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth(), shadowElevation = 1.dp) {
+        Row(
+            modifier = Modifier.padding(14.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // Audio icon
+            Surface(
+                color = if (disabled) Color(0xFFE2E8F0) else theme.primary.copy(alpha = 0.15f),
+                shape = RoundedCornerShape(10.dp),
+                modifier = Modifier.size(44.dp)
+            ) {
+                Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
+                    Icon(
+                        Icons.Default.Headphones,
+                        null,
+                        tint = if (disabled) Color(0xFF94A3B8) else theme.primary,
+                        modifier = Modifier.size(22.dp)
+                    )
+                }
+            }
+            Spacer(Modifier.width(12.dp))
+            // Simple label — no play count shown
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    if (unlimited) "Tap to play (review)" else if (disabled) "Audio locked" else "Tap to play",
+                    color = if (disabled) Color(0xFF94A3B8) else theme.darkText,
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.SemiBold
+                )
+            }
+            // Play/Pause button — DISABLED after all plays used (unless unlimited)
+            IconButton(
+                onClick = {
+                    if (disabled) return@IconButton
+                    sound.click()
+                    if (isPlaying) {
+                        return@IconButton
+                    } else {
+                        try {
+                            mediaPlayer?.release()
+                            val mp = android.media.MediaPlayer().apply {
+                                setDataSource(url)
+                                setOnPreparedListener {
+                                    start()
+                                    isPlaying = true
+                                    incrementPlayCount()
+                                }
+                                setOnCompletionListener {
+                                    if (unlimited) {
+                                        // Review mode: play once, then stop. User can click again to replay.
+                                        isPlaying = false
+                                    } else {
+                                        val cc = currentCount()
+                                        if (cc < maxPlays) {
+                                            scope.launch {
+                                                if (loopDelaySec > 0) delay(loopDelaySec * 1000L)
+                                                val latestCount = currentCount()
+                                                if (latestCount < maxPlays) {
+                                                    incrementPlayCount()
+                                                    start()
+                                                } else {
+                                                    isPlaying = false
+                                                }
+                                            }
+                                        } else {
+                                            isPlaying = false
+                                        }
                                     }
                                 } else { isPlaying = false }
                             }
@@ -1404,10 +1423,8 @@ fun ExamResultScreen(
         }
 
         // ── Per-question review (collapsible) ─────────────────────────────
+        // Sort: Reading questions first (blockType != "audio"), then Listening (blockType == "audio").
         if (showReviewSection) {
-            // Sort review: Reading questions first (blockType != "audio"),
-            // then Listening questions (blockType == "audio").
-            // Each group preserves original question order.
             val reading = result.review.filter { it.blockType != "audio" }
             val listening = result.review.filter { it.blockType == "audio" }
             val readingCount = reading.size
@@ -1427,7 +1444,6 @@ fun ExamResultScreen(
                     )
                 }
             }
-            // Reading section header (if any reading questions)
             if (readingCount > 0) {
                 item {
                     Surface(
@@ -1445,11 +1461,9 @@ fun ExamResultScreen(
                     }
                 }
             }
-            // Reading questions
             itemsIndexed(reading) { idx, review ->
                 ReviewCard(theme, review, idx + 1, sound)
             }
-            // Listening section header (if any listening questions)
             if (listeningCount > 0) {
                 item {
                     Surface(
@@ -1467,7 +1481,6 @@ fun ExamResultScreen(
                     }
                 }
             }
-            // Listening questions (numbering continues after reading)
             itemsIndexed(listening) { idx, review ->
                 ReviewCard(theme, review, readingCount + idx + 1, sound)
             }
@@ -1572,19 +1585,47 @@ fun ReviewCard(theme: AppTheme, review: ReviewItem, questionNumber: Int = 0, sou
                 fontSize = 13.sp,
                 fontWeight = FontWeight.Medium
             )
-            // Image (if any)
-            if (!review.imageUrl.isNullOrBlank()) {
+            // Description image (descType == "image") — shown in review too
+            if (review.descType == "image" && !review.descImageUrl.isNullOrBlank()) {
                 Spacer(Modifier.height(8.dp))
-                val imgAbs = review.imageUrl!!.toAbsoluteUrl()
+                val imgAbs = review.descImageUrl!!.toAbsoluteUrl()
                 coil.compose.AsyncImage(
                     model = imgAbs,
-                    contentDescription = "Question image",
-                    modifier = Modifier.fillMaxWidth().heightIn(max = 180.dp).clip(RoundedCornerShape(8.dp)),
+                    contentDescription = "Description image",
+                    modifier = Modifier.fillMaxWidth().heightIn(max = 160.dp).clip(RoundedCornerShape(8.dp)).clickable { FullScreenImageViewer.show(imgAbs) },
                     contentScale = ContentScale.Fit,
                 )
             }
-            // Audio (if any) — let student replay the question audio during review.
-            // In review mode, audio plays only ONCE per click — student can click again to replay.
+            // Media text (mediaType == "text") — shown in review too
+            if (review.mediaType == "text" && !review.mediaText.isNullOrBlank()) {
+                Spacer(Modifier.height(8.dp))
+                Surface(
+                    color = Color(0xFFF8FAFC),
+                    shape = RoundedCornerShape(8.dp),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFE2E8F0)),
+                ) {
+                    Text(
+                        review.mediaText,
+                        color = Color(0xFF1E293B),
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.Medium,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp).fillMaxWidth(),
+                    )
+                }
+            }
+            // Media image (mediaImageUrl / imageUrl) — shown in review too
+            val reviewMediaImg = (review.mediaImageUrl ?: review.imageUrl)?.toAbsoluteUrl()
+            if (!reviewMediaImg.isNullOrBlank()) {
+                Spacer(Modifier.height(8.dp))
+                coil.compose.AsyncImage(
+                    model = reviewMediaImg,
+                    contentDescription = "Question image",
+                    modifier = Modifier.fillMaxWidth().heightIn(max = 180.dp).clip(RoundedCornerShape(8.dp)).clickable { FullScreenImageViewer.show(reviewMediaImg) },
+                    contentScale = ContentScale.Fit,
+                )
+            }
+            // Audio (if any) — review mode: unlimited replays
             if (!review.audioUrl.isNullOrBlank()) {
                 Spacer(Modifier.height(8.dp))
                 val audAbs = review.audioUrl!!.toAbsoluteUrl()
@@ -1593,7 +1634,6 @@ fun ReviewCard(theme: AppTheme, review: ReviewItem, questionNumber: Int = 0, sou
             Spacer(Modifier.height(8.dp))
 
             // ── Options with correct/wrong highlighting ──────────────────
-            // If option is an image URL, render as image; otherwise render as text.
             // Handle BOTH cases:
             //   1. Text/choose options: review.options is populated
             //   2. Image/audio options: review.options may be null — iterate optionImages/optionAudios instead
@@ -1608,26 +1648,15 @@ fun ReviewCard(theme: AppTheme, review: ReviewItem, questionNumber: Int = 0, sou
                     val opt = review.options?.getOrNull(i) ?: ""
                     val optImg = review.optionImages.getOrNull(i)?.takeIf { it.isNotBlank() }
                     val optAud = review.optionAudios.getOrNull(i)?.takeIf { it.isNotBlank() }
-                    // For image/audio answer types, compare against the image/audio URL
-                    val userUrl = when (answerType) {
-                        "image" -> optImg
-                        "audio" -> optAud
-                        else -> opt
-                    }
-                    val correctUrl = when (answerType) {
-                        "image" -> optImg
-                        "audio" -> optAud
-                        else -> opt
-                    }
+                    val userUrl = when (answerType) { "image" -> optImg; "audio" -> optAud; else -> opt }
+                    val correctUrl = when (answerType) { "image" -> optImg; "audio" -> optAud; else -> opt }
                     val isUserAns = review.userAnswer != null && (
-                        review.userAnswer == userUrl ||
-                        review.userAnswer == opt ||
+                        review.userAnswer == userUrl || review.userAnswer == opt ||
                         ((review.userAnswer as? List<*>)?.contains(userUrl) == true) ||
                         ((review.userAnswer as? List<*>)?.contains(opt) == true)
                     )
                     val isCorrectAns = review.correctAnswer != null && (
-                        review.correctAnswer == correctUrl ||
-                        review.correctAnswer == opt ||
+                        review.correctAnswer == correctUrl || review.correctAnswer == opt ||
                         ((review.correctAnswer as? List<*>)?.contains(correctUrl) == true) ||
                         ((review.correctAnswer as? List<*>)?.contains(opt) == true)
                     )
@@ -1653,7 +1682,6 @@ fun ReviewCard(theme: AppTheme, review: ReviewItem, questionNumber: Int = 0, sou
                             when {
                                 answerType == "audio" && optAud != null -> {
                                     val audUrl = optAud.toAbsoluteUrl()
-                                    // Audio option in review — plays only once per click
                                     AudioPlayerCard(theme = theme, url = audUrl, loopCount = 1, loopDelaySec = 0, sound = sound ?: rememberSoundManager(), unlimited = true)
                                 }
                                 answerType == "image" && optImg != null -> {
@@ -2007,6 +2035,12 @@ private fun gradeCombinedExamClientSide(
                 type = q.type,
                 answerType = q.answerType,
                 blockType = q.blockType,
+                descType = q.descType,
+                descImageUrl = q.descImageUrl,
+                mediaType = q.mediaType,
+                mediaText = q.mediaText,
+                mediaImageUrl = q.mediaImageUrl,
+                mediaAudioUrl = q.mediaAudioUrl,
                 options = q.options,
                 optionImages = q.optionImages,
                 optionAudios = q.optionAudios,

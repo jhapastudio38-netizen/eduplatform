@@ -135,6 +135,15 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ testId: st
       type: q.type,
       answerType: q.answerType || "text",
       blockType: q.blockType || "text",
+<<<<<<< HEAD
+=======
+      descType: q.descType || "text",
+      descImageUrl: q.descImageUrl,
+      mediaType: q.mediaType || "text",
+      mediaText: q.mediaText,
+      mediaImageUrl: q.mediaImageUrl,
+      mediaAudioUrl: q.mediaAudioUrl,
+>>>>>>> 5b38225 (v10.4.0 (175): re-apply all fixes + smaller images + description in review)
       options: q.options ? JSON.parse(q.options) : null,
       optionImages: q.optionImages ? JSON.parse(q.optionImages) : [],
       optionAudios: q.optionAudios ? JSON.parse(q.optionAudios) : [],
