@@ -1283,17 +1283,6 @@ function QuestionEditor({ question, onChange, blockLabel, isAudioBlock }: {
         {/* ─── LEFT COLUMN: Description + Question ─────────────────────────── */}
         <div className="space-y-5">
 
-          {/* Question Title (optional) */}
-          <div className="space-y-1">
-            <Label className="text-sm font-semibold">Question Title <span className="text-muted-foreground font-normal text-xs">(optional)</span></Label>
-            <Input
-              value={question.title || ""}
-              onChange={(e) => onChange({ ...question, title: e.target.value })}
-              placeholder="e.g. Hello, Question 3…"
-              className="text-base font-semibold"
-            />
-          </div>
-
           {/* Description Type */}
           <div className="space-y-2">
             <Label className="text-sm font-semibold">Description Type</Label>
