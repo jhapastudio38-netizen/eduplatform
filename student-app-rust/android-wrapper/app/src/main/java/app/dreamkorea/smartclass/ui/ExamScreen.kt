@@ -562,10 +562,13 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
         } // end Box (watermark background)
 
         // ── 4. BOTTOM NAVIGATION ── compact white bar with thin border
+        // On the LAST question: only show "Previous" + "All Questions" (no Next/Submit button).
+        // On other questions: show "Previous" + "All Questions" + "Next".
         Surface(
             color = Color.White,
             border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFE2E8F0)),
         ) {
+            val isLastQuestion = currentIdx >= sortedItems.size - 1
             Row(modifier = Modifier.fillMaxWidth().height(48.dp), verticalAlignment = Alignment.CenterVertically) {
                 // Previous (अघिल्लो) — disabled when audio playing
                 Box(modifier = Modifier.weight(1f).fillMaxHeight().clickable(enabled = !audioPlaying) { if (currentIdx > 0) { currentIdx--; sound.click() } }, contentAlignment = Alignment.Center) {
@@ -576,15 +579,16 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
                 Box(modifier = Modifier.weight(1f).fillMaxHeight().clickable(enabled = !audioPlaying) { sound.click(); showGrid = true }, contentAlignment = Alignment.Center) {
                     Text("सबै प्रश्नहरू (All)", color = if (audioPlaying) Color(0xFFCBD5E1) else Color(0xFF003478), fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
                 }
-                Box(modifier = Modifier.width(1.dp).fillMaxHeight(0.6f).background(Color(0xFFE2E8F0)))
-                // Next (अर्को) or Submit — disabled when audio playing
-                Box(modifier = Modifier.weight(1f).fillMaxHeight().clickable(enabled = !audioPlaying) {
-                    if (currentIdx < sortedItems.size - 1) { currentIdx++; sound.click() }
-                    else { sound.click(); showGrid = true }
-                }, contentAlignment = Alignment.Center) {
-                    if (submitting) { CircularProgressIndicator(color = Color(0xFF003478), modifier = Modifier.size(16.dp), strokeWidth = 2.dp) }
-                    else if (currentIdx < sortedItems.size - 1) { Text("अर्को (Next)", color = if (audioPlaying) Color(0xFFCBD5E1) else Color(0xFF003478), fontSize = 13.sp, fontWeight = FontWeight.SemiBold) }
-                    else { Text("सबै प्रश्न (All Questions)", color = if (audioPlaying) Color(0xFFCBD5E1) else Color(0xFF003478), fontSize = 11.sp, fontWeight = FontWeight.Bold) }
+                // Next (अर्को) — only shown when NOT on the last question.
+                // On the last question, there is NO third button (no Submit, no Next).
+                if (!isLastQuestion) {
+                    Box(modifier = Modifier.width(1.dp).fillMaxHeight(0.6f).background(Color(0xFFE2E8F0)))
+                    Box(modifier = Modifier.weight(1f).fillMaxHeight().clickable(enabled = !audioPlaying) {
+                        if (currentIdx < sortedItems.size - 1) { currentIdx++; sound.click() }
+                    }, contentAlignment = Alignment.Center) {
+                        if (submitting) { CircularProgressIndicator(color = Color(0xFF003478), modifier = Modifier.size(16.dp), strokeWidth = 2.dp) }
+                        else { Text("अर्को (Next)", color = if (audioPlaying) Color(0xFFCBD5E1) else Color(0xFF003478), fontSize = 13.sp, fontWeight = FontWeight.SemiBold) }
+                    }
                 }
             }
         }
