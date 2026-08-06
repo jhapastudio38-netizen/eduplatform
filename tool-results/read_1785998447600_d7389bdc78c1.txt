@@ -1,0 +1,2002 @@
+     1→package app.dreamkorea.smartclass.ui
+     2→
+     3→import android.app.Activity
+     4→import android.content.pm.ActivityInfo
+     5→import androidx.compose.animation.*
+     6→import androidx.compose.animation.core.*
+     7→import androidx.compose.foundation.Image
+     8→import androidx.compose.foundation.background
+     9→import androidx.compose.foundation.border
+    10→import androidx.compose.foundation.clickable
+    11→import androidx.compose.foundation.layout.*
+    12→import androidx.compose.foundation.lazy.LazyColumn
+    13→import androidx.compose.foundation.lazy.items
+    14→import androidx.compose.foundation.lazy.itemsIndexed
+    15→import androidx.compose.foundation.rememberScrollState
+    16→import androidx.compose.foundation.shape.RoundedCornerShape
+    17→import androidx.compose.foundation.verticalScroll
+    18→import androidx.compose.material.icons.Icons
+    19→import androidx.compose.material.icons.filled.*
+    20→import androidx.compose.material3.*
+    21→import androidx.compose.runtime.*
+    22→import androidx.compose.runtime.snapshots.SnapshotStateMap
+    23→import androidx.compose.ui.Alignment
+    24→import androidx.compose.ui.Modifier
+    25→import androidx.compose.ui.draw.alpha
+    26→import androidx.compose.ui.draw.clip
+    27→import androidx.compose.ui.draw.drawWithContent
+    28→import androidx.compose.ui.draw.rotate
+    29→import androidx.compose.ui.draw.scale
+    30→import androidx.compose.ui.graphics.Brush
+    31→import androidx.compose.ui.graphics.Color
+    32→import androidx.compose.ui.graphics.SolidColor
+    33→import androidx.compose.ui.layout.ContentScale
+    34→import androidx.compose.ui.layout.layout
+    35→import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+    36→import androidx.compose.ui.platform.LocalContext
+    37→import androidx.compose.ui.platform.LocalHapticFeedback
+    38→import androidx.compose.ui.res.painterResource
+    39→import androidx.compose.ui.text.font.FontWeight
+    40→import androidx.compose.ui.text.style.TextAlign
+    41→import androidx.compose.ui.text.style.TextDecoration
+    42→import androidx.compose.ui.text.style.TextOverflow
+    43→import androidx.compose.ui.text.withStyle
+    44→import androidx.compose.ui.unit.dp
+    45→import androidx.compose.ui.unit.sp
+    46→import androidx.compose.ui.viewinterop.AndroidView
+    47→import app.dreamkorea.smartclass.api.*
+    48→import app.dreamkorea.smartclass.data.AppState
+    49→import kotlinx.coroutines.delay
+    50→import kotlinx.coroutines.launch
+    51→import kotlinx.coroutines.withTimeoutOrNull
+    52→
+    53→/**
+    54→ * Exam taking screen — full flow:
+    55→ * 1. Loading skeleton (with timeout + retry)
+    56→ * 2. Question-by-question with audio (loops N times), image, options
+    57→ * 3. Click sound on every interaction
+    58→ * 4. Wrong → shows correct answer in red
+    59→ * 5. Correct → green confirmation
+    60→ * 6. Auto-advances to next question
+    61→ * 7. Final score + review screen
+    62→ * 8. Stats auto-update via /api/student/tests/[id]/submit
+    63→ */
+    64→@Composable
+    65→fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
+    66→    val sound = rememberSoundManager()
+    67→    val scope = rememberCoroutineScope()
+    68→    val context = LocalContext.current
+    69→    var test by remember { mutableStateOf<TestDetail?>(null) }
+    70→    var loading by remember { mutableStateOf(true) }
+    71→    var error by remember { mutableStateOf("") }
+    72→    var currentIdx by remember { mutableStateOf(0) }
+    73→    val answers = remember { mutableStateMapOf<String, Any>() }
+    74→    // Persistent audio play counts per question ID — survives navigation.
+    75→    // Prevents cheat where student navigates away and back to reset plays.
+    76→    val audioPlayCounts = remember { mutableStateMapOf<String, Int>() }
+    77→    // When audio is playing, disable navigation buttons
+    78→    var audioPlaying by remember { mutableStateOf(false) }
+    79→    var submitResult by remember { mutableStateOf<SubmitResponse?>(null) }
+    80→    var submitting by remember { mutableStateOf(false) }
+    81→    // Per-question feedback (after answering, before moving on)
+    82→    var questionFeedback by remember { mutableStateOf<QuestionFeedback?>(null) }
+    83→    // Timer
+    84→    var timeLeft by remember { mutableStateOf(0) }
+    85→
+    86→    // ── ORIENTATION ── FORCE LANDSCAPE. No onDispose PORTRAIT —
+    87→    // MainScreen handles portrait when screen changes to non-exam.
+    88→    DisposableEffect(Unit) {
+    89→        val activity = context as? Activity
+    90→        activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
+    91→        onDispose { }
+    92→    }
+    93→    LaunchedEffect(Unit) {
+    94→        kotlinx.coroutines.delay(100)
+    95→        val activity = context as? Activity
+    96→        activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
+    97→    }
+    98→    // Retry trigger — increment to force reload
+    99→    var retryCount by remember { mutableStateOf(0) }
+   100→
+   101→    // Load test detail — uses LaunchedEffect's own scope, finally block guarantees loading cleanup
+   102→    // ─── Back button handler — show exit warning during exam ──────────────
+   103→    var showExitDialog by remember { mutableStateOf(false) }
+   104→    androidx.activity.compose.BackHandler(enabled = !loading && error.isEmpty()) {
+   105→        showExitDialog = true
+   106→    }
+   107→    if (showExitDialog) {
+   108→        androidx.compose.material3.AlertDialog(
+   109→            onDismissRequest = { showExitDialog = false },
+   110→            title = { Text("Exit Exam?") },
+   111→            text = { Text("Your exam is in progress. Are you sure you want to exit? Your answers will be lost.") },
+   112→            confirmButton = { Button(onClick = { showExitDialog = false; onExit() }) { Text("Exit") } },
+   113→            dismissButton = { OutlinedButton(onClick = { showExitDialog = false }) { Text("Continue Exam") } }
+   114→        )
+   115→    }
+   116→
+   117→    LaunchedEffect(testId, retryCount) {
+   118→        loading = true
+   119→        error = ""
+   120→        try {
+   121→            // 30-second timeout — combined exams may need multiple requests
+   122→            val result = withTimeoutOrNull(30_000L) {
+   123→                when {
+   124→                    // Combined QBank exam — fetches ALL published question_bank tests as one test
+   125→                    testId == "qbank-combined" -> {
+   126→                        try {
+   127→                            AppState.api.getQBankCombined().test
+   128→                        } catch (e: retrofit2.HttpException) {
+   129→                            if (e.code() == 404) buildQBankCombinedClientSide()
+   130→                            else throw e
+   131→                        }
+   132→                    }
+   133→                    // Combined bundle exam — fetches ALL tests in a specific bundle (qbank/batch)
+   134→                    testId.startsWith("bundle-") -> {
+   135→                        val bundleId = testId.removePrefix("bundle-")
+   136→                        try {
+   137→                            AppState.api.getBundleCombined(bundleId).test
+   138→                        } catch (e: retrofit2.HttpException) {
+   139→                            if (e.code() == 404) buildBundleCombinedClientSide(bundleId)
+   140→                            else throw e
+   141→                        }
+   142→                    }
+   143→                    // Normal test — fetch by ID
+   144→                    else -> AppState.api.getTestDetail(testId).test
+   145→                }
+   146→            }
+   147→            if (result != null) {
+   148→                test = result
+   149→                timeLeft = (result.durationMin.coerceAtLeast(1)) * 60
+   150→            } else {
+   151→                error = "The request timed out. Check your internet connection and try again."
+   152→            }
+   153→        } catch (e: retrofit2.HttpException) {
+   154→            // Try to read the actual error message from the response body
+   155→            val rawBody = try { e.response()?.errorBody()?.string() } catch (_: Exception) { null }
+   156→            error = when (e.code()) {
+   157→                401 -> "Your session has expired. Please log out and sign in again."
+   158→                403 -> "This exam is not available right now."
+   159→                404 -> "This test could not be found. It may have been removed."
+   160→                500 -> "Server error. Please try again in a moment.${if (rawBody != null) " ($rawBody)" else ""}"
+   161→                else -> "Could not load the test (HTTP ${e.code()}).${if (rawBody != null) " $rawBody" else ""}"
+   162→            }
+   163→        } catch (e: java.net.UnknownHostException) {
+   164→            error = "No internet connection. Please check your network and try again."
+   165→        } catch (e: java.net.SocketTimeoutException) {
+   166→            error = "The request timed out. Please try again."
+   167→        } catch (e: java.io.IOException) {
+   168→            error = "Network error: ${e.message ?: "Could not connect to server."}"
+   169→        } catch (e: Exception) {
+   170→            error = "Unexpected error: ${e.message ?: "Please try again."}"
+   171→        } finally {
+   172→            // GUARANTEED: loading is always reset, even if the coroutine is cancelled
+   173→            loading = false
+   174→        }
+   175→    }
+   176→
+   177→    // Countdown timer
+   178→    LaunchedEffect(test, submitResult) {
+   179→        if (test != null && submitResult == null) {
+   180→            while (timeLeft > 0) {
+   181→                delay(1000)
+   182→                timeLeft--
+   183→            }
+   184→            // Auto-submit when timer reaches zero
+   185→            val currentTest = test
+   186→            if (timeLeft == 0 && currentTest != null && submitResult == null && !submitting) {
+   187→                submitting = true
+   188→                sound.swoosh()
+   189→                try {
+   190→                    // Use fallback for combined exams (qbank-combined / bundle-{id})
+   191→                    submitResult = if (currentTest.id == "qbank-combined" || currentTest.id.startsWith("bundle-")) {
+   192→                        submitCombinedExamWithFallback(currentTest, answers.toMap())
+   193→                    } else {
+   194→                        submitExamWithFallback(currentTest, answers.toMap())
+   195→                    }
+   196→                    sound.success()
+   197→                } catch (e: java.net.UnknownHostException) {
+   198→                    error = "No internet connection. Could not submit your answers."
+   199→                } catch (e: java.io.IOException) {
+   200→                    error = "Network error. Could not submit your answers."
+   201→                } catch (e: Exception) {
+   202→                    error = "Could not submit: ${e.message ?: "Unknown error"}"
+   203→                }
+   204→                submitting = false
+   205→            }
+   206→        }
+   207→    }
+   208→
+   209→    if (loading) {
+   210→        // Loading skeleton with a subtle "Loading..." label so users know it's working
+   211→        Column(Modifier.fillMaxSize()) {
+   212→            LinearProgressIndicator(
+   213→                modifier = Modifier.fillMaxWidth(),
+   214→                color = theme.primary,
+   215→                trackColor = theme.primary.copy(alpha = 0.1f),
+   216→            )
+   217→            SkeletonListScreen(theme, itemCount = 4)
+   218→        }
+   219→        return
+   220→    }
+   221→
+   222→    if (error.isNotEmpty()) {
+   223→        Column(
+   224→            Modifier.fillMaxSize().padding(24.dp),
+   225→            horizontalAlignment = Alignment.CenterHorizontally,
+   226→            verticalArrangement = Arrangement.Center
+   227→        ) {
+   228→            Icon(
+   229→                Icons.Default.CloudOff,
+   230→                null,
+   231→                tint = theme.errorRed.copy(alpha = 0.7f),
+   232→                modifier = Modifier.size(56.dp)
+   233→            )
+   234→            Spacer(Modifier.height(16.dp))
+   235→            Text(
+   236→                "Couldn't load the test",
+   237→                color = theme.darkText,
+   238→                fontSize = 18.sp,
+   239→                fontWeight = FontWeight.Bold
+   240→            )
+   241→            Spacer(Modifier.height(8.dp))
+   242→            Text(
+   243→                error,
+   244→                color = theme.subText,
+   245→                fontSize = 13.sp,
+   246→                textAlign = TextAlign.Center,
+   247→                modifier = Modifier.padding(horizontal = 16.dp)
+   248→            )
+   249→            Spacer(Modifier.height(8.dp))
+   250→            Text(
+   251→                "Test ID: $testId",
+   252→                color = theme.subText.copy(alpha = 0.5f),
+   253→                fontSize = 10.sp,
+   254→                fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
+   255→            )
+   256→            Spacer(Modifier.height(24.dp))
+   257→            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+   258→                OutlinedButton(
+   259→                    onClick = onExit,
+   260→                    shape = RoundedCornerShape(10.dp)
+   261→                ) { Text("Go back") }
+   262→                Button(
+   263→                    onClick = {
+   264→                        sound.click()
+   265→                        retryCount++ // triggers LaunchedEffect reload
+   266→                    },
+   267→                    colors = ButtonDefaults.buttonColors(containerColor = theme.primary),
+   268→                    shape = RoundedCornerShape(10.dp)
+   269→                ) {
+   270→                    Icon(Icons.Default.Refresh, null, modifier = Modifier.size(18.dp))
+   271→                    Spacer(Modifier.width(6.dp))
+   272→                    Text("Retry")
+   273→                }
+   274→            }
+   275→        }
+   276→        return
+   277→    }
+   278→
+   279→    val t = test ?: return
+   280→    // Guard: if the test has no questions, show a friendly message instead of crashing
+   281→    if (t.items.isEmpty()) {
+   282→        Column(
+   283→            Modifier.fillMaxSize().padding(20.dp),
+   284→            horizontalAlignment = Alignment.CenterHorizontally,
+   285→            verticalArrangement = Arrangement.Center
+   286→        ) {
+   287→            Icon(Icons.Default.Quiz, null, tint = theme.subText, modifier = Modifier.size(48.dp))
+   288→            Spacer(Modifier.height(12.dp))
+   289→            Text("This test has no questions yet.", color = theme.darkText, fontSize = 14.sp, textAlign = TextAlign.Center)
+   290→            Spacer(Modifier.height(16.dp))
+   291→            Button(onClick = onExit, colors = ButtonDefaults.buttonColors(containerColor = theme.primary)) { Text("Go back") }
+   292→        }
+   293→        return
+   294→    }
+   295→
+   296→    val currentQuestion = t.items.getOrNull(currentIdx)
+   297→
+   298→    // ─── Result screen ──────────────────────────────────────────────────────
+   299→    if (submitResult != null) {
+   300→        ExamResultScreen(theme, submitResult!!, onExit, sound, examTitle = t.title, examDescription = t.description)
+   301→        return
+   302→    }
+   303→
+   304→    // ═══ EXAM UI — spec-compliant landscape layout ═══
+   305→    // Sort items: Reading (text) first, then Listening (audio)
+   306→    val sortedItems = t.items.sortedWith(compareBy(
+   307→        { if (it.question.blockType == "audio") 1 else 0 },
+   308→        { it.question.blockNumber }
+   309→    ))
+   310→    val item = sortedItems.getOrNull(currentIdx) ?: return
+   311→    val q = item.question
+   312→    val options = q.options ?: emptyList()
+   313→    val textItems = sortedItems.filter { it.question.blockType != "audio" }
+   314→    val readingCount = if (textItems.isNotEmpty()) textItems.size else sortedItems.size
+   315→    val listeningCount = if (textItems.isNotEmpty()) sortedItems.size - textItems.size else 0
+   316→    val answeredCount = answers.size
+   317→    val remainingCount = sortedItems.size - answeredCount
+   318→    // Start with the grid view so the student can pick which question to answer
+   319→    // first. They tap a number → answer → return to grid → pick next → submit.
+   320→    var showGrid by remember { mutableStateOf(true) }
+   321→
+   322→    Column(modifier = Modifier.fillMaxSize().background(Color(0xFFF8FAFC))) {
+   323→        // ── 1. TOP STATUS HEADER ── compact white bar with thin border
+   324→        Surface(
+   325→            color = Color.White,
+   326→            border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFE2E8F0)),
+   327→        ) {
+   328→            Row(modifier = Modifier.fillMaxWidth().height(36.dp), verticalAlignment = Alignment.CenterVertically) {
+   329→                // Section type
+   330→                Box(modifier = Modifier.weight(1f).fillMaxHeight(), contentAlignment = Alignment.Center) {
+   331→                    val sectionLabel = if (q.blockType == "audio") "Listening ($listeningCount)" else "Reading ($readingCount)"
+   332→                    Text(sectionLabel, color = Color(0xFF003478), fontSize = 10.sp, fontWeight = FontWeight.Bold)
+   333→                }
+   334→                Box(modifier = Modifier.width(1.dp).fillMaxHeight(0.6f).background(Color(0xFFE2E8F0)))
+   335→                // Total
+   336→                Box(modifier = Modifier.weight(1f).fillMaxHeight(), contentAlignment = Alignment.Center) {
+   337→                    Text("Total: ${t.items.size}", color = Color(0xFF64748B), fontSize = 10.sp)
+   338→                }
+   339→                Box(modifier = Modifier.width(1.dp).fillMaxHeight(0.6f).background(Color(0xFFE2E8F0)))
+   340→                // Remaining
+   341→                Box(modifier = Modifier.weight(1f).fillMaxHeight(), contentAlignment = Alignment.Center) {
+   342→                    Text("Left: $remainingCount", color = Color(0xFF64748B), fontSize = 10.sp)
+   343→                }
+   344→                Box(modifier = Modifier.width(1.dp).fillMaxHeight(0.6f).background(Color(0xFFE2E8F0)))
+   345→                // Timer
+   346→                Box(modifier = Modifier.weight(1f).fillMaxHeight(), contentAlignment = Alignment.Center) {
+   347→                    val mm = timeLeft / 60; val ss = timeLeft % 60
+   348→                    Text(String.format("%02d:%02d", mm, ss), color = Color(0xFF003478), fontSize = 12.sp, fontWeight = FontWeight.Bold)
+   349→                }
+   350→            }
+   351→        }
+   352→
+   353→        // ── 2. INSTRUCTION ROW ── compact question number + title + FREE badge
+   354→        Surface(modifier = Modifier.fillMaxWidth().padding(horizontal = 6.dp, vertical = 2.dp)) {
+   355→            Row(verticalAlignment = Alignment.CenterVertically) {
+   356→                Text("${currentIdx + 1}. ", color = Color(0xFF003478), fontSize = 12.sp, fontWeight = FontWeight.Bold)
+   357→                val displayText = q.stem.take(80)
+   358→                Text(displayText, color = Color(0xFF1E293B), fontSize = 11.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
+   359→                if (q.isFree) {
+   360→                    Spacer(Modifier.width(4.dp))
+   361→                    Surface(color = Color(0xFF22C55E), shape = RoundedCornerShape(3.dp)) {
+   362→                        Text("FREE", color = Color.White, fontSize = 8.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp))
+   363→                    }
+   364→                }
+   365→                Spacer(Modifier.weight(1f))
+   366→                IconButton(onClick = { showGrid = true }, modifier = Modifier.size(24.dp)) {
+   367→                    Icon(Icons.Default.GridView, null, tint = Color(0xFF64748B), modifier = Modifier.size(14.dp))
+   368→                }
+   369→            }
+   370→        }
+   371→        Box(modifier = Modifier.fillMaxWidth().height(2.dp).background(Color.Black))
+   372→
+   373→        // ── 3. MAIN CONTENT ── 60% question (left, scrollable) | 40% answers (right, scrollable)
+   374→        // DreamKorea logo watermark in background (faded, centered)
+   375→        Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
+   376→            // Watermark logo at the center of the background
+   377→            Image(
+   378→                painter = painterResource(id = app.dreamkorea.smartclass.R.drawable.dreamkorea_logo),
+   379→                contentDescription = null,
+   380→                modifier = Modifier.align(Alignment.Center).size(280.dp).alpha(0.08f),
+   381→                contentScale = ContentScale.Fit
+   382→            )
+   383→            Row(modifier = Modifier.fillMaxSize()) {
+   384→            // LEFT: Question content (60%) — scrollable so long titles/stems/images don't get cut
+   385→            Column(
+   386→                modifier = Modifier.weight(0.6f).fillMaxHeight().padding(8.dp).verticalScroll(rememberScrollState()),
+   387→                verticalArrangement = Arrangement.Center,
+   388→                horizontalAlignment = Alignment.CenterHorizontally
+   389→            ) {
+   390→                // Question title (if set by admin) — shown at the top
+   391→                if (!q.title.isNullOrBlank()) {
+   392→                    Text(
+   393→                        q.title,
+   394→                        color = Color(0xFF003478),
+   395→                        fontSize = 13.sp,
+   396→                        fontWeight = FontWeight.Bold,
+   397→                        modifier = Modifier.fillMaxWidth(0.92f).padding(bottom = 4.dp)
+   398→                    )
+   399→                }
+   400→                // Question text (stem) — shown in a card with border/shadow
+   401→                val questionText = q.stem.ifBlank { q.mediaText ?: "" }
+   402→                if (questionText.isNotBlank()) {
+   403→                    Surface(
+   404→                        color = Color.White,
+   405→                        shape = RoundedCornerShape(14.dp),
+   406→                        shadowElevation = 2.dp,
+   407→                        border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFE2E8F0)),
+   408→                        modifier = Modifier.fillMaxWidth(0.92f)
+   409→                    ) {
+   410→                        Text(
+   411→                            questionText,
+   412→                            color = Color(0xFF1E293B),
+   413→                            fontSize = 14.sp,
+   414→                            fontWeight = FontWeight.Medium,
+   415→                            modifier = Modifier.padding(14.dp)
+   416→                        )
+   417→                    }
+   418→                    Spacer(Modifier.height(6.dp))
+   419→                }
+   420→                // Media images — ContentScale.Fit (contain, not cover)
+   421→                if (q.descType == "image" && !q.descImageUrl.isNullOrBlank()) {
+   422→                    val url = q.descImageUrl!!.toAbsoluteUrl()
+   423→                    coil.compose.AsyncImage(
+   424→                        model = url, contentDescription = null,
+   425→                        modifier = Modifier.fillMaxWidth(0.92f).heightIn(max = 120.dp).clip(RoundedCornerShape(8.dp)).clickable { FullScreenImageViewer.show(url) },
+   426→                        contentScale = ContentScale.Fit
+   427→                    )
+   428→                }
+   429→                val mediaImgUrl = (q.mediaImageUrl ?: q.imageUrl)?.toAbsoluteUrl()
+   430→                if (!mediaImgUrl.isNullOrBlank()) {
+   431→                    coil.compose.AsyncImage(
+   432→                        model = mediaImgUrl, contentDescription = null,
+   433→                        modifier = Modifier.fillMaxWidth(0.92f).heightIn(max = 140.dp).clip(RoundedCornerShape(8.dp)).clickable { FullScreenImageViewer.show(mediaImgUrl) },
+   434→                        contentScale = ContentScale.Fit
+   435→                    )
+   436→                }
+   437→                val mediaAudUrl = (q.mediaAudioUrl ?: q.audioUrl)?.toAbsoluteUrl()
+   438→                if (!mediaAudUrl.isNullOrBlank()) {
+   439→                    // key(q.id) ensures the AudioPlayerCard is FULLY RECREATED when
+   440→                    // the question changes — state (playCount, disabled) resets completely.
+   441→                    // This fixes the bug where audio was locked from the previous question.
+   442→                    key(q.id) {
+   443→                        AudioPlayerCard(theme = theme, url = mediaAudUrl, loopCount = q.audioLoop, loopDelaySec = q.audioLoopDelay, sound = sound, questionId = q.id, playCounts = audioPlayCounts, onPlayingChange = { audioPlaying = it })
+   444→                    }
+   445→                }
+   446→            }
+   447→
+   448→            // Vertical divider
+   449→            Box(modifier = Modifier.width(2.dp).fillMaxHeight().background(Color.Black))
+   450→
+   451→            // RIGHT: Answer options (40%) — scrollable so long options don't get cut
+   452→            Column(
+   453→                modifier = Modifier.weight(0.4f).fillMaxHeight().padding(8.dp).verticalScroll(rememberScrollState()),
+   454→                verticalArrangement = Arrangement.Center
+   455→            ) {
+   456→                when (q.answerType) {
+   457→                    "text", "choose" -> {
+   458→                        (0 until minOf(4, options.size)).forEach { i ->
+   459→                            val isSelected = answers[q.id] == options.getOrNull(i)
+   460→                            val optText = options.getOrNull(i) ?: ""
+   461→                            val blankWord = q.optionBlanks.getOrNull(i)?.takeIf { it.isNotBlank() }
+   462→                            Row(
+   463→                                modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp).clickable { sound.click(); answers[q.id] = optText },
+   464→                                verticalAlignment = Alignment.CenterVertically
+   465→                            ) {
+   466→                                Surface(
+   467→                                    color = if (isSelected) theme.primary else Color.White,
+   468→                                    border = androidx.compose.foundation.BorderStroke(2.dp, Color.Black),
+   469→                                    shape = androidx.compose.foundation.shape.CircleShape,
+   470→                                    modifier = Modifier.size(40.dp)
+   471→                                ) {
+   472→                                    Box(contentAlignment = Alignment.Center) { Text("${i+1}", color = if (isSelected) Color.White else Color.Black, fontSize = 15.sp, fontWeight = FontWeight.Bold) }
+   473→                                }
+   474→                                Spacer(Modifier.width(8.dp))
+   475→                                // Render option text with underlined blank word (if set by admin)
+   476→                                Text(
+   477→                                    text = buildUnderlinedText(optText, blankWord),
+   478→                                    color = Color.Black,
+   479→                                    fontSize = 13.sp,
+   480→                                    modifier = Modifier.weight(1f)
+   481→                                )
+   482→                            }
+   483→                        }
+   484→                    }
+   485→                    "image" -> {
+   486→                        (0 until minOf(4, q.optionImages.size)).forEach { i ->
+   487→                            val imgUrl = q.optionImages[i]; if (imgUrl.isBlank()) return@forEach
+   488→                            val absUrl = imgUrl.toAbsoluteUrl()
+   489→                            val isSelected = answers[q.id] == absUrl
+   490→                            Row(
+   491→                                modifier = Modifier.fillMaxWidth().padding(vertical = 3.dp).clickable { sound.click(); answers[q.id] = absUrl },
+   492→                                verticalAlignment = Alignment.CenterVertically
+   493→                            ) {
+   494→                                Surface(color = if (isSelected) theme.primary else Color.White, border = androidx.compose.foundation.BorderStroke(2.dp, Color.Black), shape = androidx.compose.foundation.shape.CircleShape, modifier = Modifier.size(28.dp)) {
+   495→                                    Box(contentAlignment = Alignment.Center) { Text("${i+1}", color = if (isSelected) Color.White else Color.Black, fontSize = 10.sp, fontWeight = FontWeight.Bold) }
+   496→                                }
+   497→                                Spacer(Modifier.width(4.dp))
+   498→                                coil.compose.AsyncImage(model = absUrl, contentDescription = "Option ${i+1}", modifier = Modifier.size(48.dp).clip(RoundedCornerShape(4.dp)).clickable { FullScreenImageViewer.show(absUrl) }, contentScale = ContentScale.Fit)
+   499→                            }
+   500→                        }
+   501→                    }
+   502→                    "audio" -> {
+   503→                        (0 until minOf(4, q.optionAudios.size)).forEach { i ->
+   504→                            val audUrl = q.optionAudios[i]; if (audUrl.isBlank()) return@forEach
+   505→                            val absUrl = audUrl.toAbsoluteUrl()
+   506→                            val isSelected = answers[q.id] == absUrl
+   507→                            Row(modifier = Modifier.fillMaxWidth().padding(vertical = 3.dp).clickable { sound.click(); answers[q.id] = absUrl }, verticalAlignment = Alignment.CenterVertically) {
+   508→                                Surface(color = if (isSelected) theme.primary else Color.White, border = androidx.compose.foundation.BorderStroke(2.dp, Color.Black), shape = androidx.compose.foundation.shape.CircleShape, modifier = Modifier.size(28.dp)) {
+   509→                                    Box(contentAlignment = Alignment.Center) { Text("${i+1}", color = if (isSelected) Color.White else Color.Black, fontSize = 10.sp, fontWeight = FontWeight.Bold) }
+   510→                                }
+   511→                                Spacer(Modifier.width(4.dp))
+   512→                                // key(q.id, i) — recreate when question changes so play count resets
+   513→                                key(q.id, i) {
+   514→                                    AudioPlayerCard(theme = theme, url = absUrl, loopCount = q.audioLoop.coerceAtLeast(1), loopDelaySec = q.audioLoopDelay, sound = sound, questionId = "${q.id}-opt-$i", playCounts = audioPlayCounts, onPlayingChange = { audioPlaying = it })
+   515→                                }
+   516→                            }
+   517→                        }
+   518→                    }
+   519→                }
+   520→            }
+   521→            } // end Row
+   522→        } // end Box (watermark background)
+   523→
+   524→        // ── 4. BOTTOM NAVIGATION ── compact white bar with thin border
+   525→        Surface(
+   526→            color = Color.White,
+   527→            border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFE2E8F0)),
+   528→        ) {
+   529→            Row(modifier = Modifier.fillMaxWidth().height(48.dp), verticalAlignment = Alignment.CenterVertically) {
+   530→                // Previous (अघिल्लो) — disabled when audio playing
+   531→                Box(modifier = Modifier.weight(1f).fillMaxHeight().clickable(enabled = !audioPlaying) { if (currentIdx > 0) { currentIdx--; sound.click() } }, contentAlignment = Alignment.Center) {
+   532→                    Text("अघिल्लो (Prev)", color = if (currentIdx > 0 && !audioPlaying) Color(0xFF003478) else Color(0xFFCBD5E1), fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+   533→                }
+   534→                Box(modifier = Modifier.width(1.dp).fillMaxHeight(0.6f).background(Color(0xFFE2E8F0)))
+   535→                // All questions (सबै प्रश्नहरू) — disabled when audio playing
+   536→                Box(modifier = Modifier.weight(1f).fillMaxHeight().clickable(enabled = !audioPlaying) { sound.click(); showGrid = true }, contentAlignment = Alignment.Center) {
+   537→                    Text("सबै प्रश्नहरू (All)", color = if (audioPlaying) Color(0xFFCBD5E1) else Color(0xFF003478), fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+   538→                }
+   539→                Box(modifier = Modifier.width(1.dp).fillMaxHeight(0.6f).background(Color(0xFFE2E8F0)))
+   540→                // Next (अर्को) or Submit — disabled when audio playing
+   541→                Box(modifier = Modifier.weight(1f).fillMaxHeight().clickable(enabled = !audioPlaying) {
+   542→                    if (currentIdx < sortedItems.size - 1) { currentIdx++; sound.click() }
+   543→                    else { sound.swoosh(); submitting = true; scope.launch { try { submitResult = submitExamWithFallback(t, answers.toMap()); sound.success() } catch (e: Exception) { error = "Submit failed." }; submitting = false } }
+   544→                }, contentAlignment = Alignment.Center) {
+   545→                    if (submitting) { CircularProgressIndicator(color = Color(0xFF003478), modifier = Modifier.size(16.dp), strokeWidth = 2.dp) }
+   546→                    else if (currentIdx < sortedItems.size - 1) { Text("अर्को (Next)", color = if (audioPlaying) Color(0xFFCBD5E1) else Color(0xFF003478), fontSize = 13.sp, fontWeight = FontWeight.SemiBold) }
+   547→                    else { Text("सबमिट (Submit)", color = if (audioPlaying) Color(0xFFCBD5E1) else Color(0xFF22C55E), fontSize = 11.sp, fontWeight = FontWeight.Bold) }
+   548→                }
+   549→            }
+   550→        }
+   551→    }
+   552→
+   553→            // ── QUESTION GRID PAGE ── matches HTML reference (4-col square grid, blue #1a56ff)
+   554→    if (showGrid) {
+   555→        val readingItems = sortedItems.filter { it.question.blockType != "audio" }
+   556→        val listeningItems = sortedItems.filter { it.question.blockType == "audio" }
+   557→        // Question Bank / combined exams: show ALL questions in ONE panel (no Reading/Listening split)
+   558→        // Regular exams/tests: show Reading LEFT | Listening RIGHT
+   559→        val isQBank = testId == "qbank-combined" || testId.startsWith("bundle-")
+   560→        // showAllBlocks: true = show all blocks (added + blank), false = only show created questions
+   561→        val showAllBlocks = t.showAllBlocks
+   562→        var showSubmitDialog by remember { mutableStateOf(false) }
+   563→        val haptic = LocalHapticFeedback.current
+   564→        // Filter: null = all, true = solved only, false = unsolved only
+   565→        var filterMode by remember { mutableStateOf<Boolean?>(null) }
+   566→
+   567→        val readingAnswered = readingItems.count { answers.containsKey(it.question.id) }
+   568→        val listeningAnswered = listeningItems.count { answers.containsKey(it.question.id) }
+   569→        val totalAnswered = readingAnswered + listeningAnswered
+   570→        val totalQuestions = t.items.size
+   571→        val totalUnsolved = totalQuestions - totalAnswered
+   572→        // HH:MM:SS timer format (matches HTML reference)
+   573→        val hh = timeLeft / 3600; val mm = (timeLeft % 3600) / 60; val ss = timeLeft % 60
+   574→        val timeStr = String.format("%02d:%02d:%02d", hh, mm, ss)
+   575→        val isLowTime = timeLeft in 1..300
+   576→        val timerColor = if (isLowTime) Color(0xFFDC2626) else Color(0xFF222222)
+   577→        val accentBlue = Color(0xFF1A56FF)
+   578→
+   579→        Column(modifier = Modifier.fillMaxSize().background(Color(0xFFF5F5F5))) {
+   580→            // ── TABS ROW: All | Solved | UnSolved (with blue underline on active) ──
+   581→            Row(
+   582→                modifier = Modifier
+   583→                    .fillMaxWidth()
+   584→                    .background(Color.White)
+   585→                    .height(42.dp),
+   586→                verticalAlignment = Alignment.CenterVertically
+   587→            ) {
+   588→                RefTab("All", filterMode == null, accentBlue, Modifier.weight(1f)) { filterMode = null }
+   589→                RefTab("Solved", filterMode == true, accentBlue, Modifier.weight(1f)) { filterMode = true }
+   590→                RefTab("UnSolved", filterMode == false, accentBlue, Modifier.weight(1f)) { filterMode = false }
+   591→            }
+   592→            // Thin border under tabs
+   593→            Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(Color(0xFFE2E2E2)))
+   594→
+   595→            // ── TIMER (large, centered, monospace) ──────────────────────
+   596→            Box(
+   597→                modifier = Modifier
+   598→                    .fillMaxWidth()
+   599→                    .background(Color.White)
+   600→                    .padding(vertical = 8.dp),
+   601→                contentAlignment = Alignment.Center
+   602→            ) {
+   603→                Text(
+   604→                    timeStr,
+   605→                    color = timerColor,
+   606→                    fontSize = 18.sp,
+   607→                    fontWeight = FontWeight.Medium,
+   608→                    letterSpacing = 1.sp,
+   609→                    fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
+   610→                )
+   611→            }
+   612→            Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(Color(0xFFE2E2E2)))
+   613→
+   614→            // ── MAIN AREA ──────────────────────────────────────────────────
+   615→            // QBank: single panel with ALL questions (no Reading/Listening labels)
+   616→            // Exam: Reading LEFT | Listening RIGHT
+   617→            Box(
+   618→                modifier = Modifier
+   619→                    .weight(1f)
+   620→                    .fillMaxWidth()
+   621→                    .background(Color(0xFFF5F5F5))
+   622→            ) {
+   623→                // Watermark logo in background
+   624→                Image(
+   625→                    painter = painterResource(id = app.dreamkorea.smartclass.R.drawable.dreamkorea_logo),
+   626→                    contentDescription = null,
+   627→                    modifier = Modifier
+   628→                        .size(180.dp)
+   629→                        .align(Alignment.Center)
+   630→                        .alpha(0.04f),
+   631→                    contentScale = ContentScale.Fit
+   632→                )
+   633→
+   634→                if (isQBank) {
+   635→                    // ── QBANK: single panel, all questions, no section labels ──
+   636→                    // Fills the FULL screen — no max width constraint
+   637→                    Column(
+   638→                        modifier = Modifier
+   639→                            .fillMaxSize()
+   640→                            .padding(12.dp),
+   641→                        horizontalAlignment = Alignment.CenterHorizontally
+   642→                    ) {
+   643→                        Column(
+   644→                            modifier = Modifier
+   645→                                .fillMaxWidth()
+   646→                                .fillMaxHeight()
+   647→                                .border(2.dp, Color(0xFF111111), RoundedCornerShape(10.dp))
+   648→                                .background(Color.White)
+   649→                                .padding(8.dp)
+   650→                        ) {
+   651→                            QuestionGridRef(
+   652→                                test = t,
+   653→                                items = t.items, // ALL questions in one grid
+   654→                                answers = answers,
+   655→                                currentIdx = currentIdx,
+   656→                                sound = sound,
+   657→                                haptic = haptic,
+   658→                                filterMode = filterMode,
+   659→                                accentBlue = accentBlue,
+   660→                                showAllBlocks = showAllBlocks
+   661→                            ) { idx ->
+   662→                                currentIdx = idx
+   663→                                showGrid = false
+   664→                            }
+   665→                        }
+   666→                    }
+   667→                } else {
+   668→                    // ── EXAM: Reading LEFT | Listening RIGHT ──
+   669→                    Row(
+   670→                        modifier = Modifier.fillMaxSize().padding(8.dp),
+   671→                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+   672→                    ) {
+   673→                        // Reading panel (left)
+   674→                        Column(modifier = Modifier.weight(1f).fillMaxHeight()) {
+   675→                            Text(
+   676→                                "Reading",
+   677→                                color = Color(0xFF333333),
+   678→                                fontSize = 13.sp,
+   679→                                fontWeight = FontWeight.Medium,
+   680→                                modifier = Modifier.padding(start = 4.dp, bottom = 6.dp)
+   681→                            )
+   682→                        // Scrollable grid with border — fills full panel
+   683→                            Column(
+   684→                                modifier = Modifier
+   685→                                    .weight(1f)
+   686→                                    .fillMaxWidth()
+   687→                                    .border(2.dp, Color(0xFF111111), RoundedCornerShape(10.dp))
+   688→                                    .background(Color.White)
+   689→                                    .padding(8.dp)
+   690→                            ) {
+   691→                                QuestionGridRef(
+   692→                                    test = t,
+   693→                                    items = readingItems,
+   694→                                    answers = answers,
+   695→                                    currentIdx = currentIdx,
+   696→                                    sound = sound,
+   697→                                    haptic = haptic,
+   698→                                    filterMode = filterMode,
+   699→                                    accentBlue = accentBlue,
+   700→                                    showAllBlocks = showAllBlocks
+   701→                                ) { idx ->
+   702→                                    currentIdx = idx
+   703→                                    showGrid = false
+   704→                                }
+   705→                            }
+   706→                        }
+   707→
+   708→                        // Listening panel (right)
+   709→                        Column(modifier = Modifier.weight(1f).fillMaxHeight()) {
+   710→                            Text(
+   711→                                "Listening",
+   712→                                color = Color(0xFF333333),
+   713→                                fontSize = 13.sp,
+   714→                                fontWeight = FontWeight.Medium,
+   715→                                modifier = Modifier.padding(start = 4.dp, bottom = 6.dp)
+   716→                            )
+   717→                            Column(
+   718→                                modifier = Modifier
+   719→                                    .weight(1f)
+   720→                                    .fillMaxWidth()
+   721→                                    .border(2.dp, Color(0xFF111111), RoundedCornerShape(10.dp))
+   722→                                    .background(Color.White)
+   723→                                    .padding(8.dp)
+   724→                            ) {
+   725→                                QuestionGridRef(
+   726→                                    test = t,
+   727→                                    items = listeningItems,
+   728→                                    answers = answers,
+   729→                                    currentIdx = currentIdx,
+   730→                                    sound = sound,
+   731→                                    haptic = haptic,
+   732→                                    filterMode = filterMode,
+   733→                                    accentBlue = accentBlue,
+   734→                                    showAllBlocks = showAllBlocks
+   735→                                ) { idx ->
+   736→                                    currentIdx = idx
+   737→                                    showGrid = false
+   738→                                }
+   739→                            }
+   740→                        }
+   741→                    }
+   742→                }
+   743→            }
+   744→
+   745→            // ── SUBMIT BUTTON (blue pill, full-width-ish, at bottom) ─────
+   746→            Box(
+   747→                modifier = Modifier
+   748→                    .fillMaxWidth()
+   749→                    .background(Color(0xFFF5F5F5))
+   750→                    .padding(horizontal = 16.dp, vertical = 8.dp),
+   751→                contentAlignment = Alignment.Center
+   752→            ) {
+   753→                Button(
+   754→                    onClick = { showSubmitDialog = true },
+   755→                    modifier = Modifier.fillMaxWidth().height(48.dp),
+   756→                    colors = ButtonDefaults.buttonColors(containerColor = accentBlue),
+   757→                    shape = RoundedCornerShape(24.dp)
+   758→                ) {
+   759→                    Text(
+   760→                        "Submit and Finish Exam",
+   761→                        color = Color.White,
+   762→                        fontSize = 14.sp,
+   763→                        fontWeight = FontWeight.Medium
+   764→                    )
+   765→                }
+   766→            }
+   767→        }
+   768→
+   769→        // Submit confirmation dialog
+   770→        if (showSubmitDialog) {
+   771→            val warning = when {
+   772→                totalUnsolved == 0 -> "You answered all $totalQuestions questions. Ready to submit!"
+   773→                totalUnsolved <= 5 -> "You have $totalUnsolved unanswered question(s). Submit anyway?"
+   774→                else -> "Warning: $totalUnsolved questions are still unanswered! Submit anyway?"
+   775→            }
+   776→            val warningColor = when {
+   777→                totalUnsolved == 0 -> Color(0xFF16A34A)
+   778→                totalUnsolved <= 5 -> Color(0xFFD97706)
+   779→                else -> Color(0xFFDC2626)
+   780→            }
+   781→            AlertDialog(
+   782→                onDismissRequest = { showSubmitDialog = false },
+   783→                title = { Text("Submit Exam?") },
+   784→                text = {
+   785→                    Column {
+   786→                        Text(warning, color = warningColor, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+   787→                        Spacer(Modifier.height(6.dp))
+   788→                        Text("Reading: $readingAnswered/${readingItems.size} • Listening: $listeningAnswered/${listeningItems.size}",
+   789→                            color = Color(0xFF64748B), fontSize = 11.sp)
+   790→                    }
+   791→                },
+   792→                confirmButton = {
+   793→                    Button(
+   794→                        onClick = {
+   795→                            showSubmitDialog = false
+   796→                            if (!submitting) {
+   797→                                sound.swoosh(); submitting = true
+   798→                                scope.launch {
+   799→                                    try { submitResult = submitExamWithFallback(t, answers.toMap()); sound.success() }
+   800→                                    catch (e: Exception) { error = "Submit failed." }
+   801→                                    submitting = false
+   802→                                }
+   803→                            }
+   804→                        },
+   805→                        colors = ButtonDefaults.buttonColors(containerColor = accentBlue)
+   806→                    ) { if (submitting) { CircularProgressIndicator(color = Color.White, modifier = Modifier.size(16.dp), strokeWidth = 2.dp) } else { Text("Submit", color = Color.White) } }
+   807→                },
+   808→                dismissButton = { OutlinedButton(onClick = { showSubmitDialog = false }) { Text("Cancel") } }
+   809→            )
+   810→        }
+   811→        return
+   812→    }
+   813→}
+   814→
+   815→/// Reference-style tab: flex:1, centered, blue bottom border (3dp) when active.
+   816→@Composable
+   817→private fun RefTab(label: String, active: Boolean, accent: Color, modifier: Modifier, onClick: () -> Unit) {
+   818→    Column(
+   819→        modifier = modifier
+   820→            .fillMaxHeight()
+   821→            .clickable { onClick() }
+   822→            .background(if (active) Color(0xFFF2F2F2) else Color.White),
+   823→        horizontalAlignment = Alignment.CenterHorizontally,
+   824→        verticalArrangement = Arrangement.Center
+   825→    ) {
+   826→        Text(
+   827→            label,
+   828→            color = if (active) Color(0xFF111111) else Color(0xFF444444),
+   829→            fontSize = 13.sp,
+   830→            fontWeight = if (active) FontWeight.SemiBold else FontWeight.Normal
+   831→        )
+   832→        Spacer(Modifier.height(6.dp))
+   833→        Box(
+   834→            modifier = Modifier
+   835→                .fillMaxWidth()
+   836→                .height(if (active) 3.dp else 0.dp)
+   837→                .background(accent)
+   838→        )
+   839→    }
+   840→}
+   841→
+   842→/// Reference-style 4-column grid of PERFECT SQUARE cells with 2px black borders.
+   843→/// Solved = blue fill + white text. Current = blue border + glow.
+   844→/// Uses continuous numbering: Reading 1-20, Listening 21-40 (from globalIdx).
+   845→/// showAllBlocks: true = pad grid to expected count (20) with blank cells so
+   846→/// the user sees which questions are added vs blank.
+   847→/// false = only show cells for questions that actually exist.
+   848→/// Cells ALWAYS maintain 1:1 aspect ratio (perfect square) regardless of count.
+   849→/// Grid is scrollable so all blocks are reachable.
+   850→@Composable
+   851→private fun QuestionGridRef(
+   852→    test: TestDetail,
+   853→    items: List<TestItemDetail>,
+   854→    answers: SnapshotStateMap<String, Any>,
+   855→    currentIdx: Int,
+   856→    sound: SoundManager,
+   857→    haptic: androidx.compose.ui.hapticfeedback.HapticFeedback,
+   858→    filterMode: Boolean?,
+   859→    accentBlue: Color,
+   860→    showAllBlocks: Boolean,
+   861→    onPick: (Int) -> Unit,
+   862→) {
+   863→    val globalIndices = items.mapNotNull { item -> test.items.indexOfFirst { it.question.id == item.question.id }.takeIf { it >= 0 } }
+   864→    val cols = 4  // 4 columns per the HTML reference
+   865→    val gridScrollState = rememberScrollState()
+   866→
+   867→    // Determine total cells to render
+   868→    val expectedTotal = if (showAllBlocks) {
+   869→        val isAudio = items.isNotEmpty() && items[0].question.blockType == "audio"
+   870→        val blockCount = if (isAudio) test.audioBlockCount else test.textBlockCount
+   871→        maxOf(blockCount, items.size)
+   872→    } else {
+   873→        items.size
+   874→    }
+   875→    val rowsCount = (expectedTotal + cols - 1) / cols
+   876→
+   877→    // Scrollable grid — cells are PERFECT SQUARES (aspectRatio 1f)
+   878→    Column(
+   879→        modifier = Modifier
+   880→            .fillMaxWidth()
+   881→            .verticalScroll(gridScrollState),
+   882→        verticalArrangement = Arrangement.spacedBy(8.dp)
+   883→    ) {
+   884→        for (rowIdx in 0 until rowsCount) {
+   885→            Row(
+   886→                modifier = Modifier.fillMaxWidth(),
+   887→                horizontalArrangement = Arrangement.spacedBy(8.dp)
+   888→            ) {
+   889→                for (colIdx in 0 until cols) {
+   890→                    val localIdx = rowIdx * cols + colIdx
+   891→                    if (localIdx < items.size) {
+   892→                        val globalIdx = globalIndices[localIdx]
+   893→                        // DISPLAY NUMBER: Reading shows 1-20, Listening shows 21-40
+   894→                        // Uses blockNumber (1-20 within each block) + 20 offset for audio
+   895→                        val q = items[localIdx].question
+   896→                        val displayNum = if (q.blockType == "audio") {
+   897→                            (q.blockNumber.takeIf { it > 0 } ?: (localIdx + 1)) + 20
+   898→                        } else {
+   899→                            q.blockNumber.takeIf { it > 0 } ?: (localIdx + 1)
+   900→                        }
+   901→                        val isAnswered = answers.containsKey(items[localIdx].question.id)
+   902→                        val isCurrent = globalIdx == currentIdx
+   903→                        val isFilteredOut = when (filterMode) {
+   904→                            true -> !isAnswered
+   905→                            false -> isAnswered
+   906→                            null -> false
+   907→                        }
+   908→                        Box(
+   909→                            modifier = Modifier
+   910→                                .weight(1f)
+   911→                                .aspectRatio(1f)  // PERFECT SQUARE — always 1:1
+   912→                                .clip(RoundedCornerShape(6.dp))
+   913→                                .border(
+   914→                                    width = if (isCurrent) 2.5.dp else 1.5.dp,
+   915→                                    color = when {
+   916→                                        isCurrent -> accentBlue
+   917→                                        isAnswered -> accentBlue
+   918→                                        else -> Color(0xFF111111)
+   919→                                    },
+   920→                                    shape = RoundedCornerShape(6.dp)
+   921→                                )
+   922→                                .background(if (isAnswered) accentBlue else Color.White)
+   923→                                .alpha(if (isFilteredOut) 0.15f else 1f)
+   924→                                .clickable(enabled = !isFilteredOut) {
+   925→                                    sound.click()
+   926→                                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+   927→                                    onPick(globalIdx)
+   928→                                },
+   929→                            contentAlignment = Alignment.Center
+   930→                        ) {
+   931→                            Text(
+   932→                                "$displayNum",
+   933→                                color = if (isAnswered) Color.White else Color(0xFF111111),
+   934→                                fontSize = 15.sp,
+   935→                                fontWeight = if (isCurrent) FontWeight.Bold else FontWeight.Medium,
+   936→                            )
+   937→                        }
+   938→                    } else if (showAllBlocks) {
+   939→                        // Empty placeholder cell — perfect square
+   940→                        // Reading placeholders: 1-20, Listening placeholders: 21-40
+   941→                        val isAudioGrid = items.isNotEmpty() && items[0].question.blockType == "audio"
+   942→                        val placeholderNum = if (isAudioGrid) localIdx + 21 else localIdx + 1
+   943→                        Box(
+   944→                            modifier = Modifier
+   945→                                .weight(1f)
+   946→                                .aspectRatio(1f)  // PERFECT SQUARE
+   947→                                .clip(RoundedCornerShape(6.dp))
+   948→                                .border(1.5.dp, Color(0xFFEEEEEE), RoundedCornerShape(6.dp))
+   949→                                .background(Color(0xFFFAFAFA)),
+   950→                            contentAlignment = Alignment.Center
+   951→                        ) {
+   952→                            Text(
+   953→                                "$placeholderNum",
+   954→                                color = Color(0xFFCCCCCC),
+   955→                                fontSize = 13.sp,
+   956→                                fontWeight = FontWeight.Normal,
+   957→                            )
+   958→                        }
+   959→                    } else {
+   960→                        // showAllBlocks=false, no question — invisible spacer (perfect square)
+   961→                        Spacer(modifier = Modifier.weight(1f).aspectRatio(1f))
+   962→                    }
+   963→                }
+   964→            }
+   965→        }
+   966→    }
+   967→}
+   968→
+   969→@Composable
+   970→private fun TabButton(label: String, selected: Boolean, onClick: () -> Unit) {
+   971→    Box(
+   972→        modifier = Modifier
+   973→            .fillMaxWidth()
+   974→            .height(32.dp)
+   975→            .border(1.5.dp, Color.Black)
+   976→            .background(if (selected) Color(0xFF003478) else Color.White)
+   977→            .clickable { onClick() },
+   978→        contentAlignment = Alignment.Center
+   979→    ) {
+   980→        Text(
+   981→            label,
+   982→            color = if (selected) Color.White else Color.Black,
+   983→            fontSize = 11.sp,
+   984→            fontWeight = FontWeight.Bold,
+   985→        )
+   986→    }
+   987→}
+   988→
+   989→data class QuestionFeedback(val isCorrect: Boolean, val correctAnswer: String)
+   990→
+   991→@Composable
+   992→private fun LegendItem(color: Color, label: String) {
+   993→    Row(verticalAlignment = Alignment.CenterVertically) {
+   994→        Surface(color = color, shape = RoundedCornerShape(2.dp), border = androidx.compose.foundation.BorderStroke(1.dp, Color.Black), modifier = Modifier.size(14.dp)) {}
+   995→        Spacer(Modifier.width(4.dp))
+   996→        Text(label, color = Color.Black, fontSize = 10.sp)
+   997→    }
+   998→}
+   999→
+  1000→// ─── Audio player with loop support ───────────────────────────────────────────
+  1001→// loopCount = total number of times to play the audio:
+  1002→//   0 or 1 = plays once
+  1003→//   2 = plays twice
+  1004→//   N = plays N times
+  1005→//  -1 = infinite loop
+  1006→@Composable
+  1007→fun AudioPlayerCard(
+  1008→    theme: AppTheme,
+  1009→    url: String,
+  1010→    loopCount: Int,
+  1011→    loopDelaySec: Int,
+  1012→    sound: SoundManager,
+  1013→    questionId: String? = null,
+  1014→    playCounts: SnapshotStateMap<String, Int>? = null,
+  1015→    onPlayingChange: ((Boolean) -> Unit)? = null,
+  1016→) {
+  1017→    val context = LocalContext.current
+  1018→    var mediaPlayer by remember { mutableStateOf<android.media.MediaPlayer?>(null) }
+  1019→    var isPlaying by remember { mutableStateOf(false) }
+  1020→
+  1021→    // PERSISTENT play count — stored in parent map (survives navigation).
+  1022→    // Prevents cheat where student navigates away and back to reset plays.
+  1023→    val persistentCount = playCounts?.get(questionId) ?: 0
+  1024→    // Sync isPlaying with parent callback
+  1025→    LaunchedEffect(isPlaying) {
+  1026→        onPlayingChange?.invoke(isPlaying)
+  1027→    }
+  1028→
+  1029→    val maxPlays = if (loopCount <= 0) 2 else loopCount
+  1030→    val disabled = persistentCount >= maxPlays
+  1031→    val scope = rememberCoroutineScope()
+  1032→
+  1033→    fun incrementPlayCount() {
+  1034→        if (questionId != null && playCounts != null) {
+  1035→            playCounts[questionId] = (playCounts[questionId] ?: 0) + 1
+  1036→        }
+  1037→    }
+  1038→
+  1039→    DisposableEffect(url) {
+  1040→        onDispose {
+  1041→            mediaPlayer?.release()
+  1042→            mediaPlayer = null
+  1043→        }
+  1044→    }
+  1045→
+  1046→    Surface(color = theme.cardBg, shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth(), shadowElevation = 1.dp) {
+  1047→        Row(
+  1048→            modifier = Modifier.padding(14.dp),
+  1049→            verticalAlignment = Alignment.CenterVertically
+  1050→        ) {
+  1051→            // Audio icon
+  1052→            Surface(
+  1053→                color = if (disabled) Color(0xFFE2E8F0) else theme.primary.copy(alpha = 0.15f),
+  1054→                shape = RoundedCornerShape(10.dp),
+  1055→                modifier = Modifier.size(44.dp)
+  1056→            ) {
+  1057→                Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
+  1058→                    Icon(
+  1059→                        Icons.Default.Headphones,
+  1060→                        null,
+  1061→                        tint = if (disabled) Color(0xFF94A3B8) else theme.primary,
+  1062→                        modifier = Modifier.size(22.dp)
+  1063→                    )
+  1064→                }
+  1065→            }
+  1066→            Spacer(Modifier.width(12.dp))
+  1067→            // Simple label — no play count shown
+  1068→            Column(modifier = Modifier.weight(1f)) {
+  1069→                Text(
+  1070→                    if (disabled) "Audio locked" else "Tap to play",
+  1071→                    color = if (disabled) Color(0xFF94A3B8) else theme.darkText,
+  1072→                    fontSize = 13.sp,
+  1073→                    fontWeight = FontWeight.SemiBold
+  1074→                )
+  1075→            }
+  1076→            // Play/Pause button — DISABLED after all plays used
+  1077→            IconButton(
+  1078→                onClick = {
+  1079→                    if (disabled) return@IconButton
+  1080→                    sound.click()
+  1081→                    if (isPlaying) {
+  1082→                        // Don't pause — let it finish. Only allow play, not pause.
+  1083→                        return@IconButton
+  1084→                    } else {
+  1085→                        try {
+  1086→                            mediaPlayer?.release()
+  1087→                            val mp = android.media.MediaPlayer().apply {
+  1088→                                setDataSource(url)
+  1089→                                setOnPreparedListener {
+  1090→                                    start()
+  1091→                                    isPlaying = true
+  1092→                                    incrementPlayCount()
+  1093→                                }
+  1094→                                setOnCompletionListener {
+  1095→                                    val currentCount = playCounts?.get(questionId) ?: 0
+  1096→                                    if (currentCount < maxPlays) {
+  1097→                                        scope.launch {
+  1098→                                            if (loopDelaySec > 0) delay(loopDelaySec * 1000L)
+  1099→                                            val latestCount = playCounts?.get(questionId) ?: 0
+  1100→                                            if (latestCount < maxPlays) {
+  1101→                                                incrementPlayCount()
+  1102→                                                start()
+  1103→                                            } else {
+  1104→                                                isPlaying = false
+  1105→                                            }
+  1106→                                        }
+  1107→                                    } else {
+  1108→                                        isPlaying = false
+  1109→                                    }
+  1110→                                }
+  1111→                                setOnErrorListener { _, _, _ ->
+  1112→                                    isPlaying = false
+  1113→                                    true
+  1114→                                }
+  1115→                                prepareAsync()
+  1116→                            }
+  1117→                            mediaPlayer = mp
+  1118→                        } catch (_: Exception) {
+  1119→                            isPlaying = false
+  1120→                        }
+  1121→                    }
+  1122→                },
+  1123→                enabled = !disabled && !isPlaying
+  1124→            ) {
+  1125→                Icon(
+  1126→                    when {
+  1127→                        disabled -> Icons.Default.Lock
+  1128→                        isPlaying -> Icons.Default.VolumeUp
+  1129→                        else -> Icons.Default.PlayArrow
+  1130→                    },
+  1131→                    null,
+  1132→                    tint = if (disabled) Color(0xFFCBD5E1) else theme.primary,
+  1133→                    modifier = Modifier.size(32.dp)
+  1134→                )
+  1135→            }
+  1136→        }
+  1137→    }
+  1138→}
+  1139→
+  1140→// ─── Answer input (different per question type) ───────────────────────────────
+  1141→@Composable
+  1142→fun AnswerInput(
+  1143→    theme: AppTheme,
+  1144→    question: QuestionDetail,
+  1145→    userAnswer: Any?,
+  1146→    feedback: QuestionFeedback?,
+  1147→    onAnswer: (Any) -> Unit
+  1148→) {
+  1149→    val options = question.options ?: emptyList()
+  1150→
+  1151→    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+  1152→        when {
+  1153→            question.type == "SINGLE_CHOICE" || question.type == "TRUE_FALSE" -> {
+  1154→                options.forEachIndexed { i, opt ->
+  1155→                    val selected = userAnswer == opt
+  1156→                    val isCorrectFeedback = feedback?.let { feedback.correctAnswer == opt }
+  1157→                    val isWrongSelected = feedback != null && selected && !feedback.isCorrect
+  1158→                    val bgColor = when {
+  1159→                        isCorrectFeedback == true -> Color(0xFFD4EDDA)
+  1160→                        isWrongSelected -> Color(0xFFFFCDD2)
+  1161→                        selected -> theme.primary.copy(alpha = 0.1f)
+  1162→                        else -> theme.cardBg
+  1163→                    }
+  1164→                    val borderColor = when {
+  1165→                        isCorrectFeedback == true -> Color(0xFF28A745)
+  1166→                        isWrongSelected -> theme.errorRed
+  1167→                        selected -> theme.primary
+  1168→                        else -> theme.divider
+  1169→                    }
+  1170→                    Surface(
+  1171→                        color = bgColor,
+  1172→                        shape = RoundedCornerShape(10.dp),
+  1173→                        border = androidx.compose.foundation.BorderStroke(1.5.dp, borderColor),
+  1174→                        modifier = Modifier.fillMaxWidth().clickable {
+  1175→                            if (feedback == null) onAnswer(opt)
+  1176→                        }
+  1177→                    ) {
+  1178→                        Row(modifier = Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
+  1179→                            Surface(
+  1180→                                color = if (selected) theme.primary else Color.Transparent,
+  1181→                                shape = RoundedCornerShape(50),
+  1182→                                modifier = Modifier.size(20.dp)
+  1183→                            ) {
+  1184→                                if (selected) {
+  1185→                                    Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
+  1186→                                        Icon(Icons.Default.Check, null, tint = Color.White, modifier = Modifier.size(14.dp))
+  1187→                                    }
+  1188→                                }
+  1189→                            }
+  1190→                            Spacer(Modifier.width(12.dp))
+  1191→                            Text(opt, color = theme.darkText, fontSize = 15.sp, fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f))
+  1192→                            if (isCorrectFeedback == true) {
+  1193→                                Icon(Icons.Default.CheckCircle, null, tint = Color(0xFF28A745))
+  1194→                            } else if (isWrongSelected) {
+  1195→                                Icon(Icons.Default.Cancel, null, tint = theme.errorRed)
+  1196→                            }
+  1197→                        }
+  1198→                    }
+  1199→                }
+  1200→            }
+  1201→            question.type == "MULTIPLE_CHOICE" -> {
+  1202→                val selectedList = (userAnswer as? List<*>)?.filterIsInstance<String>() ?: emptyList()
+  1203→                options.forEachIndexed { i, opt ->
+  1204→                    val selected = selectedList.contains(opt)
+  1205→                    Surface(
+  1206→                        color = if (selected) theme.primary.copy(alpha = 0.1f) else theme.cardBg,
+  1207→                        shape = RoundedCornerShape(10.dp),
+  1208→                        border = androidx.compose.foundation.BorderStroke(1.5.dp, if (selected) theme.primary else theme.divider),
+  1209→                        modifier = Modifier.fillMaxWidth().clickable {
+  1210→                            val newList = if (selected) selectedList - opt else selectedList + opt
+  1211→                            onAnswer(newList)
+  1212→                        }
+  1213→                    ) {
+  1214→                        Row(modifier = Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
+  1215→                            Surface(
+  1216→                                color = if (selected) theme.primary else Color.Transparent,
+  1217→                                shape = RoundedCornerShape(4.dp),
+  1218→                                modifier = Modifier.size(20.dp)
+  1219→                            ) {
+  1220→                                if (selected) {
+  1221→                                    Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
+  1222→                                        Icon(Icons.Default.Check, null, tint = Color.White, modifier = Modifier.size(14.dp))
+  1223→                                    }
+  1224→                                }
+  1225→                            }
+  1226→                            Spacer(Modifier.width(12.dp))
+  1227→                            Text(opt, color = theme.darkText, fontSize = 15.sp, fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f))
+  1228→                        }
+  1229→                    }
+  1230→                }
+  1231→            }
+  1232→            else -> {
+  1233→                // ONE_WORD / SHORT_ANSWER / FILL_BLANK
+  1234→                OutlinedTextField(
+  1235→                    value = (userAnswer as? String) ?: "",
+  1236→                    onValueChange = { onAnswer(it) },
+  1237→                    label = { Text("Your answer") },
+  1238→                    modifier = Modifier.fillMaxWidth(),
+  1239→                    colors = OutlinedTextFieldDefaults.colors(
+  1240→                        focusedTextColor = theme.darkText,
+  1241→                        unfocusedTextColor = theme.darkText,
+  1242→                        focusedBorderColor = theme.primary,
+  1243→                        unfocusedBorderColor = theme.divider,
+  1244→                        cursorColor = theme.primary
+  1245→                    ),
+  1246→                    shape = RoundedCornerShape(10.dp),
+  1247→                    singleLine = true
+  1248→                )
+  1249→            }
+  1250→        }
+  1251→    }
+  1252→}
+  1253→
+  1254→// ─── Async image (loads from URL using Coil) ─────────────────────────────────
+  1255→@Composable
+  1256→fun AsyncImage(url: String, modifier: Modifier = Modifier) {
+  1257→    val theme = rememberAppTheme()
+  1258→    if (url.isBlank()) {
+  1259→        Box(modifier = modifier.background(Color(0xFFE0E0E0)), contentAlignment = Alignment.Center) {
+  1260→            Icon(Icons.Default.Image, null, tint = Color.Gray, modifier = Modifier.size(32.dp))
+  1261→        }
+  1262→        return
+  1263→    }
+  1264→    coil.compose.AsyncImage(
+  1265→        model = url,
+  1266→        contentDescription = null,
+  1267→        modifier = modifier,
+  1268→        contentScale = androidx.compose.ui.layout.ContentScale.Crop
+  1269→    )
+  1270→}
+  1271→
+  1272→// ─── Result screen ────────────────────────────────────────────────────────────
+  1273→@Composable
+  1274→fun ExamResultScreen(
+  1275→    theme: AppTheme,
+  1276→    result: SubmitResponse,
+  1277→    onExit: () -> Unit,
+  1278→    sound: SoundManager,
+  1279→    examTitle: String = "Exam",
+  1280→    examDescription: String? = null,
+  1281→) {
+  1282→    val context = LocalContext.current
+  1283→
+  1284→    // ── FORCE PORTRAIT for the result screen ────────────────────────────
+  1285→    DisposableEffect(Unit) {
+  1286→        val activity = context as? Activity
+  1287→        activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+  1288→        onDispose { }
+  1289→    }
+  1290→    LaunchedEffect(Unit) {
+  1291→        kotlinx.coroutines.delay(100)
+  1292→        val activity = context as? Activity
+  1293→        activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+  1294→    }
+  1295→
+  1296→    LaunchedEffect(Unit) { sound.success() }
+  1297→
+  1298→    // ── MARKS CALCULATION ──────────────────────────────────────────────
+  1299→    // Each question = 2.5 marks. Total marks = questionCount × 2.5.
+  1300→    // Example: 40 questions = 100 marks total.
+  1301→    // The server returns score = number of correct answers, so we convert
+  1302→    // to marks by multiplying by 2.5.
+  1303→    val MARKS_PER_QUESTION = 2.5
+  1304→    val correctCount = result.review.count { it.isCorrect }
+  1305→    val incorrectCount = result.review.size - correctCount
+  1306→    val unansweredCount = result.review.count { it.userAnswer == null }
+  1307→    val totalQuestions = result.review.size
+  1308→    val totalMarks = totalQuestions * MARKS_PER_QUESTION
+  1309→    val obtainedMarks = correctCount * MARKS_PER_QUESTION
+  1310→    val pct = if (totalMarks > 0) (obtainedMarks / totalMarks * 100).toInt() else 0
+  1311→    val passed = pct >= 40
+  1312→
+  1313→    // ── Animation states ──────────────────────────────────────────────────
+  1314→    var showScore by remember { mutableStateOf(false) }
+  1315→    var showStats by remember { mutableStateOf(false) }
+  1316→    var showReviewSection by remember { mutableStateOf(false) }
+  1317→    val animatedScore = animateFloatAsState(
+  1318→        targetValue = if (showScore && totalMarks > 0) (obtainedMarks / totalMarks).toFloat() else 0f,
+  1319→        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessLow),
+  1320→        label = "scoreAnim",
+  1321→    )
+  1322→    val statsAlpha by animateFloatAsState(
+  1323→        targetValue = if (showStats) 1f else 0f,
+  1324→        animationSpec = tween(durationMillis = 600, delayMillis = 300),
+  1325→        label = "statsAlpha",
+  1326→    )
+  1327→    val reviewAlpha by animateFloatAsState(
+  1328→        targetValue = if (showReviewSection) 1f else 0f,
+  1329→        animationSpec = tween(durationMillis = 400),
+  1330→        label = "reviewAlpha",
+  1331→    )
+  1332→
+  1333→    LaunchedEffect(Unit) {
+  1334→        delay(200)
+  1335→        showScore = true
+  1336→        delay(400)
+  1337→        showStats = true
+  1338→    }
+  1339→
+  1340→    LazyColumn(
+  1341→        modifier = Modifier.fillMaxSize().background(theme.background).padding(16.dp),
+  1342→        verticalArrangement = Arrangement.spacedBy(12.dp)
+  1343→    ) {
+  1344→        // ── DreamKorea logo at top centre ──────────────────────────────
+  1345→        item {
+  1346→            Box(
+  1347→                modifier = Modifier.fillMaxWidth(),
+  1348→                contentAlignment = Alignment.Center
+  1349→            ) {
+  1350→                Row(verticalAlignment = Alignment.CenterVertically) {
+  1351→                    Image(
+  1352→                        painter = painterResource(id = app.dreamkorea.smartclass.R.drawable.dreamkorea_logo),
+  1353→                        contentDescription = "DreamKorea Logo",
+  1354→                        modifier = Modifier.size(40.dp),
+  1355→                        contentScale = ContentScale.Fit
+  1356→                    )
+  1357→                    Spacer(Modifier.width(10.dp))
+  1358→                    Text(
+  1359→                        "DreamKorea SmartClass",
+  1360→                        color = theme.primary,
+  1361→                        fontSize = 18.sp,
+  1362→                        fontWeight = FontWeight.Bold,
+  1363→                    )
+  1364→                }
+  1365→            }
+  1366→        }
+  1367→
+  1368→        // ── Exam title + description ──────────────────────────────────────
+  1369→        item {
+  1370→            Surface(
+  1371→                color = theme.primary,
+  1372→                shape = RoundedCornerShape(16.dp),
+  1373→                modifier = Modifier.fillMaxWidth(),
+  1374→                shadowElevation = 4.dp
+  1375→            ) {
+  1376→                Column(modifier = Modifier.padding(16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+  1377→                    Text(
+  1378→                        examTitle,
+  1379→                        color = Color.White,
+  1380→                        fontSize = 18.sp,
+  1381→                        fontWeight = FontWeight.Bold,
+  1382→                        maxLines = 2,
+  1383→                        overflow = TextOverflow.Ellipsis,
+  1384→                        textAlign = TextAlign.Center,
+  1385→                    )
+  1386→                    if (!examDescription.isNullOrBlank()) {
+  1387→                        Spacer(Modifier.height(4.dp))
+  1388→                        Text(
+  1389→                            examDescription,
+  1390→                            color = Color.White.copy(alpha = 0.85f),
+  1391→                            fontSize = 12.sp,
+  1392→                            maxLines = 2,
+  1393→                            overflow = TextOverflow.Ellipsis,
+  1394→                            textAlign = TextAlign.Center,
+  1395→                        )
+  1396→                    }
+  1397→                    Spacer(Modifier.height(6.dp))
+  1398→                    Surface(color = Color.White.copy(alpha = 0.2f), shape = RoundedCornerShape(6.dp)) {
+  1399→                        Text(
+  1400→                            "Exam Completed",
+  1401→                            color = Color.White,
+  1402→                            fontSize = 10.sp,
+  1403→                            fontWeight = FontWeight.Bold,
+  1404→                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
+  1405→                        )
+  1406→                    }
+  1407→                }
+  1408→            }
+  1409→        }
+  1410→
+  1411→        // ── Score card (animated) ─────────────────────────────────────────
+  1412→        item {
+  1413→            Surface(
+  1414→                color = theme.cardBg,
+  1415→                shape = RoundedCornerShape(20.dp),
+  1416→                modifier = Modifier.fillMaxWidth(),
+  1417→                shadowElevation = 3.dp
+  1418→            ) {
+  1419→                Column(modifier = Modifier.padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+  1420→                    // Pass/Fail icon (animated scale-in)
+  1421→                    val iconScale by animateFloatAsState(
+  1422→                        targetValue = if (showScore) 1f else 0f,
+  1423→                        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy),
+  1424→                        label = "iconScale",
+  1425→                    )
+  1426→                    Surface(
+  1427→                        color = if (passed) Color(0xFF4CAF50) else theme.errorRed,
+  1428→                        shape = RoundedCornerShape(50),
+  1429→                        modifier = Modifier.size(80.dp).scale(iconScale)
+  1430→                    ) {
+  1431→                        Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
+  1432→                            Icon(
+  1433→                                if (passed) Icons.Default.Check else Icons.Default.Close,
+  1434→                                null,
+  1435→                                tint = Color.White,
+  1436→                                modifier = Modifier.size(40.dp)
+  1437→                            )
+  1438→                        }
+  1439→                    }
+  1440→                    Spacer(Modifier.height(16.dp))
+  1441→                    Text(
+  1442→                        if (passed) "Congratulations!" else "Keep practicing",
+  1443→                        color = theme.darkText,
+  1444→                        fontSize = 20.sp,
+  1445→                        fontWeight = FontWeight.Bold
+  1446→                    )
+  1447→                    Spacer(Modifier.height(8.dp))
+  1448→                    // Animated percentage
+  1449→                    val animatedPct = (animatedScore.value * 100).toInt()
+  1450→                    Text(
+  1451→                        "$animatedPct%",
+  1452→                        color = if (passed) Color(0xFF4CAF50) else theme.errorRed,
+  1453→                        fontSize = 40.sp,
+  1454→                        fontWeight = FontWeight.Bold
+  1455→                    )
+  1456→                    Text("${obtainedMarks} / $totalMarks marks", color = theme.subText, fontSize = 13.sp)
+  1457→                    Spacer(Modifier.height(16.dp))
+  1458→
+  1459→                    // ── Stats row (total marks, correct, incorrect, unanswered) ──
+  1460→                    Row(
+  1461→                        modifier = Modifier.fillMaxWidth().alpha(statsAlpha),
+  1462→                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+  1463→                    ) {
+  1464→                        StatBox("Total", "$totalMarks", Color(0xFF6A1B9A), Modifier.weight(1f))
+  1465→                        StatBox("Obtained", "$obtainedMarks", Color(0xFF4CAF50), Modifier.weight(1f))
+  1466→                        StatBox("Wrong", "$incorrectCount", theme.errorRed, Modifier.weight(1f))
+  1467→                        StatBox("Skipped", "$unansweredCount", Color(0xFFFF9800), Modifier.weight(1f))
+  1468→                    }
+  1469→                    Spacer(Modifier.height(16.dp))
+  1470→
+  1471→                    // ── Action buttons ────────────────────────────────────────
+  1472→                    Row(
+  1473→                        modifier = Modifier.fillMaxWidth(),
+  1474→                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+  1475→                    ) {
+  1476→                        OutlinedButton(
+  1477→                            onClick = { sound.click(); showReviewSection = !showReviewSection },
+  1478→                            modifier = Modifier.weight(1f).height(48.dp),
+  1479→                            shape = RoundedCornerShape(10.dp),
+  1480→                            colors = ButtonDefaults.outlinedButtonColors(contentColor = theme.primary),
+  1481→                            border = androidx.compose.foundation.BorderStroke(1.5.dp, theme.primary)
+  1482→                        ) {
+  1483→                            Icon(
+  1484→                                if (showReviewSection) Icons.Default.VisibilityOff else Icons.Default.Visibility,
+  1485→                                null,
+  1486→                                modifier = Modifier.size(18.dp)
+  1487→                            )
+  1488→                            Spacer(Modifier.width(6.dp))
+  1489→                            Text(
+  1490→                                if (showReviewSection) "Hide Review" else "Review Exam",
+  1491→                                fontWeight = FontWeight.SemiBold,
+  1492→                                fontSize = 13.sp
+  1493→                            )
+  1494→                        }
+  1495→                        Button(
+  1496→                            onClick = { sound.click(); onExit() },
+  1497→                            modifier = Modifier.weight(1f).height(48.dp),
+  1498→                            shape = RoundedCornerShape(10.dp),
+  1499→                            colors = ButtonDefaults.buttonColors(containerColor = theme.primary)
+  1500→                        ) {
+  1501→                            Icon(Icons.Default.Home, null, modifier = Modifier.size(18.dp))
+  1502→                            Spacer(Modifier.width(6.dp))
+  1503→                            Text("Back to Tests", fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+  1504→                        }
+  1505→                    }
+  1506→                }
+  1507→            }
+  1508→        }
+  1509→
+  1510→        // ── Per-question review (collapsible) ─────────────────────────────
+  1511→        if (showReviewSection) {
+  1512→            item {
+  1513→                Row(
+  1514→                    modifier = Modifier.fillMaxWidth().alpha(reviewAlpha),
+  1515→                    verticalAlignment = Alignment.CenterVertically
+  1516→                ) {
+  1517→                    Icon(Icons.Default.List, null, tint = theme.primary, modifier = Modifier.size(20.dp))
+  1518→                    Spacer(Modifier.width(6.dp))
+  1519→                    Text(
+  1520→                        "Question Review (${result.review.size})",
+  1521→                        color = theme.darkText,
+  1522→                        fontSize = 16.sp,
+  1523→                        fontWeight = FontWeight.Bold
+  1524→                    )
+  1525→                }
+  1526→            }
+  1527→            itemsIndexed(result.review) { idx, review ->
+  1528→                ReviewCard(theme, review, idx + 1, sound)
+  1529→            }
+  1530→        }
+  1531→    }
+  1532→}
+  1533→
+  1534→@Composable
+  1535→private fun StatBox(label: String, value: String, color: Color, modifier: Modifier = Modifier) {
+  1536→    Surface(
+  1537→        color = color.copy(alpha = 0.08f),
+  1538→        shape = RoundedCornerShape(10.dp),
+  1539→        border = androidx.compose.foundation.BorderStroke(1.dp, color.copy(alpha = 0.3f)),
+  1540→        modifier = modifier
+  1541→    ) {
+  1542→        Column(
+  1543→            modifier = Modifier.padding(vertical = 10.dp, horizontal = 6.dp),
+  1544→            horizontalAlignment = Alignment.CenterHorizontally
+  1545→        ) {
+  1546→            Text(value, color = color, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+  1547→            Text(label, color = Color(0xFF64748B), fontSize = 9.sp, fontWeight = FontWeight.Medium)
+  1548→        }
+  1549→    }
+  1550→}
+  1551→
+  1552→@Composable
+  1553→fun ReviewCard(theme: AppTheme, review: ReviewItem, questionNumber: Int = 0, sound: SoundManager? = null) {
+  1554→    Surface(
+  1555→        color = theme.cardBg,
+  1556→        shape = RoundedCornerShape(12.dp),
+  1557→        modifier = Modifier.fillMaxWidth(),
+  1558→        shadowElevation = 1.dp
+  1559→    ) {
+  1560→        Column(modifier = Modifier.padding(14.dp)) {
+  1561→            // ── Header: question number + correct/incorrect badge ─────────
+  1562→            Row(verticalAlignment = Alignment.CenterVertically) {
+  1563→                if (questionNumber > 0) {
+  1564→                    Surface(
+  1565→                        color = if (review.isCorrect) Color(0xFF4CAF50).copy(alpha = 0.15f) else theme.errorRed.copy(alpha = 0.15f),
+  1566→                        shape = RoundedCornerShape(6.dp)
+  1567→                    ) {
+  1568→                        Text(
+  1569→                            "Q$questionNumber",
+  1570→                            color = if (review.isCorrect) Color(0xFF4CAF50) else theme.errorRed,
+  1571→                            fontSize = 11.sp,
+  1572→                            fontWeight = FontWeight.Bold,
+  1573→                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+  1574→                        )
+  1575→                    }
+  1576→                    Spacer(Modifier.width(8.dp))
+  1577→                }
+  1578→                Icon(
+  1579→                    if (review.isCorrect) Icons.Default.CheckCircle else Icons.Default.Cancel,
+  1580→                    null,
+  1581→                    tint = if (review.isCorrect) Color(0xFF4CAF50) else theme.errorRed,
+  1582→                    modifier = Modifier.size(20.dp)
+  1583→                )
+  1584→                Spacer(Modifier.width(6.dp))
+  1585→                Text(
+  1586→                    if (review.isCorrect) "Correct" else "Incorrect",
+  1587→                    color = if (review.isCorrect) Color(0xFF4CAF50) else theme.errorRed,
+  1588→                    fontSize = 12.sp,
+  1589→                    fontWeight = FontWeight.SemiBold
+  1590→                )
+  1591→                Spacer(Modifier.weight(1f))
+  1592→                if (review.userAnswer == null) {
+  1593→                    Surface(color = Color(0xFFFF9800).copy(alpha = 0.15f), shape = RoundedCornerShape(6.dp)) {
+  1594→                        Text(
+  1595→                            "Skipped",
+  1596→                            color = Color(0xFFFF9800),
+  1597→                            fontSize = 9.sp,
+  1598→                            fontWeight = FontWeight.Bold,
+  1599→                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+  1600→                        )
+  1601→                    }
+  1602→                }
+  1603→            }
+  1604→            Spacer(Modifier.height(8.dp))
+  1605→
+  1606→            // ── Question title (if set by admin) ────────────────────────
+  1607→            if (!review.title.isNullOrBlank()) {
+  1608→                Surface(
+  1609→                    color = theme.primary.copy(alpha = 0.1f),
+  1610→                    shape = RoundedCornerShape(6.dp),
+  1611→                    modifier = Modifier.fillMaxWidth()
+  1612→                ) {
+  1613→                    Text(
+  1614→                        review.title,
+  1615→                        color = theme.primary,
+  1616→                        fontSize = 12.sp,
+  1617→                        fontWeight = FontWeight.Bold,
+  1618→                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+  1619→                    )
+  1620→                }
+  1621→                Spacer(Modifier.height(6.dp))
+  1622→            }
+  1623→
+  1624→            // ── Question stem ─────────────────────────────────────────────
+  1625→            Text(
+  1626→                review.stem.take(300),
+  1627→                color = theme.darkText,
+  1628→                fontSize = 13.sp,
+  1629→                fontWeight = FontWeight.Medium
+  1630→            )
+  1631→            // Image (if any)
+  1632→            if (!review.imageUrl.isNullOrBlank()) {
+  1633→                Spacer(Modifier.height(8.dp))
+  1634→                val imgAbs = review.imageUrl!!.toAbsoluteUrl()
+  1635→                coil.compose.AsyncImage(
+  1636→                    model = imgAbs,
+  1637→                    contentDescription = "Question image",
+  1638→                    modifier = Modifier.fillMaxWidth().heightIn(max = 180.dp).clip(RoundedCornerShape(8.dp)),
+  1639→                    contentScale = ContentScale.Fit,
+  1640→                )
+  1641→            }
+  1642→            // Audio (if any) — let student replay the question audio during review
+  1643→            if (!review.audioUrl.isNullOrBlank()) {
+  1644→                Spacer(Modifier.height(8.dp))
+  1645→                val audAbs = review.audioUrl!!.toAbsoluteUrl()
+  1646→                AudioPlayerCard(theme = theme, url = audAbs, loopCount = review.audioLoop.coerceAtLeast(1), loopDelaySec = review.audioLoopDelay, sound = sound ?: rememberSoundManager())
+  1647→            }
+  1648→            Spacer(Modifier.height(8.dp))
+  1649→
+  1650→            // ── Options with correct/wrong highlighting ──────────────────
+  1651→            // If option is an image URL, render as image; otherwise render as text.
+  1652→            review.options?.let { opts ->
+  1653→                opts.forEachIndexed { i, opt ->
+  1654→                    val isUserAns = (review.userAnswer == opt) || ((review.userAnswer as? List<*>)?.contains(opt) == true)
+  1655→                    val isCorrectAns = (review.correctAnswer == opt) || ((review.correctAnswer as? List<*>)?.contains(opt) == true)
+  1656→                    val bg = when {
+  1657→                        isCorrectAns -> Color(0xFFD4EDDA)
+  1658→                        isUserAns && !isCorrectAns -> Color(0xFFFFCDD2)
+  1659→                        else -> Color.Transparent
+  1660→                    }
+  1661→                    val borderColor = when {
+  1662→                        isCorrectAns -> Color(0xFF28A745)
+  1663→                        isUserAns && !isCorrectAns -> theme.errorRed
+  1664→                        else -> Color(0xFFE0E0E0)
+  1665→                    }
+  1666→                    // Check if this option is an image URL or audio URL
+  1667→                    val optImg = review.optionImages.getOrNull(i)?.takeIf { it.isNotBlank() }
+  1668→                    val optAud = review.optionAudios.getOrNull(i)?.takeIf { it.isNotBlank() }
+  1669→                    val isImageUrl = optImg != null || opt.startsWith("http") || opt.startsWith("/api/files") || opt.startsWith("/uploads")
+  1670→                    val isAudioUrl = optAud != null
+  1671→                    Surface(
+  1672→                        color = bg,
+  1673→                        shape = RoundedCornerShape(6.dp),
+  1674→                        border = androidx.compose.foundation.BorderStroke(1.dp, borderColor),
+  1675→                        modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp)
+  1676→                    ) {
+  1677→                        Row(modifier = Modifier.padding(8.dp), verticalAlignment = Alignment.CenterVertically) {
+  1678→                            Text("${'A' + i}.", color = theme.subText, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+  1679→                            Spacer(Modifier.width(8.dp))
+  1680→                            if (isAudioUrl) {
+  1681→                                val audUrl = optAud!!.toAbsoluteUrl()
+  1682→                                AudioPlayerCard(theme = theme, url = audUrl, loopCount = 1, loopDelaySec = 0, sound = sound ?: rememberSoundManager())
+  1683→                            } else if (isImageUrl) {
+  1684→                                // Render as image — use optionImages if available, otherwise the option text IS the URL
+  1685→                                val imgUrl = (optImg ?: opt).toAbsoluteUrl()
+  1686→                                coil.compose.AsyncImage(
+  1687→                                    model = imgUrl,
+  1688→                                    contentDescription = "Option ${'A' + i}",
+  1689→                                    modifier = Modifier.weight(1f).heightIn(max = 120.dp).clip(RoundedCornerShape(6.dp)),
+  1690→                                    contentScale = ContentScale.Fit,
+  1691→                                )
+  1692→                            } else {
+  1693→                                // Render as text
+  1694→                                Text(opt, color = theme.darkText, fontSize = 13.sp, fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f))
+  1695→                            }
+  1696→                            if (isCorrectAns) {
+  1697→                                Icon(Icons.Default.Check, null, tint = Color(0xFF28A745), modifier = Modifier.size(14.dp))
+  1698→                            } else if (isUserAns && !isCorrectAns) {
+  1699→                                Icon(Icons.Default.Close, null, tint = theme.errorRed, modifier = Modifier.size(14.dp))
+  1700→                            }
+  1701→                        }
+  1702→                    }
+  1703→                }
+  1704→            }
+  1705→
+  1706→            // ── User answer vs correct answer summary ─────────────────────
+  1707→            Spacer(Modifier.height(8.dp))
+  1708→            Row(modifier = Modifier.fillMaxWidth()) {
+  1709→                Surface(
+  1710→                    color = theme.errorRed.copy(alpha = 0.05f),
+  1711→                    shape = RoundedCornerShape(6.dp),
+  1712→                    modifier = Modifier.weight(1f)
+  1713→                ) {
+  1714→                    Column(modifier = Modifier.padding(8.dp)) {
+  1715→                        Text("Your Answer", color = theme.subText, fontSize = 9.sp, fontWeight = FontWeight.SemiBold)
+  1716→                        AnswerDisplay(review.userAnswer, theme, sound)
+  1717→                    }
+  1718→                }
+  1719→                Spacer(Modifier.width(6.dp))
+  1720→                Surface(
+  1721→                    color = Color(0xFF4CAF50).copy(alpha = 0.05f),
+  1722→                    shape = RoundedCornerShape(6.dp),
+  1723→                    modifier = Modifier.weight(1f)
+  1724→                ) {
+  1725→                    Column(modifier = Modifier.padding(8.dp)) {
+  1726→                        Text("Correct Answer", color = Color(0xFF4CAF50), fontSize = 9.sp, fontWeight = FontWeight.SemiBold)
+  1727→                        AnswerDisplay(review.correctAnswer, theme, sound)
+  1728→                    }
+  1729→                }
+  1730→            }
+  1731→
+  1732→            // ── Explanation ───────────────────────────────────────────────
+  1733→            if (!review.explanation.isNullOrBlank()) {
+  1734→                Spacer(Modifier.height(8.dp))
+  1735→                Surface(color = theme.primary.copy(alpha = 0.05f), shape = RoundedCornerShape(6.dp)) {
+  1736→                    Column(modifier = Modifier.padding(8.dp)) {
+  1737→                        Row(verticalAlignment = Alignment.CenterVertically) {
+  1738→                            Icon(Icons.Default.Lightbulb, null, tint = theme.primary, modifier = Modifier.size(14.dp))
+  1739→                            Spacer(Modifier.width(4.dp))
+  1740→                            Text("Explanation", color = theme.primary, fontSize = 10.sp, fontWeight = FontWeight.SemiBold)
+  1741→                        }
+  1742→                        Spacer(Modifier.height(4.dp))
+  1743→                        Text(review.explanation, color = theme.darkText, fontSize = 12.sp)
+  1744→                    }
+  1745→                }
+  1746→            }
+  1747→        }
+  1748→    }
+  1749→}
+  1750→
+  1751→/** Formats an answer (String or List<String>) for display. */
+  1752→private fun formatAnswer(answer: Any?): String? {
+  1753→    if (answer == null) return null
+  1754→    return when (answer) {
+  1755→        is String -> answer
+  1756→        is List<*> -> answer.joinToString(", ")
+  1757→        else -> answer.toString()
+  1758→    }
+  1759→}
+  1760→
+  1761→/// Renders an answer — shows media (image/audio) for URL answers, text otherwise.
+  1762→@Composable
+  1763→private fun AnswerDisplay(answer: Any?, theme: AppTheme, sound: SoundManager? = null) {
+  1764→    if (answer == null) {
+  1765→        Text("—", color = theme.subText, fontSize = 12.sp)
+  1766→        return
+  1767→    }
+  1768→    when (answer) {
+  1769→        is String -> {
+  1770→            val url = answer.trim()
+  1771→            if (url.startsWith("http") && (url.contains(".jpg") || url.contains(".jpeg") || url.contains(".png") || url.contains(".gif") || url.contains(".webp"))) {
+  1772→                coil.compose.AsyncImage(
+  1773→                    model = url, contentDescription = "Answer image",
+  1774→                    modifier = Modifier.fillMaxWidth().heightIn(max = 80.dp).clip(RoundedCornerShape(6.dp)),
+  1775→                    contentScale = ContentScale.Fit
+  1776→                )
+  1777→            } else if (url.startsWith("http") && (url.contains(".mp3") || url.contains(".wav") || url.contains(".ogg") || url.contains(".m4a"))) {
+  1778→                AudioPlayerCard(theme = theme, url = url, loopCount = 1, loopDelaySec = 0, sound = sound ?: rememberSoundManager())
+  1779→            } else {
+  1780→                Text(url, color = theme.darkText, fontSize = 12.sp, fontWeight = FontWeight.Medium)
+  1781→            }
+  1782→        }
+  1783→        is List<*> -> {
+  1784→            Column { answer.forEach { Text(it?.toString() ?: "", color = theme.darkText, fontSize = 12.sp) } }
+  1785→        }
+  1786→        else -> Text(answer.toString(), color = theme.darkText, fontSize = 12.sp)
+  1787→    }
+  1788→}
+  1789→
+  1790→@Composable
+  1791→fun AnswerInputBlock(
+  1792→    theme: AppTheme,
+  1793→    question: QuestionDetail,
+  1794→    userAnswer: Any?,
+  1795→    feedback: QuestionFeedback?,
+  1796→    sound: SoundManager,
+  1797→    onAnswer: (Any) -> Unit
+  1798→) {
+  1799→    val options = question.options ?: emptyList()
+  1800→    val optionImgs = question.optionImages
+  1801→    val optionAuds = question.optionAudios
+  1802→
+  1803→    when (question.answerType) {
+  1804→        "text", "choose" -> {
+  1805→            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+  1806→                options.forEachIndexed { i, opt ->
+  1807→                    val selected = userAnswer == opt
+  1808→                    val isCorrectFeedback = feedback?.let { i == question.correctOption }
+  1809→                    val isWrongSelected = feedback != null && selected && !feedback.isCorrect
+  1810→                    val bgColor = when {
+  1811→                        isCorrectFeedback == true -> Color(0xFFD4EDDA)
+  1812→                        isWrongSelected -> Color(0xFFFFCDD2)
+  1813→                        selected -> theme.primary.copy(alpha = 0.1f)
+  1814→                        else -> theme.cardBg
+  1815→                    }
+  1816→                    val borderColor = when {
+  1817→                        isCorrectFeedback == true -> Color(0xFF28A745)
+  1818→                        isWrongSelected -> theme.errorRed
+  1819→                        selected -> theme.primary
+  1820→                        else -> theme.divider
+  1821→                    }
+  1822→                    Surface(
+  1823→                        color = bgColor,
+  1824→                        shape = RoundedCornerShape(10.dp),
+  1825→                        border = androidx.compose.foundation.BorderStroke(1.5.dp, borderColor),
+  1826→                        modifier = Modifier.fillMaxWidth().clickable {
+  1827→                            if (feedback == null) { sound.click(); onAnswer(opt) }
+  1828→                        }
+  1829→                    ) {
+  1830→                        Row(modifier = Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
+  1831→                            Surface(color = if (selected) theme.primary else Color.Transparent, shape = RoundedCornerShape(50), modifier = Modifier.size(20.dp)) {
+  1832→                                if (selected) { Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) { Icon(Icons.Default.Check, null, tint = Color.White, modifier = Modifier.size(14.dp)) } }
+  1833→                            }
+  1834→                            Spacer(Modifier.width(12.dp))
+  1835→                            Text(opt, color = theme.darkText, fontSize = 15.sp, fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f))
+  1836→                        }
+  1837→                    }
+  1838→                }
+  1839→            }
+  1840→        }
+  1841→        "image" -> {
+  1842→            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+  1843→                optionImgs.forEachIndexed { i, imgUrl ->
+  1844→                    if (imgUrl.isBlank()) return@forEachIndexed
+  1845→                    val selected = userAnswer == imgUrl
+  1846→                    val isCorrectFeedback = feedback?.let { i == question.correctOption }
+  1847→                    val isWrongSelected = feedback != null && selected && !feedback.isCorrect
+  1848→                    val borderColor = when {
+  1849→                        isCorrectFeedback == true -> Color(0xFF28A745)
+  1850→                        isWrongSelected -> theme.errorRed
+  1851→                        selected -> theme.primary
+  1852→                        else -> theme.divider
+  1853→                    }
+  1854→                    Surface(
+  1855→                        color = if (selected) theme.primary.copy(alpha = 0.05f) else theme.cardBg,
+  1856→                        shape = RoundedCornerShape(12.dp),
+  1857→                        border = androidx.compose.foundation.BorderStroke(2.dp, borderColor),
+  1858→                        modifier = Modifier.fillMaxWidth().clickable {
+  1859→                            if (feedback == null) { sound.click(); onAnswer(imgUrl) }
+  1860→                        }
+  1861→                    ) {
+  1862→                        Row(modifier = Modifier.padding(8.dp), verticalAlignment = Alignment.CenterVertically) {
+  1863→                            coil.compose.AsyncImage(
+  1864→                                model = imgUrl.toAbsoluteUrl(),
+  1865→                                contentDescription = null,
+  1866→                                modifier = Modifier.size(72.dp).clip(RoundedCornerShape(8.dp)),
+  1867→                                contentScale = ContentScale.Fit
+  1868→                            )
+  1869→                            Spacer(Modifier.width(12.dp))
+  1870→                            Text(question.options?.getOrNull(i) ?: "Option ${'A' + i}", color = theme.darkText, fontSize = 14.sp, fontWeight = FontWeight.Medium)
+  1871→                            Spacer(Modifier.weight(1f))
+  1872→                            if (selected) { Icon(Icons.Default.CheckCircle, null, tint = theme.primary, modifier = Modifier.size(20.dp)) }
+  1873→                        }
+  1874→                    }
+  1875→                }
+  1876→            }
+  1877→        }
+  1878→        "audio" -> {
+  1879→            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+  1880→                optionAuds.forEachIndexed { i, audUrl ->
+  1881→                    if (audUrl.isBlank()) return@forEachIndexed
+  1882→                    val selected = userAnswer == audUrl
+  1883→                    val isCorrectFeedback = feedback?.let { i == question.correctOption }
+  1884→                    val isWrongSelected = feedback != null && selected && !feedback.isCorrect
+  1885→                    val borderColor = when {
+  1886→                        isCorrectFeedback == true -> Color(0xFF28A745)
+  1887→                        isWrongSelected -> theme.errorRed
+  1888→                        selected -> theme.primary
+  1889→                        else -> theme.divider
+  1890→                    }
+  1891→                    Surface(
+  1892→                        color = if (selected) theme.primary.copy(alpha = 0.05f) else theme.cardBg,
+  1893→                        shape = RoundedCornerShape(10.dp),
+  1894→                        border = androidx.compose.foundation.BorderStroke(1.5.dp, borderColor),
+  1895→                        modifier = Modifier.fillMaxWidth().clickable {
+  1896→                            if (feedback == null) { sound.click(); onAnswer(audUrl) }
+  1897→                        }
+  1898→                    ) {
+  1899→                        Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+  1900→                            Text(question.options?.getOrNull(i) ?: "Audio ${'A' + i}", color = theme.darkText, fontSize = 14.sp, fontWeight = FontWeight.Medium)
+  1901→                            Spacer(Modifier.weight(1f))
+  1902→                            if (selected) { Icon(Icons.Default.CheckCircle, null, tint = theme.primary, modifier = Modifier.size(20.dp)) }
+  1903→                        }
+  1904→                    }
+  1905→                }
+  1906→            }
+  1907→        }
+  1908→        else -> {
+  1909→            // Fallback: text options
+  1910→            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+  1911→                options.forEachIndexed { i, opt ->
+  1912→                    val selected = userAnswer == opt
+  1913→                    Surface(
+  1914→                        color = if (selected) theme.primary.copy(alpha = 0.1f) else theme.cardBg,
+  1915→                        shape = RoundedCornerShape(10.dp),
+  1916→                        border = androidx.compose.foundation.BorderStroke(1.5.dp, if (selected) theme.primary else theme.divider),
+  1917→                        modifier = Modifier.fillMaxWidth().clickable { if (feedback == null) { sound.click(); onAnswer(opt) } }
+  1918→                    ) {
+  1919→                        Row(modifier = Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
+  1920→                            Text(opt, color = theme.darkText, fontSize = 15.sp, fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f))
+  1921→                        }
+  1922→                    }
+  1923→                }
+  1924→            }
+  1925→        }
+  1926→    }
+  1927→}
+  1928→
+  1929→fun String.toAbsoluteUrl(): String {
+  1930→    if (this.startsWith("http://") || this.startsWith("https://")) return this
+  1931→    return "https://my-project-five-sepia.vercel.app" + (if (this.startsWith("/")) this else "/$this")
+  1932→}
+  1933→
+  1934→/**
+  1935→ * Builds an AnnotatedString where the [blankWord] is underlined within [text].
+  1936→ * If blankWord is null/empty, returns the plain text.
+  1937→ * The underlined word is case-insensitive matched.
+  1938→ */
+  1939→fun buildUnderlinedText(text: String, blankWord: String?): androidx.compose.ui.text.AnnotatedString {
+  1940→    if (blankWord.isNullOrBlank()) return androidx.compose.ui.text.AnnotatedString(text)
+  1941→    val idx = text.indexOf(blankWord, ignoreCase = true)
+  1942→    if (idx < 0) return androidx.compose.ui.text.AnnotatedString(text)
+  1943→    return androidx.compose.ui.text.buildAnnotatedString {
+  1944→        append(text.substring(0, idx))
+  1945→        withStyle(androidx.compose.ui.text.SpanStyle(textDecoration = androidx.compose.ui.text.style.TextDecoration.Underline)) {
+  1946→            append(text.substring(idx, idx + blankWord.length))
+  1947→        }
+  1948→        append(text.substring(idx + blankWord.length))
+  1949→    }
+  1950→}
+  1951→
+  1952→// ═══════════════════════════════════════════════════════════════════════════
+  1953→// CLIENT-SIDE SUBMIT FALLBACK — when the server's submit endpoint doesn't
+  1954→// know how to handle combined exam IDs (qbank-combined / bundle-{id}), we
+  1955→// grade the exam locally using the question data we already have loaded.
+  1956→// ═══════════════════════════════════════════════════════════════════════════
+  1957→
+  1958→/**
+  1959→ * Grades a combined exam client-side. Used as a fallback when
+  1960→ * /api/student/tests/[testId]/submit returns 404 for combined exam IDs.
+  1961→ *
+  1962→ * Grades SINGLE_CHOICE, TRUE_FALSE, ONE_WORD, FILL_BLANK, MULTIPLE_CHOICE.
+  1963→ * Subjective types (SHORT_ANSWER, LONG_ANSWER, MATCHING) are marked as
+  1964→ * incorrect (the student would need a teacher to review them).
+  1965→ */
+  1966→private fun gradeCombinedExamClientSide(
+  1967→    test: TestDetail,
+  1968→    answers: Map<String, Any>,
+  1969→): SubmitResponse {
+  1970→    var score = 0
+  1971→    val review = mutableListOf<ReviewItem>()
+  1972→
+  1973→    // Normalize URL — strip origin so /api/files/... matches https://.../api/files/...
+  1974→    fun normalizeUrl(val_: Any?): Any? {
+  1975→        if (val_ is String) {
+  1976→            return try {
+  1977→                if (val_.startsWith("http://") || val_.startsWith("https://")) {
+  1978→                    java.net.URI(val_).path
+  1979→                } else val_
+  1980→            } catch (_: Exception) { val_ }
+  1981→        }
+  1982→        return val_
+  1983→    }
+  1984→
+  1985→    for (item in test.items) {
+  1986→        val q = item.question
+  1987→        val ans = normalizeUrl(answers[q.id])
+  1988→        var isCorrect = false
+  1989→
+  1990→        when (q.type) {
+  1991→            "SINGLE_CHOICE", "TRUE_FALSE", "ONE_WORD", "FILL_BLANK" -> {
+  1992→                val correctIdx = q.correctOption
+  1993→                val correctAns = normalizeUrl(q.options?.getOrNull(correctIdx)
+  1994→                    ?: q.options?.getOrNull(0)
+  1995→                    ?: "") as? String ?: ""
+  1996→                if (ans is String && correctAns.isNotEmpty() &&
+  1997→                    ans.trim().equals(correctAns.trim(), ignoreCase = true)) {
+  1998→                    isCorrect = true
+  1999→                    score++
+  2000→                }
+
+[showing lines 1-2000 of 2280; use offset=2001 with limit to continue reading]
