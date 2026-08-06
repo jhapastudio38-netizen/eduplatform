@@ -1375,13 +1375,10 @@ fun ExamResultScreen(
             // Sort review: Reading questions first (blockType != "audio"),
             // then Listening questions (blockType == "audio").
             // Each group preserves original question order.
-            val sortedReview = remember(result.review) {
-                val reading = result.review.filter { it.blockType != "audio" }
-                val listening = result.review.filter { it.blockType == "audio" }
-                reading + listening
-            }
-            val readingCount = sortedReview.count { it.blockType != "audio" }
-            val listeningCount = sortedReview.size - readingCount
+            val reading = result.review.filter { it.blockType != "audio" }
+            val listening = result.review.filter { it.blockType == "audio" }
+            val readingCount = reading.size
+            val listeningCount = listening.size
             item {
                 Row(
                     modifier = Modifier.fillMaxWidth().alpha(reviewAlpha),
@@ -1416,7 +1413,7 @@ fun ExamResultScreen(
                 }
             }
             // Reading questions
-            itemsIndexed(sortedReview.filter { it.blockType != "audio" }) { idx, review ->
+            itemsIndexed(reading) { idx, review ->
                 ReviewCard(theme, review, idx + 1, sound)
             }
             // Listening section header (if any listening questions)
@@ -1438,7 +1435,7 @@ fun ExamResultScreen(
                 }
             }
             // Listening questions (numbering continues after reading)
-            itemsIndexed(sortedReview.filter { it.blockType == "audio" }) { idx, review ->
+            itemsIndexed(listening) { idx, review ->
                 ReviewCard(theme, review, readingCount + idx + 1, sound)
             }
         }
