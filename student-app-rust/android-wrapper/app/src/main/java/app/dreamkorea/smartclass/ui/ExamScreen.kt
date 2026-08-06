@@ -639,8 +639,8 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
                             Surface(color = Color.White, shape = RoundedCornerShape(4.dp),
                                 border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFCCCCCC)),
                                 modifier = Modifier.fillMaxWidth().padding(bottom = 2.dp)) {
-                                Text("Reading", color = Color.Black, fontSize = 14.sp, fontWeight = FontWeight.Bold,
-                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp))
+                                Text("Reading", color = Color(0xFF003478), fontSize = 15.sp, fontWeight = FontWeight.ExtraBold,
+                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 3.dp))
                             }
                             Column(modifier = Modifier.weight(1f).fillMaxWidth()
                                 .border(2.dp, Color.Black, RoundedCornerShape(12.dp))
@@ -655,8 +655,8 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
                             Surface(color = Color.White, shape = RoundedCornerShape(4.dp),
                                 border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFCCCCCC)),
                                 modifier = Modifier.fillMaxWidth().padding(bottom = 2.dp)) {
-                                Text("Listening", color = Color.Black, fontSize = 14.sp, fontWeight = FontWeight.Bold,
-                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp))
+                                Text("Listening", color = Color(0xFF003478), fontSize = 15.sp, fontWeight = FontWeight.ExtraBold,
+                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 3.dp))
                             }
                             Column(modifier = Modifier.weight(1f).fillMaxWidth()
                                 .border(2.dp, Color.Black, RoundedCornerShape(12.dp))
@@ -927,7 +927,7 @@ fun AudioPlayerCard(
             ) {
                 Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
                     Icon(
-                        Icons.Default.Headphones,
+                        Icons.Default.PlayArrow,
                         null,
                         tint = if (disabled) Color(0xFF94A3B8) else theme.primary,
                         modifier = Modifier.size(22.dp)
@@ -994,10 +994,7 @@ fun AudioPlayerCard(
                 enabled = !disabled && !isPlaying && !blocked
             ) {
                 Icon(
-                    when {
-                        isPlaying -> Icons.Default.VolumeUp
-                        else -> Icons.Default.PlayArrow
-                    },
+                    Icons.Default.PlayArrow,
                     null,
                     tint = if (disabled || blocked) Color(0xFFCBD5E1) else if (isPlaying) theme.primary.copy(alpha = 0.4f) else theme.primary,
                     modifier = Modifier.size(32.dp)
