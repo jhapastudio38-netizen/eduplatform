@@ -442,6 +442,7 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
                 }
                 // Question media text (mediaText when mediaType = text)
                 // Center-aligned + width wraps to text length (does not fill full width) — nice fit on screen.
+                // Bigger font (17sp) so Korean-learning students can read the description clearly.
                 if (q.mediaType == "text" && !q.mediaText.isNullOrBlank()) {
                     Surface(
                         color = Color(0xFFF8FAFC),
@@ -452,10 +453,10 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
                         Text(
                             q.mediaText,
                             color = Color(0xFF1E293B),
-                            fontSize = 14.sp,
+                            fontSize = 17.sp,
                             fontWeight = FontWeight.Medium,
                             textAlign = TextAlign.Center,
-                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp)
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)
                         )
                     }
                     Spacer(Modifier.height(8.dp))
