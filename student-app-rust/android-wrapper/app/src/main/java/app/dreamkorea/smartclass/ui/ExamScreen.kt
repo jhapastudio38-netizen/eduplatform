@@ -857,7 +857,7 @@ private fun CanvasBlockPage(
                         title,
                         color = Color(0xFF111111),
                         fontSize = headerSp,
-                        fontWeight = FontWeight.Bold,
+                        fontWeight = FontWeight.Medium,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                         modifier = Modifier.weight(1f).padding(horizontal = 8.sc(scale))
@@ -951,11 +951,11 @@ private fun CanvasBlockPage(
             Box(modifier = Modifier.fillMaxWidth().padding(top = 8.sc(scale)), contentAlignment = Alignment.Center) {
                 Button(
                     onClick = onSubmit,
-                    modifier = Modifier.width(300.sc(scale)).height(50.sc(scale)),
+                    modifier = Modifier.offset(x = 520.sc(scale), y = 605.sc(scale)).width(325.sc(scale)).height(67.sc(scale)),
                     colors = ButtonDefaults.buttonColors(containerColor = submitBlue),
-                    shape = RoundedCornerShape(8.sc(scale))
+                    shape = RoundedCornerShape(18.sc(scale))
                 ) {
-                    Text("Submit and Finish Exam", color = Color.White, fontSize = (18f * scale).sp, fontWeight = FontWeight.Bold)
+                    Text("Submit and Finish Exam", color = Color.White, fontSize = (24f * scale).sp, fontWeight = FontWeight.Medium)
                 }
             }
         }
@@ -1084,7 +1084,7 @@ private fun CanvasGroup(
                                         "$displayNum",
                                         color = if (isAnswered) Color.White else Color(0xFF111111),
                                         fontSize = numSp,
-                                        fontWeight = FontWeight.Bold,
+                                        fontWeight = FontWeight.Medium,
                                     )
                                 }
                             } else {
@@ -1276,7 +1276,7 @@ private fun TabButton(label: String, selected: Boolean, onClick: () -> Unit) {
             label,
             color = if (selected) Color.White else Color.Black,
             fontSize = 11.sp,
-            fontWeight = FontWeight.Bold,
+            fontWeight = FontWeight.Medium,
         )
     }
 }
@@ -1645,7 +1645,7 @@ fun ExamResultScreen(
                         "DreamKorea SmartClass",
                         color = theme.primary,
                         fontSize = 18.sp,
-                        fontWeight = FontWeight.Bold,
+                        fontWeight = FontWeight.Medium,
                     )
                 }
             }
@@ -1664,7 +1664,7 @@ fun ExamResultScreen(
                         examTitle,
                         color = Color.White,
                         fontSize = 18.sp,
-                        fontWeight = FontWeight.Bold,
+                        fontWeight = FontWeight.Medium,
                         maxLines = 2,
                         overflow = TextOverflow.Ellipsis,
                         textAlign = TextAlign.Center,
@@ -1686,7 +1686,7 @@ fun ExamResultScreen(
                             "Exam Completed",
                             color = Color.White,
                             fontSize = 10.sp,
-                            fontWeight = FontWeight.Bold,
+                            fontWeight = FontWeight.Medium,
                             modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
                         )
                     }
@@ -1826,7 +1826,7 @@ fun ExamResultScreen(
                             "Reading (${readingReviews.size})",
                             color = Color(0xFF003478),
                             fontSize = 14.sp,
-                            fontWeight = FontWeight.Bold,
+                            fontWeight = FontWeight.Medium,
                             modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)
                         )
                     }
@@ -1848,7 +1848,7 @@ fun ExamResultScreen(
                             "Listening (${listeningReviews.size})",
                             color = Color(0xFF6A1B9A),
                             fontSize = 14.sp,
-                            fontWeight = FontWeight.Bold,
+                            fontWeight = FontWeight.Medium,
                             modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)
                         )
                     }
@@ -1900,7 +1900,7 @@ fun ReviewCard(theme: AppTheme, review: ReviewItem, questionNumber: Int = 0, sou
                             "Q$questionNumber",
                             color = if (review.isCorrect) Color(0xFF4CAF50) else theme.errorRed,
                             fontSize = 11.sp,
-                            fontWeight = FontWeight.Bold,
+                            fontWeight = FontWeight.Medium,
                             modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
                         )
                     }
@@ -1926,7 +1926,7 @@ fun ReviewCard(theme: AppTheme, review: ReviewItem, questionNumber: Int = 0, sou
                             "Skipped",
                             color = Color(0xFFFF9800),
                             fontSize = 9.sp,
-                            fontWeight = FontWeight.Bold,
+                            fontWeight = FontWeight.Medium,
                             modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
                         )
                     }
@@ -1945,7 +1945,7 @@ fun ReviewCard(theme: AppTheme, review: ReviewItem, questionNumber: Int = 0, sou
                         review.title,
                         color = theme.primary,
                         fontSize = 12.sp,
-                        fontWeight = FontWeight.Bold,
+                        fontWeight = FontWeight.Medium,
                         modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
                     )
                 }
@@ -2015,7 +2015,7 @@ fun ReviewCard(theme: AppTheme, review: ReviewItem, questionNumber: Int = 0, sou
             if (!mediaImgUrl.isNullOrBlank()) {
                 Box(
                     modifier = Modifier
-                        .fillMaxWidth()
+                        .fillMaxWidth(0.92f)
                         .heightIn(max = 220.dp)
                         .clip(RoundedCornerShape(8.dp))
                         .background(Color(0xFFF1F5F9)),
@@ -2641,7 +2641,7 @@ fun EyeTestGateScreen(
             "Eye Vision Check",
             color = Color(0xFF003478),
             fontSize = 22.sp,
-            fontWeight = FontWeight.Bold,
+            fontWeight = FontWeight.Medium,
         )
         Spacer(Modifier.height(8.dp))
         Text(
@@ -2682,7 +2682,7 @@ fun EyeTestGateScreen(
                     "$currentNumber",
                     color = Color.White,
                     fontSize = 80.sp,
-                    fontWeight = FontWeight.Bold,
+                    fontWeight = FontWeight.Medium,
                 )
             }
         }
@@ -2734,7 +2734,7 @@ fun EyeTestGateScreen(
                                 "$num",
                                 color = if (isSelected) Color.White else Color(0xFF003478),
                                 fontSize = 24.sp,
-                                fontWeight = FontWeight.Bold,
+                                fontWeight = FontWeight.Medium,
                             )
                         }
                     }
@@ -2761,7 +2761,7 @@ fun EyeTestGateScreen(
                 if (currentTestIdx < testNumbers.size - 1) "Next" else "Finish",
                 color = Color.White,
                 fontSize = 16.sp,
-                fontWeight = FontWeight.Bold,
+                fontWeight = FontWeight.Medium,
             )
         }
 

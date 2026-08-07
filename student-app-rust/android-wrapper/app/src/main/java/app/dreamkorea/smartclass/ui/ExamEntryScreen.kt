@@ -279,7 +279,7 @@ fun ExamEntryScreen(theme: AppTheme, sound: SoundManager, testId: String, onStar
                     Spacer(Modifier.height(8.dp))
                     Column(modifier = Modifier.fillMaxWidth(), horizontalAlignment = Alignment.Start) {
                         Text("Exam description", color = Color.Black, fontSize = 14.sp, fontWeight = FontWeight.Bold)
-                        Text(t.description!!, color = Color(0xFF333333), fontSize = 12.sp, lineHeight = 15.sp)
+                        Text(t.description!!, color = Color(0xFF333333), fontSize = 12.sp, lineHeight = 15.sp, maxLines = 4, overflow = TextOverflow.Ellipsis)
                     }
                 }
                 Spacer(Modifier.height(12.dp))
