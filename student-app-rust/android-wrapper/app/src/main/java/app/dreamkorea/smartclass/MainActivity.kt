@@ -12,9 +12,6 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.foundation.layout.*
 import androidx.core.content.ContextCompat
-import androidx.core.view.WindowCompat
-import androidx.core.view.WindowInsetsCompat
-import androidx.core.view.WindowInsetsControllerCompat
 import app.dreamkorea.smartclass.data.AppState
 import app.dreamkorea.smartclass.notifications.NotificationService
 import app.dreamkorea.smartclass.ui.*
@@ -28,12 +25,6 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        // ── IMMERSIVE FULLSCREEN — hide status bar, edge-to-edge ──
-        WindowCompat.setDecorFitsSystemWindows(window, false)
-        WindowInsetsControllerCompat(window, window.decorView).apply {
-            hide(WindowInsetsCompat.Type.statusBars())
-            systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
-        }
         setContent {
             var isLoggedIn by remember { mutableStateOf(AppState.isLoggedIn()) }
             var userName by remember { mutableStateOf(AppState.getUserName()) }
@@ -44,16 +35,6 @@ class MainActivity : ComponentActivity() {
                 MainScreen(userName = userName, onLogout = {
                     NotificationService.stopPolling(); AppState.clearSession(); isLoggedIn = false; userName = "Student"
                 })
-            }
-        }
-    }
-
-    override fun onWindowFocusChanged(hasFocus: Boolean) {
-        super.onWindowFocusChanged(hasFocus)
-        if (hasFocus) {
-            WindowInsetsControllerCompat(window, window.decorView).apply {
-                hide(WindowInsetsCompat.Type.statusBars())
-                systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
             }
         }
     }
