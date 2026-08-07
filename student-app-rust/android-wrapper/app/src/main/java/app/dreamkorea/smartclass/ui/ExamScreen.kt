@@ -527,6 +527,8 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
                     val mediaImgUrl = (q.mediaImageUrl ?: q.imageUrl)?.toAbsoluteUrl()
                     if (!mediaImgUrl.isNullOrBlank()) {
                         Log.d("IMG_DEBUG", "Rendering media image, URL = $mediaImgUrl")
+                        // Show the URL as text for debugging
+                        Text("[IMG URL: $mediaImgUrl]", color = Color.Red, fontSize = 8.sp, maxLines = 1)
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth(0.92f)
@@ -539,6 +541,23 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
                         ) {
                             RemoteImage(
                                 url = mediaImgUrl,
+                                modifier = Modifier.fillMaxSize(),
+                                contentScale = ContentScale.Fit,
+                            )
+                        }
+                        // TEST: hardcoded known-working image to verify RemoteImage works
+                        Text("[TEST IMG below]", color = Color.Blue, fontSize = 8.sp)
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth(0.92f)
+                                .height(100.dp)
+                                .padding(vertical = 4.dp)
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(Color(0xFFFFE0E0)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            RemoteImage(
+                                url = "https://www.google.com/images/branding/googlelogo/2x/googlelogo_color_272x92dp.png",
                                 modifier = Modifier.fillMaxSize(),
                                 contentScale = ContentScale.Fit,
                             )
