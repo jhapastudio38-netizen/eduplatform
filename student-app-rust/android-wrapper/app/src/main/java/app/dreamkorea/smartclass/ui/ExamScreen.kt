@@ -79,63 +79,13 @@ fun RemoteImage(
     modifier: Modifier = Modifier,
     contentScale: ContentScale = ContentScale.Fit,
 ) {
-    var bitmap by remember(url) { mutableStateOf<Bitmap?>(null) }
-    var loading by remember(url) { mutableStateOf(true) }
-    var error by remember(url) { mutableStateOf<String?>(null) }
-
-    LaunchedEffect(url) {
-        loading = true
-        error = null
-        bitmap = null
-        try {
-            val bmp = withContext(Dispatchers.IO) {
-                Log.d("IMG_DEBUG", "Downloading image: $url")
-                val client = okhttp3.OkHttpClient.Builder()
-                    .connectTimeout(30, java.util.concurrent.TimeUnit.SECONDS)
-                    .readTimeout(30, java.util.concurrent.TimeUnit.SECONDS)
-                    .build()
-                val request = okhttp3.Request.Builder().url(url).build()
-                val response = client.newCall(request).execute()
-                val contentType = response.header("Content-Type") ?: ""
-                Log.d("IMG_DEBUG", "Response: ${response.code} Content-Type: $contentType Size: ${response.body?.contentLength()}")
-                if (response.isSuccessful) {
-                    val bytes = response.body?.bytes()
-                    if (bytes != null && bytes.isNotEmpty()) {
-                        Log.d("IMG_DEBUG", "Decoding bitmap from ${bytes.size} bytes")
-                        BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
-                    } else {
-                        Log.e("IMG_DEBUG", "Empty response body for $url")
-                        null
-                    }
-                } else {
-                    Log.e("IMG_DEBUG", "HTTP ${response.code} for $url")
-                    null
-                }
-            }
-            if (bmp != null) {
-                bitmap = bmp
-                Log.d("IMG_DEBUG", "Image loaded successfully: ${bmp.width}x${bmp.height}")
-            } else {
-                error = "Failed to decode image"
-                Log.e("IMG_DEBUG", "Failed to decode image from $url")
-            }
-        } catch (e: Exception) {
-            error = e.message
-            Log.e("IMG_DEBUG", "Image load error: $url", e)
-        }
-        loading = false
-    }
-
-    Box(modifier = modifier, contentAlignment = Alignment.Center) {
-        if (bitmap != null) {
-            Image(
-                bitmap = bitmap!!.asImageBitmap(),
-                contentDescription = "Question image",
-                modifier = Modifier.fillMaxSize(),
-                contentScale = contentScale,
-            )
-        }
-    }
+    Log.d("IMG_DEBUG", "RemoteImage called with URL: $url")
+    coil.compose.AsyncImage(
+        model = url,
+        contentDescription = "Question image",
+        modifier = modifier,
+        contentScale = contentScale,
+    )
 }
 
 @Composable
