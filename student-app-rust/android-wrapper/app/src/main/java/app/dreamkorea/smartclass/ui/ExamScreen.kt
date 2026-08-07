@@ -3,6 +3,10 @@ package app.dreamkorea.smartclass.ui
 import android.app.Activity
 import android.content.pm.ActivityInfo
 import android.util.Log
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.Image
@@ -64,6 +68,76 @@ import kotlinx.coroutines.withTimeoutOrNull
  * 8. Stats auto-update via /api/student/tests/[id]/submit
  */
 @Composable
+
+/**
+ * Custom image loader that downloads bytes via OkHttp (bypassing Coil's Content-Type check)
+ * and displays as Bitmap. This fixes WordPress servers that return text/html for .jpg files.
+ */
+@Composable
+fun RemoteImage(
+    url: String,
+    modifier: Modifier = Modifier,
+    contentScale: ContentScale = ContentScale.Fit,
+) {
+    var bitmap by remember(url) { mutableStateOf<Bitmap?>(null) }
+    var loading by remember(url) { mutableStateOf(true) }
+    var error by remember(url) { mutableStateOf<String?>(null) }
+
+    LaunchedEffect(url) {
+        loading = true
+        error = null
+        bitmap = null
+        try {
+            val bmp = withContext(Dispatchers.IO) {
+                Log.d("IMG_DEBUG", "Downloading image: $url")
+                val client = okhttp3.OkHttpClient.Builder()
+                    .connectTimeout(30, java.util.concurrent.TimeUnit.SECONDS)
+                    .readTimeout(30, java.util.concurrent.TimeUnit.SECONDS)
+                    .build()
+                val request = okhttp3.Request.Builder().url(url).build()
+                val response = client.newCall(request).execute()
+                val contentType = response.header("Content-Type") ?: ""
+                Log.d("IMG_DEBUG", "Response: ${response.code} Content-Type: $contentType Size: ${response.body?.contentLength()}")
+                if (response.isSuccessful) {
+                    val bytes = response.body?.bytes()
+                    if (bytes != null && bytes.isNotEmpty()) {
+                        Log.d("IMG_DEBUG", "Decoding bitmap from ${bytes.size} bytes")
+                        BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
+                    } else {
+                        Log.e("IMG_DEBUG", "Empty response body for $url")
+                        null
+                    }
+                } else {
+                    Log.e("IMG_DEBUG", "HTTP ${response.code} for $url")
+                    null
+                }
+            }
+            if (bmp != null) {
+                bitmap = bmp
+                Log.d("IMG_DEBUG", "Image loaded successfully: ${bmp.width}x${bmp.height}")
+            } else {
+                error = "Failed to decode image"
+                Log.e("IMG_DEBUG", "Failed to decode image from $url")
+            }
+        } catch (e: Exception) {
+            error = e.message
+            Log.e("IMG_DEBUG", "Image load error: $url", e)
+        }
+        loading = false
+    }
+
+    Box(modifier = modifier, contentAlignment = Alignment.Center) {
+        if (bitmap != null) {
+            Image(
+                bitmap = bitmap!!,
+                contentDescription = "Question image",
+                modifier = Modifier.fillMaxSize(),
+                contentScale = contentScale,
+            )
+        }
+    }
+}
+
 fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
     val sound = rememberSoundManager()
     val scope = rememberCoroutineScope()
@@ -423,9 +497,8 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
                                 .clickable { FullScreenImageViewer.show(url) },
                             contentAlignment = Alignment.Center
                         ) {
-                            coil.compose.AsyncImage(
-                                model = url,
-                                contentDescription = "Description image",
+                            RemoteImage(
+                                url = url,
                                 modifier = Modifier.fillMaxSize(),
                                 contentScale = ContentScale.Fit,
                             )
@@ -463,9 +536,8 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
                                 .clickable { FullScreenImageViewer.show(mediaImgUrl) },
                             contentAlignment = Alignment.Center
                         ) {
-                            coil.compose.AsyncImage(
-                                model = mediaImgUrl,
-                                contentDescription = "Question image",
+                            RemoteImage(
+                                url = mediaImgUrl,
                                 modifier = Modifier.fillMaxSize(),
                                 contentScale = ContentScale.Fit,
                             )
@@ -542,7 +614,7 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
                                     Box(contentAlignment = Alignment.Center) { Text("${i+1}", color = if (isSelected) Color.White else Color.Black, fontSize = 14.sp, fontWeight = FontWeight.Bold) }
                                 }
                                 Spacer(Modifier.width(6.dp))
-                                coil.compose.AsyncImage(model = ImageRequest.Builder(LocalContext.current).data(absUrl).listener(onStart = { Log.d("IMG_DEBUG", "optionImage loading: $absUrl") }, onSuccess = { _, r -> Log.d("IMG_DEBUG", "optionImage SUCCESS") }, onError = { _, r -> Log.e("IMG_DEBUG", "optionImage ERROR: $absUrl", r.throwable) }).build(), contentDescription = "Option ${i+1}", modifier = Modifier.size(80.dp).clip(RoundedCornerShape(4.dp)).clickable { FullScreenImageViewer.show(absUrl) }, contentScale = ContentScale.Fit)
+                                RemoteImage(url = absUrl, modifier = Modifier.size(80.dp).clip(RoundedCornerShape(4.dp)).clickable { FullScreenImageViewer.show(absUrl) }, contentScale = ContentScale.Fit)
                             }
                         }
                     }
