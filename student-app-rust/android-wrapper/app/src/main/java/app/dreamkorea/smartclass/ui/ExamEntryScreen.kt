@@ -35,11 +35,15 @@ import kotlinx.coroutines.withTimeoutOrNull
 /**
  * Pre-exam info screen — shown before the user starts the actual test.
  *
- * Layout (landscape-friendly — uses Row layout so left side has student info,
- * right side has exam info + buttons):
+ * Layout (vertical scrollable Column — works in portrait and landscape):
  * - Outer black border around the entire screen
- * - LEFT: Title + circular avatar + student name + student email
- * - RIGHT: Exam description + exam stats (time/questions/pass) + Get Started + Cancel
+ * - DreamKorea logo at top
+ * - Exam title
+ * - Circular avatar
+ * - Student name + email
+ * - Exam description card
+ * - Get Started button
+ * - Cancel button
  *
  * Forces landscape on entry (BEFORE the loading check so the user sees the
  * loading screen in landscape), restores orientation on leave.
@@ -253,121 +257,100 @@ fun ExamEntryScreen(theme: AppTheme, sound: SoundManager, testId: String, onStar
             }
         }
 
-        Box(
-            modifier = Modifier.weight(1f).padding(16.dp)
+        // ── Vertical scrollable Column with all content ──────────────────
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxWidth()
+                .verticalScroll(rememberScrollState())
+                .padding(16.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // Landscape-friendly layout: Row with LEFT (student) + RIGHT (exam)
-            Row(
-                modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()),
-                horizontalArrangement = Arrangement.spacedBy(24.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                // ── LEFT: Student info ────────────────────────────────────
-                Column(
-                    modifier = Modifier.weight(0.4f),
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    // Title at top
-                Text(
-                    t.title,
-                    color = Color.Black,
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.Bold,
-                    textAlign = TextAlign.Center,
-                    maxLines = 2
-                )
-                Spacer(Modifier.height(16.dp))
+            // Exam title
+            Text(
+                t.title,
+                color = Color.Black,
+                fontSize = 16.sp,
+                fontWeight = FontWeight.Bold,
+                textAlign = TextAlign.Center,
+                maxLines = 3
+            )
+            Spacer(Modifier.height(16.dp))
 
-                // Profile icon
-                Box(
-                    modifier = Modifier
-                        .size(64.dp)
-                        .clip(CircleShape)
-                        .background(Color(0xFF003478)),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(Icons.Default.Person, null, tint = Color.White, modifier = Modifier.size(36.dp))
-                }
-                Spacer(Modifier.height(8.dp))
-
-                // Student name
-                Text(
-                    studentName,
-                    color = Color.Black,
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    textAlign = TextAlign.Center
-                )
-                // Student email
-                Text(
-                    studentEmail,
-                    color = Color.Gray,
-                    fontSize = 11.sp,
-                    textAlign = TextAlign.Center
-                )
-            }
-
-            // ── Vertical divider ──────────────────────────────────────────
+            // Profile icon
             Box(
                 modifier = Modifier
-                    .width(1.dp)
-                    .fillMaxHeight(0.7f)
-                    .background(Color(0xFFCCCCCC))
+                    .size(64.dp)
+                    .clip(CircleShape)
+                    .background(Color(0xFF003478)),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(Icons.Default.Person, null, tint = Color.White, modifier = Modifier.size(36.dp))
+            }
+            Spacer(Modifier.height(8.dp))
+
+            // Student name
+            Text(
+                studentName,
+                color = Color.Black,
+                fontSize = 14.sp,
+                fontWeight = FontWeight.SemiBold,
+                textAlign = TextAlign.Center
+            )
+            // Student email
+            Text(
+                studentEmail,
+                color = Color.Gray,
+                fontSize = 11.sp,
+                textAlign = TextAlign.Center
             )
 
-            // ── RIGHT: Exam info + buttons ────────────────────────────────
-            Column(
-                modifier = Modifier.weight(0.6f),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                // Exam description
-                if (!t.description.isNullOrBlank()) {
-                    Surface(
-                        color = Color(0xFFF5F5F5),
-                        shape = RoundedCornerShape(8.dp),
-                        border = BorderStroke(1.dp, Color(0xFFCCCCCC)),
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Text(
-                            t.description!!,
-                            color = Color.Black,
-                            fontSize = 12.sp,
-                            modifier = Modifier.padding(12.dp)
-                        )
-                    }
-                    Spacer(Modifier.height(12.dp))
-                }
+            Spacer(Modifier.height(20.dp))
 
-                                Spacer(Modifier.height(20.dp))
-
-                // Get Started button — graded exams lock after 1 attempt, practice can retake
-                Button(
-                    onClick = { sound.swoosh(); onStart() },
-                    modifier = Modifier.fillMaxWidth(0.7f).height(44.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF003478)),
-                    shape = RoundedCornerShape(10.dp),
-                    enabled = !alreadyCompleted
+            // Exam description
+            if (!t.description.isNullOrBlank()) {
+                Surface(
+                    color = Color(0xFFF5F5F5),
+                    shape = RoundedCornerShape(8.dp),
+                    border = BorderStroke(1.dp, Color(0xFFCCCCCC)),
+                    modifier = Modifier.fillMaxWidth()
                 ) {
                     Text(
-                        if (alreadyCompleted) "Already Completed" else "Get Started",
-                        color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Bold
+                        t.description!!,
+                        color = Color.Black,
+                        fontSize = 12.sp,
+                        modifier = Modifier.padding(12.dp)
                     )
                 }
-
-                Spacer(Modifier.height(8.dp))
-
-                // Cancel button
-                OutlinedButton(
-                    onClick = { sound.click(); onBack() },
-                    modifier = Modifier.fillMaxWidth(0.7f).height(40.dp),
-                    shape = RoundedCornerShape(10.dp),
-                    colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.Black),
-                    border = BorderStroke(1.dp, Color.Black)
-                ) {
-                    Text("Cancel", fontSize = 13.sp)
-                }
+                Spacer(Modifier.height(20.dp))
             }
-        }
+
+            // Get Started button — graded exams lock after 1 attempt, practice can retake
+            Button(
+                onClick = { sound.swoosh(); onStart() },
+                modifier = Modifier.fillMaxWidth(0.7f).height(44.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF003478)),
+                shape = RoundedCornerShape(10.dp),
+                enabled = !alreadyCompleted
+            ) {
+                Text(
+                    if (alreadyCompleted) "Already Completed" else "Get Started",
+                    color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Bold
+                )
+            }
+
+            Spacer(Modifier.height(8.dp))
+
+            // Cancel button
+            OutlinedButton(
+                onClick = { sound.click(); onBack() },
+                modifier = Modifier.fillMaxWidth(0.7f).height(40.dp),
+                shape = RoundedCornerShape(10.dp),
+                colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.Black),
+                border = BorderStroke(1.dp, Color.Black)
+            ) {
+                Text("Cancel", fontSize = 13.sp)
+            }
         }
     }
 }

@@ -2,6 +2,7 @@ package app.dreamkorea.smartclass.ui
 
 import android.app.Activity
 import android.content.pm.ActivityInfo
+import android.util.Log
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.Image
@@ -43,12 +44,35 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.viewinterop.AndroidView
 import app.dreamkorea.smartclass.api.*
 import app.dreamkorea.smartclass.data.AppState
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
+
+/**
+ * RemoteImage — thin wrapper around Coil AsyncImage with debug logging so we
+ * can trace which image URLs are requested. Used by the exam screen for both
+ * description images and media images (instead of calling coil.compose.AsyncImage
+ * inline everywhere).
+ */
+@Composable
+fun RemoteImage(
+    url: String,
+    modifier: Modifier = Modifier,
+    contentScale: ContentScale = ContentScale.Fit,
+) {
+    Log.d("IMG_DEBUG", "RemoteImage called with URL: $url")
+    coil.compose.AsyncImage(
+        model = url,
+        contentDescription = "Question image",
+        modifier = modifier,
+        contentScale = contentScale,
+    )
+}
 
 /**
  * Exam taking screen — full flow:
@@ -76,6 +100,9 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
     val audioPlayCounts = remember { mutableStateMapOf<String, Int>() }
     // When audio is playing, disable navigation buttons
     var audioPlaying by remember { mutableStateOf(false) }
+    var currentlyPlayingId by remember { mutableStateOf<String?>(null) }
+    // ID of the audio option currently playing — used to block other audio
+    // options from playing simultaneously (only one audio at a time).
     var submitResult by remember { mutableStateOf<SubmitResponse?>(null) }
     var submitting by remember { mutableStateOf(false) }
     // Per-question feedback (after answering, before moving on)
@@ -146,7 +173,10 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
             }
             if (result != null) {
                 test = result
-                timeLeft = (result.durationMin.coerceAtLeast(1)) * 60
+                // Default to 50 minutes when durationMin is missing or out of range.
+                // Admins sometimes set 0 or absurdly large values; clamp to 1–50.
+                val dur = result.durationMin
+                timeLeft = (if (dur > 0 && dur <= 50) dur else 50) * 60
             } else {
                 error = "The request timed out. Check your internet connection and try again."
             }
@@ -242,7 +272,7 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
             Text(
                 error,
                 color = theme.subText,
-                fontSize = 13.sp,
+                fontSize = 16.sp,
                 textAlign = TextAlign.Center,
                 modifier = Modifier.padding(horizontal = 16.dp)
             )
@@ -284,7 +314,7 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
-            Icon(Icons.Default.Quiz, null, tint = theme.subText, modifier = Modifier.size(48.dp))
+            Icon(Icons.Default.Quiz, null, tint = theme.subText, modifier = Modifier.size(80.dp))
             Spacer(Modifier.height(12.dp))
             Text("This test has no questions yet.", color = theme.darkText, fontSize = 14.sp, textAlign = TextAlign.Center)
             Spacer(Modifier.height(16.dp))
@@ -350,21 +380,20 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
             }
         }
 
-        // ── 2. INSTRUCTION ROW ── compact question number + title + FREE badge
+        // ── 2. INSTRUCTION ROW ── question number + FULL stem text (no truncation)
         Surface(modifier = Modifier.fillMaxWidth().padding(horizontal = 6.dp, vertical = 2.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("${currentIdx + 1}. ", color = Color(0xFF003478), fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                val displayText = q.stem.take(80)
-                Text(displayText, color = Color(0xFF1E293B), fontSize = 11.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
+            Row(verticalAlignment = Alignment.Top) {
+                Text("${currentIdx + 1}. ", color = Color(0xFF003478), fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                val displayText = q.stem.ifBlank { q.mediaText ?: "" }
+                Text(displayText, color = Color(0xFF1E293B), fontSize = 15.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f, fill = true))
                 if (q.isFree) {
                     Spacer(Modifier.width(4.dp))
                     Surface(color = Color(0xFF22C55E), shape = RoundedCornerShape(3.dp)) {
-                        Text("FREE", color = Color.White, fontSize = 8.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp))
+                        Text("FREE", color = Color.White, fontSize = 9.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp))
                     }
                 }
-                Spacer(Modifier.weight(1f))
-                IconButton(onClick = { showGrid = true }, modifier = Modifier.size(24.dp)) {
-                    Icon(Icons.Default.GridView, null, tint = Color(0xFF64748B), modifier = Modifier.size(14.dp))
+                IconButton(onClick = { showGrid = true }, modifier = Modifier.size(34.dp)) {
+                    Icon(Icons.Default.GridView, null, tint = Color(0xFF64748B), modifier = Modifier.size(18.dp))
                 }
             }
         }
@@ -381,66 +410,108 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
                 contentScale = ContentScale.Fit
             )
             Row(modifier = Modifier.fillMaxSize()) {
-            // LEFT: Question content (60%) — scrollable so long titles/stems/images don't get cut
+            // LEFT: Question content (60%) — scrollable so long descriptions/images don't get cut.
+            // The question STEM is NOT shown here — it's at the top bar now.
             Column(
                 modifier = Modifier.weight(0.6f).fillMaxHeight().padding(8.dp).verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.Center,
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                // Question title (if set by admin) — shown at the top
-                if (!q.title.isNullOrBlank()) {
-                    Text(
-                        q.title,
-                        color = Color(0xFF003478),
-                        fontSize = 13.sp,
-                        fontWeight = FontWeight.Bold,
-                        modifier = Modifier.fillMaxWidth(0.92f).padding(bottom = 4.dp)
-                    )
-                }
-                // Question text (stem) — shown in a card with border/shadow
-                val questionText = q.stem.ifBlank { q.mediaText ?: "" }
-                if (questionText.isNotBlank()) {
+                // Description TEXT (if admin set descType=text)
+                if (q.descType == "text" && !q.descText.isNullOrBlank()) {
                     Surface(
                         color = Color.White,
-                        shape = RoundedCornerShape(14.dp),
-                        shadowElevation = 2.dp,
+                        shape = RoundedCornerShape(12.dp),
+                        shadowElevation = 1.dp,
                         border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFE2E8F0)),
-                        modifier = Modifier.fillMaxWidth(0.92f)
+                        modifier = Modifier.fillMaxWidth(0.92f).padding(vertical = 4.dp)
                     ) {
                         Text(
-                            questionText,
+                            q.descText!!,
                             color = Color(0xFF1E293B),
-                            fontSize = 14.sp,
+                            fontSize = 18.sp,
                             fontWeight = FontWeight.Medium,
+                            textAlign = TextAlign.Center,
                             modifier = Modifier.padding(14.dp)
                         )
                     }
-                    Spacer(Modifier.height(6.dp))
                 }
-                // Media images — ContentScale.Fit (contain, not cover)
-                if (q.descType == "image" && !q.descImageUrl.isNullOrBlank()) {
+                // Description IMAGE (if admin set a descImageUrl)
+                if (!q.descImageUrl.isNullOrBlank()) {
                     val url = q.descImageUrl!!.toAbsoluteUrl()
-                    coil.compose.AsyncImage(
-                        model = url, contentDescription = null,
-                        modifier = Modifier.fillMaxWidth(0.92f).heightIn(max = 120.dp).clip(RoundedCornerShape(8.dp)).clickable { FullScreenImageViewer.show(url) },
-                        contentScale = ContentScale.Fit
-                    )
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth(0.92f)
+                            .height(200.dp)
+                            .padding(vertical = 4.dp)
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(Color(0xFFF1F5F9))
+                            .clickable { FullScreenImageViewer.show(url) },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        RemoteImage(
+                            url = url,
+                            modifier = Modifier.fillMaxSize(),
+                            contentScale = ContentScale.Fit,
+                        )
+                    }
                 }
+                // Media TEXT (if admin set mediaType=text)
+                if (q.mediaType == "text" && !q.mediaText.isNullOrBlank()) {
+                    Surface(
+                        color = Color.White,
+                        shape = RoundedCornerShape(12.dp),
+                        shadowElevation = 1.dp,
+                        border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFE2E8F0)),
+                        modifier = Modifier.fillMaxWidth(0.92f).padding(vertical = 4.dp)
+                    ) {
+                        Text(
+                            q.mediaText!!,
+                            color = Color(0xFF1E293B),
+                            fontSize = 18.sp,
+                            fontWeight = FontWeight.Medium,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.padding(14.dp)
+                        )
+                    }
+                }
+                // Media IMAGE (mediaImageUrl falls back to legacy imageUrl)
                 val mediaImgUrl = (q.mediaImageUrl ?: q.imageUrl)?.toAbsoluteUrl()
                 if (!mediaImgUrl.isNullOrBlank()) {
-                    coil.compose.AsyncImage(
-                        model = mediaImgUrl, contentDescription = null,
-                        modifier = Modifier.fillMaxWidth(0.92f).heightIn(max = 140.dp).clip(RoundedCornerShape(8.dp)).clickable { FullScreenImageViewer.show(mediaImgUrl) },
-                        contentScale = ContentScale.Fit
-                    )
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth(0.92f)
+                            .height(220.dp)
+                            .padding(vertical = 4.dp)
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(Color(0xFFF1F5F9))
+                            .clickable { FullScreenImageViewer.show(mediaImgUrl) },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        RemoteImage(
+                            url = mediaImgUrl,
+                            modifier = Modifier.fillMaxSize(),
+                            contentScale = ContentScale.Fit,
+                        )
+                    }
                 }
+                // Question audio (mediaAudioUrl falls back to legacy audioUrl)
                 val mediaAudUrl = (q.mediaAudioUrl ?: q.audioUrl)?.toAbsoluteUrl()
                 if (!mediaAudUrl.isNullOrBlank()) {
                     // key(q.id) ensures the AudioPlayerCard is FULLY RECREATED when
                     // the question changes — state (playCount, disabled) resets completely.
                     // This fixes the bug where audio was locked from the previous question.
                     key(q.id) {
-                        AudioPlayerCard(theme = theme, url = mediaAudUrl, loopCount = q.audioLoop, loopDelaySec = q.audioLoopDelay, sound = sound, questionId = q.id, playCounts = audioPlayCounts, onPlayingChange = { audioPlaying = it })
+                        AudioPlayerCard(
+                            theme = theme,
+                            url = mediaAudUrl,
+                            loopCount = q.audioLoop,
+                            loopDelaySec = if (q.audioLoopDelay > 0) q.audioLoopDelay else 2,
+                            sound = sound,
+                            questionId = q.id,
+                            playCounts = audioPlayCounts,
+                            onPlayingChange = { audioPlaying = it },
+                        )
                     }
                 }
             }
@@ -460,23 +531,23 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
                             val optText = options.getOrNull(i) ?: ""
                             val blankWord = q.optionBlanks.getOrNull(i)?.takeIf { it.isNotBlank() }
                             Row(
-                                modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp).clickable { sound.click(); answers[q.id] = optText },
+                                modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp).clickable(enabled = !audioPlaying) { sound.click(); answers[q.id] = optText },
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Surface(
                                     color = if (isSelected) theme.primary else Color.White,
                                     border = androidx.compose.foundation.BorderStroke(2.dp, Color.Black),
                                     shape = androidx.compose.foundation.shape.CircleShape,
-                                    modifier = Modifier.size(40.dp)
+                                    modifier = Modifier.size(44.dp)
                                 ) {
-                                    Box(contentAlignment = Alignment.Center) { Text("${i+1}", color = if (isSelected) Color.White else Color.Black, fontSize = 15.sp, fontWeight = FontWeight.Bold) }
+                                    Box(contentAlignment = Alignment.Center) { Text("${i+1}", color = if (isSelected) Color.White else Color.Black, fontSize = 18.sp, fontWeight = FontWeight.Bold) }
                                 }
-                                Spacer(Modifier.width(8.dp))
+                                Spacer(Modifier.width(10.dp))
                                 // Render option text with underlined blank word (if set by admin)
                                 Text(
                                     text = buildUnderlinedText(optText, blankWord),
                                     color = Color.Black,
-                                    fontSize = 13.sp,
+                                    fontSize = 16.sp,
                                     modifier = Modifier.weight(1f)
                                 )
                             }
@@ -488,14 +559,23 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
                             val absUrl = imgUrl.toAbsoluteUrl()
                             val isSelected = answers[q.id] == absUrl
                             Row(
-                                modifier = Modifier.fillMaxWidth().padding(vertical = 3.dp).clickable { sound.click(); answers[q.id] = absUrl },
+                                modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp).clickable(enabled = !audioPlaying) { sound.click(); answers[q.id] = absUrl },
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Surface(color = if (isSelected) theme.primary else Color.White, border = androidx.compose.foundation.BorderStroke(2.dp, Color.Black), shape = androidx.compose.foundation.shape.CircleShape, modifier = Modifier.size(28.dp)) {
-                                    Box(contentAlignment = Alignment.Center) { Text("${i+1}", color = if (isSelected) Color.White else Color.Black, fontSize = 10.sp, fontWeight = FontWeight.Bold) }
+                                Surface(
+                                    color = if (isSelected) theme.primary else Color.White,
+                                    border = androidx.compose.foundation.BorderStroke(2.dp, Color.Black),
+                                    shape = androidx.compose.foundation.shape.CircleShape,
+                                    modifier = Modifier.size(34.dp)
+                                ) {
+                                    Box(contentAlignment = Alignment.Center) { Text("${i+1}", color = if (isSelected) Color.White else Color.Black, fontSize = 14.sp, fontWeight = FontWeight.Bold) }
                                 }
-                                Spacer(Modifier.width(4.dp))
-                                coil.compose.AsyncImage(model = absUrl, contentDescription = "Option ${i+1}", modifier = Modifier.size(48.dp).clip(RoundedCornerShape(4.dp)).clickable { FullScreenImageViewer.show(absUrl) }, contentScale = ContentScale.Fit)
+                                Spacer(Modifier.width(8.dp))
+                                RemoteImage(
+                                    url = absUrl,
+                                    modifier = Modifier.size(80.dp).clip(RoundedCornerShape(6.dp)).clickable { FullScreenImageViewer.show(absUrl) },
+                                    contentScale = ContentScale.Fit,
+                                )
                             }
                         }
                     }
@@ -503,15 +583,39 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
                         (0 until minOf(4, q.optionAudios.size)).forEach { i ->
                             val audUrl = q.optionAudios[i]; if (audUrl.isBlank()) return@forEach
                             val absUrl = audUrl.toAbsoluteUrl()
+                            val optId = "${q.id}-opt-$i"
                             val isSelected = answers[q.id] == absUrl
-                            Row(modifier = Modifier.fillMaxWidth().padding(vertical = 3.dp).clickable { sound.click(); answers[q.id] = absUrl }, verticalAlignment = Alignment.CenterVertically) {
-                                Surface(color = if (isSelected) theme.primary else Color.White, border = androidx.compose.foundation.BorderStroke(2.dp, Color.Black), shape = androidx.compose.foundation.shape.CircleShape, modifier = Modifier.size(28.dp)) {
-                                    Box(contentAlignment = Alignment.Center) { Text("${i+1}", color = if (isSelected) Color.White else Color.Black, fontSize = 10.sp, fontWeight = FontWeight.Bold) }
+                            Row(
+                                modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp).clickable(enabled = !audioPlaying) { sound.click(); answers[q.id] = absUrl },
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Surface(
+                                    color = if (isSelected) theme.primary else Color.White,
+                                    border = androidx.compose.foundation.BorderStroke(2.dp, Color.Black),
+                                    shape = androidx.compose.foundation.shape.CircleShape,
+                                    modifier = Modifier.size(34.dp)
+                                ) {
+                                    Box(contentAlignment = Alignment.Center) { Text("${i+1}", color = if (isSelected) Color.White else Color.Black, fontSize = 14.sp, fontWeight = FontWeight.Bold) }
                                 }
-                                Spacer(Modifier.width(4.dp))
-                                // key(q.id, i) — recreate when question changes so play count resets
+                                Spacer(Modifier.width(8.dp))
+                                // key(q.id, i) — recreate when question changes so play count resets.
+                                // blocked = true when ANOTHER audio option is currently playing
+                                // (so only one audio can play at a time).
                                 key(q.id, i) {
-                                    AudioPlayerCard(theme = theme, url = absUrl, loopCount = q.audioLoop.coerceAtLeast(1), loopDelaySec = q.audioLoopDelay, sound = sound, questionId = "${q.id}-opt-$i", playCounts = audioPlayCounts, onPlayingChange = { audioPlaying = it })
+                                    AudioPlayerCard(
+                                        theme = theme,
+                                        url = absUrl,
+                                        loopCount = q.audioLoop.coerceAtLeast(1),
+                                        loopDelaySec = if (q.audioLoopDelay > 0) q.audioLoopDelay else 2,
+                                        sound = sound,
+                                        questionId = optId,
+                                        playCounts = audioPlayCounts,
+                                        blocked = currentlyPlayingId != null && currentlyPlayingId != optId,
+                                        onPlayingChange = { playing ->
+                                            audioPlaying = playing
+                                            currentlyPlayingId = if (playing) optId else null
+                                        },
+                                    )
                                 }
                             }
                         }
@@ -521,7 +625,9 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
             } // end Row
         } // end Box (watermark background)
 
-        // ── 4. BOTTOM NAVIGATION ── compact white bar with thin border
+        // ── 4. BOTTOM NAVIGATION ── compact white bar with thin border.
+        // On the LAST question, hide Next/Submit — student must use the grid
+        // page's blue Submit button. Prev + All Questions are always available.
         Surface(
             color = Color.White,
             border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFE2E8F0)),
@@ -536,29 +642,24 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
                 Box(modifier = Modifier.weight(1f).fillMaxHeight().clickable(enabled = !audioPlaying) { sound.click(); showGrid = true }, contentAlignment = Alignment.Center) {
                     Text("सबै प्रश्नहरू (All)", color = if (audioPlaying) Color(0xFFCBD5E1) else Color(0xFF003478), fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
                 }
-                Box(modifier = Modifier.width(1.dp).fillMaxHeight(0.6f).background(Color(0xFFE2E8F0)))
-                // Next (अर्को) or Submit — disabled when audio playing
-                Box(modifier = Modifier.weight(1f).fillMaxHeight().clickable(enabled = !audioPlaying) {
-                    if (currentIdx < sortedItems.size - 1) { currentIdx++; sound.click() }
-                    else { sound.swoosh(); submitting = true; scope.launch { try { submitResult = submitExamWithFallback(t, answers.toMap()); sound.success() } catch (e: Exception) { error = "Submit failed." }; submitting = false } }
-                }, contentAlignment = Alignment.Center) {
-                    if (submitting) { CircularProgressIndicator(color = Color(0xFF003478), modifier = Modifier.size(16.dp), strokeWidth = 2.dp) }
-                    else if (currentIdx < sortedItems.size - 1) { Text("अर्को (Next)", color = if (audioPlaying) Color(0xFFCBD5E1) else Color(0xFF003478), fontSize = 13.sp, fontWeight = FontWeight.SemiBold) }
-                    else { Text("सबमिट (Submit)", color = if (audioPlaying) Color(0xFFCBD5E1) else Color(0xFF22C55E), fontSize = 11.sp, fontWeight = FontWeight.Bold) }
+                // Next (अर्को) — HIDDEN on the last question (use grid's Submit instead)
+                if (currentIdx < sortedItems.size - 1) {
+                    Box(modifier = Modifier.width(1.dp).fillMaxHeight(0.6f).background(Color(0xFFE2E8F0)))
+                    Box(modifier = Modifier.weight(1f).fillMaxHeight().clickable(enabled = !audioPlaying) { currentIdx++; sound.click() }, contentAlignment = Alignment.Center) {
+                        Text("अर्को (Next)", color = if (audioPlaying) Color(0xFFCBD5E1) else Color(0xFF003478), fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                    }
                 }
             }
         }
     }
 
-            // ── QUESTION GRID PAGE ── matches HTML reference (4-col square grid, blue #1a56ff)
+            // ── QUESTION GRID PAGE ── fixed 1364×694 canvas (matches HTML reference)
     if (showGrid) {
         val readingItems = sortedItems.filter { it.question.blockType != "audio" }
         val listeningItems = sortedItems.filter { it.question.blockType == "audio" }
         // Question Bank / combined exams: show ALL questions in ONE panel (no Reading/Listening split)
         // Regular exams/tests: show Reading LEFT | Listening RIGHT
         val isQBank = testId == "qbank-combined" || testId.startsWith("bundle-")
-        // showAllBlocks: true = show all blocks (added + blank), false = only show created questions
-        val showAllBlocks = t.showAllBlocks
         var showSubmitDialog by remember { mutableStateOf(false) }
         val haptic = LocalHapticFeedback.current
         // Filter: null = all, true = solved only, false = unsolved only
@@ -572,201 +673,10 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
         // HH:MM:SS timer format (matches HTML reference)
         val hh = timeLeft / 3600; val mm = (timeLeft % 3600) / 60; val ss = timeLeft % 60
         val timeStr = String.format("%02d:%02d:%02d", hh, mm, ss)
-        val isLowTime = timeLeft in 1..300
-        val timerColor = if (isLowTime) Color(0xFFDC2626) else Color(0xFF222222)
-        val accentBlue = Color(0xFF1A56FF)
 
-        Column(modifier = Modifier.fillMaxSize().background(Color(0xFFF5F5F5))) {
-            // ── TABS ROW: All | Solved | UnSolved (with blue underline on active) ──
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(Color.White)
-                    .height(42.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                RefTab("All", filterMode == null, accentBlue, Modifier.weight(1f)) { filterMode = null }
-                RefTab("Solved", filterMode == true, accentBlue, Modifier.weight(1f)) { filterMode = true }
-                RefTab("UnSolved", filterMode == false, accentBlue, Modifier.weight(1f)) { filterMode = false }
-            }
-            // Thin border under tabs
-            Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(Color(0xFFE2E2E2)))
+        val studentId = AppState.getUserEmail().ifBlank { AppState.getUserPhone().ifBlank { "—" } }
 
-            // ── TIMER (large, centered, monospace) ──────────────────────
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(Color.White)
-                    .padding(vertical = 8.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    timeStr,
-                    color = timerColor,
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.Medium,
-                    letterSpacing = 1.sp,
-                    fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
-                )
-            }
-            Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(Color(0xFFE2E2E2)))
-
-            // ── MAIN AREA ──────────────────────────────────────────────────
-            // QBank: single panel with ALL questions (no Reading/Listening labels)
-            // Exam: Reading LEFT | Listening RIGHT
-            Box(
-                modifier = Modifier
-                    .weight(1f)
-                    .fillMaxWidth()
-                    .background(Color(0xFFF5F5F5))
-            ) {
-                // Watermark logo in background
-                Image(
-                    painter = painterResource(id = app.dreamkorea.smartclass.R.drawable.dreamkorea_logo),
-                    contentDescription = null,
-                    modifier = Modifier
-                        .size(180.dp)
-                        .align(Alignment.Center)
-                        .alpha(0.04f),
-                    contentScale = ContentScale.Fit
-                )
-
-                if (isQBank) {
-                    // ── QBANK: single panel, all questions, no section labels ──
-                    // Fills the FULL screen — no max width constraint
-                    Column(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(12.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        Column(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .fillMaxHeight()
-                                .border(2.dp, Color(0xFF111111), RoundedCornerShape(10.dp))
-                                .background(Color.White)
-                                .padding(8.dp)
-                        ) {
-                            QuestionGridRef(
-                                test = t,
-                                items = t.items, // ALL questions in one grid
-                                answers = answers,
-                                currentIdx = currentIdx,
-                                sound = sound,
-                                haptic = haptic,
-                                filterMode = filterMode,
-                                accentBlue = accentBlue,
-                                showAllBlocks = showAllBlocks
-                            ) { idx ->
-                                currentIdx = idx
-                                showGrid = false
-                            }
-                        }
-                    }
-                } else {
-                    // ── EXAM: Reading LEFT | Listening RIGHT ──
-                    Row(
-                        modifier = Modifier.fillMaxSize().padding(8.dp),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        // Reading panel (left)
-                        Column(modifier = Modifier.weight(1f).fillMaxHeight()) {
-                            Text(
-                                "Reading",
-                                color = Color(0xFF333333),
-                                fontSize = 13.sp,
-                                fontWeight = FontWeight.Medium,
-                                modifier = Modifier.padding(start = 4.dp, bottom = 6.dp)
-                            )
-                        // Scrollable grid with border — fills full panel
-                            Column(
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .fillMaxWidth()
-                                    .border(2.dp, Color(0xFF111111), RoundedCornerShape(10.dp))
-                                    .background(Color.White)
-                                    .padding(8.dp)
-                            ) {
-                                QuestionGridRef(
-                                    test = t,
-                                    items = readingItems,
-                                    answers = answers,
-                                    currentIdx = currentIdx,
-                                    sound = sound,
-                                    haptic = haptic,
-                                    filterMode = filterMode,
-                                    accentBlue = accentBlue,
-                                    showAllBlocks = showAllBlocks
-                                ) { idx ->
-                                    currentIdx = idx
-                                    showGrid = false
-                                }
-                            }
-                        }
-
-                        // Listening panel (right)
-                        Column(modifier = Modifier.weight(1f).fillMaxHeight()) {
-                            Text(
-                                "Listening",
-                                color = Color(0xFF333333),
-                                fontSize = 13.sp,
-                                fontWeight = FontWeight.Medium,
-                                modifier = Modifier.padding(start = 4.dp, bottom = 6.dp)
-                            )
-                            Column(
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .fillMaxWidth()
-                                    .border(2.dp, Color(0xFF111111), RoundedCornerShape(10.dp))
-                                    .background(Color.White)
-                                    .padding(8.dp)
-                            ) {
-                                QuestionGridRef(
-                                    test = t,
-                                    items = listeningItems,
-                                    answers = answers,
-                                    currentIdx = currentIdx,
-                                    sound = sound,
-                                    haptic = haptic,
-                                    filterMode = filterMode,
-                                    accentBlue = accentBlue,
-                                    showAllBlocks = showAllBlocks
-                                ) { idx ->
-                                    currentIdx = idx
-                                    showGrid = false
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-
-            // ── SUBMIT BUTTON (blue pill, full-width-ish, at bottom) ─────
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(Color(0xFFF5F5F5))
-                    .padding(horizontal = 16.dp, vertical = 8.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                Button(
-                    onClick = { showSubmitDialog = true },
-                    modifier = Modifier.fillMaxWidth().height(48.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = accentBlue),
-                    shape = RoundedCornerShape(24.dp)
-                ) {
-                    Text(
-                        "Submit and Finish Exam",
-                        color = Color.White,
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.Medium
-                    )
-                }
-            }
-        }
-
-        // Submit confirmation dialog
+        // Submit confirmation dialog (used by the in-canvas Submit button)
         if (showSubmitDialog) {
             val warning = when {
                 totalUnsolved == 0 -> "You answered all $totalQuestions questions. Ready to submit!"
@@ -802,13 +712,398 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
                                 }
                             }
                         },
-                        colors = ButtonDefaults.buttonColors(containerColor = accentBlue)
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF156BF2))
                     ) { if (submitting) { CircularProgressIndicator(color = Color.White, modifier = Modifier.size(16.dp), strokeWidth = 2.dp) } else { Text("Submit", color = Color.White) } }
                 },
                 dismissButton = { OutlinedButton(onClick = { showSubmitDialog = false }) { Text("Cancel") } }
             )
         }
+
+        // ── Fixed 1364×694 canvas, scaled to fit the screen, centered, scrollable ──
+        BoxWithConstraints(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color(0xFFF5F5F5))
+                .verticalScroll(rememberScrollState()),
+            contentAlignment = Alignment.Center,
+        ) {
+            val scale = minOf(maxWidth.value / 1364f, maxHeight.value / 694f)
+            CanvasBlockPage(
+                scale = scale,
+                title = t.title,
+                studentId = studentId,
+                timeStr = timeStr,
+                readingItems = readingItems,
+                listeningItems = listeningItems,
+                isQBank = isQBank,
+                allItems = t.items,
+                answers = answers,
+                currentIdx = currentIdx,
+                sound = sound,
+                haptic = haptic,
+                filterMode = filterMode,
+                onFilterChange = { filterMode = it },
+                onSubmit = { showSubmitDialog = true },
+                onPick = { idx ->
+                    currentIdx = idx
+                    showGrid = false
+                },
+            )
+        }
         return
+    }
+}
+
+/// Scale helpers — convert absolute pixel values from the 1364×694 reference
+/// canvas into Dp values based on the runtime scale factor.
+private fun Int.sc(s: Float): Dp = (this.toFloat() * s).dp
+private fun Float.sc(s: Float): Dp = (this * s).dp
+
+/**
+ * CanvasBlockPage — renders the exam block-page (question grid) on a fixed
+ * 1364×694 canvas, scaled to fit the available screen space. All positions
+ * are absolute pixel coordinates that get multiplied by `scale` to produce
+ * the actual Dp values used at runtime.
+ *
+ * Layout (top-down):
+ *   ┌────────────────────────────────────────────────────────────────┐
+ *   │ ┌──────┬─────────────────────────────────────────────────────┐ │  ← outer 3px frame
+ *   │ │ logo │ title | studentId | dreamkorea          (30sp)       │ │  ← top info header
+ *   │ │ 138  │ Nepal | All | Solved | Unsolved | Timer (30sp)       │ │  ← nav row
+ *   │ └──────┴─────────────────────────────────────────────────────┘ │
+ *   │ ┌─────────────────────────┐  ┌─────────────────────────┐       │
+ *   │ │ Reading (5×4 grid)      │  │ Listening (5×4 grid)    │       │
+ *   │ │ 1..20                   │  │ 21..40                  │       │
+ *   │ └─────────────────────────┘  └─────────────────────────┘       │
+ *   │                  ┌──────────────────┐                          │
+ *   │                  │  Submit (#156BF2)│                          │
+ *   │                  └──────────────────┘                          │
+ *   └────────────────────────────────────────────────────────────────┘
+ *
+ * "All" tab is always selected (matches the design — #F3F3F9 bg + 4px black underline).
+ */
+@Composable
+private fun CanvasBlockPage(
+    scale: Float,
+    title: String,
+    studentId: String,
+    timeStr: String,
+    readingItems: List<TestItemDetail>,
+    listeningItems: List<TestItemDetail>,
+    isQBank: Boolean,
+    allItems: List<TestItemDetail>,
+    answers: SnapshotStateMap<String, Any>,
+    currentIdx: Int,
+    sound: SoundManager,
+    haptic: androidx.compose.ui.hapticfeedback.HapticFeedback,
+    filterMode: Boolean?,
+    onFilterChange: (Boolean?) -> Unit,
+    onSubmit: () -> Unit,
+    onPick: (Int) -> Unit,
+) {
+    val frameColor = Color(0xFF343434)
+    val navTabBg = Color(0xFFF3F3F9)
+    val groupBorder = Color(0xFF111111)
+    val titleBoxBorder = Color(0xFFC8C8C8)
+    val submitBlue = Color(0xFF156BF2)
+    val headerSp = (30f * scale).sp
+    val titleSp = (25f * scale).sp
+    val numSp = (34f * scale).sp
+
+    Box(
+        modifier = Modifier
+            .width(1364.sc(scale))
+            .height(694.sc(scale))
+            .border(3.sc(scale), frameColor)
+            .background(Color.White)
+    ) {
+        // Watermark logo behind everything (0.10 alpha)
+        Image(
+            painter = painterResource(id = app.dreamkorea.smartclass.R.drawable.dreamkorea_logo),
+            contentDescription = null,
+            modifier = Modifier
+                .align(Alignment.Center)
+                .size(280.sc(scale))
+                .alpha(0.10f),
+            contentScale = ContentScale.Fit
+        )
+
+        // ── Top header (height 157): logo (138 wide) | info column (rest) ──
+        Row(modifier = Modifier.align(Alignment.TopStart).fillMaxWidth().height(157.sc(scale))) {
+            // Logo box (138 wide, 157 tall, 3px right border)
+            Box(
+                modifier = Modifier
+                    .width(138.sc(scale))
+                    .fillMaxHeight()
+                    .border(width = 3.sc(scale), color = frameColor)
+                    .background(Color.White),
+                contentAlignment = Alignment.Center
+            ) {
+                Image(
+                    painter = painterResource(id = app.dreamkorea.smartclass.R.drawable.dreamkorea_logo),
+                    contentDescription = "DreamKorea Logo",
+                    modifier = Modifier.size(80.sc(scale)),
+                    contentScale = ContentScale.Fit
+                )
+            }
+            // Info column: title row (top) | nav row (bottom) — each 78 tall
+            Column(modifier = Modifier.weight(1f).fillMaxHeight()) {
+                // Title row (30sp): title | studentId | "dreamkorea"
+                Row(
+                    modifier = Modifier.fillMaxWidth().weight(1f).background(Color.White),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        title,
+                        color = Color(0xFF111111),
+                        fontSize = headerSp,
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f).padding(horizontal = 8.sc(scale))
+                    )
+                    Text("ID: $studentId", color = Color(0xFF444444), fontSize = headerSp, fontWeight = FontWeight.Medium, modifier = Modifier.padding(horizontal = 8.sc(scale)))
+                    Text("dreamkorea", color = Color(0xFF003478), fontSize = headerSp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 8.sc(scale)))
+                }
+                // Nav row (30sp): Nepal | All (selected) | Solved | Unsolved | Timer
+                Row(
+                    modifier = Modifier.fillMaxWidth().weight(1f),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    NavTab(scale, headerSp, "Nepal", selected = false, onClick = null)
+                    NavTab(scale, headerSp, "All", selected = filterMode == null, underline = true, bg = navTabBg, onClick = { onFilterChange(null) })
+                    NavTab(scale, headerSp, "Solved", selected = filterMode == true, onClick = { onFilterChange(true) })
+                    NavTab(scale, headerSp, "Unsolved", selected = filterMode == false, onClick = { onFilterChange(false) })
+                    // Timer (right)
+                    Box(modifier = Modifier.weight(1f).fillMaxHeight().background(Color.White), contentAlignment = Alignment.Center) {
+                        Text(timeStr, color = Color(0xFF222222), fontSize = headerSp, fontWeight = FontWeight.Bold, fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace)
+                    }
+                }
+            }
+        }
+
+        // Horizontal divider under header (3px black line at y=157)
+        Box(modifier = Modifier.align(Alignment.TopStart).fillMaxWidth().height(3.sc(scale)).offset(y = 157.sc(scale)).background(frameColor))
+
+        // ── Bottom area (height 694 - 157 = 537): Reading | Listening groups + Submit ──
+        Column(
+            modifier = Modifier
+                .align(Alignment.TopStart)
+                .fillMaxWidth()
+                .height((694 - 157).sc(scale))
+                .offset(y = 160.sc(scale))
+                .padding(8.sc(scale))
+        ) {
+            Row(modifier = Modifier.weight(1f).fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.sc(scale))) {
+                if (isQBank) {
+                    CanvasGroup(
+                        scale = scale,
+                        title = "All Questions",
+                        titleSp = titleSp,
+                        numSp = numSp,
+                        items = allItems,
+                        baseIdx = 0,
+                        startNum = 1,
+                        answers = answers,
+                        currentIdx = currentIdx,
+                        sound = sound,
+                        haptic = haptic,
+                        filterMode = filterMode,
+                        onPick = onPick,
+                        modifier = Modifier.weight(1f).fillMaxHeight(),
+                    )
+                } else {
+                    CanvasGroup(
+                        scale = scale,
+                        title = "Reading",
+                        titleSp = titleSp,
+                        numSp = numSp,
+                        items = readingItems,
+                        baseIdx = 0,
+                        startNum = 1,
+                        answers = answers,
+                        currentIdx = currentIdx,
+                        sound = sound,
+                        haptic = haptic,
+                        filterMode = filterMode,
+                        onPick = onPick,
+                        modifier = Modifier.weight(1f).fillMaxHeight(),
+                    )
+                    CanvasGroup(
+                        scale = scale,
+                        title = "Listening",
+                        titleSp = titleSp,
+                        numSp = numSp,
+                        items = listeningItems,
+                        baseIdx = readingItems.size,
+                        startNum = 21,
+                        answers = answers,
+                        currentIdx = currentIdx,
+                        sound = sound,
+                        haptic = haptic,
+                        filterMode = filterMode,
+                        onPick = onPick,
+                        modifier = Modifier.weight(1f).fillMaxHeight(),
+                    )
+                }
+            }
+            // Submit button (centered, #156BF2)
+            Box(modifier = Modifier.fillMaxWidth().padding(top = 8.sc(scale)), contentAlignment = Alignment.Center) {
+                Button(
+                    onClick = onSubmit,
+                    modifier = Modifier.width(300.sc(scale)).height(50.sc(scale)),
+                    colors = ButtonDefaults.buttonColors(containerColor = submitBlue),
+                    shape = RoundedCornerShape(8.sc(scale))
+                ) {
+                    Text("Submit and Finish Exam", color = Color.White, fontSize = (18f * scale).sp, fontWeight = FontWeight.Bold)
+                }
+            }
+        }
+    }
+}
+
+/// Single nav tab in the CanvasBlockPage header. `selected` controls color
+/// and (optionally) a 4px black underline. `onClick = null` makes it a static label.
+@Composable
+private fun NavTab(
+    scale: Float,
+    sp: androidx.compose.ui.unit.TextUnit,
+    label: String,
+    selected: Boolean,
+    underline: Boolean = false,
+    bg: Color = Color.White,
+    onClick: (() -> Unit)?,
+) {
+    val textColor = if (selected) Color(0xFF111111) else Color(0xFF444444)
+    val weight = FontWeight.Bold
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .fillMaxHeight()
+            .background(if (selected) bg else Color.White)
+            .let { if (onClick != null) it.clickable { onClick() } else it },
+        contentAlignment = Alignment.Center
+    ) {
+        Column(modifier = Modifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
+            Text(label, color = textColor, fontSize = sp, fontWeight = weight)
+            if (underline || selected) {
+                Box(modifier = Modifier.fillMaxWidth().height(4.sc(scale)).background(Color.Black))
+            }
+        }
+    }
+}
+
+/**
+ * CanvasGroup — one of the two halves (Reading / Listening) of the block page.
+ * Renders a title box (2px #C8C8C8 border, 25sp) and a 5×4 grid of question
+ * boxes inside a 4px #111111 border with 20px corner radius.
+ *
+ * Numbering:
+ *   • Reading    → displayNum = localIdx + 1     (1..20)
+ *   • Listening  → displayNum = localIdx + 21    (21..40)
+ * globalIdx is the index into the full sorted items list (so onPick can jump
+ * the exam screen to the correct question).
+ */
+@Composable
+private fun CanvasGroup(
+    scale: Float,
+    title: String,
+    titleSp: androidx.compose.ui.unit.TextUnit,
+    numSp: androidx.compose.ui.unit.TextUnit,
+    items: List<TestItemDetail>,
+    baseIdx: Int,
+    startNum: Int,
+    answers: SnapshotStateMap<String, Any>,
+    currentIdx: Int,
+    sound: SoundManager,
+    haptic: androidx.compose.ui.hapticfeedback.HapticFeedback,
+    filterMode: Boolean?,
+    onPick: (Int) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val groupBorder = Color(0xFF111111)
+    val titleBoxBorder = Color(0xFFC8C8C8)
+    val cols = 5
+    val rows = 4
+
+    Column(modifier = modifier) {
+        // Title box (2px #C8C8C8 border, 25sp)
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(40.sc(scale))
+                .border(2.sc(scale), titleBoxBorder)
+                .background(Color.White),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(title, color = Color(0xFF111111), fontSize = titleSp, fontWeight = FontWeight.Bold)
+        }
+        // Group container (4px #111111 border, 20px radius)
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .fillMaxWidth()
+                .border(4.sc(scale), groupBorder, RoundedCornerShape(20.sc(scale)))
+                .background(Color.White)
+                .padding(8.sc(scale))
+        ) {
+            Column(
+                modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(6.sc(scale))
+            ) {
+                for (rowIdx in 0 until rows) {
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.sc(scale))) {
+                        for (colIdx in 0 until cols) {
+                            val localIdx = rowIdx * cols + colIdx
+                            val displayNum = startNum + localIdx
+                            if (localIdx < items.size) {
+                                val globalIdx = baseIdx + localIdx
+                                val item = items[localIdx]
+                                val isAnswered = answers.containsKey(item.question.id)
+                                val isCurrent = globalIdx == currentIdx
+                                val isFilteredOut = when (filterMode) {
+                                    true -> !isAnswered
+                                    false -> isAnswered
+                                    null -> false
+                                }
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .aspectRatio(1f)
+                                        .border(3.sc(scale), if (isCurrent) Color(0xFF156BF2) else groupBorder)
+                                        .background(if (isAnswered) Color(0xFF156BF2) else Color.White)
+                                        .alpha(if (isFilteredOut) 0.15f else 1f)
+                                        .clickable(enabled = !isFilteredOut) {
+                                            sound.click()
+                                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                            onPick(globalIdx)
+                                        },
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        "$displayNum",
+                                        color = if (isAnswered) Color.White else Color(0xFF111111),
+                                        fontSize = numSp,
+                                        fontWeight = FontWeight.Bold,
+                                    )
+                                }
+                            } else {
+                                // Empty placeholder cell
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .aspectRatio(1f)
+                                        .border(3.sc(scale), Color(0xFFEEEEEE)),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text("$displayNum", color = Color(0xFFCCCCCC), fontSize = numSp, fontWeight = FontWeight.Normal)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -826,7 +1121,7 @@ private fun RefTab(label: String, active: Boolean, accent: Color, modifier: Modi
         Text(
             label,
             color = if (active) Color(0xFF111111) else Color(0xFF444444),
-            fontSize = 13.sp,
+            fontSize = 16.sp,
             fontWeight = if (active) FontWeight.SemiBold else FontWeight.Normal
         )
         Spacer(Modifier.height(6.dp))
@@ -907,7 +1202,7 @@ private fun QuestionGridRef(
                         }
                         Box(
                             modifier = Modifier
-                                .weight(1f)
+                                .fillMaxWidth()
                                 .aspectRatio(1f)  // PERFECT SQUARE — always 1:1
                                 .clip(RoundedCornerShape(6.dp))
                                 .border(
@@ -942,7 +1237,7 @@ private fun QuestionGridRef(
                         val placeholderNum = if (isAudioGrid) localIdx + 21 else localIdx + 1
                         Box(
                             modifier = Modifier
-                                .weight(1f)
+                                .fillMaxWidth()
                                 .aspectRatio(1f)  // PERFECT SQUARE
                                 .clip(RoundedCornerShape(6.dp))
                                 .border(1.5.dp, Color(0xFFEEEEEE), RoundedCornerShape(6.dp))
@@ -952,7 +1247,7 @@ private fun QuestionGridRef(
                             Text(
                                 "$placeholderNum",
                                 color = Color(0xFFCCCCCC),
-                                fontSize = 13.sp,
+                                fontSize = 16.sp,
                                 fontWeight = FontWeight.Normal,
                             )
                         }
@@ -997,12 +1292,21 @@ private fun LegendItem(color: Color, label: String) {
     }
 }
 
-// ─── Audio player with loop support ───────────────────────────────────────────
+// ─── Audio player — compact 36dp play-icon-only button ───────────────────────
 // loopCount = total number of times to play the audio:
 //   0 or 1 = plays once
 //   2 = plays twice
 //   N = plays N times
 //  -1 = infinite loop
+//
+// `blocked` = true disables the button (another audio is currently playing).
+// `unlimited` = true ignores loopCount and lets the user replay indefinitely
+//   (used by the review screen so students can listen as many times as they want).
+//
+// Play count is persisted in the parent `playCounts` map (keyed by `questionId`)
+// so navigating away and back doesn't reset it. In review mode (`playCounts` is
+// null or `unlimited` is true), a local `localPlayCount` is used instead so the
+// UI can still show "playing" state without the parent map.
 @Composable
 fun AudioPlayerCard(
     theme: AppTheme,
@@ -1012,27 +1316,29 @@ fun AudioPlayerCard(
     sound: SoundManager,
     questionId: String? = null,
     playCounts: SnapshotStateMap<String, Int>? = null,
+    blocked: Boolean = false,
+    unlimited: Boolean = false,
     onPlayingChange: ((Boolean) -> Unit)? = null,
 ) {
-    val context = LocalContext.current
     var mediaPlayer by remember { mutableStateOf<android.media.MediaPlayer?>(null) }
     var isPlaying by remember { mutableStateOf(false) }
+    // Local play count — used when there's no parent playCounts map (review mode)
+    var localPlayCount by remember { mutableStateOf(0) }
 
-    // PERSISTENT play count — stored in parent map (survives navigation).
-    // Prevents cheat where student navigates away and back to reset plays.
-    val persistentCount = playCounts?.get(questionId) ?: 0
-    // Sync isPlaying with parent callback
+    val persistentCount = playCounts?.get(questionId) ?: localPlayCount
     LaunchedEffect(isPlaying) {
         onPlayingChange?.invoke(isPlaying)
     }
 
     val maxPlays = if (loopCount <= 0) 2 else loopCount
-    val disabled = persistentCount >= maxPlays
+    val disabled = !unlimited && persistentCount >= maxPlays
     val scope = rememberCoroutineScope()
 
     fun incrementPlayCount() {
         if (questionId != null && playCounts != null) {
             playCounts[questionId] = (playCounts[questionId] ?: 0) + 1
+        } else {
+            localPlayCount++
         }
     }
 
@@ -1043,96 +1349,76 @@ fun AudioPlayerCard(
         }
     }
 
-    Surface(color = theme.cardBg, shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth(), shadowElevation = 1.dp) {
-        Row(
-            modifier = Modifier.padding(14.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            // Audio icon
-            Surface(
-                color = if (disabled) Color(0xFFE2E8F0) else theme.primary.copy(alpha = 0.15f),
-                shape = RoundedCornerShape(10.dp),
-                modifier = Modifier.size(44.dp)
-            ) {
-                Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
-                    Icon(
-                        Icons.Default.Headphones,
-                        null,
-                        tint = if (disabled) Color(0xFF94A3B8) else theme.primary,
-                        modifier = Modifier.size(22.dp)
-                    )
-                }
-            }
-            Spacer(Modifier.width(12.dp))
-            // Simple label — no play count shown
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    if (disabled) "Audio locked" else "Tap to play",
-                    color = if (disabled) Color(0xFF94A3B8) else theme.darkText,
-                    fontSize = 13.sp,
-                    fontWeight = FontWeight.SemiBold
-                )
-            }
-            // Play/Pause button — DISABLED after all plays used
-            IconButton(
-                onClick = {
-                    if (disabled) return@IconButton
-                    sound.click()
-                    if (isPlaying) {
-                        // Don't pause — let it finish. Only allow play, not pause.
-                        return@IconButton
-                    } else {
-                        try {
-                            mediaPlayer?.release()
-                            val mp = android.media.MediaPlayer().apply {
-                                setDataSource(url)
-                                setOnPreparedListener {
-                                    start()
-                                    isPlaying = true
-                                    incrementPlayCount()
-                                }
-                                setOnCompletionListener {
-                                    val currentCount = playCounts?.get(questionId) ?: 0
-                                    if (currentCount < maxPlays) {
-                                        scope.launch {
-                                            if (loopDelaySec > 0) delay(loopDelaySec * 1000L)
-                                            val latestCount = playCounts?.get(questionId) ?: 0
-                                            if (latestCount < maxPlays) {
-                                                incrementPlayCount()
-                                                start()
-                                            } else {
-                                                isPlaying = false
-                                            }
-                                        }
-                                    } else {
-                                        isPlaying = false
-                                    }
-                                }
-                                setOnErrorListener { _, _, _ ->
-                                    isPlaying = false
-                                    true
-                                }
-                                prepareAsync()
+    // Compact 36dp play-icon-only button — no label, no card wrapper.
+    Surface(
+        color = Color.Transparent,
+        shape = androidx.compose.foundation.shape.CircleShape,
+        modifier = Modifier.size(36.dp)
+    ) {
+        IconButton(
+            onClick = {
+                if (disabled || blocked) return@IconButton
+                sound.click()
+                if (isPlaying) {
+                    // Don't pause — let it finish. Only allow play, not pause.
+                    return@IconButton
+                } else {
+                    try {
+                        mediaPlayer?.release()
+                        val mp = android.media.MediaPlayer().apply {
+                            setDataSource(url)
+                            setOnPreparedListener {
+                                start()
+                                isPlaying = true
+                                incrementPlayCount()
                             }
-                            mediaPlayer = mp
-                        } catch (_: Exception) {
-                            isPlaying = false
+                            setOnCompletionListener {
+                                val currentCount = playCounts?.get(questionId) ?: localPlayCount
+                                if (unlimited || currentCount < maxPlays) {
+                                    scope.launch {
+                                        if (loopDelaySec > 0) delay(loopDelaySec * 1000L)
+                                        val latestCount = playCounts?.get(questionId) ?: localPlayCount
+                                        if (unlimited || latestCount < maxPlays) {
+                                            incrementPlayCount()
+                                            start()
+                                        } else {
+                                            isPlaying = false
+                                        }
+                                    }
+                                } else {
+                                    isPlaying = false
+                                }
+                            }
+                            setOnErrorListener { _, _, _ ->
+                                isPlaying = false
+                                true
+                            }
+                            prepareAsync()
                         }
+                        mediaPlayer = mp
+                    } catch (_: Exception) {
+                        isPlaying = false
                     }
+                }
+            },
+            enabled = !disabled && !blocked && !isPlaying,
+            modifier = Modifier.size(36.dp)
+        ) {
+            Icon(
+                when {
+                    disabled -> Icons.Default.Lock
+                    blocked -> Icons.Default.Lock
+                    isPlaying -> Icons.Default.VolumeUp
+                    else -> Icons.Default.PlayArrow
                 },
-                enabled = !disabled && !isPlaying
-            ) {
-                Icon(
-                    when {
-                        disabled -> Icons.Default.Lock
-                        isPlaying -> Icons.Default.VolumeUp
-                        else -> Icons.Default.PlayArrow
-                    },
-                    null,
-                    tint = if (disabled) Color(0xFFCBD5E1) else theme.primary,
-                    modifier = Modifier.size(32.dp)
-                )
-            }
+                null,
+                tint = when {
+                    disabled || blocked -> Color(0xFFCBD5E1)
+                    isPlaying -> Color(0xFF22C55E)
+                    else -> theme.primary
+                },
+                modifier = Modifier.size(24.dp)
+            )
         }
     }
 }
@@ -1508,7 +1794,11 @@ fun ExamResultScreen(
         }
 
         // ── Per-question review (collapsible) ─────────────────────────────
+        // Sorted: Reading (blockType != "audio") first, then Listening (== "audio").
+        // Each section has its own colored header.
         if (showReviewSection) {
+            val readingReviews = result.review.filter { it.blockType != "audio" }
+            val listeningReviews = result.review.filter { it.blockType == "audio" }
             item {
                 Row(
                     modifier = Modifier.fillMaxWidth().alpha(reviewAlpha),
@@ -1524,8 +1814,48 @@ fun ExamResultScreen(
                     )
                 }
             }
-            itemsIndexed(result.review) { idx, review ->
-                ReviewCard(theme, review, idx + 1, sound)
+            // Reading section (blue header)
+            if (readingReviews.isNotEmpty()) {
+                item {
+                    Surface(
+                        color = Color(0xFF003478).copy(alpha = 0.1f),
+                        shape = RoundedCornerShape(8.dp),
+                        modifier = Modifier.fillMaxWidth().alpha(reviewAlpha)
+                    ) {
+                        Text(
+                            "Reading (${readingReviews.size})",
+                            color = Color(0xFF003478),
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)
+                        )
+                    }
+                }
+                itemsIndexed(readingReviews) { idx, review ->
+                    ReviewCard(theme, review, idx + 1, sound)
+                }
+            }
+            // Listening section (purple header)
+            if (listeningReviews.isNotEmpty()) {
+                item {
+                    Spacer(Modifier.height(8.dp))
+                    Surface(
+                        color = Color(0xFF6A1B9A).copy(alpha = 0.1f),
+                        shape = RoundedCornerShape(8.dp),
+                        modifier = Modifier.fillMaxWidth().alpha(reviewAlpha)
+                    ) {
+                        Text(
+                            "Listening (${listeningReviews.size})",
+                            color = Color(0xFF6A1B9A),
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)
+                        )
+                    }
+                }
+                itemsIndexed(listeningReviews) { idx, review ->
+                    ReviewCard(theme, review, idx + 1, sound)
+                }
             }
         }
     }
@@ -1551,6 +1881,7 @@ private fun StatBox(label: String, value: String, color: Color, modifier: Modifi
 
 @Composable
 fun ReviewCard(theme: AppTheme, review: ReviewItem, questionNumber: Int = 0, sound: SoundManager? = null) {
+    val reviewSound = sound ?: rememberSoundManager()
     Surface(
         color = theme.cardBg,
         shape = RoundedCornerShape(12.dp),
@@ -1621,82 +1952,235 @@ fun ReviewCard(theme: AppTheme, review: ReviewItem, questionNumber: Int = 0, sou
                 Spacer(Modifier.height(6.dp))
             }
 
+            // ── Description TEXT (if admin set descType=text) ───────────
+            if (review.descType == "text" && !review.descText.isNullOrBlank()) {
+                Surface(
+                    color = Color(0xFFF8FAFC),
+                    shape = RoundedCornerShape(8.dp),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFE2E8F0)),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(
+                        review.descText!!,
+                        color = theme.darkText,
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Medium,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.padding(12.dp)
+                    )
+                }
+                Spacer(Modifier.height(8.dp))
+            }
+            // ── Description IMAGE ──────────────────────────────────────────
+            if (!review.descImageUrl.isNullOrBlank()) {
+                val url = review.descImageUrl!!.toAbsoluteUrl()
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(max = 200.dp)
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(Color(0xFFF1F5F9)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    RemoteImage(
+                        url = url,
+                        modifier = Modifier.fillMaxWidth().heightIn(max = 200.dp),
+                        contentScale = ContentScale.Fit,
+                    )
+                }
+                Spacer(Modifier.height(8.dp))
+            }
+
+            // ── Media TEXT (if admin set mediaType=text) ────────────────
+            if (review.mediaType == "text" && !review.mediaText.isNullOrBlank()) {
+                Surface(
+                    color = Color(0xFFF8FAFC),
+                    shape = RoundedCornerShape(8.dp),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFE2E8F0)),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(
+                        review.mediaText!!,
+                        color = theme.darkText,
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Medium,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.padding(12.dp)
+                    )
+                }
+                Spacer(Modifier.height(8.dp))
+            }
+            // ── Media IMAGE (mediaImageUrl falls back to legacy imageUrl) ─
+            val mediaImgUrl = (review.mediaImageUrl ?: review.imageUrl)?.toAbsoluteUrl()
+            if (!mediaImgUrl.isNullOrBlank()) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(max = 220.dp)
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(Color(0xFFF1F5F9)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    RemoteImage(
+                        url = mediaImgUrl,
+                        modifier = Modifier.fillMaxWidth().heightIn(max = 220.dp),
+                        contentScale = ContentScale.Fit,
+                    )
+                }
+                Spacer(Modifier.height(8.dp))
+            }
+            // ── Media AUDIO (mediaAudioUrl falls back to legacy audioUrl) ─
+            // Review mode: unlimited replays so students can listen as many times as they want.
+            val mediaAudUrl = (review.mediaAudioUrl ?: review.audioUrl)?.toAbsoluteUrl()
+            if (!mediaAudUrl.isNullOrBlank()) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    AudioPlayerCard(
+                        theme = theme,
+                        url = mediaAudUrl,
+                        loopCount = review.audioLoop.coerceAtLeast(1),
+                        loopDelaySec = review.audioLoopDelay,
+                        sound = reviewSound,
+                        unlimited = true,
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    Text("Question audio (unlimited replays)", color = theme.subText, fontSize = 11.sp)
+                }
+                Spacer(Modifier.height(8.dp))
+            }
+
             // ── Question stem ─────────────────────────────────────────────
             Text(
                 review.stem.take(300),
                 color = theme.darkText,
-                fontSize = 13.sp,
+                fontSize = 16.sp,
                 fontWeight = FontWeight.Medium
             )
-            // Image (if any)
-            if (!review.imageUrl.isNullOrBlank()) {
-                Spacer(Modifier.height(8.dp))
-                val imgAbs = review.imageUrl!!.toAbsoluteUrl()
-                coil.compose.AsyncImage(
-                    model = imgAbs,
-                    contentDescription = "Question image",
-                    modifier = Modifier.fillMaxWidth().heightIn(max = 180.dp).clip(RoundedCornerShape(8.dp)),
-                    contentScale = ContentScale.Fit,
-                )
-            }
-            // Audio (if any) — let student replay the question audio during review
-            if (!review.audioUrl.isNullOrBlank()) {
-                Spacer(Modifier.height(8.dp))
-                val audAbs = review.audioUrl!!.toAbsoluteUrl()
-                AudioPlayerCard(theme = theme, url = audAbs, loopCount = review.audioLoop.coerceAtLeast(1), loopDelaySec = review.audioLoopDelay, sound = sound ?: rememberSoundManager())
-            }
             Spacer(Modifier.height(8.dp))
 
             // ── Options with correct/wrong highlighting ──────────────────
-            // If option is an image URL, render as image; otherwise render as text.
-            review.options?.let { opts ->
-                opts.forEachIndexed { i, opt ->
-                    val isUserAns = (review.userAnswer == opt) || ((review.userAnswer as? List<*>)?.contains(opt) == true)
-                    val isCorrectAns = (review.correctAnswer == opt) || ((review.correctAnswer as? List<*>)?.contains(opt) == true)
-                    val bg = when {
-                        isCorrectAns -> Color(0xFFD4EDDA)
-                        isUserAns && !isCorrectAns -> Color(0xFFFFCDD2)
-                        else -> Color.Transparent
-                    }
-                    val borderColor = when {
-                        isCorrectAns -> Color(0xFF28A745)
-                        isUserAns && !isCorrectAns -> theme.errorRed
-                        else -> Color(0xFFE0E0E0)
-                    }
-                    // Check if this option is an image URL or audio URL
-                    val optImg = review.optionImages.getOrNull(i)?.takeIf { it.isNotBlank() }
-                    val optAud = review.optionAudios.getOrNull(i)?.takeIf { it.isNotBlank() }
-                    val isImageUrl = optImg != null || opt.startsWith("http") || opt.startsWith("/api/files") || opt.startsWith("/uploads")
-                    val isAudioUrl = optAud != null
-                    Surface(
-                        color = bg,
-                        shape = RoundedCornerShape(6.dp),
-                        border = androidx.compose.foundation.BorderStroke(1.dp, borderColor),
-                        modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp)
-                    ) {
-                        Row(modifier = Modifier.padding(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                            Text("${'A' + i}.", color = theme.subText, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                            Spacer(Modifier.width(8.dp))
-                            if (isAudioUrl) {
-                                val audUrl = optAud!!.toAbsoluteUrl()
-                                AudioPlayerCard(theme = theme, url = audUrl, loopCount = 1, loopDelaySec = 0, sound = sound ?: rememberSoundManager())
-                            } else if (isImageUrl) {
-                                // Render as image — use optionImages if available, otherwise the option text IS the URL
-                                val imgUrl = (optImg ?: opt).toAbsoluteUrl()
-                                coil.compose.AsyncImage(
-                                    model = imgUrl,
-                                    contentDescription = "Option ${'A' + i}",
-                                    modifier = Modifier.weight(1f).heightIn(max = 120.dp).clip(RoundedCornerShape(6.dp)),
+            // For "image" answerType we iterate optionImages, for "audio" we iterate
+            // optionAudios, otherwise we iterate the text options list.
+            when (review.answerType) {
+                "image" -> {
+                    review.optionImages.forEachIndexed { i, rawImgUrl ->
+                        if (rawImgUrl.isBlank()) return@forEachIndexed
+                        val imgUrl = rawImgUrl.toAbsoluteUrl()
+                        // Match by URL (the user's answer is stored as the absolute URL)
+                        val isUserAns = (review.userAnswer == imgUrl) || (review.userAnswer == rawImgUrl) ||
+                            ((review.userAnswer as? List<*>)?.any { it == imgUrl || it == rawImgUrl } == true)
+                        val isCorrectAns = i == review.options?.indexOfFirst { it == review.correctAnswer }?.takeIf { it >= 0 } ||
+                            (review.correctAnswer == imgUrl) || (review.correctAnswer == rawImgUrl)
+                        val bg = when {
+                            isCorrectAns -> Color(0xFFD4EDDA)
+                            isUserAns && !isCorrectAns -> Color(0xFFFFCDD2)
+                            else -> Color.Transparent
+                        }
+                        val borderColor = when {
+                            isCorrectAns -> Color(0xFF28A745)
+                            isUserAns && !isCorrectAns -> theme.errorRed
+                            else -> Color(0xFFE0E0E0)
+                        }
+                        Surface(
+                            color = bg,
+                            shape = RoundedCornerShape(6.dp),
+                            border = androidx.compose.foundation.BorderStroke(1.dp, borderColor),
+                            modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp)
+                        ) {
+                            Row(modifier = Modifier.padding(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                                Text("${'A' + i}.", color = theme.subText, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                Spacer(Modifier.width(8.dp))
+                                RemoteImage(
+                                    url = imgUrl,
+                                    modifier = Modifier.weight(1f).height(200.dp).clip(RoundedCornerShape(6.dp)),
                                     contentScale = ContentScale.Fit,
                                 )
-                            } else {
-                                // Render as text
-                                Text(opt, color = theme.darkText, fontSize = 13.sp, fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f))
+                                if (isCorrectAns) {
+                                    Icon(Icons.Default.Check, null, tint = Color(0xFF28A745), modifier = Modifier.size(14.dp))
+                                } else if (isUserAns && !isCorrectAns) {
+                                    Icon(Icons.Default.Close, null, tint = theme.errorRed, modifier = Modifier.size(14.dp))
+                                }
                             }
-                            if (isCorrectAns) {
-                                Icon(Icons.Default.Check, null, tint = Color(0xFF28A745), modifier = Modifier.size(14.dp))
-                            } else if (isUserAns && !isCorrectAns) {
-                                Icon(Icons.Default.Close, null, tint = theme.errorRed, modifier = Modifier.size(14.dp))
+                        }
+                    }
+                }
+                "audio" -> {
+                    review.optionAudios.forEachIndexed { i, rawAudUrl ->
+                        if (rawAudUrl.isBlank()) return@forEachIndexed
+                        val audUrl = rawAudUrl.toAbsoluteUrl()
+                        val isUserAns = (review.userAnswer == audUrl) || (review.userAnswer == rawAudUrl) ||
+                            ((review.userAnswer as? List<*>)?.any { it == audUrl || it == rawAudUrl } == true)
+                        val isCorrectAns = (review.correctAnswer == audUrl) || (review.correctAnswer == rawAudUrl)
+                        val bg = when {
+                            isCorrectAns -> Color(0xFFD4EDDA)
+                            isUserAns && !isCorrectAns -> Color(0xFFFFCDD2)
+                            else -> Color.Transparent
+                        }
+                        val borderColor = when {
+                            isCorrectAns -> Color(0xFF28A745)
+                            isUserAns && !isCorrectAns -> theme.errorRed
+                            else -> Color(0xFFE0E0E0)
+                        }
+                        Surface(
+                            color = bg,
+                            shape = RoundedCornerShape(6.dp),
+                            border = androidx.compose.foundation.BorderStroke(1.dp, borderColor),
+                            modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp)
+                        ) {
+                            Row(modifier = Modifier.padding(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                                Text("${'A' + i}.", color = theme.subText, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                Spacer(Modifier.width(8.dp))
+                                // Unlimited replays during review
+                                AudioPlayerCard(
+                                    theme = theme,
+                                    url = audUrl,
+                                    loopCount = 1,
+                                    loopDelaySec = 0,
+                                    sound = reviewSound,
+                                    unlimited = true,
+                                )
+                                Spacer(Modifier.width(8.dp))
+                                Text(review.options?.getOrNull(i) ?: "Audio ${'A' + i}", color = theme.darkText, fontSize = 13.sp, fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f))
+                                if (isCorrectAns) {
+                                    Icon(Icons.Default.Check, null, tint = Color(0xFF28A745), modifier = Modifier.size(14.dp))
+                                } else if (isUserAns && !isCorrectAns) {
+                                    Icon(Icons.Default.Close, null, tint = theme.errorRed, modifier = Modifier.size(14.dp))
+                                }
+                            }
+                        }
+                    }
+                }
+                else -> {
+                    // Text options (answerType = "text" / "choose" / etc.)
+                    review.options?.let { opts ->
+                        opts.forEachIndexed { i, opt ->
+                            val isUserAns = (review.userAnswer == opt) || ((review.userAnswer as? List<*>)?.contains(opt) == true)
+                            val isCorrectAns = (review.correctAnswer == opt) || ((review.correctAnswer as? List<*>)?.contains(opt) == true)
+                            val bg = when {
+                                isCorrectAns -> Color(0xFFD4EDDA)
+                                isUserAns && !isCorrectAns -> Color(0xFFFFCDD2)
+                                else -> Color.Transparent
+                            }
+                            val borderColor = when {
+                                isCorrectAns -> Color(0xFF28A745)
+                                isUserAns && !isCorrectAns -> theme.errorRed
+                                else -> Color(0xFFE0E0E0)
+                            }
+                            Surface(
+                                color = bg,
+                                shape = RoundedCornerShape(6.dp),
+                                border = androidx.compose.foundation.BorderStroke(1.dp, borderColor),
+                                modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp)
+                            ) {
+                                Row(modifier = Modifier.padding(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                                    Text("${'A' + i}.", color = theme.subText, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                    Spacer(Modifier.width(8.dp))
+                                    Text(opt, color = theme.darkText, fontSize = 13.sp, fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f))
+                                    if (isCorrectAns) {
+                                        Icon(Icons.Default.Check, null, tint = Color(0xFF28A745), modifier = Modifier.size(14.dp))
+                                    } else if (isUserAns && !isCorrectAns) {
+                                        Icon(Icons.Default.Close, null, tint = theme.errorRed, modifier = Modifier.size(14.dp))
+                                    }
+                                }
                             }
                         }
                     }
@@ -1713,7 +2197,7 @@ fun ReviewCard(theme: AppTheme, review: ReviewItem, questionNumber: Int = 0, sou
                 ) {
                     Column(modifier = Modifier.padding(8.dp)) {
                         Text("Your Answer", color = theme.subText, fontSize = 9.sp, fontWeight = FontWeight.SemiBold)
-                        AnswerDisplay(review.userAnswer, theme, sound)
+                        AnswerDisplay(review.userAnswer, theme, reviewSound)
                     }
                 }
                 Spacer(Modifier.width(6.dp))
@@ -1724,7 +2208,7 @@ fun ReviewCard(theme: AppTheme, review: ReviewItem, questionNumber: Int = 0, sou
                 ) {
                     Column(modifier = Modifier.padding(8.dp)) {
                         Text("Correct Answer", color = Color(0xFF4CAF50), fontSize = 9.sp, fontWeight = FontWeight.SemiBold)
-                        AnswerDisplay(review.correctAnswer, theme, sound)
+                        AnswerDisplay(review.correctAnswer, theme, reviewSound)
                     }
                 }
             }
@@ -2025,6 +2509,18 @@ private fun gradeCombinedExamClientSide(
                 correctAnswer = q.options?.getOrNull(q.correctOption),
                 explanation = q.explanation,
                 isCorrect = isCorrect,
+                // Pass-through block-based fields so the ReviewCard can render
+                // description and media (text/image/audio) and the review list
+                // can be sorted into Reading vs Listening.
+                answerType = q.answerType,
+                blockType = q.blockType,
+                descType = q.descType,
+                descText = q.descText,
+                descImageUrl = q.descImageUrl,
+                mediaType = q.mediaType,
+                mediaText = q.mediaText,
+                mediaImageUrl = q.mediaImageUrl,
+                mediaAudioUrl = q.mediaAudioUrl,
             )
         )
     }
@@ -2151,7 +2647,7 @@ fun EyeTestGateScreen(
         Text(
             reason,
             color = Color(0xFF64748B),
-            fontSize = 13.sp,
+            fontSize = 16.sp,
             textAlign = TextAlign.Center,
             modifier = Modifier.padding(horizontal = 24.dp),
         )
@@ -2220,7 +2716,7 @@ fun EyeTestGateScreen(
                         border = androidx.compose.foundation.BorderStroke(2.dp, Color(0xFF003478)),
                         shape = RoundedCornerShape(12.dp),
                         modifier = Modifier
-                            .weight(1f)
+                            .fillMaxWidth()
                             .aspectRatio(1f)
                             .clickable {
                                 sound.click()

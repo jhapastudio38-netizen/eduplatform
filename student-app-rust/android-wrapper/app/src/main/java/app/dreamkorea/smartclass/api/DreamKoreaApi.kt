@@ -157,7 +157,19 @@ data class ReviewItem(
     val userAnswer: Any?, // String or List<String>
     val correctAnswer: Any?, // String or List<String>
     val explanation: String?,
-    val isCorrect: Boolean
+    val isCorrect: Boolean,
+    // Block-based fields — needed so the ReviewCard can render description and
+    // media (text, image, audio) for each question, and so the review list can
+    // be sorted into Reading (blockType != "audio") vs Listening (== "audio").
+    val answerType: String = "text",
+    val blockType: String = "text",
+    val descType: String = "none",
+    val descText: String? = null,
+    val descImageUrl: String? = null,
+    val mediaType: String = "none",
+    val mediaText: String? = null,
+    val mediaImageUrl: String? = null,
+    val mediaAudioUrl: String? = null,
 )
 data class EyeVisionRecommendation(
     val show: Boolean = false,
