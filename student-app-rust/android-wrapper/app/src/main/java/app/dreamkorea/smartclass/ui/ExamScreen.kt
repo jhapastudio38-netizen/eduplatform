@@ -412,20 +412,24 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
                     // Description IMAGE — shown whenever a URL exists
                     if (!q.descImageUrl.isNullOrBlank()) {
                         val url = q.descImageUrl!!.toAbsoluteUrl()
-                        val ctx = LocalContext.current
-                        coil.compose.AsyncImage(
-                            model = ImageRequest.Builder(ctx)
-                                .data(url)
-                                .listener(
-                                    onStart = { Log.d("IMG_DEBUG", "descImage loading: $url") },
-                                    onSuccess = { _, r -> Log.d("IMG_DEBUG", "descImage SUCCESS: ${r.drawable.intrinsicWidth}x${r.drawable.intrinsicHeight}") },
-                                    onError = { _, r -> Log.e("IMG_DEBUG", "descImage ERROR: $url", r.throwable) }
-                                )
-                                .build(),
-                            contentDescription = null,
-                            modifier = Modifier.fillMaxWidth(0.92f).height(200.dp).padding(vertical = 4.dp).clip(RoundedCornerShape(8.dp)).clickable { FullScreenImageViewer.show(url) },
-                            contentScale = ContentScale.Fit,
-                        )
+                        Log.d("IMG_DEBUG", "Rendering desc image, URL = $url")
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth(0.92f)
+                                .height(200.dp)
+                                .padding(vertical = 4.dp)
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(Color(0xFFF1F5F9))
+                                .clickable { FullScreenImageViewer.show(url) },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            coil.compose.AsyncImage(
+                                model = url,
+                                contentDescription = "Description image",
+                                modifier = Modifier.fillMaxSize(),
+                                contentScale = ContentScale.Fit,
+                            )
+                        }
                     }
                     // Media TEXT — shown in a centered card (18sp)
                     if (q.mediaType == "text" && !q.mediaText.isNullOrBlank()) {
@@ -448,20 +452,24 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
                     // Media IMAGE — main media image (shown whenever a URL exists)
                     val mediaImgUrl = (q.mediaImageUrl ?: q.imageUrl)?.toAbsoluteUrl()
                     if (!mediaImgUrl.isNullOrBlank()) {
-                        val ctx2 = LocalContext.current
-                        coil.compose.AsyncImage(
-                            model = ImageRequest.Builder(ctx2)
-                                .data(mediaImgUrl)
-                                .listener(
-                                    onStart = { Log.d("IMG_DEBUG", "mediaImage loading: $mediaImgUrl") },
-                                    onSuccess = { _, r -> Log.d("IMG_DEBUG", "mediaImage SUCCESS: ${r.drawable.intrinsicWidth}x${r.drawable.intrinsicHeight}") },
-                                    onError = { _, r -> Log.e("IMG_DEBUG", "mediaImage ERROR: $mediaImgUrl", r.throwable) }
-                                )
-                                .build(),
-                            contentDescription = null,
-                            modifier = Modifier.fillMaxWidth(0.92f).height(220.dp).padding(vertical = 4.dp).clip(RoundedCornerShape(8.dp)).clickable { FullScreenImageViewer.show(mediaImgUrl) },
-                            contentScale = ContentScale.Fit,
-                        )
+                        Log.d("IMG_DEBUG", "Rendering media image, URL = $mediaImgUrl")
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth(0.92f)
+                                .height(220.dp)
+                                .padding(vertical = 4.dp)
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(Color(0xFFF1F5F9))
+                                .clickable { FullScreenImageViewer.show(mediaImgUrl) },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            coil.compose.AsyncImage(
+                                model = mediaImgUrl,
+                                contentDescription = "Question image",
+                                modifier = Modifier.fillMaxSize(),
+                                contentScale = ContentScale.Fit,
+                            )
+                        }
                     }
                     // Media AUDIO — single play button (36dp), blocked when another audio is playing
                     val mediaAudUrl = (q.mediaAudioUrl ?: q.audioUrl)?.toAbsoluteUrl()
