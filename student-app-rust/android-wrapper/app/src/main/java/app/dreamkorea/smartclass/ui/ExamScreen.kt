@@ -1004,36 +1004,34 @@ private fun CanvasBlockPage(
         )
 
         // ── Reading question boxes (numbers 1–20): 5 cols × 4 rows ──
+        // sortedItems has Reading items first (index 0..readingCount-1), then Listening.
+        // So clicking Reading box N opens sortedItems[N-1] which is currentIdx = localIdx.
         for ((rowIdx, rowY) in QBoxRows.withIndex()) {
             for ((colIdx, colX) in QBoxColsReading.withIndex()) {
                 val localIdx = rowIdx * 5 + colIdx
                 if (localIdx >= readingItems.size) continue
                 val item = readingItems[localIdx]
                 val q = item.question
-                val globalIdx = allItems.indexOfFirst { it.question.id == q.id }.takeIf { it >= 0 } ?: localIdx
-                val displayNum = if (q.blockType == "audio") {
-                    (q.blockNumber.takeIf { it > 0 } ?: (localIdx + 1)) + 20
-                } else {
-                    q.blockNumber.takeIf { it > 0 } ?: (localIdx + 1)
-                }
+                // globalIdx into sortedItems = localIdx (Reading items are first in sortedItems)
+                val globalIdx = localIdx
+                val displayNum = localIdx + 1
                 CanvasQuestionBox(scale, colX, rowY, displayNum, q.id, globalIdx, currentIdx,
                     answers, filterMode, accentBlue, borderColor, sound, haptic, onPick)
             }
         }
 
         // ── Listening question boxes (numbers 21–40): 5 cols × 4 rows ──
+        // sortedItems has Listening items after Reading items.
+        // So clicking Listening box N opens sortedItems[readingCount + localIdx].
         for ((rowIdx, rowY) in QBoxRows.withIndex()) {
             for ((colIdx, colX) in QBoxColsListening.withIndex()) {
                 val localIdx = rowIdx * 5 + colIdx
                 if (localIdx >= listeningItems.size) continue
                 val item = listeningItems[localIdx]
                 val q = item.question
-                val globalIdx = allItems.indexOfFirst { it.question.id == q.id }.takeIf { it >= 0 } ?: localIdx
-                val displayNum = if (q.blockType == "audio") {
-                    (q.blockNumber.takeIf { it > 0 } ?: (localIdx + 1)) + 20
-                } else {
-                    q.blockNumber.takeIf { it > 0 } ?: (localIdx + 1)
-                }
+                // globalIdx into sortedItems = readingItems.size + localIdx
+                val globalIdx = readingItems.size + localIdx
+                val displayNum = localIdx + 21
                 CanvasQuestionBox(scale, colX, rowY, displayNum, q.id, globalIdx, currentIdx,
                     answers, filterMode, accentBlue, borderColor, sound, haptic, onPick)
             }
