@@ -2,6 +2,7 @@ package app.dreamkorea.smartclass.ui
 
 import android.app.Activity
 import android.content.pm.ActivityInfo
+import android.util.Log
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.Image
@@ -46,6 +47,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import app.dreamkorea.smartclass.api.*
 import app.dreamkorea.smartclass.data.AppState
+import coil.request.ImageRequest
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
@@ -407,11 +409,20 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
                             )
                         }
                     }
-                    // Description IMAGE — shown whenever a URL exists (regardless of descType)
+                    // Description IMAGE — shown whenever a URL exists
                     if (!q.descImageUrl.isNullOrBlank()) {
                         val url = q.descImageUrl!!.toAbsoluteUrl()
+                        val ctx = LocalContext.current
                         coil.compose.AsyncImage(
-                            model = url, contentDescription = null,
+                            model = ImageRequest.Builder(ctx)
+                                .data(url)
+                                .listener(
+                                    onStart = { Log.d("IMG_DEBUG", "descImage loading: $url") },
+                                    onSuccess = { _, r -> Log.d("IMG_DEBUG", "descImage SUCCESS: ${r.drawable.intrinsicWidth}x${r.drawable.intrinsicHeight}") },
+                                    onError = { _, r -> Log.e("IMG_DEBUG", "descImage ERROR: $url", r.throwable) }
+                                )
+                                .build(),
+                            contentDescription = null,
                             modifier = Modifier.fillMaxWidth(0.92f).heightIn(max = 220.dp).padding(vertical = 4.dp).clip(RoundedCornerShape(8.dp)).clickable { FullScreenImageViewer.show(url) },
                             contentScale = ContentScale.Fit,
                         )
@@ -437,8 +448,17 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
                     // Media IMAGE — main media image (shown whenever a URL exists)
                     val mediaImgUrl = (q.mediaImageUrl ?: q.imageUrl)?.toAbsoluteUrl()
                     if (!mediaImgUrl.isNullOrBlank()) {
+                        val ctx2 = LocalContext.current
                         coil.compose.AsyncImage(
-                            model = mediaImgUrl, contentDescription = null,
+                            model = ImageRequest.Builder(ctx2)
+                                .data(mediaImgUrl)
+                                .listener(
+                                    onStart = { Log.d("IMG_DEBUG", "mediaImage loading: $mediaImgUrl") },
+                                    onSuccess = { _, r -> Log.d("IMG_DEBUG", "mediaImage SUCCESS: ${r.drawable.intrinsicWidth}x${r.drawable.intrinsicHeight}") },
+                                    onError = { _, r -> Log.e("IMG_DEBUG", "mediaImage ERROR: $mediaImgUrl", r.throwable) }
+                                )
+                                .build(),
+                            contentDescription = null,
                             modifier = Modifier.fillMaxWidth(0.92f).heightIn(max = 240.dp).padding(vertical = 4.dp).clip(RoundedCornerShape(8.dp)).clickable { FullScreenImageViewer.show(mediaImgUrl) },
                             contentScale = ContentScale.Fit,
                         )
@@ -514,7 +534,7 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
                                     Box(contentAlignment = Alignment.Center) { Text("${i+1}", color = if (isSelected) Color.White else Color.Black, fontSize = 14.sp, fontWeight = FontWeight.Bold) }
                                 }
                                 Spacer(Modifier.width(6.dp))
-                                coil.compose.AsyncImage(model = absUrl, contentDescription = "Option ${i+1}", modifier = Modifier.size(80.dp).clip(RoundedCornerShape(4.dp)).clickable { FullScreenImageViewer.show(absUrl) }, contentScale = ContentScale.Fit)
+                                coil.compose.AsyncImage(model = ImageRequest.Builder(LocalContext.current).data(absUrl).listener(onStart = { Log.d("IMG_DEBUG", "optionImage loading: $absUrl") }, onSuccess = { _, r -> Log.d("IMG_DEBUG", "optionImage SUCCESS") }, onError = { _, r -> Log.e("IMG_DEBUG", "optionImage ERROR: $absUrl", r.throwable) }).build(), contentDescription = "Option ${i+1}", modifier = Modifier.size(80.dp).clip(RoundedCornerShape(4.dp)).clickable { FullScreenImageViewer.show(absUrl) }, contentScale = ContentScale.Fit)
                             }
                         }
                     }
