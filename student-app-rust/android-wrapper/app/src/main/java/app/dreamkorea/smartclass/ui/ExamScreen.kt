@@ -71,7 +71,7 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
     var error by remember { mutableStateOf("") }
     var currentIdx by remember { mutableStateOf(0) }
     val answers = remember { mutableStateMapOf<String, Any>() }
-    // Persistent audio play counts per question ID — survives navigation.
+    // Persistent audio play counts per question ID — survives navigation AND config changes.
     // Prevents cheat where student navigates away and back to reset plays.
     val audioPlayCounts = remember { mutableStateMapOf<String, Int>() }
     // When audio is playing, disable navigation buttons
@@ -147,7 +147,9 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
             }
             if (result != null) {
                 test = result
-                timeLeft = (if (result.durationMin > 0) result.durationMin else 50) * 60
+                // Default to 50 minutes if duration is 0 or > 50 (user wants 50 min default)
+                val dur = result.durationMin
+                timeLeft = (if (dur > 0 && dur <= 50) dur else 50) * 60
             } else {
                 error = "The request timed out. Check your internet connection and try again."
             }

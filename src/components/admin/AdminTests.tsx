@@ -323,7 +323,7 @@ function CreateExamDialog({ open, testCategory, onOpenChange, onCreated }: {
   const [form, setForm] = useState({
     title: "",
     description: "",
-    durationMin: 60,
+    durationMin: 50,
     examType: "UBT",
     category: "",
     price: "",
@@ -413,7 +413,7 @@ function CreateExamDialog({ open, testCategory, onOpenChange, onCreated }: {
           <div className="grid grid-cols-2 gap-3">
             <div>
               <Label className="text-sm font-semibold">Time (minutes) *</Label>
-              <Input type="number" value={form.durationMin} onChange={(e) => setForm(f => ({ ...f, durationMin: parseInt(e.target.value) || 60 }))} min={1} />
+              <Input type="number" value={form.durationMin} onChange={(e) => setForm(f => ({ ...f, durationMin: parseInt(e.target.value) || 50 }))} min={1} />
             </div>
             <div>
               <Label className="text-sm font-semibold">Price (optional)</Label>
