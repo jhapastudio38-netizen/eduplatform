@@ -383,17 +383,12 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
                 contentScale = ContentScale.Fit
             )
             Row(modifier = Modifier.fillMaxSize()) {
-            // LEFT: Question content (60%) — uses BoxWithConstraints so it always
-            // fills the available height, centering its contents vertically.
-            BoxWithConstraints(
-                modifier = Modifier.weight(0.6f).fillMaxHeight().padding(8.dp)
+            // LEFT: Question content (60%) — scrollable so long content doesn't get cut
+            Column(
+                modifier = Modifier.weight(0.6f).fillMaxHeight().padding(8.dp).verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.Center,
+                horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                val boxMaxHeight = this.maxHeight
-                Column(
-                    modifier = Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).heightIn(min = boxMaxHeight),
-                    verticalArrangement = Arrangement.Center,
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
                     // Description TEXT — shown in a centered card (18sp)
                     if (q.descType == "text" && !q.descText.isNullOrBlank()) {
                         Surface(
@@ -467,7 +462,6 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
                             )
                         }
                     }
-                }
             }
 
             // Vertical divider
