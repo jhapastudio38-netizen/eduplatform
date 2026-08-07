@@ -5,6 +5,7 @@ import android.content.pm.ActivityInfo
 import android.util.Log
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import androidx.compose.ui.graphics.asImageBitmap
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import androidx.compose.animation.*
@@ -67,7 +68,6 @@ import kotlinx.coroutines.withTimeoutOrNull
  * 7. Final score + review screen
  * 8. Stats auto-update via /api/student/tests/[id]/submit
  */
-@Composable
 
 /**
  * Custom image loader that downloads bytes via OkHttp (bypassing Coil's Content-Type check)
@@ -129,7 +129,7 @@ fun RemoteImage(
     Box(modifier = modifier, contentAlignment = Alignment.Center) {
         if (bitmap != null) {
             Image(
-                bitmap = bitmap!!,
+                bitmap = bitmap!!.asImageBitmap(),
                 contentDescription = "Question image",
                 modifier = Modifier.fillMaxSize(),
                 contentScale = contentScale,
@@ -138,6 +138,7 @@ fun RemoteImage(
     }
 }
 
+@Composable
 fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
     val sound = rememberSoundManager()
     val scope = rememberCoroutineScope()
