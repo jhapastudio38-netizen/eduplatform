@@ -356,7 +356,7 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
             Row(verticalAlignment = Alignment.Top) {
                 Text("${currentIdx + 1}. ", color = Color(0xFF003478), fontSize = 16.sp, fontWeight = FontWeight.Bold)
                 val displayText = q.stem.ifBlank { q.mediaText ?: "" }
-                Text(displayText, color = Color(0xFF1E293B), fontSize = 15.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f, fill = true))
+                Text(displayText, color = Color(0xFF1E293B), fontSize = 16.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f, fill = true))
                 if (q.isFree) {
                     Spacer(Modifier.width(4.dp))
                     Surface(color = Color(0xFF22C55E), shape = RoundedCornerShape(3.dp)) {
@@ -392,7 +392,7 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
                     verticalArrangement = Arrangement.Center,
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    // Description TEXT — shown in a centered card (17sp)
+                    // Description TEXT — shown in a centered card (18sp)
                     if (q.descType == "text" && !q.descText.isNullOrBlank()) {
                         Surface(
                             color = Color.White,
@@ -404,22 +404,22 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
                             Text(
                                 q.descText!!,
                                 color = Color(0xFF1E293B),
-                                fontSize = 17.sp,
+                                fontSize = 18.sp,
                                 fontWeight = FontWeight.Medium,
                                 modifier = Modifier.padding(14.dp)
                             )
                         }
                     }
-                    // Description IMAGE — shown when descType == "image"
-                    if (q.descType == "image" && !q.descImageUrl.isNullOrBlank()) {
+                    // Description IMAGE — shown whenever a URL exists (regardless of descType)
+                    if (!q.descImageUrl.isNullOrBlank()) {
                         val url = q.descImageUrl!!.toAbsoluteUrl()
                         coil.compose.AsyncImage(
                             model = url, contentDescription = null,
-                            modifier = Modifier.fillMaxWidth(0.92f).heightIn(max = 200.dp).padding(vertical = 4.dp).clip(RoundedCornerShape(8.dp)).clickable { FullScreenImageViewer.show(url) },
+                            modifier = Modifier.fillMaxWidth(0.92f).heightIn(max = 220.dp).padding(vertical = 4.dp).clip(RoundedCornerShape(8.dp)).clickable { FullScreenImageViewer.show(url) },
                             contentScale = ContentScale.Fit
                         )
                     }
-                    // Media TEXT — shown in a centered card (17sp)
+                    // Media TEXT — shown in a centered card (18sp)
                     if (q.mediaType == "text" && !q.mediaText.isNullOrBlank()) {
                         Surface(
                             color = Color.White,
@@ -431,18 +431,18 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
                             Text(
                                 q.mediaText!!,
                                 color = Color(0xFF1E293B),
-                                fontSize = 17.sp,
+                                fontSize = 18.sp,
                                 fontWeight = FontWeight.Medium,
                                 modifier = Modifier.padding(14.dp)
                             )
                         }
                     }
-                    // Media IMAGE — main media image
+                    // Media IMAGE — main media image (shown whenever a URL exists)
                     val mediaImgUrl = (q.mediaImageUrl ?: q.imageUrl)?.toAbsoluteUrl()
                     if (!mediaImgUrl.isNullOrBlank()) {
                         coil.compose.AsyncImage(
                             model = mediaImgUrl, contentDescription = null,
-                            modifier = Modifier.fillMaxWidth(0.92f).heightIn(max = 220.dp).padding(vertical = 4.dp).clip(RoundedCornerShape(8.dp)).clickable { FullScreenImageViewer.show(mediaImgUrl) },
+                            modifier = Modifier.fillMaxWidth(0.92f).heightIn(max = 240.dp).padding(vertical = 4.dp).clip(RoundedCornerShape(8.dp)).clickable { FullScreenImageViewer.show(mediaImgUrl) },
                             contentScale = ContentScale.Fit
                         )
                     }
@@ -585,15 +585,12 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
         }
     }
 
-            // ── QUESTION GRID PAGE ── matches HTML reference (4-col square grid, blue #1a56ff)
+            // ── QUESTION GRID PAGE ── pixel-perfect 1364×694 canvas (v10.5.2)
     if (showGrid) {
         val readingItems = sortedItems.filter { it.question.blockType != "audio" }
         val listeningItems = sortedItems.filter { it.question.blockType == "audio" }
-        // Question Bank / combined exams: show ALL questions in ONE panel (no Reading/Listening split)
-        // Regular exams/tests: show Reading LEFT | Listening RIGHT
+        // Question Bank / combined exams: same dual-panel layout (Reading | Listening).
         val isQBank = testId == "qbank-combined" || testId.startsWith("bundle-")
-        // showAllBlocks: true = show all blocks (added + blank), false = only show created questions
-        val showAllBlocks = t.showAllBlocks
         var showSubmitDialog by remember { mutableStateOf(false) }
         val haptic = LocalHapticFeedback.current
         // Filter: null = all, true = solved only, false = unsolved only
@@ -610,194 +607,36 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
         val isLowTime = timeLeft in 1..300
         val timerColor = if (isLowTime) Color(0xFFDC2626) else Color(0xFF222222)
         val accentBlue = Color(0xFF1A56FF)
+        val studentName = AppState.getUserName()
 
-        Column(modifier = Modifier.fillMaxSize().background(Color(0xFFF5F5F5))) {
-            // ── TABS ROW: All | Solved | UnSolved (with blue underline on active) ──
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(Color.White)
-                    .height(42.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                RefTab("All", filterMode == null, accentBlue, Modifier.weight(1f)) { filterMode = null }
-                RefTab("Solved", filterMode == true, accentBlue, Modifier.weight(1f)) { filterMode = true }
-                RefTab("UnSolved", filterMode == false, accentBlue, Modifier.weight(1f)) { filterMode = false }
-            }
-            // Thin border under tabs
-            Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(Color(0xFFE2E2E2)))
-
-            // ── TIMER (large, centered, monospace) ──────────────────────
+        // Fixed 1364×694 logical canvas, scaled uniformly to fit the screen.
+        BoxWithConstraints(modifier = Modifier.fillMaxSize().background(Color.White)) {
+            val scale = minOf(maxWidth.value / 1364f, maxHeight.value / 694f)
+            // Center the 1364×694 canvas on screen
             Box(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .background(Color.White)
-                    .padding(vertical = 8.dp),
-                contentAlignment = Alignment.Center
+                    .size((1364f * scale).dp, (694f * scale).dp)
+                    .align(Alignment.Center)
             ) {
-                Text(
-                    timeStr,
-                    color = timerColor,
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.Medium,
-                    letterSpacing = 1.sp,
-                    fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
+                CanvasBlockPage(
+                    scale = scale,
+                    title = t.title,
+                    studentId = studentName,
+                    timeStr = timeStr,
+                    timerColor = timerColor,
+                    readingItems = readingItems,
+                    listeningItems = listeningItems,
+                    allItems = t.items,
+                    isQBank = isQBank,
+                    answers = answers,
+                    currentIdx = currentIdx,
+                    sound = sound,
+                    haptic = haptic,
+                    filterMode = filterMode,
+                    onFilterChange = { filterMode = it },
+                    onPick = { idx -> currentIdx = idx; showGrid = false },
+                    onSubmit = { showSubmitDialog = true }
                 )
-            }
-            Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(Color(0xFFE2E2E2)))
-
-            // ── MAIN AREA ──────────────────────────────────────────────────
-            // QBank: single panel with ALL questions (no Reading/Listening labels)
-            // Exam: Reading LEFT | Listening RIGHT
-            Box(
-                modifier = Modifier
-                    .weight(1f)
-                    .fillMaxWidth()
-                    .background(Color(0xFFF5F5F5))
-            ) {
-                // Watermark logo in background
-                Image(
-                    painter = painterResource(id = app.dreamkorea.smartclass.R.drawable.dreamkorea_logo),
-                    contentDescription = null,
-                    modifier = Modifier
-                        .size(180.dp)
-                        .align(Alignment.Center)
-                        .alpha(0.04f),
-                    contentScale = ContentScale.Fit
-                )
-
-                if (isQBank) {
-                    // ── QBANK: single panel, all questions, no section labels ──
-                    // Fills the FULL screen — no max width constraint
-                    Column(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(12.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        Column(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .fillMaxHeight()
-                                .border(2.dp, Color(0xFF111111), RoundedCornerShape(10.dp))
-                                .background(Color.White)
-                                .padding(8.dp)
-                        ) {
-                            QuestionGridRef(
-                                test = t,
-                                items = t.items, // ALL questions in one grid
-                                answers = answers,
-                                currentIdx = currentIdx,
-                                sound = sound,
-                                haptic = haptic,
-                                filterMode = filterMode,
-                                accentBlue = accentBlue,
-                                showAllBlocks = showAllBlocks
-                            ) { idx ->
-                                currentIdx = idx
-                                showGrid = false
-                            }
-                        }
-                    }
-                } else {
-                    // ── EXAM: Reading LEFT | Listening RIGHT ──
-                    Row(
-                        modifier = Modifier.fillMaxSize().padding(8.dp),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        // Reading panel (left)
-                        Column(modifier = Modifier.weight(1f).fillMaxHeight()) {
-                            Text(
-                                "Reading",
-                                color = Color(0xFF333333),
-                                fontSize = 13.sp,
-                                fontWeight = FontWeight.Medium,
-                                modifier = Modifier.padding(start = 4.dp, bottom = 6.dp)
-                            )
-                        // Scrollable grid with border — fills full panel
-                            Column(
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .fillMaxWidth()
-                                    .border(2.dp, Color(0xFF111111), RoundedCornerShape(10.dp))
-                                    .background(Color.White)
-                                    .padding(8.dp)
-                            ) {
-                                QuestionGridRef(
-                                    test = t,
-                                    items = readingItems,
-                                    answers = answers,
-                                    currentIdx = currentIdx,
-                                    sound = sound,
-                                    haptic = haptic,
-                                    filterMode = filterMode,
-                                    accentBlue = accentBlue,
-                                    showAllBlocks = showAllBlocks
-                                ) { idx ->
-                                    currentIdx = idx
-                                    showGrid = false
-                                }
-                            }
-                        }
-
-                        // Listening panel (right)
-                        Column(modifier = Modifier.weight(1f).fillMaxHeight()) {
-                            Text(
-                                "Listening",
-                                color = Color(0xFF333333),
-                                fontSize = 13.sp,
-                                fontWeight = FontWeight.Medium,
-                                modifier = Modifier.padding(start = 4.dp, bottom = 6.dp)
-                            )
-                            Column(
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .fillMaxWidth()
-                                    .border(2.dp, Color(0xFF111111), RoundedCornerShape(10.dp))
-                                    .background(Color.White)
-                                    .padding(8.dp)
-                            ) {
-                                QuestionGridRef(
-                                    test = t,
-                                    items = listeningItems,
-                                    answers = answers,
-                                    currentIdx = currentIdx,
-                                    sound = sound,
-                                    haptic = haptic,
-                                    filterMode = filterMode,
-                                    accentBlue = accentBlue,
-                                    showAllBlocks = showAllBlocks
-                                ) { idx ->
-                                    currentIdx = idx
-                                    showGrid = false
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-
-            // ── SUBMIT BUTTON (blue pill, full-width-ish, at bottom) ─────
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(Color(0xFFF5F5F5))
-                    .padding(horizontal = 16.dp, vertical = 8.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                Button(
-                    onClick = { showSubmitDialog = true },
-                    modifier = Modifier.fillMaxWidth().height(48.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = accentBlue),
-                    shape = RoundedCornerShape(24.dp)
-                ) {
-                    Text(
-                        "Submit and Finish Exam",
-                        color = Color.White,
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.Medium
-                    )
-                }
             }
         }
 
@@ -844,6 +683,437 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
             )
         }
         return
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Pixel scaling helpers — convert logical canvas pixels (1364×694 design) to
+// density-independent dp/sp by multiplying by the uniform scale factor.
+// ═══════════════════════════════════════════════════════════════════════════
+fun Float.sc(s: Float) = (this * s).dp
+fun Int.sc(s: Float) = (this.toFloat() * s).dp
+fun Float.tc(s: Float) = (this * s).sp
+fun Int.tc(s: Float) = (this.toFloat() * s).sp
+
+// Question-box grid coordinates (relative to the 1364×694 canvas).
+// Reading: 5 cols × 4 rows (numbers 1–20)
+private val QBoxColsReading = listOf(42 to 99, 168 to 97, 292 to 98, 418 to 98, 543 to 98)
+// Listening: 5 cols × 4 rows (numbers 21–40)
+private val QBoxColsListening = listOf(722 to 98, 847 to 98, 972 to 98, 1098 to 98, 1223 to 97)
+private val QBoxRows = listOf(269 to 70, 349 to 70, 428 to 70, 508 to 71)
+
+/**
+ * Pixel-perfect block (question grid) page rendered on a fixed 1364×694
+ * logical canvas. ALL elements are positioned absolutely using offset + size,
+ * scaled uniformly by [scale] to fit the screen while preserving the layout.
+ *
+ * Layout matches the v10.5.2 spec exactly.
+ */
+@Composable
+private fun CanvasBlockPage(
+    scale: Float,
+    title: String,
+    studentId: String,
+    timeStr: String,
+    timerColor: Color,
+    readingItems: List<TestItemDetail>,
+    listeningItems: List<TestItemDetail>,
+    allItems: List<TestItemDetail>,
+    @Suppress("UNUSED_PARAMETER") isQBank: Boolean,
+    answers: SnapshotStateMap<String, Any>,
+    currentIdx: Int,
+    sound: SoundManager,
+    haptic: androidx.compose.ui.hapticfeedback.HapticFeedback,
+    filterMode: Boolean?,
+    onFilterChange: (Boolean?) -> Unit,
+    onPick: (Int) -> Unit,
+    onSubmit: () -> Unit
+) {
+    val accentBlue = Color(0xFF1A56FF)
+    val borderColor = Color(0xFF111111)
+    val textDark = Color(0xFF151515)
+    val navGray = Color(0xFFF3F3F3)
+
+    // Outer frame: 0,0 to 1364×694, white bg, 3px border #343434
+    Box(
+        modifier = Modifier
+            .size(1364.sc(scale), 694.sc(scale))
+            .background(Color.White)
+            .border(3.sc(scale), Color(0xFF343434))
+    ) {
+        // Watermark — Dream Korea logo centered at ~680,400, 280×170px, alpha 0.10
+        Image(
+            painter = painterResource(id = app.dreamkorea.smartclass.R.drawable.dreamkorea_logo),
+            contentDescription = null,
+            modifier = Modifier
+                .offset(x = 540.sc(scale), y = 315.sc(scale))
+                .size(280.sc(scale), 170.sc(scale))
+                .alpha(0.10f),
+            contentScale = ContentScale.Fit
+        )
+
+        // ── Top-left logo area: x=0, y=0, w=138, h=157, white bg, 3px right border #2A2A2A ──
+        Box(
+            modifier = Modifier
+                .offset(x = 0.sc(scale), y = 0.sc(scale))
+                .size(138.sc(scale), 157.sc(scale))
+        ) {
+            Box(modifier = Modifier.fillMaxSize().background(Color.White))
+            // Logo centered at ~61×51 inside the 138×157 area
+            Image(
+                painter = painterResource(id = app.dreamkorea.smartclass.R.drawable.dreamkorea_logo),
+                contentDescription = null,
+                modifier = Modifier
+                    .align(Alignment.Center)
+                    .size(100.sc(scale), 100.sc(scale)),
+                contentScale = ContentScale.Fit
+            )
+            // Right border #2A2A2A (3px)
+            Box(
+                modifier = Modifier
+                    .align(Alignment.CenterEnd)
+                    .fillMaxHeight()
+                    .width(3.sc(scale))
+                    .background(Color(0xFF2A2A2A))
+            )
+        }
+
+        // ── Top info header: x=138, y=0, w=1226, h=79, white bg, 3px bottom border #252525 ──
+        // Three texts centered:
+        //   Title at center-x=407, 30sp
+        //   Student ID at center-x=811, 30sp
+        //   "dreamkorea" at center-x=1157, 29sp
+        Box(
+            modifier = Modifier
+                .offset(x = 138.sc(scale), y = 0.sc(scale))
+                .size(1226.sc(scale), 79.sc(scale))
+        ) {
+            Box(modifier = Modifier.fillMaxSize().background(Color.White))
+
+            // Title — text box of width 200, centered on x=407 (relative to canvas).
+            // Offset within header = (407 - 138) - 100 = 169
+            Box(
+                modifier = Modifier
+                    .offset(x = 169.sc(scale), y = 0.sc(scale))
+                    .size(200.sc(scale), 79.sc(scale)),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    title,
+                    color = textDark,
+                    fontSize = 30f.tc(scale),
+                    fontWeight = FontWeight.Medium,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+
+            // Student ID — text box of width 300, centered on x=811.
+            // Offset within header = (811 - 138) - 150 = 523
+            Box(
+                modifier = Modifier
+                    .offset(x = 523.sc(scale), y = 0.sc(scale))
+                    .size(300.sc(scale), 79.sc(scale)),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    studentId,
+                    color = textDark,
+                    fontSize = 30f.tc(scale),
+                    fontWeight = FontWeight.Medium,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+
+            // "dreamkorea" — text box of width 160, centered on x=1157.
+            // Offset within header = (1157 - 138) - 80 = 939
+            Box(
+                modifier = Modifier
+                    .offset(x = 939.sc(scale), y = 0.sc(scale))
+                    .size(160.sc(scale), 79.sc(scale)),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    "dreamkorea",
+                    color = textDark,
+                    fontSize = 29f.tc(scale),
+                    fontWeight = FontWeight.Medium
+                )
+            }
+
+            // Bottom border #252525 (3px)
+            Box(
+                modifier = Modifier
+                    .align(Alignment.BottomStart)
+                    .fillMaxWidth()
+                    .height(3.sc(scale))
+                    .background(Color(0xFF252525))
+            )
+        }
+
+        // ── Nav row: x=138, y=79, w=1226, h=78, white bg, 3px bottom border #252525 ──
+        // Five regions: Nepal | All | Solved | Unsolved | Timer
+        Box(
+            modifier = Modifier
+                .offset(x = 138.sc(scale), y = 79.sc(scale))
+                .size(1226.sc(scale), 78.sc(scale))
+        ) {
+            Box(modifier = Modifier.fillMaxSize().background(Color.White))
+
+            // Nepal label (non-interactive): x=138, w=229 → offset within nav = 0
+            Box(
+                modifier = Modifier
+                    .offset(x = 0.sc(scale), y = 0.sc(scale))
+                    .size(229.sc(scale), 78.sc(scale)),
+                contentAlignment = Alignment.Center
+            ) {
+                Text("Nepal", color = textDark, fontSize = 30f.tc(scale), fontWeight = FontWeight.Medium)
+            }
+
+            // "All" filter: x=367, w=244 → offset within nav = 367-138=229
+            // Selected when filterMode == null → gray bg + 4px black underline
+            val allSelected = filterMode == null
+            Box(
+                modifier = Modifier
+                    .offset(x = 229.sc(scale), y = 0.sc(scale))
+                    .size(244.sc(scale), 78.sc(scale))
+                    .background(if (allSelected) navGray else Color.White)
+                    .clickable { sound.click(); onFilterChange(null) },
+                contentAlignment = Alignment.Center
+            ) {
+                Text("All", color = textDark, fontSize = 30f.tc(scale), fontWeight = FontWeight.Medium)
+            }
+            if (allSelected) {
+                Box(
+                    modifier = Modifier
+                        .offset(x = 229.sc(scale), y = 74.sc(scale))
+                        .size(244.sc(scale), 4.sc(scale))
+                        .background(Color.Black)
+                )
+            }
+
+            // "Solved" filter: x=611, w=253 → offset within nav = 473
+            val solvedSelected = filterMode == true
+            Box(
+                modifier = Modifier
+                    .offset(x = 473.sc(scale), y = 0.sc(scale))
+                    .size(253.sc(scale), 78.sc(scale))
+                    .background(if (solvedSelected) navGray else Color.White)
+                    .clickable { sound.click(); onFilterChange(true) },
+                contentAlignment = Alignment.Center
+            ) {
+                Text("Solved", color = textDark, fontSize = 30f.tc(scale), fontWeight = FontWeight.Medium)
+            }
+            if (solvedSelected) {
+                Box(
+                    modifier = Modifier
+                        .offset(x = 473.sc(scale), y = 74.sc(scale))
+                        .size(253.sc(scale), 4.sc(scale))
+                        .background(Color.Black)
+                )
+            }
+
+            // "Unsolved" filter: x=864, w=245 → offset within nav = 726
+            val unsolvedSelected = filterMode == false
+            Box(
+                modifier = Modifier
+                    .offset(x = 726.sc(scale), y = 0.sc(scale))
+                    .size(245.sc(scale), 78.sc(scale))
+                    .background(if (unsolvedSelected) navGray else Color.White)
+                    .clickable { sound.click(); onFilterChange(false) },
+                contentAlignment = Alignment.Center
+            ) {
+                Text("Unsolved", color = textDark, fontSize = 30f.tc(scale), fontWeight = FontWeight.Medium)
+            }
+            if (unsolvedSelected) {
+                Box(
+                    modifier = Modifier
+                        .offset(x = 726.sc(scale), y = 74.sc(scale))
+                        .size(245.sc(scale), 4.sc(scale))
+                        .background(Color.Black)
+                )
+            }
+
+            // Timer: x=1109, w=255 → offset within nav = 971
+            Box(
+                modifier = Modifier
+                    .offset(x = 971.sc(scale), y = 0.sc(scale))
+                    .size(255.sc(scale), 78.sc(scale)),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    timeStr,
+                    color = timerColor,
+                    fontSize = 29f.tc(scale),
+                    fontWeight = FontWeight.Medium,
+                    fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
+                )
+            }
+
+            // Bottom border #252525 (3px)
+            Box(
+                modifier = Modifier
+                    .align(Alignment.BottomStart)
+                    .fillMaxWidth()
+                    .height(3.sc(scale))
+                    .background(Color(0xFF252525))
+            )
+        }
+
+        // ── Reading title box: x=19, y=166, w=645, h=69, 2px border #C8C8C8 ──
+        Box(
+            modifier = Modifier
+                .offset(x = 19.sc(scale), y = 166.sc(scale))
+                .size(645.sc(scale), 69.sc(scale))
+                .background(Color.White)
+                .border(2.sc(scale), Color(0xFFC8C8C8)),
+            contentAlignment = Alignment.Center
+        ) {
+            Text("Reading", color = textDark, fontSize = 25f.tc(scale), fontWeight = FontWeight.Medium)
+        }
+
+        // ── Listening title box: x=699, y=166, w=645, h=69, 2px border #C8C8C8 ──
+        Box(
+            modifier = Modifier
+                .offset(x = 699.sc(scale), y = 166.sc(scale))
+                .size(645.sc(scale), 69.sc(scale))
+                .background(Color.White)
+                .border(2.sc(scale), Color(0xFFC8C8C8)),
+            contentAlignment = Alignment.Center
+        ) {
+            Text("Listening", color = textDark, fontSize = 25f.tc(scale), fontWeight = FontWeight.Medium)
+        }
+
+        // ── Reading group container: x=28, y=252, w=628, h=344, 4px border #111111, 20px radius ──
+        Box(
+            modifier = Modifier
+                .offset(x = 28.sc(scale), y = 252.sc(scale))
+                .size(628.sc(scale), 344.sc(scale))
+                .background(Color.White, shape = RoundedCornerShape(20.sc(scale)))
+                .border(4.sc(scale), borderColor, shape = RoundedCornerShape(20.sc(scale)))
+        )
+
+        // ── Listening group container: x=708, y=252, w=627, h=344, 4px border #111111, 20px radius ──
+        Box(
+            modifier = Modifier
+                .offset(x = 708.sc(scale), y = 252.sc(scale))
+                .size(627.sc(scale), 344.sc(scale))
+                .background(Color.White, shape = RoundedCornerShape(20.sc(scale)))
+                .border(4.sc(scale), borderColor, shape = RoundedCornerShape(20.sc(scale)))
+        )
+
+        // ── Reading question boxes (numbers 1–20): 5 cols × 4 rows ──
+        for ((rowIdx, rowY) in QBoxRows.withIndex()) {
+            for ((colIdx, colX) in QBoxColsReading.withIndex()) {
+                val localIdx = rowIdx * 5 + colIdx
+                if (localIdx >= readingItems.size) continue
+                val item = readingItems[localIdx]
+                val q = item.question
+                val globalIdx = allItems.indexOfFirst { it.question.id == q.id }.takeIf { it >= 0 } ?: localIdx
+                val displayNum = if (q.blockType == "audio") {
+                    (q.blockNumber.takeIf { it > 0 } ?: (localIdx + 1)) + 20
+                } else {
+                    q.blockNumber.takeIf { it > 0 } ?: (localIdx + 1)
+                }
+                CanvasQuestionBox(scale, colX, rowY, displayNum, q.id, globalIdx, currentIdx,
+                    answers, filterMode, accentBlue, borderColor, sound, haptic, onPick)
+            }
+        }
+
+        // ── Listening question boxes (numbers 21–40): 5 cols × 4 rows ──
+        for ((rowIdx, rowY) in QBoxRows.withIndex()) {
+            for ((colIdx, colX) in QBoxColsListening.withIndex()) {
+                val localIdx = rowIdx * 5 + colIdx
+                if (localIdx >= listeningItems.size) continue
+                val item = listeningItems[localIdx]
+                val q = item.question
+                val globalIdx = allItems.indexOfFirst { it.question.id == q.id }.takeIf { it >= 0 } ?: localIdx
+                val displayNum = if (q.blockType == "audio") {
+                    (q.blockNumber.takeIf { it > 0 } ?: (localIdx + 1)) + 20
+                } else {
+                    q.blockNumber.takeIf { it > 0 } ?: (localIdx + 1)
+                }
+                CanvasQuestionBox(scale, colX, rowY, displayNum, q.id, globalIdx, currentIdx,
+                    answers, filterMode, accentBlue, borderColor, sound, haptic, onPick)
+            }
+        }
+
+        // ── Submit button: x=520, y=605, w=325, h=67, bg #156BF2, 18px radius ──
+        // White text "Submit and Finish Exam" 24sp
+        Box(
+            modifier = Modifier
+                .offset(x = 520.sc(scale), y = 605.sc(scale))
+                .size(325.sc(scale), 67.sc(scale))
+                .background(Color(0xFF156BF2), shape = RoundedCornerShape(18.sc(scale)))
+                .clickable { sound.click(); onSubmit() },
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                "Submit and Finish Exam",
+                color = Color.White,
+                fontSize = 24f.tc(scale),
+                fontWeight = FontWeight.Medium
+            )
+        }
+    }
+}
+
+/**
+ * Single absolutely-positioned question box on the 1364×694 canvas.
+ * - Answered: blue fill + white text
+ * - Current:  4px red border (instead of 3px black)
+ * - Filtered-out: alpha 0.15 (non-clickable)
+ */
+@Composable
+private fun CanvasQuestionBox(
+    scale: Float,
+    colX: Pair<Int, Int>,
+    rowY: Pair<Int, Int>,
+    displayNum: Int,
+    questionId: String,
+    globalIdx: Int,
+    currentIdx: Int,
+    answers: SnapshotStateMap<String, Any>,
+    filterMode: Boolean?,
+    accentBlue: Color,
+    borderColor: Color,
+    sound: SoundManager,
+    haptic: androidx.compose.ui.hapticfeedback.HapticFeedback,
+    onPick: (Int) -> Unit
+) {
+    val (x, w) = colX
+    val (y, h) = rowY
+    val isAnswered = answers.containsKey(questionId)
+    val isCurrent = globalIdx == currentIdx
+    val isFilteredOut = when (filterMode) {
+        true -> !isAnswered
+        false -> isAnswered
+        null -> false
+    }
+    Box(
+        modifier = Modifier
+            .offset(x = x.sc(scale), y = y.sc(scale))
+            .size(w.sc(scale), h.sc(scale))
+            .background(if (isAnswered) accentBlue else Color.White)
+            .border(
+                width = if (isCurrent) 4.sc(scale) else 3.sc(scale),
+                color = if (isCurrent) Color(0xFFDC2626) else borderColor
+            )
+            .alpha(if (isFilteredOut) 0.15f else 1f)
+            .clickable(enabled = !isFilteredOut) {
+                sound.click()
+                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                onPick(globalIdx)
+            },
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            "$displayNum",
+            color = if (isAnswered) Color.White else borderColor,
+            fontSize = 34f.tc(scale),
+            fontWeight = FontWeight.Medium
+        )
     }
 }
 
@@ -1660,14 +1930,14 @@ fun ReviewCard(theme: AppTheme, review: ReviewItem, questionNumber: Int = 0, sou
                     )
                 }
             }
-            // ── Description IMAGE (when descType == "image") ──────────────
-            if (review.descType == "image" && !review.descImageUrl.isNullOrBlank()) {
+            // ── Description IMAGE (shown whenever a URL exists — regardless of descType) ──
+            if (!review.descImageUrl.isNullOrBlank()) {
                 Spacer(Modifier.height(8.dp))
                 val imgAbs = review.descImageUrl!!.toAbsoluteUrl()
                 coil.compose.AsyncImage(
                     model = imgAbs,
                     contentDescription = "Description image",
-                    modifier = Modifier.fillMaxWidth().heightIn(max = 200.dp).clip(RoundedCornerShape(8.dp)),
+                    modifier = Modifier.fillMaxWidth().heightIn(max = 220.dp).clip(RoundedCornerShape(8.dp)),
                     contentScale = ContentScale.Fit,
                 )
             }
@@ -1696,7 +1966,7 @@ fun ReviewCard(theme: AppTheme, review: ReviewItem, questionNumber: Int = 0, sou
                 coil.compose.AsyncImage(
                     model = imgAbs,
                     contentDescription = "Media image",
-                    modifier = Modifier.fillMaxWidth().heightIn(max = 200.dp).clip(RoundedCornerShape(8.dp)),
+                    modifier = Modifier.fillMaxWidth().heightIn(max = 240.dp).clip(RoundedCornerShape(8.dp)),
                     contentScale = ContentScale.Fit,
                 )
             }
@@ -1707,7 +1977,7 @@ fun ReviewCard(theme: AppTheme, review: ReviewItem, questionNumber: Int = 0, sou
                 coil.compose.AsyncImage(
                     model = imgAbs,
                     contentDescription = "Question image",
-                    modifier = Modifier.fillMaxWidth().heightIn(max = 180.dp).clip(RoundedCornerShape(8.dp)),
+                    modifier = Modifier.fillMaxWidth().heightIn(max = 220.dp).clip(RoundedCornerShape(8.dp)),
                     contentScale = ContentScale.Fit,
                 )
             }
