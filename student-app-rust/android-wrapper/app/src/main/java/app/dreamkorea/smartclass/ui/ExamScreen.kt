@@ -727,7 +727,7 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
                 .verticalScroll(rememberScrollState()),
             contentAlignment = Alignment.Center,
         ) {
-            val scale = minOf(maxWidth.value / 1364f, maxHeight.value / 694f)
+            val scale = maxOf(maxWidth.value / 1364f, maxHeight.value / 694f)
             CanvasBlockPage(
                 scale = scale,
                 title = t.title,
