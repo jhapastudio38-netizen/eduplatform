@@ -483,7 +483,7 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
                             val optText = options.getOrNull(i) ?: ""
                             val blankWord = q.optionBlanks.getOrNull(i)?.takeIf { it.isNotBlank() }
                             Row(
-                                modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp).clickable { sound.click(); answers[q.id] = optText },
+                                modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp).clickable(enabled = !audioPlaying) { sound.click(); answers[q.id] = optText },
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Surface(
@@ -498,7 +498,7 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
                                 // Render option text with underlined blank word (if set by admin)
                                 Text(
                                     text = buildUnderlinedText(optText, blankWord),
-                                    color = Color.Black,
+                                    color = if (audioPlaying) Color.Gray else Color.Black,
                                     fontSize = 16.sp,
                                     modifier = Modifier.weight(1f)
                                 )
@@ -511,7 +511,7 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
                             val absUrl = imgUrl.toAbsoluteUrl()
                             val isSelected = answers[q.id] == absUrl
                             Row(
-                                modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp).clickable { sound.click(); answers[q.id] = absUrl },
+                                modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp).clickable(enabled = !audioPlaying) { sound.click(); answers[q.id] = absUrl },
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Surface(color = if (isSelected) theme.primary else Color.White, border = androidx.compose.foundation.BorderStroke(2.dp, Color.Black), shape = androidx.compose.foundation.shape.CircleShape, modifier = Modifier.size(34.dp)) {
@@ -527,7 +527,7 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
                             val audUrl = q.optionAudios[i]; if (audUrl.isBlank()) return@forEach
                             val absUrl = audUrl.toAbsoluteUrl()
                             val isSelected = answers[q.id] == absUrl
-                            Row(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp).clickable { sound.click(); answers[q.id] = absUrl }, verticalAlignment = Alignment.CenterVertically) {
+                            Row(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp).clickable(enabled = !audioPlaying) { sound.click(); answers[q.id] = absUrl }, verticalAlignment = Alignment.CenterVertically) {
                                 Surface(color = if (isSelected) theme.primary else Color.White, border = androidx.compose.foundation.BorderStroke(2.dp, Color.Black), shape = androidx.compose.foundation.shape.CircleShape, modifier = Modifier.size(34.dp)) {
                                     Box(contentAlignment = Alignment.Center) { Text("${i+1}", color = if (isSelected) Color.White else Color.Black, fontSize = 14.sp, fontWeight = FontWeight.Bold) }
                                 }
@@ -609,9 +609,10 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
         val accentBlue = Color(0xFF1A56FF)
         val studentName = AppState.getUserName()
 
-        // Fixed 1364×694 logical canvas, scaled uniformly to fit the screen.
+        // Fixed 1364×694 logical canvas, scaled to FILL the screen.
+        // Uses max scale so it fills width AND height (no empty space on sides).
         BoxWithConstraints(modifier = Modifier.fillMaxSize().background(Color.White)) {
-            val scale = minOf(maxWidth.value / 1364f, maxHeight.value / 694f)
+            val scale = maxOf(maxWidth.value / 1364f, maxHeight.value / 694f)
             // Center the 1364×694 canvas on screen
             Box(
                 modifier = Modifier
