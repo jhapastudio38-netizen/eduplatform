@@ -656,9 +656,11 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
         val accentBlue = Color(0xFF1A56FF)
         val studentName = AppState.getUserName()
 
-        // Fixed 1364×694 logical canvas, scaled to FIT the screen (no overflow, no empty space).
-        BoxWithConstraints(modifier = Modifier.fillMaxSize().background(Color.White)) {
-            val scale = maxOf(maxWidth.value / 1364f, maxHeight.value / 694f)
+        // Fixed 1364×694 logical canvas, scaled to FIT the screen.
+        // Uses minOf so everything fits — no clipping, no scroll needed.
+        // Wrapped in verticalScroll so if content is slightly taller, user can scroll.
+        BoxWithConstraints(modifier = Modifier.fillMaxSize().background(Color.White).verticalScroll(rememberScrollState())) {
+            val scale = minOf(maxWidth.value / 1364f, maxHeight.value / 694f)
             // Center the 1364×694 canvas on screen
             Box(
                 modifier = Modifier
