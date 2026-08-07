@@ -1,340 +1,605 @@
 package app.dreamkorea.smartclass.ui
 
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.scaleIn
-import androidx.compose.animation.scaleOut
+import android.app.Activity
+import android.content.pm.ActivityInfo
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.filled.Backspace
+import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.KeyboardCapitalization
-import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import app.dreamkorea.smartclass.api.AppNotification
 import app.dreamkorea.smartclass.api.EyeVisionTestItem
 import app.dreamkorea.smartclass.data.AppState
+import coil.compose.AsyncImage
+import coil.request.ImageRequest
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
-data class EyeVisionTest(
-    val id: String,
-    val title: String,
-    val description: String?,
-    val imageUrl: String,
-    val category: String?,
-    val level: Int
-)
+// ─── Ishihara color vision eye-test screen ───────────────────────────────────
+// Landscape-only, split-pane UI: left = large plate image, right = stats +
+// numeric keypad + Skip/Next controls. After every question is answered or
+// skipped, a results screen summarizes the run.
+
+/** Bright blue used for the status box and primary action buttons. */
+private val IshiharaBlue = Color(0xFF1565FF)
+
+/** Outcome recorded for each individual plate after the user moves on. */
+private enum class AnswerOutcome { PENDING, CORRECT, INCORRECT, SKIPPED }
+
+// `String.toAbsoluteUrl()` is defined in ExamScreen.kt (same package) and reused here.
 
 @Composable
 fun EyeVisionScreen(theme: AppTheme, sound: SoundManager, onBack: () -> Unit) {
+    val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    var tests by remember { mutableStateOf<List<EyeVisionTest>>(emptyList()) }
+
+    var tests by remember { mutableStateOf<List<EyeVisionTestItem>>(emptyList()) }
     var loading by remember { mutableStateOf(true) }
     var error by remember { mutableStateOf("") }
-    // Adaptive state — surfaced from the API
-    var currentLevel by remember { mutableStateOf(1) }
-    var statsAccuracy by remember { mutableStateOf(0) }
-    var statsAttempts by remember { mutableStateOf(0) }
-    var statsStreak by remember { mutableStateOf(0) }
-    var leveledUpBanner by remember { mutableStateOf(false) }
-    var leveledDownBanner by remember { mutableStateOf(false) }
 
-    fun toAbs(url: String): String =
-        if (url.startsWith("http")) url else "https://my-project-five-sepia.vercel.app$url"
+    var currentQuestion by remember { mutableStateOf(0) }
+    var solvedCount by remember { mutableStateOf(0) }
+    var userAnswer by remember { mutableStateOf("") }
+    var isProcessing by remember { mutableStateOf(false) }
+    var outcomes by remember { mutableStateOf<List<AnswerOutcome>>(emptyList()) }
+    var showResults by remember { mutableStateOf(false) }
 
-    fun loadTests(adaptive: Boolean = true) {
-        scope.launch {
-            loading = true
-            try {
-                val resp = AppState.api.getEyeVisionTests(if (adaptive) "true" else null)
-                tests = resp.tests.map {
-                    EyeVisionTest(it.id, it.title, it.description, toAbs(it.imageUrl), it.category, it.level)
-                }
-                currentLevel = resp.level
-                statsAccuracy = resp.stats.accuracy
-                statsAttempts = resp.stats.totalAttempts
-                statsStreak = resp.stats.consecutiveCorrect
-            } catch (e: Exception) {
-                error = "Could not load eye vision tests"
-            }
-            loading = false
+    // ── 1. Forced landscape orientation — restore to portrait on dispose ──
+    DisposableEffect(Unit) {
+        val activity = context as? Activity
+        activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
+        onDispose {
+            activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
         }
     }
 
-    LaunchedEffect(Unit) { loadTests(adaptive = true) }
-
-    Column(modifier = Modifier.fillMaxSize().background(theme.background)) {
-        ScreenHeader(theme, sound, "Eye Vision Test", "Adaptive — Level $currentLevel", onBack)
-
-        // Adaptive stats banner — only shown once the student has attempted at least 1 test
-        if (statsAttempts > 0) {
-            Surface(
-                color = theme.cardBg,
-                shape = RoundedCornerShape(12.dp),
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
-                shadowElevation = 2.dp
-            ) {
-                Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            "Level $currentLevel of 5",
-                            color = theme.darkText,
-                            fontSize = 14.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                        Text(
-                            "Streak: $statsStreak · Accuracy: $statsAccuracy% · $statsAttempts attempts",
-                            color = theme.subText,
-                            fontSize = 12.sp
-                        )
-                    }
-                    // Level-up / level-down chips fire for a moment after each attempt
-                    AnimatedVisibility(
-                        visible = leveledUpBanner,
-                        enter = fadeIn() + scaleIn(initialScale = 0.7f),
-                        exit = fadeOut() + scaleOut(targetScale = 0.7f)
-                    ) {
-                        Surface(color = Color(0xFF4CAF50), shape = RoundedCornerShape(8.dp)) {
-                            Text("Level up! 🎉", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp))
-                        }
-                    }
-                    AnimatedVisibility(
-                        visible = leveledDownBanner,
-                        enter = fadeIn() + scaleIn(initialScale = 0.7f),
-                        exit = fadeOut() + scaleOut(targetScale = 0.7f)
-                    ) {
-                        Surface(color = Color(0xFFFF9800), shape = RoundedCornerShape(8.dp)) {
-                            Text("Easier next 👍", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp))
-                        }
-                    }
-                }
-            }
+    // ── Load all tests on screen open ──
+    LaunchedEffect(Unit) {
+        loading = true
+        try {
+            val resp = AppState.api.getEyeVisionTests()
+            tests = resp.tests
+            outcomes = List(resp.tests.size) { AnswerOutcome.PENDING }
+            currentQuestion = 0
+            solvedCount = 0
+            userAnswer = ""
+            showResults = false
+        } catch (e: Exception) {
+            error = "Could not load eye vision tests. ${e.message ?: ""}"
         }
+        loading = false
+    }
 
-        if (loading) {
-            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator(color = theme.primary)
-            }
-            return
+    // ── Preload next plate image into Coil's memory cache ──
+    LaunchedEffect(currentQuestion, tests) {
+        if (tests.isNotEmpty() && currentQuestion + 1 < tests.size) {
+            val nextUrl = tests[currentQuestion + 1].imageUrl.toAbsoluteUrl()
+            val imageLoader = coil.Coil.imageLoader(context)
+            imageLoader.enqueue(
+                ImageRequest.Builder(context).data(nextUrl).build()
+            )
         }
+    }
 
-        if (error.isNotEmpty()) {
-            Column(
-                Modifier.fillMaxSize().padding(24.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.Center
-            ) {
-                Text(error, color = theme.subText, fontSize = 14.sp, textAlign = TextAlign.Center)
-                Spacer(Modifier.height(16.dp))
-                Button(onClick = onBack, colors = ButtonDefaults.buttonColors(containerColor = theme.primary)) {
-                    Text("Go back")
-                }
-            }
-            return
-        }
-
-        if (tests.isEmpty()) {
-            Column(
-                Modifier.fillMaxSize().padding(32.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.Center
-            ) {
-                Icon(Icons.Default.Visibility, null, tint = theme.subText, modifier = Modifier.size(48.dp))
-                Spacer(Modifier.height(12.dp))
-                Text("No eye vision tests yet", color = theme.darkText, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
-                Text("Your teacher will add tests here soon", color = theme.subText, fontSize = 13.sp, textAlign = TextAlign.Center)
-            }
-            return
-        }
-
-        LazyColumn(
-            modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+    // ── Loading state ──
+    if (loading) {
+        Box(
+            modifier = Modifier.fillMaxSize().background(Color.White),
+            contentAlignment = Alignment.Center
         ) {
-            items(tests) { test ->
-                EyeVisionTestCard(
-                    theme = theme,
-                    sound = sound,
-                    test = test,
-                    onResult = { leveledUp, leveledDown, accuracy, attempts, streak, level ->
-                        // Update banner + stats so the UI reflects the new adaptive state
-                        if (leveledUp) {
-                            leveledUpBanner = true
-                            sound.success()
-                        } else if (leveledDown) {
-                            leveledDownBanner = true
-                        }
-                        // Auto-hide the banner after 1.6 seconds
+            CircularProgressIndicator(color = IshiharaBlue)
+        }
+        return
+    }
+
+    // ── Error state ──
+    if (error.isNotEmpty()) {
+        Column(
+            modifier = Modifier.fillMaxSize().background(Color.White).padding(32.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
+        ) {
+            Text(
+                error,
+                color = Color(0xFF333333),
+                fontSize = 16.sp,
+                textAlign = TextAlign.Center
+            )
+            Spacer(Modifier.height(16.dp))
+            Button(
+                onClick = { sound.click(); onBack() },
+                shape = RoundedCornerShape(12.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = IshiharaBlue)
+            ) {
+                Text("Go Back", color = Color.White, fontWeight = FontWeight.SemiBold)
+            }
+        }
+        return
+    }
+
+    // ── Empty state ──
+    if (tests.isEmpty()) {
+        Column(
+            modifier = Modifier.fillMaxSize().background(Color.White).padding(32.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
+        ) {
+            Text(
+                "No eye vision tests available",
+                color = Color(0xFF333333),
+                fontSize = 18.sp,
+                fontWeight = FontWeight.SemiBold
+            )
+            Spacer(Modifier.height(8.dp))
+            Text(
+                "Your teacher has not added any tests yet.",
+                color = Color(0xFF888888),
+                fontSize = 14.sp,
+                textAlign = TextAlign.Center
+            )
+            Spacer(Modifier.height(16.dp))
+            Button(
+                onClick = { sound.click(); onBack() },
+                shape = RoundedCornerShape(12.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = IshiharaBlue)
+            ) {
+                Text("Back to Home", color = Color.White, fontWeight = FontWeight.SemiBold)
+            }
+        }
+        return
+    }
+
+    // ── Results screen ──
+    if (showResults) {
+        EyeVisionResultsScreen(
+            total = tests.size,
+            correct = solvedCount,
+            incorrect = outcomes.count { it == AnswerOutcome.INCORRECT },
+            skipped = outcomes.count { it == AnswerOutcome.SKIPPED },
+            onRestart = {
+                sound.click()
+                currentQuestion = 0
+                solvedCount = 0
+                userAnswer = ""
+                outcomes = List(tests.size) { AnswerOutcome.PENDING }
+                showResults = false
+            },
+            onBackHome = {
+                sound.click()
+                onBack()
+            }
+        )
+        return
+    }
+
+    // ── Advance to the next plate, or finish the test ──
+    fun advance() {
+        if (currentQuestion + 1 >= tests.size) {
+            showResults = true
+        } else {
+            currentQuestion++
+        }
+    }
+
+    // ── Main split-pane UI ──
+    Row(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color.White)
+            .navigationBarsPadding()
+            .statusBarsPadding()
+    ) {
+        // ── Left half: large Ishihara plate image ──
+        Box(
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxHeight()
+                .padding(16.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            val test = tests.getOrNull(currentQuestion)
+            if (test != null) {
+                AsyncImage(
+                    model = test.imageUrl.toAbsoluteUrl(),
+                    contentDescription = "Ishihara plate ${currentQuestion + 1}",
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.Fit
+                )
+            }
+        }
+
+        // ── Right half: control panel ──
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxHeight()
+                .padding(16.dp)
+                .verticalScroll(rememberScrollState()),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            // Stats row: Total on left, Solved on right
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    "Total: ${tests.size}",
+                    color = Color(0xFF333333),
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Bold
+                )
+                Text(
+                    "Solved: $solvedCount",
+                    color = Color(0xFF333333),
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+
+            // Blue progress box — "current / total" centered
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.Center
+            ) {
+                Surface(
+                    color = IshiharaBlue,
+                    shape = RoundedCornerShape(12.dp),
+                    shadowElevation = 2.dp
+                ) {
+                    Text(
+                        "${currentQuestion + 1} / ${tests.size}",
+                        color = Color.White,
+                        fontSize = 22.sp,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(horizontal = 32.dp, vertical = 6.dp)
+                    )
+                }
+            }
+
+            // Answer display field — large current input
+            Surface(
+                color = Color(0xFFF5F6F8),
+                shape = RoundedCornerShape(12.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Box(
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = if (userAnswer.isEmpty()) "—" else userAnswer,
+                        color = if (userAnswer.isEmpty()) Color(0xFFAAAAAA) else Color(0xFF111111),
+                        fontSize = 34.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
+
+            // Numeric keypad — 3 cols × 4 rows
+            Keypad(
+                onDigit = { digit ->
+                    sound.click()
+                    if (userAnswer.length < 4) {
+                        userAnswer += digit
+                    }
+                },
+                onBackspace = {
+                    sound.click()
+                    if (userAnswer.isNotEmpty()) {
+                        userAnswer = userAnswer.dropLast(1)
+                    }
+                }
+            )
+
+            // Skip / Next action row
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                // Skip — marks as skipped, advances, clears answer
+                Button(
+                    onClick = {
+                        if (isProcessing) return@Button
+                        isProcessing = true
+                        sound.swoosh()
+                        val updated = outcomes.toMutableList()
+                        updated[currentQuestion] = AnswerOutcome.SKIPPED
+                        outcomes = updated
+                        userAnswer = ""
+                        advance()
                         scope.launch {
-                            kotlinx.coroutines.delay(1600)
-                            leveledUpBanner = false
-                            leveledDownBanner = false
+                            delay(180) // brief guard against double-tap
+                            isProcessing = false
                         }
-                        currentLevel = level
-                        statsAccuracy = accuracy
-                        statsAttempts = attempts
-                        statsStreak = streak
-                        // If the level changed, reload tests at the new level
-                        // after a short delay so the user sees the banner first
-                        if (leveledUp || leveledDown) {
-                            scope.launch {
-                                kotlinx.coroutines.delay(1800)
-                                loadTests(adaptive = true)
+                    },
+                    enabled = !isProcessing,
+                    modifier = Modifier.weight(1f).height(50.dp),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = IshiharaBlue)
+                ) {
+                    Text("Skip", color = Color.White, fontSize = 17.sp, fontWeight = FontWeight.Bold)
+                }
+
+                // Next — submits answer to API, advances on response
+                Button(
+                    onClick = {
+                        if (isProcessing) return@Button
+                        if (userAnswer.isBlank()) {
+                            sound.error()
+                            return@Button
+                        }
+                        isProcessing = true
+                        sound.click()
+                        val test = tests[currentQuestion]
+                        val submitted = userAnswer.trim()
+                        scope.launch {
+                            try {
+                                val resp = AppState.api.checkEyeVisionAnswer(
+                                    test.id,
+                                    mapOf("answer" to submitted)
+                                )
+                                val updated = outcomes.toMutableList()
+                                updated[currentQuestion] =
+                                    if (resp.correct) AnswerOutcome.CORRECT else AnswerOutcome.INCORRECT
+                                outcomes = updated
+                                if (resp.correct) {
+                                    solvedCount++
+                                    sound.success()
+                                } else {
+                                    sound.error()
+                                }
+                            } catch (e: Exception) {
+                                // Network/API failure — count as incorrect so flow continues
+                                val updated = outcomes.toMutableList()
+                                updated[currentQuestion] = AnswerOutcome.INCORRECT
+                                outcomes = updated
+                                sound.error()
+                            }
+                            userAnswer = ""
+                            advance()
+                            isProcessing = false
+                        }
+                    },
+                    enabled = !isProcessing && userAnswer.isNotBlank(),
+                    modifier = Modifier.weight(1f).height(50.dp),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = IshiharaBlue)
+                ) {
+                    if (isProcessing) {
+                        CircularProgressIndicator(
+                            color = Color.White,
+                            modifier = Modifier.size(20.dp),
+                            strokeWidth = 2.dp
+                        )
+                    } else {
+                        Text("Next", color = Color.White, fontSize = 17.sp, fontWeight = FontWeight.Bold)
+                    }
+                }
+            }
+        }
+    }
+}
+
+// ─── Numeric keypad ────────────────────────────────────────────────────────────
+
+@Composable
+private fun Keypad(
+    onDigit: (String) -> Unit,
+    onBackspace: () -> Unit
+) {
+    val keys = listOf("1", "2", "3", "4", "5", "6", "7", "8", "9", ".", "0", "⌫")
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        keys.chunked(3).forEach { row ->
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                row.forEach { key ->
+                    KeypadKey(
+                        key = key,
+                        modifier = Modifier.weight(1f),
+                        onClick = {
+                            when (key) {
+                                "⌫" -> onBackspace()
+                                "." -> { /* disabled — Ishihara answers are integers */ }
+                                else -> onDigit(key)
                             }
                         }
-                    }
-                )
+                    )
+                }
             }
         }
     }
 }
 
 @Composable
-fun EyeVisionTestCard(
-    theme: AppTheme,
-    sound: SoundManager,
-    test: EyeVisionTest,
-    onResult: (leveledUp: Boolean, leveledDown: Boolean, accuracy: Int, attempts: Int, streak: Int, level: Int) -> Unit
+private fun KeypadKey(
+    key: String,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit
 ) {
-    var answer by remember { mutableStateOf("") }
-    var result by remember { mutableStateOf<String?>(null) }
-    var isCorrect by remember { mutableStateOf(false) }
-    var checking by remember { mutableStateOf(false) }
-    val scope = rememberCoroutineScope()
-
+    val disabled = key == "."
     Surface(
-        color = theme.cardBg,
-        shape = RoundedCornerShape(16.dp),
-        modifier = Modifier.fillMaxWidth(),
-        shadowElevation = 3.dp
+        color = if (disabled) Color(0xFFE6E8EC) else Color.White,
+        shape = RoundedCornerShape(12.dp),
+        shadowElevation = if (disabled) 0.dp else 2.dp,
+        modifier = modifier
+            .height(46.dp)
+            .clickable(enabled = !disabled) { onClick() }
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(test.title, color = theme.darkText, fontSize = 16.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
-                // Level chip
-                Surface(
-                    color = when (test.level) {
-                        1 -> Color(0xFFE8F5E9); 2 -> Color(0xFFFFF9C4); 3 -> Color(0xFFFFE0B2)
-                        4 -> Color(0xFFFFCCBC); else -> Color(0xFFFFCDD2)
-                    },
-                    shape = RoundedCornerShape(8.dp)
-                ) {
+        Box(contentAlignment = Alignment.Center) {
+            when {
+                key == "⌫" -> {
+                    Icon(
+                        Icons.Default.Backspace,
+                        contentDescription = "Backspace",
+                        tint = Color(0xFF222222),
+                        modifier = Modifier.size(24.dp)
+                    )
+                }
+                else -> {
                     Text(
-                        "L${test.level}",
-                        color = Color(0xFF424242),
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Bold,
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
+                        key,
+                        color = if (disabled) Color(0xFFB0B4BC) else Color(0xFF111111),
+                        fontSize = 24.sp,
+                        fontWeight = FontWeight.Bold
                     )
                 }
             }
-            if (!test.description.isNullOrBlank()) {
-                Spacer(Modifier.height(4.dp))
-                Text(test.description!!, color = theme.subText, fontSize = 13.sp)
-            }
-            Spacer(Modifier.height(12.dp))
+        }
+    }
+}
 
-            // Image — tap to view full-screen
-            coil.compose.AsyncImage(
-                model = test.imageUrl,
-                contentDescription = "Eye vision test image",
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(200.dp)
-                    .clip(RoundedCornerShape(12.dp))
-                    .clickable {
-                        // Open full-screen image viewer
-                        FullScreenImageViewer.show(test.imageUrl)
-                    },
-                contentScale = ContentScale.Fit
-            )
+// ─── Results screen ────────────────────────────────────────────────────────────
 
-            Spacer(Modifier.height(12.dp))
+@Composable
+private fun EyeVisionResultsScreen(
+    total: Int,
+    correct: Int,
+    incorrect: Int,
+    skipped: Int,
+    onRestart: () -> Unit,
+    onBackHome: () -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color.White)
+            .verticalScroll(rememberScrollState())
+            .padding(horizontal = 48.dp, vertical = 32.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        Text(
+            "Test Complete",
+            color = Color(0xFF111111),
+            fontSize = 30.sp,
+            fontWeight = FontWeight.Bold
+        )
 
-            // Answer input
-            OutlinedTextField(
-                value = answer,
-                onValueChange = { answer = it; result = null },
-                modifier = Modifier.fillMaxWidth(),
-                label = { Text("Type what you see") },
-                singleLine = true,
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedTextColor = theme.darkText,
-                    unfocusedTextColor = theme.darkText,
-                    focusedBorderColor = theme.primary,
-                    unfocusedBorderColor = theme.divider,
-                    cursorColor = theme.primary,
-                ),
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text, capitalization = KeyboardCapitalization.None),
-                shape = RoundedCornerShape(12.dp),
-                leadingIcon = { Icon(Icons.Default.Visibility, null, tint = theme.subText, modifier = Modifier.size(20.dp)) }
-            )
+        Spacer(Modifier.height(20.dp))
 
-            result?.let { r ->
-                Spacer(Modifier.height(8.dp))
-                Surface(
-                    color = if (isCorrect) Color(0xFFE8F5E9) else Color(0xFFFFEBEE),
-                    shape = RoundedCornerShape(8.dp),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Text(r, color = if (isCorrect) Color(0xFF34C759) else theme.errorRed, fontSize = 14.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(12.dp))
-                }
-            }
+        // 2×2 stat grid
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            ResultStatBox("Total", total, Modifier.weight(1f), Color(0xFF607D8B))
+            ResultStatBox("Correct", correct, Modifier.weight(1f), Color(0xFF34A853))
+        }
+        Spacer(Modifier.height(12.dp))
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            ResultStatBox("Incorrect", incorrect, Modifier.weight(1f), Color(0xFFEA4335))
+            ResultStatBox("Skipped", skipped, Modifier.weight(1f), Color(0xFFFB8C00))
+        }
 
-            Spacer(Modifier.height(12.dp))
+        Spacer(Modifier.height(20.dp))
 
-            Button(
-                onClick = {
-                    if (answer.isBlank()) { sound.error(); return@Button }
-                    checking = true; result = null
-                    sound.click()
-                    scope.launch {
-                        try {
-                            val resp = AppState.api.checkEyeVisionAnswer(
-                                test.id,
-                                mapOf("answer" to answer.trim())
-                            )
-                            isCorrect = resp.correct
-                            result = if (resp.correct) "Correct! 🎉" else "Incorrect — answer was: ${resp.correctAnswer}"
-                            onResult(resp.leveledUp, resp.leveledDown, resp.stats.accuracy, resp.stats.totalAttempts, resp.stats.consecutiveCorrect, resp.nextLevel)
-                            if (resp.correct) sound.success() else sound.error()
-                        } catch (e: Exception) {
-                            result = "Could not check answer — try again"
-                            isCorrect = false
-                            sound.error()
-                        }
-                        checking = false
-                    }
-                },
-                enabled = !checking && answer.isNotBlank(),
-                modifier = Modifier.fillMaxWidth().height(46.dp),
-                shape = RoundedCornerShape(12.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = theme.primary)
+        // Score percentage banner
+        val score = if (total > 0) (correct * 100 / total) else 0
+        Surface(
+            color = IshiharaBlue,
+            shape = RoundedCornerShape(16.dp),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Column(
+                modifier = Modifier.padding(vertical = 16.dp, horizontal = 20.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                if (checking) {
-                    CircularProgressIndicator(color = Color.White, modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
-                } else {
-                    Text("Check Answer", fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
-                }
+                Text("Score", color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Medium)
+                Text("$score%", color = Color.White, fontSize = 44.sp, fontWeight = FontWeight.Bold)
             }
+        }
+
+        Spacer(Modifier.height(20.dp))
+
+        // Medical disclaimer
+        Text(
+            "This is a screening result, not a medical diagnosis. " +
+                "Please consult a qualified eye-care professional for a comprehensive evaluation.",
+            color = Color(0xFF888888),
+            fontSize = 13.sp,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.fillMaxWidth()
+        )
+
+        Spacer(Modifier.height(20.dp))
+
+        Button(
+            onClick = onRestart,
+            modifier = Modifier.fillMaxWidth().height(50.dp),
+            shape = RoundedCornerShape(12.dp),
+            colors = ButtonDefaults.buttonColors(containerColor = IshiharaBlue)
+        ) {
+            Icon(
+                Icons.Default.Refresh,
+                contentDescription = null,
+                tint = Color.White,
+                modifier = Modifier.size(20.dp)
+            )
+            Spacer(Modifier.width(8.dp))
+            Text("Restart Test", color = Color.White, fontSize = 17.sp, fontWeight = FontWeight.Bold)
+        }
+
+        Spacer(Modifier.height(10.dp))
+
+        OutlinedButton(
+            onClick = onBackHome,
+            modifier = Modifier.fillMaxWidth().height(50.dp),
+            shape = RoundedCornerShape(12.dp),
+            colors = ButtonDefaults.outlinedButtonColors(contentColor = IshiharaBlue)
+        ) {
+            Icon(
+                Icons.Default.Home,
+                contentDescription = null,
+                modifier = Modifier.size(20.dp)
+            )
+            Spacer(Modifier.width(8.dp))
+            Text("Back to Home", fontSize = 17.sp, fontWeight = FontWeight.Bold)
+        }
+    }
+}
+
+@Composable
+private fun ResultStatBox(
+    label: String,
+    value: Int,
+    modifier: Modifier = Modifier,
+    accent: Color
+) {
+    Surface(
+        color = accent.copy(alpha = 0.12f),
+        shape = RoundedCornerShape(12.dp),
+        modifier = modifier
+    ) {
+        Column(
+            modifier = Modifier.padding(vertical = 14.dp, horizontal = 12.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Text(label, color = accent, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+            Text("$value", color = Color(0xFF111111), fontSize = 26.sp, fontWeight = FontWeight.Bold)
         }
     }
 }
