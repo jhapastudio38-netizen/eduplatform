@@ -423,7 +423,7 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
                                 )
                                 .build(),
                             contentDescription = null,
-                            modifier = Modifier.fillMaxWidth(0.92f).heightIn(max = 220.dp).padding(vertical = 4.dp).clip(RoundedCornerShape(8.dp)).clickable { FullScreenImageViewer.show(url) },
+                            modifier = Modifier.fillMaxWidth(0.92f).height(200.dp).padding(vertical = 4.dp).clip(RoundedCornerShape(8.dp)).clickable { FullScreenImageViewer.show(url) },
                             contentScale = ContentScale.Fit,
                         )
                     }
@@ -459,7 +459,7 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
                                 )
                                 .build(),
                             contentDescription = null,
-                            modifier = Modifier.fillMaxWidth(0.92f).heightIn(max = 240.dp).padding(vertical = 4.dp).clip(RoundedCornerShape(8.dp)).clickable { FullScreenImageViewer.show(mediaImgUrl) },
+                            modifier = Modifier.fillMaxWidth(0.92f).height(220.dp).padding(vertical = 4.dp).clip(RoundedCornerShape(8.dp)).clickable { FullScreenImageViewer.show(mediaImgUrl) },
                             contentScale = ContentScale.Fit,
                         )
                     }
