@@ -609,10 +609,9 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
         val accentBlue = Color(0xFF1A56FF)
         val studentName = AppState.getUserName()
 
-        // Fixed 1364×694 logical canvas, scaled to FILL the screen.
-        // Uses max scale so it fills width AND height (no empty space on sides).
+        // Fixed 1364×694 logical canvas, scaled to FIT the screen (no overflow, no empty space).
         BoxWithConstraints(modifier = Modifier.fillMaxSize().background(Color.White)) {
-            val scale = maxOf(maxWidth.value / 1364f, maxHeight.value / 694f)
+            val scale = minOf(maxWidth.value / 1364f, maxHeight.value / 694f)
             // Center the 1364×694 canvas on screen
             Box(
                 modifier = Modifier
@@ -1352,7 +1351,8 @@ fun AudioPlayerCard(
             try {
                 mediaPlayer?.release()
                 val mp = android.media.MediaPlayer().apply {
-                    setDataSource(url)
+                    setAudioStreamType(android.media.AudioManager.STREAM_MUSIC)
+                    setDataSource(context, android.net.Uri.parse(url))
                     setOnPreparedListener { start(); incrementPlayCount() }
                     setOnCompletionListener {
                         if (unlimited) { isPlaying = false }
@@ -1368,11 +1368,18 @@ fun AudioPlayerCard(
                             } else { isPlaying = false }
                         }
                     }
-                    setOnErrorListener { _, _, _ -> isPlaying = false; true }
+                    setOnErrorListener { _, what, extra ->
+                        android.util.Log.e("AudioPlayer", "Error what=$what extra=$extra url=$url")
+                        isPlaying = false
+                        true
+                    }
                     prepareAsync()
                 }
                 mediaPlayer = mp
-            } catch (_: Exception) { isPlaying = false }
+            } catch (e: Exception) {
+                android.util.Log.e("AudioPlayer", "Exception: ${e.message} url=$url")
+                isPlaying = false
+            }
         }) {
             Icon(Icons.Default.PlayArrow, null,
                 tint = if (disabled || blocked) Color(0xFFCBD5E1) else if (isPlaying) theme.primary.copy(alpha = 0.4f) else theme.primary,
