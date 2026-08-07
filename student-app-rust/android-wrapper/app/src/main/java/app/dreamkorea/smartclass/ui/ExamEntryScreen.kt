@@ -25,6 +25,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.dreamkorea.smartclass.api.TestDetail
@@ -257,53 +258,41 @@ fun ExamEntryScreen(theme: AppTheme, sound: SoundManager, testId: String, onStar
             }
         }
 
-        // ── Vertical scrollable Column with all content ──────────────────
-        Column(
-            modifier = Modifier
-                .weight(1f)
-                .fillMaxWidth()
-                .verticalScroll(rememberScrollState())
-                .padding(16.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
+        Box(
+            modifier = Modifier.weight(1f).padding(8.dp)
         ) {
-            // Exam title
-            Text(
-                t.title,
-                color = Color.Black,
-                fontSize = 16.sp,
-                fontWeight = FontWeight.Bold,
-                textAlign = TextAlign.Center,
-                maxLines = 3
-            )
-            Spacer(Modifier.height(16.dp))
-
-            // Profile icon
-            Box(
-                modifier = Modifier
-                    .size(64.dp)
-                    .clip(CircleShape)
-                    .background(Color(0xFF003478)),
-                contentAlignment = Alignment.Center
+            Column(
+                modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 10.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(4.dp)
             ) {
-                Icon(Icons.Default.Person, null, tint = Color.White, modifier = Modifier.size(36.dp))
+                Spacer(Modifier.height(4.dp))
+                Text(t.title, color = Color.Black, fontSize = 18.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                Spacer(Modifier.height(6.dp))
+                Box(modifier = Modifier.size(52.dp).clip(CircleShape).border(2.dp, Color.Black, CircleShape).background(Color.White), contentAlignment = Alignment.Center) {
+                    Icon(Icons.Default.Person, null, tint = Color.Black, modifier = Modifier.size(30.dp))
+                }
+                Spacer(Modifier.height(4.dp))
+                Text("Name of Student: $studentName", color = Color.Black, fontSize = 13.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text("Student Email: $studentEmail", color = Color.Black, fontSize = 13.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                if (!t.description.isNullOrBlank()) {
+                    Spacer(Modifier.height(8.dp))
+                    Column(modifier = Modifier.fillMaxWidth(), horizontalAlignment = Alignment.Start) {
+                        Text("Exam description", color = Color.Black, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                        Text(t.description!!, color = Color(0xFF333333), fontSize = 12.sp, lineHeight = 15.sp)
+                    }
+                }
+                Spacer(Modifier.height(12.dp))
+                Button(onClick = { sound.swoosh(); onStart() }, modifier = Modifier.fillMaxWidth(0.65f).height(40.dp), colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2563EB)), shape = RoundedCornerShape(10.dp), enabled = !alreadyCompleted, contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 12.dp, vertical = 0.dp)) {
+                    Text(if (alreadyCompleted) "Already Completed" else "Get Started", color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                }
+                Spacer(Modifier.height(6.dp))
+                OutlinedButton(onClick = { sound.click(); onBack() }, modifier = Modifier.fillMaxWidth(0.65f).height(36.dp), shape = RoundedCornerShape(10.dp), colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.Black), border = BorderStroke(1.5.dp, Color.Black), contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 12.dp, vertical = 0.dp)) {
+                    Text("Cancel", fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                }
+                Spacer(Modifier.height(8.dp))
             }
-            Spacer(Modifier.height(8.dp))
-
-            // Student name
-            Text(
-                studentName,
-                color = Color.Black,
-                fontSize = 14.sp,
-                fontWeight = FontWeight.SemiBold,
-                textAlign = TextAlign.Center
-            )
-            // Student email
-            Text(
-                studentEmail,
-                color = Color.Gray,
-                fontSize = 11.sp,
-                textAlign = TextAlign.Center
-            )
+        }
 
             Spacer(Modifier.height(20.dp))
 
