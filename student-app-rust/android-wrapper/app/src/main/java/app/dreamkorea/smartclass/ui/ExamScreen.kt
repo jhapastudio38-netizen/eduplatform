@@ -418,7 +418,9 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
                         coil.compose.AsyncImage(
                             model = url, contentDescription = null,
                             modifier = Modifier.fillMaxWidth(0.92f).heightIn(max = 220.dp).padding(vertical = 4.dp).clip(RoundedCornerShape(8.dp)).clickable { FullScreenImageViewer.show(url) },
-                            contentScale = ContentScale.Fit
+                            contentScale = ContentScale.Fit,
+                            error = painterResource(id = android.R.drawable.ic_menu_report_image),
+                            placeholder = painterResource(id = android.R.drawable.ic_menu_gallery)
                         )
                     }
                     // Media TEXT — shown in a centered card (18sp)
@@ -445,7 +447,9 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
                         coil.compose.AsyncImage(
                             model = mediaImgUrl, contentDescription = null,
                             modifier = Modifier.fillMaxWidth(0.92f).heightIn(max = 240.dp).padding(vertical = 4.dp).clip(RoundedCornerShape(8.dp)).clickable { FullScreenImageViewer.show(mediaImgUrl) },
-                            contentScale = ContentScale.Fit
+                            contentScale = ContentScale.Fit,
+                            error = painterResource(id = android.R.drawable.ic_menu_report_image),
+                            placeholder = painterResource(id = android.R.drawable.ic_menu_gallery)
                         )
                     }
                     // Media AUDIO — single play button (36dp), blocked when another audio is playing
