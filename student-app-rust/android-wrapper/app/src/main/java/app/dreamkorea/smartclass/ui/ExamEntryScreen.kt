@@ -291,58 +291,10 @@ fun ExamEntryScreen(theme: AppTheme, sound: SoundManager, testId: String, onStar
                     Text("Cancel", fontSize = 14.sp, fontWeight = FontWeight.Bold)
                 }
                 Spacer(Modifier.height(8.dp))
-            }
-        }
-
-            Spacer(Modifier.height(20.dp))
-
-            // Exam description
-            if (!t.description.isNullOrBlank()) {
-                Surface(
-                    color = Color(0xFFF5F5F5),
-                    shape = RoundedCornerShape(8.dp),
-                    border = BorderStroke(1.dp, Color(0xFFCCCCCC)),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Text(
-                        t.description!!,
-                        color = Color.Black,
-                        fontSize = 12.sp,
-                        modifier = Modifier.padding(12.dp)
-                    )
-                }
-                Spacer(Modifier.height(20.dp))
-            }
-
-            // Get Started button — graded exams lock after 1 attempt, practice can retake
-            Button(
-                onClick = { sound.swoosh(); onStart() },
-                modifier = Modifier.fillMaxWidth(0.7f).height(44.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF003478)),
-                shape = RoundedCornerShape(10.dp),
-                enabled = !alreadyCompleted
-            ) {
-                Text(
-                    if (alreadyCompleted) "Already Completed" else "Get Started",
-                    color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Bold
-                )
-            }
-
-            Spacer(Modifier.height(8.dp))
-
-            // Cancel button
-            OutlinedButton(
-                onClick = { sound.click(); onBack() },
-                modifier = Modifier.fillMaxWidth(0.7f).height(40.dp),
-                shape = RoundedCornerShape(10.dp),
-                colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.Black),
-                border = BorderStroke(1.dp, Color.Black)
-            ) {
-                Text("Cancel", fontSize = 13.sp)
-            }
         }
     }
 }
+            }
 
 @Composable
 private fun StatChip(value: String, label: String, modifier: Modifier = Modifier) {
