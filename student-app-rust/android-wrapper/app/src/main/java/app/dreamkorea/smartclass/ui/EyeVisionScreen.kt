@@ -52,8 +52,14 @@ fun EyeVisionScreen(theme: AppTheme, sound: SoundManager, onBack: () -> Unit) {
     var correctAnswers by remember { mutableStateOf<List<String>>(emptyList()) }
     var showFinishConfirm by remember { mutableStateOf(false) }
 
-    // Force landscape for the test AND results. Review is portrait.
-    // Single source of truth — no competing DisposableEffects.
+    // Force landscape immediately on entry (before any UI renders)
+    LaunchedEffect(Unit) {
+        (context as? Activity)?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
+    }
+
+    // Single source of truth for orientation:
+    // - showReview = false → landscape (test + results)
+    // - showReview = true  → portrait (review only)
     DisposableEffect(showReview) {
         val activity = context as? Activity
         if (showReview) {
