@@ -668,7 +668,7 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
                 } else {
                     // ── EXAM: Reading LEFT | Listening RIGHT ──
                     Row(
-                        modifier = Modifier.fillMaxSize().padding(8.dp),
+                        modifier = Modifier.fillMaxSize().padding(6.dp),
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         // Reading panel (left)
