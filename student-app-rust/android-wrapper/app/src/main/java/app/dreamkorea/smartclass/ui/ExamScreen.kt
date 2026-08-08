@@ -555,217 +555,135 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
     if (showGrid) {
         val readingItems = sortedItems.filter { it.question.blockType != "audio" }
         val listeningItems = sortedItems.filter { it.question.blockType == "audio" }
-        // Question Bank / combined exams: show ALL questions in ONE panel (no Reading/Listening split)
-        // Regular exams/tests: show Reading LEFT | Listening RIGHT
         val isQBank = testId == "qbank-combined" || testId.startsWith("bundle-")
-        // showAllBlocks: true = show all blocks (added + blank), false = only show created questions
-        val showAllBlocks = t.showAllBlocks
         var showSubmitDialog by remember { mutableStateOf(false) }
         val haptic = LocalHapticFeedback.current
-        // Filter: null = all, true = solved only, false = unsolved only
         var filterMode by remember { mutableStateOf<Boolean?>(null) }
-
         val readingAnswered = readingItems.count { answers.containsKey(it.question.id) }
         val listeningAnswered = listeningItems.count { answers.containsKey(it.question.id) }
         val totalAnswered = readingAnswered + listeningAnswered
         val totalQuestions = t.items.size
         val totalUnsolved = totalQuestions - totalAnswered
-        // HH:MM:SS timer format (matches HTML reference)
         val hh = timeLeft / 3600; val mm = (timeLeft % 3600) / 60; val ss = timeLeft % 60
-        val timeStr = String.format("%02d:%02d:%02d", hh, mm, ss)
+        val timeStr = String.format("%02d : %02d : %02d", hh, mm, ss)
         val isLowTime = timeLeft in 1..300
         val timerColor = if (isLowTime) Color(0xFFDC2626) else Color(0xFF222222)
         val accentBlue = Color(0xFF1A56FF)
+        val studentName = AppState.getUserName() ?: "Student"
+        val studentEmail = AppState.getUserEmail() ?: ""
+        val navGray = Color(0xFFF3F3F3)
 
-        Column(modifier = Modifier.fillMaxSize().background(Color(0xFFF5F5F5))) {
-            // ── TABS ROW: All | Solved | UnSolved (with blue underline on active) ──
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(Color.White)
-                    .height(42.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                RefTab("All", filterMode == null, accentBlue, Modifier.weight(1f)) { filterMode = null }
-                RefTab("Solved", filterMode == true, accentBlue, Modifier.weight(1f)) { filterMode = true }
-                RefTab("UnSolved", filterMode == false, accentBlue, Modifier.weight(1f)) { filterMode = false }
-            }
-            // Thin border under tabs
-            Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(Color(0xFFE2E2E2)))
+        BoxWithConstraints(modifier = Modifier.fillMaxSize().background(Color.White)) {
+            val cw = maxWidth.value  // canvas width in dp
+            val ch = maxHeight.value // canvas height in dp
+            val headerSp = (cw * 0.018f).coerceIn(12f, 22f).sp
+            val navSp = (cw * 0.016f).coerceIn(11f, 18f).sp
+            val titleSp = (cw * 0.014f).coerceIn(10f, 16f).sp
+            val numSp = (cw * 0.014f).coerceIn(10f, 18f).sp
+            val submitSp = (cw * 0.013f).coerceIn(10f, 15f).sp
+            val gap = (cw * 0.008f).dp
+            val pad = (cw * 0.01f).dp
 
-            // ── TIMER (large, centered, monospace) ──────────────────────
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(Color.White)
-                    .padding(vertical = 8.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    timeStr,
-                    color = timerColor,
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.Medium,
-                    letterSpacing = 1.sp,
-                    fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
-                )
-            }
-            Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(Color(0xFFE2E2E2)))
-
-            // ── MAIN AREA ──────────────────────────────────────────────────
-            // QBank: single panel with ALL questions (no Reading/Listening labels)
-            // Exam: Reading LEFT | Listening RIGHT
-            Box(
-                modifier = Modifier
-                    .weight(1f)
-                    .fillMaxWidth()
-                    .background(Color(0xFFF5F5F5))
-            ) {
-                // Watermark logo in background
-                Image(
-                    painter = painterResource(id = app.dreamkorea.smartclass.R.drawable.dreamkorea_logo),
-                    contentDescription = null,
-                    modifier = Modifier
-                        .size(180.dp)
-                        .align(Alignment.Center)
-                        .alpha(0.04f),
-                    contentScale = ContentScale.Fit
-                )
-
-                if (isQBank) {
-                    // ── QBANK: single panel, all questions, no section labels ──
-                    // Fills the FULL screen — no max width constraint
-                    Column(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(12.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        Column(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .fillMaxHeight()
-                                .border(2.dp, Color(0xFF333333), RoundedCornerShape(10.dp))
-                                .background(Color.White)
-                                .padding(8.dp)
-                        ) {
-                            QuestionGridRef(
-                                baseIdx = 0,
-                                test = t,
-                                items = t.items, // ALL questions in one grid
-                                answers = answers,
-                                currentIdx = currentIdx,
-                                sound = sound,
-                                haptic = haptic,
-                                filterMode = filterMode,
-                                accentBlue = accentBlue,
-                                showAllBlocks = showAllBlocks
-                            ) { idx ->
-                                currentIdx = idx
-                                showGrid = false
+            Column(modifier = Modifier.fillMaxSize().padding(pad).border(2.dp, Color(0xFF333333))) {
+                // ── Row 1: Logo + Header (11% height) ──
+                Row(modifier = Modifier.fillMaxWidth().fillMaxHeight(0.11f)) {
+                    // Logo column (9.5% width)
+                    Box(modifier = Modifier.fillMaxHeight().width((cw * 0.085f).dp).border(2.dp, Color(0xFF333333)), contentAlignment = Alignment.Center) {
+                        Image(painter = painterResource(id = app.dreamkorea.smartclass.R.drawable.dreamkorea_logo), contentDescription = null, modifier = Modifier.size((cw * 0.06f).dp), contentScale = ContentScale.Fit)
+                    }
+                    // Header content (90.5% width): title | id | name
+                    Row(modifier = Modifier.fillMaxHeight().weight(1f).border(width = 0.dp, color = Color.Transparent), verticalAlignment = Alignment.CenterVertically) {
+                        Box(modifier = Modifier.weight(0.41f).fillMaxHeight(), contentAlignment = Alignment.Center) { Text(t.title.take(30), color = Color(0xFF171717), fontSize = headerSp, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis) }
+                        Box(modifier = Modifier.weight(0.27f).fillMaxHeight(), contentAlignment = Alignment.Center) { Text(studentEmail.take(15), color = Color(0xFF171717), fontSize = headerSp, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis) }
+                        Box(modifier = Modifier.weight(0.32f).fillMaxHeight(), contentAlignment = Alignment.Center) { Text(studentName.take(15), color = Color(0xFF171717), fontSize = headerSp, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis) }
+                    }
+                }
+                Box(modifier = Modifier.fillMaxWidth().height(2.dp).background(Color(0xFF333333)))
+                // ── Row 2: Nav tabs (11% height) ──
+                Row(modifier = Modifier.fillMaxWidth().fillMaxHeight(0.13f)) {
+                    // Empty space under logo
+                    Spacer(modifier = Modifier.width((cw * 0.085f).dp).fillMaxHeight())
+                    // 5 nav sections
+                    val navLabels = listOf("Nepal" to (null as Boolean?), "All" to null, "Solved" to true, "Unsolved" to false)
+                    navLabels.forEach { (label, mode) ->
+                        val selected = filterMode == mode
+                        Box(modifier = Modifier.weight(1f).fillMaxHeight().background(if (selected) navGray else Color.White).clickable { sound.click(); filterMode = mode }, contentAlignment = Alignment.Center) {
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                Text(label, color = Color(0xFF151515), fontSize = navSp, fontWeight = FontWeight.Medium)
+                                if (selected) { Box(modifier = Modifier.fillMaxWidth().height(3.dp).background(Color.Black)) }
                             }
                         }
                     }
-                } else {
-                    // ── EXAM: Reading LEFT | Listening RIGHT ──
-                    Row(
-                        modifier = Modifier.fillMaxSize().padding(6.dp),
-                        horizontalArrangement = Arrangement.spacedBy(3.dp)
-                    ) {
-                        // Reading panel (left)
-                        Column(modifier = Modifier.weight(1f).fillMaxHeight()) {
-                            Text(
-                                "Reading",
-                                color = Color(0xFF333333),
-                                fontSize = 16.sp,
-                                fontWeight = FontWeight.Medium,
-                                modifier = Modifier.padding(start = 4.dp, bottom = 6.dp)
-                            )
-                        // Scrollable grid with border — fills full panel
-                            Column(
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .fillMaxWidth()
-                                    .border(2.dp, Color(0xFF333333), RoundedCornerShape(10.dp))
-                                    .background(Color.White)
-                                    .padding(8.dp)
-                            ) {
-                                QuestionGridRef(
-                                baseIdx = 0,
-                                    test = t,
-                                    items = readingItems,
-                                    answers = answers,
-                                    currentIdx = currentIdx,
-                                    sound = sound,
-                                    haptic = haptic,
-                                    filterMode = filterMode,
-                                    accentBlue = accentBlue,
-                                    showAllBlocks = showAllBlocks
-                                ) { idx ->
-                                    currentIdx = idx
-                                    showGrid = false
+                    // Timer
+                    Box(modifier = Modifier.weight(1f).fillMaxHeight(), contentAlignment = Alignment.Center) {
+                        Text(timeStr, color = timerColor, fontSize = navSp, fontWeight = FontWeight.Medium, fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace)
+                    }
+                }
+                Box(modifier = Modifier.fillMaxWidth().height(2.dp).background(Color(0xFF333333)))
+                // ── Row 3: Section titles (8% height) ──
+                Row(modifier = Modifier.fillMaxWidth().fillMaxHeight(0.1f).padding(horizontal = pad)) {
+                    Box(modifier = Modifier.weight(1f).fillMaxHeight().padding(end = gap / 2).border(1.5.dp, Color(0xFFC8C8C8)), contentAlignment = Alignment.Center) { Text("Reading", color = Color(0xFF202020), fontSize = titleSp, fontWeight = FontWeight.Medium) }
+                    Box(modifier = Modifier.weight(1f).fillMaxHeight().padding(start = gap / 2).border(1.5.dp, Color(0xFFC8C8C8)), contentAlignment = Alignment.Center) { Text("Listening", color = Color(0xFF202020), fontSize = titleSp, fontWeight = FontWeight.Medium) }
+                }
+                Spacer(modifier = Modifier.height(gap))
+                // ── Row 4: Question grids (50% height) ──
+                Row(modifier = Modifier.fillMaxWidth().fillMaxHeight(0.62f).padding(horizontal = pad)) {
+                    // Reading grid
+                    Column(modifier = Modifier.weight(1f).fillMaxHeight().padding(end = gap / 2)) {
+                        Box(modifier = Modifier.fillMaxSize().border(2.5.dp, Color(0xFF111111), RoundedCornerShape((cw * 0.012f).dp)).background(Color.White).padding((cw * 0.008f).dp)) {
+                            Column(modifier = Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(gap)) {
+                                for (rowIdx in 0 until 4) {
+                                    Row(modifier = Modifier.fillMaxWidth().weight(1f), horizontalArrangement = Arrangement.spacedBy(gap)) {
+                                        for (colIdx in 0 until 5) {
+                                            val localIdx = rowIdx * 5 + colIdx
+                                            val displayNum = localIdx + 1
+                                            if (localIdx < readingItems.size) {
+                                                val globalIdx = localIdx
+                                                val item = readingItems[localIdx]
+                                                val isAnswered = answers.containsKey(item.question.id)
+                                                val isCurrent = globalIdx == currentIdx
+                                                val isFilteredOut = when (filterMode) { true -> !isAnswered; false -> isAnswered; null -> false }
+                                                Box(modifier = Modifier.weight(1f).fillMaxHeight().clip(RoundedCornerShape(4.dp)).border(2.dp, if (isCurrent) accentBlue else Color(0xFF111111)).background(if (isAnswered) accentBlue else Color.White).alpha(if (isFilteredOut) 0.15f else 1f).clickable(enabled = !isFilteredOut) { sound.click(); haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove); currentIdx = globalIdx; showGrid = false }, contentAlignment = Alignment.Center) { Text("$displayNum", color = if (isAnswered) Color.White else Color(0xFF171717), fontSize = numSp, fontWeight = if (isCurrent) FontWeight.Bold else FontWeight.Medium) }
+                                            } else {
+                                                Box(modifier = Modifier.weight(1f).fillMaxHeight().clip(RoundedCornerShape(4.dp)).border(2.dp, Color(0xFFEEEEEE)).background(Color(0xFFFAFAFA)), contentAlignment = Alignment.Center) { Text("$displayNum", color = Color(0xFFCCCCCC), fontSize = numSp) }
+                                            }
+                                        }
+                                    }
                                 }
                             }
                         }
-
-                        // Listening panel (right)
-                        Column(modifier = Modifier.weight(1f).fillMaxHeight()) {
-                            Text(
-                                "Listening",
-                                color = Color(0xFF333333),
-                                fontSize = 16.sp,
-                                fontWeight = FontWeight.Medium,
-                                modifier = Modifier.padding(start = 4.dp, bottom = 6.dp)
-                            )
-                            Column(
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .fillMaxWidth()
-                                    .border(2.dp, Color(0xFF333333), RoundedCornerShape(10.dp))
-                                    .background(Color.White)
-                                    .padding(8.dp)
-                            ) {
-                                QuestionGridRef(
-                                baseIdx = readingItems.size,
-                                    test = t,
-                                    items = listeningItems,
-                                    answers = answers,
-                                    currentIdx = currentIdx,
-                                    sound = sound,
-                                    haptic = haptic,
-                                    filterMode = filterMode,
-                                    accentBlue = accentBlue,
-                                    showAllBlocks = showAllBlocks
-                                ) { idx ->
-                                    currentIdx = idx
-                                    showGrid = false
+                    }
+                    // Listening grid
+                    Column(modifier = Modifier.weight(1f).fillMaxHeight().padding(start = gap / 2)) {
+                        Box(modifier = Modifier.fillMaxSize().border(2.5.dp, Color(0xFF111111), RoundedCornerShape((cw * 0.012f).dp)).background(Color.White).padding((cw * 0.008f).dp)) {
+                            Column(modifier = Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(gap)) {
+                                for (rowIdx in 0 until 4) {
+                                    Row(modifier = Modifier.fillMaxWidth().weight(1f), horizontalArrangement = Arrangement.spacedBy(gap)) {
+                                        for (colIdx in 0 until 5) {
+                                            val localIdx = rowIdx * 5 + colIdx
+                                            val displayNum = localIdx + 21
+                                            if (localIdx < listeningItems.size) {
+                                                val globalIdx = readingItems.size + localIdx
+                                                val item = listeningItems[localIdx]
+                                                val isAnswered = answers.containsKey(item.question.id)
+                                                val isCurrent = globalIdx == currentIdx
+                                                val isFilteredOut = when (filterMode) { true -> !isAnswered; false -> isAnswered; null -> false }
+                                                Box(modifier = Modifier.weight(1f).fillMaxHeight().clip(RoundedCornerShape(4.dp)).border(2.dp, if (isCurrent) accentBlue else Color(0xFF111111)).background(if (isAnswered) accentBlue else Color.White).alpha(if (isFilteredOut) 0.15f else 1f).clickable(enabled = !isFilteredOut) { sound.click(); haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove); currentIdx = globalIdx; showGrid = false }, contentAlignment = Alignment.Center) { Text("$displayNum", color = if (isAnswered) Color.White else Color(0xFF171717), fontSize = numSp, fontWeight = if (isCurrent) FontWeight.Bold else FontWeight.Medium) }
+                                            } else {
+                                                Box(modifier = Modifier.weight(1f).fillMaxHeight().clip(RoundedCornerShape(4.dp)).border(2.dp, Color(0xFFEEEEEE)).background(Color(0xFFFAFAFA)), contentAlignment = Alignment.Center) { Text("$displayNum", color = Color(0xFFCCCCCC), fontSize = numSp) }
+                                            }
+                                        }
+                                    }
                                 }
                             }
                         }
                     }
                 }
-            }
-
-            // ── SUBMIT BUTTON (blue pill, full-width-ish, at bottom) ─────
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(Color(0xFFF5F5F5))
-                    .padding(horizontal = 16.dp, vertical = 4.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                Button(
-                    onClick = { showSubmitDialog = true },
-                    modifier = Modifier.fillMaxWidth().height(44.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = accentBlue),
-                    shape = RoundedCornerShape(24.dp)
-                ) {
-                    Text(
-                        "Submit and Finish Exam",
-                        color = Color.White,
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.Medium
-                    )
+                // ── Row 5: Submit button (bottom area) ──
+                Box(modifier = Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) {
+                    Button(onClick = { showSubmitDialog = true }, modifier = Modifier.fillMaxWidth(0.25f).fillMaxHeight(0.7f), colors = ButtonDefaults.buttonColors(containerColor = accentBlue), shape = RoundedCornerShape((cw * 0.012f).dp)) {
+                        Text("Submit and Finish Exam", color = Color.White, fontSize = submitSp, fontWeight = FontWeight.Medium)
+                    }
                 }
             }
         }
@@ -777,37 +695,22 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
                 totalUnsolved <= 5 -> "You have $totalUnsolved unanswered question(s). Submit anyway?"
                 else -> "Warning: $totalUnsolved questions are still unanswered! Submit anyway?"
             }
-            val warningColor = when {
-                totalUnsolved == 0 -> Color(0xFF16A34A)
-                totalUnsolved <= 5 -> Color(0xFFD97706)
-                else -> Color(0xFFDC2626)
-            }
             AlertDialog(
                 onDismissRequest = { showSubmitDialog = false },
                 title = { Text("Submit Exam?") },
-                text = {
-                    Column {
-                        Text(warning, color = warningColor, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
-                        Spacer(Modifier.height(6.dp))
-                        Text("Reading: $readingAnswered/${readingItems.size} • Listening: $listeningAnswered/${listeningItems.size}",
-                            color = Color(0xFF64748B), fontSize = 11.sp)
-                    }
-                },
+                text = { Text(warning, fontSize = 13.sp) },
                 confirmButton = {
-                    Button(
-                        onClick = {
-                            showSubmitDialog = false
-                            if (!submitting) {
-                                sound.swoosh(); submitting = true
-                                scope.launch {
-                                    try { submitResult = submitExamWithFallback(t, answers.toMap()); sound.success() }
-                                    catch (e: Exception) { error = "Submit failed." }
-                                    submitting = false
-                                }
+                    Button(onClick = {
+                        showSubmitDialog = false
+                        if (!submitting) {
+                            sound.swoosh(); submitting = true
+                            scope.launch {
+                                try { submitResult = submitExamWithFallback(t, answers.toMap()); sound.success() }
+                                catch (e: Exception) { error = "Submit failed." }
+                                submitting = false
                             }
-                        },
-                        colors = ButtonDefaults.buttonColors(containerColor = accentBlue)
-                    ) { if (submitting) { CircularProgressIndicator(color = Color.White, modifier = Modifier.size(16.dp), strokeWidth = 2.dp) } else { Text("Submit", color = Color.White) } }
+                        }
+                    }) { if (submitting) { CircularProgressIndicator(color = Color.White, modifier = Modifier.size(16.dp), strokeWidth = 2.dp) } else { Text("Submit") } }
                 },
                 dismissButton = { OutlinedButton(onClick = { showSubmitDialog = false }) { Text("Cancel") } }
             )
