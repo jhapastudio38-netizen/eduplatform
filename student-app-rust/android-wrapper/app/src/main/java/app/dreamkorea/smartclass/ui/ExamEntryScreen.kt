@@ -291,9 +291,6 @@ fun ExamEntryScreen(theme: AppTheme, sound: SoundManager, testId: String, onStar
         }
     }
 }
-        }
-    }
-}
 
 @Composable
 private fun StatChip(value: String, label: String, modifier: Modifier = Modifier) {
