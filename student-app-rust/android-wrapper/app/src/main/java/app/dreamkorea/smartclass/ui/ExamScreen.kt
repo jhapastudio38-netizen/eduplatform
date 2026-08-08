@@ -670,7 +670,7 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
                     // ── EXAM: Reading LEFT | Listening RIGHT ──
                     Row(
                         modifier = Modifier.fillMaxSize().padding(6.dp),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        horizontalArrangement = Arrangement.spacedBy(3.dp)
                     ) {
                         // Reading panel (left)
                         Column(modifier = Modifier.weight(1f).fillMaxHeight()) {
@@ -881,12 +881,12 @@ private fun QuestionGridRef(
     Column(
         modifier = Modifier
             .fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(4.dp)
+        verticalArrangement = Arrangement.spacedBy(3.dp)
     ) {
         for (rowIdx in 0 until rowsCount) {
             Row(
                 modifier = Modifier.fillMaxWidth().weight(1f),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                horizontalArrangement = Arrangement.spacedBy(3.dp)
             ) {
                 for (colIdx in 0 until cols) {
                     val localIdx = rowIdx * cols + colIdx
@@ -906,7 +906,7 @@ private fun QuestionGridRef(
                         Box(
                             modifier = Modifier
                                 .weight(1f)
-                                
+                                .aspectRatio(1f)
                                 .clip(RoundedCornerShape(6.dp))
                                 .border(
                                     width = if (isCurrent) 2.5.dp else 1.5.dp,
@@ -929,7 +929,7 @@ private fun QuestionGridRef(
                             Text(
                                 "$displayNum",
                                 color = if (isAnswered) Color.White else Color(0xFF111111),
-                                fontSize = 15.sp,
+                                fontSize = 14.sp,
                                 fontWeight = if (isCurrent) FontWeight.Bold else FontWeight.Medium,
                             )
                         }
@@ -941,7 +941,7 @@ private fun QuestionGridRef(
                         Box(
                             modifier = Modifier
                                 .weight(1f)
-                                
+                                .aspectRatio(1f)
                                 .clip(RoundedCornerShape(6.dp))
                                 .border(1.5.dp, Color(0xFFEEEEEE), RoundedCornerShape(6.dp))
                                 .background(Color(0xFFFAFAFA)),
@@ -1457,7 +1457,7 @@ fun ExamResultScreen(
                     // ── Stats row (total marks, correct, incorrect, unanswered) ──
                     Row(
                         modifier = Modifier.fillMaxWidth().alpha(statsAlpha),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        horizontalArrangement = Arrangement.spacedBy(3.dp)
                     ) {
                         StatBox("Total", "$totalMarks", Color(0xFF6A1B9A), Modifier.weight(1f))
                         StatBox("Obtained", "$obtainedMarks", Color(0xFF4CAF50), Modifier.weight(1f))
@@ -1469,7 +1469,7 @@ fun ExamResultScreen(
                     // ── Action buttons ────────────────────────────────────────
                     Row(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        horizontalArrangement = Arrangement.spacedBy(3.dp)
                     ) {
                         OutlinedButton(
                             onClick = { sound.click(); showReviewSection = !showReviewSection },
