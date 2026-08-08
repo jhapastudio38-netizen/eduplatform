@@ -650,6 +650,7 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
                                 .padding(8.dp)
                         ) {
                             QuestionGridRef(
+                                baseIdx = 0,
                                 test = t,
                                 items = t.items, // ALL questions in one grid
                                 answers = answers,
@@ -690,6 +691,7 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
                                     .padding(8.dp)
                             ) {
                                 QuestionGridRef(
+                                baseIdx = 0,
                                     test = t,
                                     items = readingItems,
                                     answers = answers,
@@ -724,6 +726,7 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
                                     .padding(8.dp)
                             ) {
                                 QuestionGridRef(
+                                baseIdx = readingItems.size,
                                     test = t,
                                     items = listeningItems,
                                     answers = answers,
@@ -850,6 +853,7 @@ private fun RefTab(label: String, active: Boolean, accent: Color, modifier: Modi
 /// Grid is scrollable so all blocks are reachable.
 @Composable
 private fun QuestionGridRef(
+    baseIdx: Int,
     test: TestDetail,
     items: List<TestItemDetail>,
     answers: SnapshotStateMap<String, Any>,
@@ -861,7 +865,6 @@ private fun QuestionGridRef(
     showAllBlocks: Boolean,
     onPick: (Int) -> Unit,
 ) {
-    val globalIndices = items.mapNotNull { item -> test.items.indexOfFirst { it.question.id == item.question.id }.takeIf { it >= 0 } }
     val cols = 4  // 4 columns per the HTML reference
     val gridScrollState = rememberScrollState()
 
@@ -890,15 +893,11 @@ private fun QuestionGridRef(
                 for (colIdx in 0 until cols) {
                     val localIdx = rowIdx * cols + colIdx
                     if (localIdx < items.size) {
-                        val globalIdx = globalIndices[localIdx]
+                        val globalIdx = baseIdx + localIdx
                         // DISPLAY NUMBER: Reading shows 1-20, Listening shows 21-40
                         // Uses blockNumber (1-20 within each block) + 20 offset for audio
                         val q = items[localIdx].question
-                        val displayNum = if (q.blockType == "audio") {
-                            (q.blockNumber.takeIf { it > 0 } ?: (localIdx + 1)) + 20
-                        } else {
-                            q.blockNumber.takeIf { it > 0 } ?: (localIdx + 1)
-                        }
+                        val displayNum = if (q.blockType == "audio") localIdx + 21 else localIdx + 1
                         val isAnswered = answers.containsKey(items[localIdx].question.id)
                         val isCurrent = globalIdx == currentIdx
                         val isFilteredOut = when (filterMode) {
