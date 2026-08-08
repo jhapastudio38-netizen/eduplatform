@@ -1550,22 +1550,75 @@ fun ReviewCard(theme: AppTheme, review: ReviewItem, questionNumber: Int = 0, sou
                 fontSize = 13.sp,
                 fontWeight = FontWeight.Medium
             )
-            // Image (if any)
-            if (!review.imageUrl.isNullOrBlank()) {
-                Spacer(Modifier.height(8.dp))
-                val imgAbs = review.imageUrl!!.toAbsoluteUrl()
+
+            // ── Description section ──
+            // Description image
+            if (review.descType == "image" && !review.descImageUrl.isNullOrBlank()) {
+                Spacer(Modifier.height(6.dp))
+                val descImgAbs = review.descImageUrl!!.toAbsoluteUrl()
                 coil.compose.AsyncImage(
-                    model = imgAbs,
-                    contentDescription = "Question image",
+                    model = descImgAbs,
+                    contentDescription = "Description image",
+                    modifier = Modifier.fillMaxWidth().heightIn(max = 160.dp).clip(RoundedCornerShape(8.dp)),
+                    contentScale = ContentScale.Fit,
+                )
+            }
+            // Description text — LEFT aligned
+            if (!review.descText.isNullOrBlank()) {
+                Spacer(Modifier.height(6.dp))
+                Surface(
+                    color = Color(0xFFF8FAFC),
+                    shape = RoundedCornerShape(8.dp),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFE2E8F0)),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(
+                        review.descText!!,
+                        color = Color(0xFF1E293B),
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Medium,
+                        textAlign = androidx.compose.ui.text.style.TextAlign.Start,
+                        modifier = Modifier.padding(10.dp).fillMaxWidth()
+                    )
+                }
+            }
+
+            // ── Media section ──
+            // Media image
+            val reviewMediaImg = (review.mediaImageUrl ?: review.imageUrl)?.toAbsoluteUrl()
+            if (!reviewMediaImg.isNullOrBlank()) {
+                Spacer(Modifier.height(6.dp))
+                coil.compose.AsyncImage(
+                    model = reviewMediaImg,
+                    contentDescription = "Media image",
                     modifier = Modifier.fillMaxWidth().heightIn(max = 180.dp).clip(RoundedCornerShape(8.dp)),
                     contentScale = ContentScale.Fit,
                 )
             }
-            // Audio (if any) — let student replay the question audio during review
-            if (!review.audioUrl.isNullOrBlank()) {
+            // Media text — CENTER aligned
+            if (!review.mediaText.isNullOrBlank()) {
+                Spacer(Modifier.height(6.dp))
+                Surface(
+                    color = Color(0xFFF8FAFC),
+                    shape = RoundedCornerShape(8.dp),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFE2E8F0)),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(
+                        review.mediaText!!,
+                        color = Color(0xFF1E293B),
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Medium,
+                        textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                        modifier = Modifier.padding(10.dp).fillMaxWidth()
+                    )
+                }
+            }
+            // Media audio (if any) — let student replay the question audio during review
+            val reviewMediaAud = (review.mediaAudioUrl ?: review.audioUrl)?.toAbsoluteUrl()
+            if (!reviewMediaAud.isNullOrBlank()) {
                 Spacer(Modifier.height(8.dp))
-                val audAbs = review.audioUrl!!.toAbsoluteUrl()
-                AudioPlayerCard(theme = theme, url = audAbs, loopCount = 1, loopDelaySec = 0, sound = sound ?: rememberSoundManager(), isReview = true)
+                AudioPlayerCard(theme = theme, url = reviewMediaAud, loopCount = 1, loopDelaySec = 0, sound = sound ?: rememberSoundManager(), isReview = true)
             }
             Spacer(Modifier.height(8.dp))
 
