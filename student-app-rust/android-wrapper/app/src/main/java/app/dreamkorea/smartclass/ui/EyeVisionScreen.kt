@@ -52,11 +52,11 @@ fun EyeVisionScreen(theme: AppTheme, sound: SoundManager, onBack: () -> Unit) {
     var correctAnswers by remember { mutableStateOf<List<String>>(emptyList()) }
     var showFinishConfirm by remember { mutableStateOf(false) }
 
-    // Force landscape ONLY when taking the test (not during review/results which are portrait).
+    // Force landscape for the test AND results (only review is portrait).
     // This prevents the orientation glitch when switching between test and review.
-    DisposableEffect(showReview, showResults) {
+    DisposableEffect(showReview) {
         val activity = context as? Activity
-        if (!showReview && !showResults) {
+        if (!showReview) {
             activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
         }
         onDispose { }
@@ -191,14 +191,8 @@ fun EyeVisionScreen(theme: AppTheme, sound: SoundManager, onBack: () -> Unit) {
         return
     }
 
-    // ── RESULTS SCREEN — portrait ──
+    // ── RESULTS SCREEN — landscape (same as test) ──
     if (showResults) {
-        DisposableEffect(Unit) {
-            (context as? Activity)?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
-            onDispose {
-                (context as? Activity)?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
-            }
-        }
         val correct = outcomes.count { it == AnswerOutcome.CORRECT }
         val incorrect = outcomes.count { it == AnswerOutcome.INCORRECT }
         val total = tests.size
@@ -296,54 +290,65 @@ fun EyeVisionScreen(theme: AppTheme, sound: SoundManager, onBack: () -> Unit) {
                 }
                 Box(modifier = Modifier.width(2.dp).fillMaxHeight().background(Color.Black))
 
-                // RIGHT: Answer input + numeric keyboard
-                Column(modifier = Modifier.weight(0.45f).fillMaxHeight().padding(12.dp)) {
-                    Text("What number do you see?", color = Color(0xFF1E293B), fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
-                    Spacer(Modifier.height(6.dp))
-                    Box(modifier = Modifier.fillMaxWidth().height(48.dp).clip(RoundedCornerShape(8.dp)).background(Color(0xFFF8FAFC)).border(2.dp, Color(0xFF1565FF), RoundedCornerShape(8.dp)), contentAlignment = Alignment.Center) {
+                // RIGHT: Answer input + numeric keyboard — fills available height
+                Column(modifier = Modifier.weight(0.45f).fillMaxHeight().padding(10.dp)) {
+                    Text("What number do you see?", color = Color(0xFF1E293B), fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                    Spacer(Modifier.height(4.dp))
+                    // Answer display
+                    Box(modifier = Modifier.fillMaxWidth().height(42.dp).clip(RoundedCornerShape(8.dp)).background(Color(0xFFF8FAFC)).border(2.dp, Color(0xFF1565FF), RoundedCornerShape(8.dp)), contentAlignment = Alignment.Center) {
                         Text(
                             if (typedAnswer.isBlank()) "Type your answer" else typedAnswer,
                             color = if (typedAnswer.isBlank()) Color(0xFF94A3B8) else Color(0xFF0F172A),
-                            fontSize = 22.sp,
+                            fontSize = 20.sp,
                             fontWeight = FontWeight.Bold,
                             fontFamily = FontFamily.Monospace
                         )
                     }
-                    Spacer(Modifier.height(10.dp))
+                    Spacer(Modifier.height(8.dp))
 
-                    val keyBtnModifier = Modifier.weight(1f).height(44.dp)
+                    // Numeric keyboard — 3 rows of 3 (1-9), then 0 + Delete, fills remaining space
                     val keyColor = Color(0xFF1565FF)
 
-                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        listOf("1", "2", "3", "4").forEach { k ->
-                            KeyButton(k, keyColor, keyBtnModifier) { sound.click(); if (typedAnswer.length < 3) typedAnswer += k }
+                    // Row 1: 1 2 3
+                    Row(modifier = Modifier.fillMaxWidth().weight(1f), horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+                        listOf("1", "2", "3").forEach { k ->
+                            KeyButton(k, keyColor, Modifier.weight(1f).fillMaxHeight()) { sound.click(); if (typedAnswer.length < 3) typedAnswer += k }
                         }
                     }
-                    Spacer(Modifier.height(6.dp))
-                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        listOf("5", "6", "7", "8").forEach { k ->
-                            KeyButton(k, keyColor, keyBtnModifier) { sound.click(); if (typedAnswer.length < 3) typedAnswer += k }
+                    Spacer(Modifier.height(5.dp))
+                    // Row 2: 4 5 6
+                    Row(modifier = Modifier.fillMaxWidth().weight(1f), horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+                        listOf("4", "5", "6").forEach { k ->
+                            KeyButton(k, keyColor, Modifier.weight(1f).fillMaxHeight()) { sound.click(); if (typedAnswer.length < 3) typedAnswer += k }
                         }
                     }
-                    Spacer(Modifier.height(6.dp))
-                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        KeyButton("0", keyColor, keyBtnModifier) { sound.click(); if (typedAnswer.length < 3) typedAnswer += "0" }
-                        Box(modifier = Modifier.weight(1f).height(44.dp))
+                    Spacer(Modifier.height(5.dp))
+                    // Row 3: 7 8 9
+                    Row(modifier = Modifier.fillMaxWidth().weight(1f), horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+                        listOf("7", "8", "9").forEach { k ->
+                            KeyButton(k, keyColor, Modifier.weight(1f).fillMaxHeight()) { sound.click(); if (typedAnswer.length < 3) typedAnswer += k }
+                        }
+                    }
+                    Spacer(Modifier.height(5.dp))
+                    // Row 4: 0 (weight 1) + Delete (weight 2)
+                    Row(modifier = Modifier.fillMaxWidth().weight(1f), horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+                        KeyButton("0", keyColor, Modifier.weight(1f).fillMaxHeight()) { sound.click(); if (typedAnswer.length < 3) typedAnswer += "0" }
                         OutlinedButton(
                             onClick = { sound.click(); if (typedAnswer.isNotEmpty()) typedAnswer = typedAnswer.dropLast(1) },
-                            modifier = Modifier.weight(2f).height(44.dp),
+                            modifier = Modifier.weight(2f).fillMaxHeight(),
                             shape = RoundedCornerShape(8.dp),
                             border = androidx.compose.foundation.BorderStroke(2.dp, Color(0xFFEF4444)),
-                            colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFFEF4444))
+                            colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFFEF4444)),
+                            contentPadding = PaddingValues(0.dp)
                         ) {
                             Icon(Icons.Default.Backspace, null, modifier = Modifier.size(18.dp))
                             Spacer(Modifier.width(6.dp))
-                            Text("Delete", fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                            Text("Delete", fontSize = 14.sp, fontWeight = FontWeight.Bold)
                         }
                     }
-                    Spacer(Modifier.height(8.dp))
+                    Spacer(Modifier.height(6.dp))
 
-                    // Next / Submit button
+                    // Next / Submit + Skip
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                         OutlinedButton(
                             onClick = {
@@ -355,10 +360,10 @@ fun EyeVisionScreen(theme: AppTheme, sound: SoundManager, onBack: () -> Unit) {
                                 scope.launch { delay(150); isProcessing = false }
                             },
                             enabled = !isProcessing,
-                            modifier = Modifier.weight(1f).height(46.dp),
+                            modifier = Modifier.weight(1f).height(42.dp),
                             shape = RoundedCornerShape(8.dp)
                         ) {
-                            Text("Skip", fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                            Text("Skip", fontSize = 13.sp, fontWeight = FontWeight.Bold)
                         }
                         Button(
                             onClick = {
@@ -389,14 +394,14 @@ fun EyeVisionScreen(theme: AppTheme, sound: SoundManager, onBack: () -> Unit) {
                                 }
                             },
                             enabled = !isProcessing && typedAnswer.isNotBlank(),
-                            modifier = Modifier.weight(2f).height(46.dp),
+                            modifier = Modifier.weight(2f).height(42.dp),
                             shape = RoundedCornerShape(8.dp),
                             colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1565FF))
                         ) {
                             if (isProcessing) {
                                 CircularProgressIndicator(color = Color.White, modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
                             } else {
-                                Text(if (isLast) "Submit" else "Next", color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.Bold)
+                                Text(if (isLast) "Submit" else "Next", color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Bold)
                             }
                         }
                     }

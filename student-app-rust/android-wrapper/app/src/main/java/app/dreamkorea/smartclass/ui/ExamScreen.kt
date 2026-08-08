@@ -665,14 +665,14 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
             )
             val cw = maxWidth.value  // canvas width in dp
             val ch = maxHeight.value // canvas height in dp
-            val headerSp = (cw * 0.018f).coerceIn(12f, 22f).sp
-            val navSp = (cw * 0.013f).coerceIn(9f, 15f).sp
-            val titleSp = (cw * 0.017f).coerceIn(12f, 20f).sp
-            val numSp = (cw * 0.014f).coerceIn(10f, 18f).sp
-            val submitSp = (cw * 0.013f).coerceIn(10f, 15f).sp
-            val timerSp = (cw * 0.016f).coerceIn(11f, 17f).sp
-            val gap = (cw * 0.008f).dp
-            val pad = (cw * 0.01f).dp
+            val headerSp = (cw * 0.020f).coerceIn(14f, 24f).sp
+            val navSp = (cw * 0.015f).coerceIn(10f, 16f).sp
+            val titleSp = (cw * 0.019f).coerceIn(13f, 22f).sp
+            val numSp = (cw * 0.016f).coerceIn(11f, 19f).sp
+            val submitSp = (cw * 0.014f).coerceIn(11f, 16f).sp
+            val timerSp = (cw * 0.018f).coerceIn(12f, 18f).sp
+            val gap = (cw * 0.006f).dp
+            val pad = (cw * 0.008f).dp
 
             Column(modifier = Modifier.fillMaxSize().padding(pad).border(1.dp, Color(0xFF444444))) {
                 // ── Row 1: Logo + Header (9% height) ──
