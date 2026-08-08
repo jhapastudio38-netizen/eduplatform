@@ -52,11 +52,13 @@ fun EyeVisionScreen(theme: AppTheme, sound: SoundManager, onBack: () -> Unit) {
     var correctAnswers by remember { mutableStateOf<List<String>>(emptyList()) }
     var showFinishConfirm by remember { mutableStateOf(false) }
 
-    // Force landscape for the test AND results (only review is portrait).
-    // This prevents the orientation glitch when switching between test and review.
+    // Force landscape for the test AND results. Review is portrait.
+    // Single source of truth — no competing DisposableEffects.
     DisposableEffect(showReview) {
         val activity = context as? Activity
-        if (!showReview) {
+        if (showReview) {
+            activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+        } else {
             activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
         }
         onDispose { }
@@ -99,14 +101,8 @@ fun EyeVisionScreen(theme: AppTheme, sound: SoundManager, onBack: () -> Unit) {
         return
     }
 
-    // ── REVIEW SCREEN — portrait, no stat boxes, only Back to Home ──
+    // ── REVIEW SCREEN — portrait (handled by top-level DisposableEffect) ──
     if (showReview) {
-        DisposableEffect(Unit) {
-            (context as? Activity)?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
-            onDispose {
-                (context as? Activity)?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
-            }
-        }
         Box(modifier = Modifier.fillMaxSize().background(Color.White)) {
             Image(
                 painter = painterResource(id = app.dreamkorea.smartclass.R.drawable.dreamkorea_logo),
