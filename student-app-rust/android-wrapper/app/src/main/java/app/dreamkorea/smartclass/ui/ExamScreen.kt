@@ -527,7 +527,7 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
             color = Color.White,
             border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFE2E8F0)),
         ) {
-            Row(modifier = Modifier.fillMaxWidth(0.6f).height(44.dp), verticalAlignment = Alignment.CenterVertically) {
+            Row(modifier = Modifier.fillMaxWidth().height(44.dp), verticalAlignment = Alignment.CenterVertically) {
                 // Previous (अघिल्लो) — disabled when audio playing
                 Box(modifier = Modifier.weight(1f).fillMaxHeight().clickable(enabled = !audioPlaying) { if (currentIdx > 0) { currentIdx--; sound.click() } }, contentAlignment = Alignment.Center) {
                     Text("अघिल्लो (Prev)", color = if (currentIdx > 0 && !audioPlaying) Color(0xFF003478) else Color(0xFFCBD5E1), fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
@@ -645,7 +645,7 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .fillMaxHeight()
-                                .border(1.dp, Color(0xFFCBD5E1), RoundedCornerShape(12.dp))
+                                .border(2.dp, Color(0xFF333333), RoundedCornerShape(10.dp))
                                 .background(Color.White)
                                 .padding(8.dp)
                         ) {
@@ -685,7 +685,7 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
                                 modifier = Modifier
                                     .weight(1f)
                                     .fillMaxWidth()
-                                    .border(1.dp, Color(0xFFCBD5E1), RoundedCornerShape(12.dp))
+                                    .border(2.dp, Color(0xFF333333), RoundedCornerShape(10.dp))
                                     .background(Color.White)
                                     .padding(8.dp)
                             ) {
@@ -719,7 +719,7 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
                                 modifier = Modifier
                                     .weight(1f)
                                     .fillMaxWidth()
-                                    .border(1.dp, Color(0xFFCBD5E1), RoundedCornerShape(12.dp))
+                                    .border(2.dp, Color(0xFF333333), RoundedCornerShape(10.dp))
                                     .background(Color.White)
                                     .padding(8.dp)
                             ) {
@@ -753,7 +753,7 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
             ) {
                 Button(
                     onClick = { showSubmitDialog = true },
-                    modifier = Modifier.fillMaxWidth(0.6f).height(44.dp),
+                    modifier = Modifier.fillMaxWidth().height(44.dp),
                     colors = ButtonDefaults.buttonColors(containerColor = accentBlue),
                     shape = RoundedCornerShape(24.dp)
                 ) {
