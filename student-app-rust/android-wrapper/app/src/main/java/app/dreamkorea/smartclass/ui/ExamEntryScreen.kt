@@ -57,16 +57,8 @@ fun ExamEntryScreen(theme: AppTheme, sound: SoundManager, testId: String, onStar
     var error by remember { mutableStateOf("") }
     var alreadyCompleted by remember { mutableStateOf(false) }
     var isSubscribed by remember { mutableStateOf(false) }
-    var showRotateHint by remember { mutableStateOf(true) }
 
-    // Auto-hide the rotate hint after 3 seconds
-    LaunchedEffect(Unit) {
-        kotlinx.coroutines.delay(3000)
-        showRotateHint = false
-    }
-
-    // ── ORIENTATION ── FORCE LANDSCAPE. No onDispose PORTRAIT —
-    // MainScreen handles portrait when screen changes to non-exam.
+    // ── ORIENTATION ── FORCE LANDSCAPE.
     DisposableEffect(Unit) {
         val activity = context as? Activity
         activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
@@ -155,41 +147,6 @@ fun ExamEntryScreen(theme: AppTheme, sound: SoundManager, testId: String, onStar
         }
     }
 
-    // ── Rotate hint overlay — shows briefly when entering landscape ─────
-    if (showRotateHint && !loading) {
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(Color.Black.copy(alpha = 0.7f))
-                .clickable { showRotateHint = false },
-            contentAlignment = Alignment.Center
-        ) {
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                // Rotating phone icon
-                Icon(
-                    Icons.Default.ScreenRotation,
-                    null,
-                    tint = Color.White,
-                    modifier = Modifier.size(64.dp)
-                )
-                Spacer(Modifier.height(16.dp))
-                Text(
-                    "Rotate to Landscape",
-                    color = Color.White,
-                    fontSize = 20.sp,
-                    fontWeight = FontWeight.Bold
-                )
-                Spacer(Modifier.height(8.dp))
-                Text(
-                    "This exam works best in landscape mode.\nTap to continue.",
-                    color = Color.White.copy(alpha = 0.8f),
-                    fontSize = 13.sp,
-                    textAlign = TextAlign.Center
-                )
-            }
-        }
-    }
-
     if (loading) {
         Column(
             modifier = Modifier.fillMaxSize().background(Color.White),
@@ -230,6 +187,7 @@ fun ExamEntryScreen(theme: AppTheme, sound: SoundManager, testId: String, onStar
             .fillMaxSize()
             .background(Color.White)
             .border(2.dp, Color.Black)
+            .verticalScroll(rememberScrollState())
     ) {
         // ── DreamKorea logo at top centre ────────────────────────────────
         Box(
@@ -256,91 +214,81 @@ fun ExamEntryScreen(theme: AppTheme, sound: SoundManager, testId: String, onStar
         Box(
             modifier = Modifier.weight(1f).padding(16.dp)
         ) {
-            // Landscape-friendly layout: Row with LEFT (student) + RIGHT (exam)
-            Row(
-                modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()),
-                horizontalArrangement = Arrangement.spacedBy(24.dp),
-                verticalAlignment = Alignment.CenterVertically
+            // Vertical compact layout: student info on top, exam info below
+            Column(
+                modifier = Modifier.fillMaxSize(),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center
             ) {
-                // ── LEFT: Student info ────────────────────────────────────
-                Column(
-                    modifier = Modifier.weight(0.4f),
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    // Title at top
+                // ── Title ──
                 Text(
                     t.title,
                     color = Color.Black,
-                    fontSize = 16.sp,
+                    fontSize = 18.sp,
                     fontWeight = FontWeight.Bold,
                     textAlign = TextAlign.Center,
                     maxLines = 2
                 )
-                Spacer(Modifier.height(16.dp))
+                Spacer(Modifier.height(12.dp))
 
-                // Profile icon
+                // ── Profile icon ──
                 Box(
                     modifier = Modifier
-                        .size(64.dp)
+                        .size(52.dp)
                         .clip(CircleShape)
                         .background(Color(0xFF003478)),
                     contentAlignment = Alignment.Center
                 ) {
-                    Icon(Icons.Default.Person, null, tint = Color.White, modifier = Modifier.size(36.dp))
+                    Icon(Icons.Default.Person, null, tint = Color.White, modifier = Modifier.size(28.dp))
                 }
-                Spacer(Modifier.height(8.dp))
+                Spacer(Modifier.height(6.dp))
 
-                // Student name
+                // ── Student name + email ──
                 Text(
                     studentName,
                     color = Color.Black,
-                    fontSize = 14.sp,
+                    fontSize = 13.sp,
                     fontWeight = FontWeight.SemiBold,
                     textAlign = TextAlign.Center
                 )
-                // Student email
                 Text(
                     studentEmail,
                     color = Color.Gray,
-                    fontSize = 11.sp,
+                    fontSize = 13.sp,
                     textAlign = TextAlign.Center
                 )
-            }
 
-            // ── Vertical divider ──────────────────────────────────────────
-            Box(
-                modifier = Modifier
-                    .width(1.dp)
-                    .fillMaxHeight(0.7f)
-                    .background(Color(0xFFCCCCCC))
-            )
+                Spacer(Modifier.height(16.dp))
 
-            // ── RIGHT: Exam info + buttons ────────────────────────────────
-            Column(
-                modifier = Modifier.weight(0.6f),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                // Exam description
+                // ── Description heading ──
                 if (!t.description.isNullOrBlank()) {
+                    Text(
+                        "Description",
+                        color = Color(0xFF003478),
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Bold,
+                        textAlign = TextAlign.Center
+                    )
+                    Spacer(Modifier.height(4.dp))
                     Surface(
                         color = Color(0xFFF5F5F5),
                         shape = RoundedCornerShape(8.dp),
                         border = BorderStroke(1.dp, Color(0xFFCCCCCC)),
-                        modifier = Modifier.fillMaxWidth()
+                        modifier = Modifier.fillMaxWidth(0.85f)
                     ) {
                         Text(
                             t.description!!,
                             color = Color.Black,
                             fontSize = 12.sp,
-                            modifier = Modifier.padding(12.dp)
+                            modifier = Modifier.padding(12.dp),
+                            maxLines = 4,
+                            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
                         )
                     }
-                    Spacer(Modifier.height(12.dp))
+                    Spacer(Modifier.height(16.dp))
                 }
 
-                                Spacer(Modifier.height(20.dp))
-
-                // Get Started button — graded exams lock after 1 attempt, practice can retake
+                // ── Get Started button ──
                 Button(
                     onClick = { sound.swoosh(); onStart() },
                     modifier = Modifier.fillMaxWidth(0.7f).height(44.dp),
@@ -356,7 +304,7 @@ fun ExamEntryScreen(theme: AppTheme, sound: SoundManager, testId: String, onStar
 
                 Spacer(Modifier.height(8.dp))
 
-                // Cancel button
+                // ── Cancel button ──
                 OutlinedButton(
                     onClick = { sound.click(); onBack() },
                     modifier = Modifier.fillMaxWidth(0.7f).height(40.dp),
@@ -367,7 +315,6 @@ fun ExamEntryScreen(theme: AppTheme, sound: SoundManager, testId: String, onStar
                     Text("Cancel", fontSize = 13.sp)
                 }
             }
-        }
         }
     }
 }
