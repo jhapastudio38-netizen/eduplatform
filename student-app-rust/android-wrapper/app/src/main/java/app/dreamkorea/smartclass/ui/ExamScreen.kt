@@ -865,8 +865,7 @@ private fun QuestionGridRef(
     showAllBlocks: Boolean,
     onPick: (Int) -> Unit,
 ) {
-    val cols = 4  // 4 columns per the HTML reference
-    val gridScrollState = rememberScrollState()
+    val cols = 5  // 5 columns per the reference
 
     // Determine total cells to render
     val expectedTotal = if (showAllBlocks) {
@@ -878,16 +877,15 @@ private fun QuestionGridRef(
     }
     val rowsCount = (expectedTotal + cols - 1) / cols
 
-    // Scrollable grid — cells are PERFECT SQUARES (aspectRatio 1f)
+    // Grid — 5 columns, fills available space
     Column(
         modifier = Modifier
-            .fillMaxWidth()
-            .verticalScroll(gridScrollState),
-        verticalArrangement = Arrangement.spacedBy(8.dp)
+            .fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(4.dp)
     ) {
         for (rowIdx in 0 until rowsCount) {
             Row(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier.fillMaxWidth().weight(1f),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 for (colIdx in 0 until cols) {
@@ -908,7 +906,7 @@ private fun QuestionGridRef(
                         Box(
                             modifier = Modifier
                                 .weight(1f)
-                                .aspectRatio(1f)  // PERFECT SQUARE — always 1:1
+                                
                                 .clip(RoundedCornerShape(6.dp))
                                 .border(
                                     width = if (isCurrent) 2.5.dp else 1.5.dp,
@@ -943,7 +941,7 @@ private fun QuestionGridRef(
                         Box(
                             modifier = Modifier
                                 .weight(1f)
-                                .aspectRatio(1f)  // PERFECT SQUARE
+                                
                                 .clip(RoundedCornerShape(6.dp))
                                 .border(1.5.dp, Color(0xFFEEEEEE), RoundedCornerShape(6.dp))
                                 .background(Color(0xFFFAFAFA)),
@@ -958,7 +956,7 @@ private fun QuestionGridRef(
                         }
                     } else {
                         // showAllBlocks=false, no question — invisible spacer (perfect square)
-                        Spacer(modifier = Modifier.weight(1f).aspectRatio(1f))
+                        Spacer(modifier = Modifier.weight(1f).fillMaxHeight())
                     }
                 }
             }
