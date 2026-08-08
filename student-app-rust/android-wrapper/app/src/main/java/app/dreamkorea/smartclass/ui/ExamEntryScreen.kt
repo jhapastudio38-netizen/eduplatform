@@ -148,58 +148,14 @@ fun ExamEntryScreen(theme: AppTheme, sound: SoundManager, testId: String, onStar
     }
 
     if (loading) {
-        // Skeleton loading — matches the exam overview layout shape
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(Color(0xFFF5F5F5))
-                .navigationBarsPadding()
-                .statusBarsPadding(),
-            contentAlignment = Alignment.Center
+        Column(
+            modifier = Modifier.fillMaxSize().background(Color.White),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
         ) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth(0.97f)
-                    .fillMaxHeight(0.94f)
-                    .background(Color.White)
-                    .border(1.5.dp, Color(0xFF222222))
-            ) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(horizontal = 28.dp, vertical = 16.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.Center
-                ) {
-                    // Title skeleton
-                    Box(modifier = Modifier.fillMaxWidth(0.6f).height(28.dp).clip(RoundedCornerShape(4.dp)).background(Color(0xFFE0E0E0)))
-                    Spacer(Modifier.height(16.dp))
-                    // Avatar skeleton
-                    Box(modifier = Modifier.size(80.dp).clip(CircleShape).background(Color(0xFFE0E0E0)))
-                    Spacer(Modifier.height(10.dp))
-                    // Name skeleton
-                    Box(modifier = Modifier.fillMaxWidth(0.5f).height(18.dp).clip(RoundedCornerShape(4.dp)).background(Color(0xFFE0E0E0)))
-                    Spacer(Modifier.height(4.dp))
-                    // Email skeleton
-                    Box(modifier = Modifier.fillMaxWidth(0.4f).height(18.dp).clip(RoundedCornerShape(4.dp)).background(Color(0xFFE0E0E0)))
-                    Spacer(Modifier.height(16.dp))
-                    // Description heading skeleton
-                    Box(modifier = Modifier.fillMaxWidth(0.3f).height(20.dp).clip(RoundedCornerShape(4.dp)).background(Color(0xFFE0E0E0)))
-                    Spacer(Modifier.height(6.dp))
-                    // Description lines skeleton
-                    Box(modifier = Modifier.fillMaxWidth(0.9f).height(16.dp).clip(RoundedCornerShape(4.dp)).background(Color(0xFFE0E0E0)))
-                    Spacer(Modifier.height(4.dp))
-                    Box(modifier = Modifier.fillMaxWidth(0.85f).height(16.dp).clip(RoundedCornerShape(4.dp)).background(Color(0xFFE0E0E0)))
-                    Spacer(Modifier.height(4.dp))
-                    Box(modifier = Modifier.fillMaxWidth(0.7f).height(16.dp).clip(RoundedCornerShape(4.dp)).background(Color(0xFFE0E0E0)))
-                    Spacer(Modifier.height(18.dp))
-                    // Button skeletons
-                    Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                        Box(modifier = Modifier.width(140.dp).height(46.dp).clip(RoundedCornerShape(10.dp)).background(Color(0xFFE0E0E0)))
-                        Box(modifier = Modifier.width(160.dp).height(46.dp).clip(RoundedCornerShape(10.dp)).background(Color(0xFFE0E0E0)))
-                    }
-                }
-            }
+            CircularProgressIndicator(color = Color(0xFF003478))
+            Spacer(Modifier.height(12.dp))
+            Text("Loading exam…", color = Color.Gray, fontSize = 13.sp)
         }
         return
     }

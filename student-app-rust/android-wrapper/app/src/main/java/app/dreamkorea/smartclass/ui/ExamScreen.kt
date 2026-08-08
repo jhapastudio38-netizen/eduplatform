@@ -1446,7 +1446,14 @@ fun ExamResultScreen(
                     )
                 }
             }
-            itemsIndexed(result.review) { idx, review ->
+            itemsIndexed(
+                items = result.review.sortedWith(
+                    compareBy(
+                        { if (it.blockType == "audio") 1 else 0 },  // Reading (non-audio) first, Listening (audio) second
+                        { it.questionId }  // then by question ID for stable order
+                    )
+                )
+            ) { idx, review ->
                 ReviewCard(theme, review, idx + 1, sound)
             }
         }
