@@ -181,9 +181,9 @@ fun ExamEntryScreen(theme: AppTheme, sound: SoundManager, testId: String, onStar
     val studentName = AppState.getUserName() ?: "Student"
     val studentEmail = AppState.getUserEmail() ?: ""
 
-    // ── LANDSCAPE EXAM OVERVIEW ──
+    // ── LANDSCAPE EXAM OVERVIEW — vertical stacked layout ──
     // Light grey background, large white panel (97% width, 94% height) centered.
-    // Title centered at top, Row below: left=student (avatar+info), right=description+buttons.
+    // Top→bottom: DreamKorea title, profile avatar, user info, exam description, buttons.
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -203,13 +203,15 @@ fun ExamEntryScreen(theme: AppTheme, sound: SoundManager, testId: String, onStar
             Column(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(horizontal = 32.dp, vertical = 20.dp)
+                    .padding(horizontal = 28.dp, vertical = 16.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center
             ) {
-                // ── TITLE (centered, bold) ──
+                // ── 1. DreamKorea title (centered, bold) ──
                 Text(
                     t.title,
                     color = Color.Black,
-                    fontSize = 24.sp,
+                    fontSize = 22.sp,
                     fontWeight = FontWeight.Bold,
                     textAlign = TextAlign.Center,
                     maxLines = 2,
@@ -217,111 +219,97 @@ fun ExamEntryScreen(theme: AppTheme, sound: SoundManager, testId: String, onStar
                     modifier = Modifier.fillMaxWidth()
                 )
 
-                Spacer(Modifier.height(24.dp))
+                Spacer(Modifier.height(16.dp))
 
-                // ── MAIN CONTENT ROW: left (student 44%) | right (description 56%) ──
+                // ── 2. Profile avatar (circular, dark) ──
+                Box(
+                    modifier = Modifier
+                        .size(80.dp)
+                        .clip(CircleShape)
+                        .background(Color(0xFF1A1A1A)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(Icons.Default.Person, null, tint = Color.White, modifier = Modifier.size(44.dp))
+                }
+
+                Spacer(Modifier.height(10.dp))
+
+                // ── 3. User info (name + email) ──
+                Text(
+                    "Name of Student: $studentName",
+                    color = Color.Black,
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 1,
+                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                    textAlign = TextAlign.Center
+                )
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    "Student Email: $studentEmail",
+                    color = Color.Black,
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 1,
+                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                    textAlign = TextAlign.Center
+                )
+
+                Spacer(Modifier.height(16.dp))
+
+                // ── 4. Exam description ──
+                Text(
+                    "Exam description",
+                    color = Color.Black,
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Bold,
+                    textAlign = TextAlign.Center
+                )
+                Spacer(Modifier.height(6.dp))
+                Text(
+                    t.description ?: "No description available.",
+                    color = Color.Black,
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Normal,
+                    lineHeight = 20.sp,
+                    maxLines = 5,
+                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.fillMaxWidth(0.9f)
+                )
+
+                Spacer(Modifier.height(18.dp))
+
+                // ── 5. Buttons (horizontal row) ──
                 Row(
-                    modifier = Modifier.weight(1f).fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(28.dp),
+                    horizontalArrangement = Arrangement.spacedBy(16.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    // ── LEFT: Student section — avatar + info side by side ──
-                    Row(
-                        modifier = Modifier.weight(0.44f).fillMaxHeight(),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.Center
+                    // Cancel button (secondary — white with dark border)
+                    OutlinedButton(
+                        onClick = { sound.click(); onBack() },
+                        modifier = Modifier.width(140.dp).height(46.dp),
+                        shape = RoundedCornerShape(10.dp),
+                        colors = ButtonDefaults.outlinedButtonColors(
+                            containerColor = Color.White,
+                            contentColor = Color.Black
+                        ),
+                        border = BorderStroke(1.5.dp, Color(0xFF333333))
                     ) {
-                        // Avatar (circular, dark)
-                        Box(
-                            modifier = Modifier
-                                .size(100.dp)
-                                .clip(CircleShape)
-                                .background(Color(0xFF1A1A1A)),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(Icons.Default.Person, null, tint = Color.White, modifier = Modifier.size(56.dp))
-                        }
-                        Spacer(Modifier.width(24.dp))
-                        // Student info
-                        Column {
-                            Text(
-                                "Name of Student: $studentName",
-                                color = Color.Black,
-                                fontSize = 17.sp,
-                                fontWeight = FontWeight.SemiBold,
-                                maxLines = 1,
-                                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
-                            )
-                            Spacer(Modifier.height(8.dp))
-                            Text(
-                                "Student Email: $studentEmail",
-                                color = Color.Black,
-                                fontSize = 17.sp,
-                                fontWeight = FontWeight.SemiBold,
-                                maxLines = 1,
-                                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
-                            )
-                        }
+                        Text("Cancel", fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
                     }
-
-                    // ── RIGHT: Description + buttons ──
-                    Column(
-                        modifier = Modifier.weight(0.56f).fillMaxHeight(),
-                        verticalArrangement = Arrangement.Center
+                    // Get Started button (primary — blue)
+                    Button(
+                        onClick = { sound.swoosh(); onStart() },
+                        modifier = Modifier.width(160.dp).height(46.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1A73E8)),
+                        shape = RoundedCornerShape(10.dp),
+                        enabled = !alreadyCompleted
                     ) {
-                        // Description heading
                         Text(
-                            "Exam description",
-                            color = Color.Black,
-                            fontSize = 20.sp,
-                            fontWeight = FontWeight.Bold
+                            if (alreadyCompleted) "Already Completed" else "Get Started",
+                            color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Bold
                         )
-                        Spacer(Modifier.height(10.dp))
-                        // Description paragraph (wraps naturally)
-                        Text(
-                            t.description ?: "No description available.",
-                            color = Color.Black,
-                            fontSize = 17.sp,
-                            fontWeight = FontWeight.Normal,
-                            lineHeight = 24.sp,
-                            maxLines = 8,
-                            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
-                        )
-
-                        Spacer(Modifier.height(24.dp))
-
-                        // ── Buttons (horizontal row) ──
-                        Row(
-                            horizontalArrangement = Arrangement.spacedBy(16.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            // Cancel button (secondary — white with dark border)
-                            OutlinedButton(
-                                onClick = { sound.click(); onBack() },
-                                modifier = Modifier.width(150.dp).height(54.dp),
-                                shape = RoundedCornerShape(10.dp),
-                                colors = ButtonDefaults.outlinedButtonColors(
-                                    containerColor = Color.White,
-                                    contentColor = Color.Black
-                                ),
-                                border = BorderStroke(1.5.dp, Color(0xFF333333))
-                            ) {
-                                Text("Cancel", fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
-                            }
-                            // Get Started button (primary — blue)
-                            Button(
-                                onClick = { sound.swoosh(); onStart() },
-                                modifier = Modifier.width(170.dp).height(54.dp),
-                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1A73E8)),
-                                shape = RoundedCornerShape(10.dp),
-                                enabled = !alreadyCompleted
-                            ) {
-                                Text(
-                                    if (alreadyCompleted) "Already Completed" else "Get Started",
-                                    color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.Bold
-                                )
-                            }
-                        }
                     }
                 }
             }
