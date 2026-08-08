@@ -523,7 +523,7 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
                     // the question changes — state (playCount, disabled) resets completely.
                     // This fixes the bug where audio was locked from the previous question.
                     key(q.id) {
-                        AudioPlayerCard(theme = theme, url = mediaAudUrl, loopCount = q.audioLoop, loopDelaySec = if (q.audioLoopDelay > 0) q.audioLoopDelay else 2, sound = sound, questionId = q.id, playCounts = audioPlayCounts, onPlayingChange = { audioPlaying = it }, onPlayStart = { currentlyPlayingId = q.id }, stopToken = currentlyPlayingId)
+                        AudioPlayerCard(theme = theme, url = mediaAudUrl, loopCount = q.audioLoop, loopDelaySec = if (q.audioLoopDelay > 0) q.audioLoopDelay else 2, sound = sound, questionId = q.id, playCounts = audioPlayCounts, onPlayingChange = { audioPlaying = it }, onPlayStart = { currentlyPlayingId = q.id }, stopToken = currentlyPlayingId, externallyBlocked = audioPlaying && currentlyPlayingId != q.id)
                     }
                 }
             }
@@ -594,7 +594,7 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
                                 Spacer(Modifier.width(4.dp))
                                 // key(q.id, i) — recreate when question changes so play count resets
                                 key(q.id, i) {
-                                    AudioPlayerCard(theme = theme, url = absUrl, loopCount = q.audioLoop.coerceAtLeast(1), loopDelaySec = if (q.audioLoopDelay > 0) q.audioLoopDelay else 2, sound = sound, questionId = "${q.id}-opt-$i", playCounts = audioPlayCounts, onPlayingChange = { audioPlaying = it }, onPlayStart = { currentlyPlayingId = "${q.id}-opt-$i" }, stopToken = currentlyPlayingId)
+                                    AudioPlayerCard(theme = theme, url = absUrl, loopCount = q.audioLoop.coerceAtLeast(1), loopDelaySec = if (q.audioLoopDelay > 0) q.audioLoopDelay else 2, sound = sound, questionId = "${q.id}-opt-$i", playCounts = audioPlayCounts, onPlayingChange = { audioPlaying = it }, onPlayStart = { currentlyPlayingId = "${q.id}-opt-$i" }, stopToken = currentlyPlayingId, externallyBlocked = audioPlaying && currentlyPlayingId != "${q.id}-opt-$i")
                                 }
                             }
                         }
@@ -1009,6 +1009,7 @@ fun AudioPlayerCard(
     onPlayStart: (() -> Unit)? = null,
     stopToken: String? = null,
     isReview: Boolean = false,
+    externallyBlocked: Boolean = false,  // true = another audio is playing, block this button
 ) {
     val context = LocalContext.current
     var mediaPlayer by remember { mutableStateOf<android.media.MediaPlayer?>(null) }
@@ -1102,7 +1103,7 @@ fun AudioPlayerCard(
                         }
                     }
                 },
-                enabled = !disabled && !isPlaying
+                enabled = !disabled && !isPlaying && !externallyBlocked
             ) {
                 // Pulsing animation when playing so user knows which audio is active
                 val infiniteTransition = androidx.compose.animation.core.rememberInfiniteTransition(label = "audioPulse")
