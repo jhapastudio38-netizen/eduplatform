@@ -58,11 +58,11 @@ fun EyeVisionScreen(theme: AppTheme, sound: SoundManager, onBack: () -> Unit) {
     }
 
     // Single source of truth for orientation:
-    // - showReview = false → landscape (test + results)
-    // - showReview = true  → portrait (review only)
-    DisposableEffect(showReview) {
+    // - showReview = false AND showResults = false → landscape (test only)
+    // - showReview = true OR showResults = true  → portrait (results + review)
+    DisposableEffect(showReview, showResults) {
         val activity = context as? Activity
-        if (showReview) {
+        if (showReview || showResults) {
             activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
         } else {
             activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
