@@ -208,14 +208,70 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
     }
 
     if (loading) {
-        // Loading skeleton with a subtle "Loading..." label so users know it's working
-        Column(Modifier.fillMaxSize()) {
+        // Loading skeleton — matches the block page layout (header, nav tabs, section titles, 2 grids)
+        Column(Modifier.fillMaxSize().background(Color.White)) {
             LinearProgressIndicator(
                 modifier = Modifier.fillMaxWidth(),
                 color = theme.primary,
                 trackColor = theme.primary.copy(alpha = 0.1f),
             )
-            SkeletonListScreen(theme, itemCount = 4)
+            // Outer border like block page
+            Column(modifier = Modifier.fillMaxSize().padding(6.dp)) {
+                // Header row (logo + title placeholders)
+                Row(modifier = Modifier.fillMaxWidth().height(50.dp), verticalAlignment = Alignment.CenterVertically) {
+                    ShimmerBox(modifier = Modifier.width(60.dp).fillMaxHeight(), cornerRadius = 2.dp, theme = theme)
+                    Spacer(Modifier.width(4.dp))
+                    ShimmerBox(modifier = Modifier.weight(0.41f).height(20.dp), cornerRadius = 2.dp, theme = theme)
+                    Spacer(Modifier.width(8.dp))
+                    ShimmerBox(modifier = Modifier.weight(0.27f).height(20.dp), cornerRadius = 2.dp, theme = theme)
+                    Spacer(Modifier.width(8.dp))
+                    ShimmerBox(modifier = Modifier.weight(0.32f).height(20.dp), cornerRadius = 2.dp, theme = theme)
+                }
+                Spacer(Modifier.height(4.dp))
+                // Nav tabs row
+                Row(modifier = Modifier.fillMaxWidth().height(40.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Spacer(Modifier.width(60.dp))
+                    repeat(5) {
+                        ShimmerBox(modifier = Modifier.weight(1f).height(16.dp), cornerRadius = 2.dp, theme = theme)
+                        Spacer(Modifier.width(4.dp))
+                    }
+                }
+                Spacer(Modifier.height(4.dp))
+                // Section titles row (Reading | Listening)
+                Row(modifier = Modifier.fillMaxWidth().height(30.dp), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    ShimmerBox(modifier = Modifier.weight(1f).fillMaxHeight(), cornerRadius = 2.dp, theme = theme)
+                    ShimmerBox(modifier = Modifier.weight(1f).fillMaxHeight(), cornerRadius = 2.dp, theme = theme)
+                }
+                Spacer(Modifier.height(4.dp))
+                // Two grids (Reading | Listening) — 4 rows x 5 cols each
+                Row(modifier = Modifier.fillMaxWidth().weight(1f), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    // Reading grid
+                    Column(modifier = Modifier.weight(1f).fillMaxHeight(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        repeat(4) {
+                            Row(modifier = Modifier.fillMaxWidth().weight(1f), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                repeat(5) {
+                                    ShimmerBox(modifier = Modifier.weight(1f).fillMaxHeight(), cornerRadius = 3.dp, theme = theme)
+                                }
+                            }
+                        }
+                    }
+                    // Listening grid
+                    Column(modifier = Modifier.weight(1f).fillMaxHeight(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        repeat(4) {
+                            Row(modifier = Modifier.fillMaxWidth().weight(1f), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                repeat(5) {
+                                    ShimmerBox(modifier = Modifier.weight(1f).fillMaxHeight(), cornerRadius = 3.dp, theme = theme)
+                                }
+                            }
+                        }
+                    }
+                }
+                Spacer(Modifier.height(4.dp))
+                // Submit button placeholder (centered)
+                Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                    ShimmerBox(modifier = Modifier.width(120.dp).height(30.dp), cornerRadius = 4.dp, theme = theme)
+                }
+            }
         }
         return
     }
@@ -2003,6 +2059,15 @@ private fun gradeCombinedExamClientSide(
                 audioUrl = q.audioUrl,
                 audioLoop = q.audioLoop,
                 audioLoopDelay = q.audioLoopDelay,
+                descType = q.descType,
+                descText = q.descText,
+                descImageUrl = q.descImageUrl,
+                mediaType = q.mediaType,
+                mediaText = q.mediaText,
+                mediaImageUrl = q.mediaImageUrl,
+                mediaAudioUrl = q.mediaAudioUrl,
+                answerType = q.answerType,
+                blockType = q.blockType,
                 userAnswer = ans,
                 correctAnswer = q.options?.getOrNull(q.correctOption),
                 explanation = q.explanation,
