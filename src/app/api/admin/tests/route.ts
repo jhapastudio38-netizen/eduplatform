@@ -30,7 +30,7 @@ export async function GET(req: NextRequest) {
 const testSchema = z.object({
   title: z.string().min(2).max(200),
   description: z.string().max(2000).optional().default(""),
-  durationMin: z.number().int().min(1).max(600).default(30),
+  durationMin: z.number().int().min(1).max(600).default(50),
   isExam: z.boolean().default(true),
   examType: z.string().default("UBT"),
   testCategory: z.enum(["exam", "demo", "batch", "chapter", "question_bank"]).default("exam"),

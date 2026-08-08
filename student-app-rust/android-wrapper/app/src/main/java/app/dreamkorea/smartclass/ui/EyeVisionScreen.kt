@@ -38,21 +38,6 @@ fun EyeVisionScreen(theme: AppTheme, sound: SoundManager, onBack: () -> Unit) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
 
-    // Force landscape for the test
-    DisposableEffect(Unit) {
-        val activity = context as? Activity
-        activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
-        onDispose {
-            activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
-        }
-    }
-    LaunchedEffect(Unit) {
-        delay(100)
-        (context as? Activity)?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
-        delay(300)
-        (context as? Activity)?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
-    }
-
     var tests by remember { mutableStateOf<List<app.dreamkorea.smartclass.api.EyeVisionTestItem>>(emptyList()) }
     var loading by remember { mutableStateOf(true) }
     var errorMsg by remember { mutableStateOf("") }
@@ -66,6 +51,16 @@ fun EyeVisionScreen(theme: AppTheme, sound: SoundManager, onBack: () -> Unit) {
     var userAnswers by remember { mutableStateOf<List<String>>(emptyList()) }
     var correctAnswers by remember { mutableStateOf<List<String>>(emptyList()) }
     var showFinishConfirm by remember { mutableStateOf(false) }
+
+    // Force landscape ONLY when taking the test (not during review/results which are portrait).
+    // This prevents the orientation glitch when switching between test and review.
+    DisposableEffect(showReview, showResults) {
+        val activity = context as? Activity
+        if (!showReview && !showResults) {
+            activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
+        }
+        onDispose { }
+    }
 
     LaunchedEffect(Unit) {
         loading = true
