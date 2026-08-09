@@ -27,8 +27,6 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import app.dreamkorea.smartclass.api.OtpRequest
-import app.dreamkorea.smartclass.api.VerifyRequest
 import app.dreamkorea.smartclass.data.AppState
 import kotlinx.coroutines.launch
 
@@ -58,8 +56,6 @@ fun LoginScreen(onLoginSuccess: () -> Unit) {
     var suEmail by remember { mutableStateOf("") }
     var suPhone by remember { mutableStateOf("") }
     var suPassword by remember { mutableStateOf("") }
-    var suCode by remember { mutableStateOf("") }
-    var suStep by remember { mutableStateOf(1) } // 1=enter info, 2=enter OTP code
 
     // Login state
     var liEmail by remember { mutableStateOf("") }
@@ -127,7 +123,7 @@ fun LoginScreen(onLoginSuccess: () -> Unit) {
                         if (key == "signup") Spacer(Modifier.width(8.dp))
                         FilterChip(
                             selected = mode == key,
-                            onClick = { sound.click(); mode = key; error = ""; info = ""; fpStep = 1; suStep = 1; suCode = "" },
+                            onClick = { sound.click(); mode = key; error = ""; info = ""; fpStep = 1 },
                             label = { Text(label, fontSize = 12.sp) },
                             colors = FilterChipDefaults.filterChipColors(
                                 selectedContainerColor = NavyBlue,
@@ -201,65 +197,40 @@ fun LoginScreen(onLoginSuccess: () -> Unit) {
                             )
                             "signup" -> SignupTab(
                                 name = suName, email = suEmail, phone = suPhone, password = suPassword,
-                                code = suCode, step = suStep,
                                 passwordVisible = passwordVisible, loading = loading,
                                 onNameChange = { suName = it }, onEmailChange = { suEmail = it },
                                 onPhoneChange = { suPhone = it }, onPasswordChange = { suPassword = it },
-                                onCodeChange = { suCode = it },
                                 onTogglePassword = { passwordVisible = !passwordVisible },
                                 onSubmit = {
-                                    if (suStep == 1) {
-                                        // Step 1: validate + send OTP
-                                        if (suName.isBlank()) { error = "Name is required"; return@SignupTab }
-                                        if (suEmail.isBlank() || !suEmail.contains("@")) { error = "Enter a valid email"; return@SignupTab }
-                                        if (suPassword.length < 6) { error = "Password must be at least 6 characters"; return@SignupTab }
-                                        loading = true; error = ""; info = ""
-                                        scope.launch {
-                                            try {
-                                                AppState.api.requestOtp(OtpRequest(contact = suEmail.trim().lowercase()))
+                                    if (suName.isBlank()) { error = "Name is required"; return@SignupTab }
+                                    if (suEmail.isBlank() || !suEmail.contains("@")) { error = "Enter a valid email"; return@SignupTab }
+                                    if (suPassword.length < 6) { error = "Password must be at least 6 characters"; return@SignupTab }
+                                    loading = true; error = ""; info = ""
+                                    scope.launch {
+                                        try {
+                                            val resp = AppState.api.signup(mapOf(
+                                                "mode" to "student",
+                                                "name" to suName.trim(),
+                                                "email" to suEmail.trim().lowercase(),
+                                                "phone" to suPhone.trim(),
+                                                "password" to suPassword
+                                            ))
+                                            if (resp.ok) {
                                                 sound.success()
-                                                info = "A 6-digit code was sent to ${suEmail.trim()}."
-                                                suStep = 2
-                                            } catch (e: retrofit2.HttpException) {
+                                                AppState.saveUserProfile(resp.user)
+                                                AppState.invalidateCache()
+                                                onLoginSuccess()
+                                            } else {
                                                 sound.error()
-                                                error = extractHttpError(e) ?: "Could not send code. Try again."
-                                            } catch (e: java.net.UnknownHostException) { sound.error(); error = "No internet connection." }
-                                            catch (e: java.io.IOException) { sound.error(); error = "Could not connect." }
-                                            catch (e: Exception) { sound.error(); error = "Could not send code: ${e.message ?: "unknown"}" }
-                                            loading = false
-                                        }
-                                    } else {
-                                        // Step 2: verify OTP + create account
-                                        if (suCode.length != 6) { error = "Enter the 6-digit code"; return@SignupTab }
-                                        loading = true; error = ""; info = ""
-                                        scope.launch {
-                                            try {
-                                                val resp = AppState.api.verifyOtp(VerifyRequest(
-                                                    contact = suEmail.trim().lowercase(),
-                                                    code = suCode.trim(),
-                                                    role = "STUDENT",
-                                                    name = suName.trim(),
-                                                    email = suEmail.trim().lowercase(),
-                                                    phone = suPhone.trim().ifBlank { null },
-                                                    password = suPassword
-                                                ))
-                                                if (resp.ok) {
-                                                    sound.success()
-                                                    AppState.saveUserProfile(resp.user)
-                                                    AppState.invalidateCache()
-                                                    onLoginSuccess()
-                                                } else {
-                                                    sound.error()
-                                                    error = "Verification failed."
-                                                }
-                                            } catch (e: retrofit2.HttpException) {
-                                                sound.error()
-                                                error = extractHttpError(e) ?: "Verification failed."
-                                            } catch (e: java.net.UnknownHostException) { sound.error(); error = "No internet connection." }
-                                            catch (e: java.io.IOException) { sound.error(); error = "Could not connect." }
-                                            catch (e: Exception) { sound.error(); error = "Verification failed: ${e.message ?: "unknown"}" }
-                                            loading = false
-                                        }
+                                                error = resp.error ?: "Signup failed."
+                                            }
+                                        } catch (e: retrofit2.HttpException) {
+                                            sound.error()
+                                            error = extractHttpError(e) ?: "Signup failed."
+                                        } catch (e: java.net.UnknownHostException) { sound.error(); error = "No internet connection." }
+                                        catch (e: java.io.IOException) { sound.error(); error = "Could not connect." }
+                                        catch (e: Exception) { sound.error(); error = "Signup failed: ${e.message ?: "unknown"}" }
+                                        loading = false
                                     }
                                 }
                             )
@@ -361,67 +332,34 @@ private fun LoginTab(
 @Composable
 private fun SignupTab(
     name: String, email: String, phone: String, password: String,
-    code: String, step: Int,
     passwordVisible: Boolean, loading: Boolean,
     onNameChange: (String) -> Unit, onEmailChange: (String) -> Unit,
     onPhoneChange: (String) -> Unit, onPasswordChange: (String) -> Unit,
-    onCodeChange: (String) -> Unit,
     onTogglePassword: () -> Unit, onSubmit: () -> Unit
 ) {
     Column(modifier = Modifier.fillMaxWidth()) {
-        if (step == 1) {
-            Text("Create Account", color = TextDark, fontSize = 20.sp, fontWeight = FontWeight.Bold)
-            Text("Sign up with email — we'll send you a verification code", color = TextMid, fontSize = 13.sp)
-            Spacer(Modifier.height(16.dp))
-            Field("Full Name", name, onNameChange, Icons.Default.Person, KeyboardType.Text)
-            Spacer(Modifier.height(10.dp))
-            Field("Email", email, onEmailChange, Icons.Default.Email, KeyboardType.Email)
-            Spacer(Modifier.height(10.dp))
-            Field("Phone (optional)", phone, onPhoneChange, Icons.Default.Phone, KeyboardType.Phone, "+977 98XXXXXXXX")
-            Spacer(Modifier.height(10.dp))
-            PasswordField("Password (min 6 chars)", password, onPasswordChange, passwordVisible, onTogglePassword)
-            Spacer(Modifier.height(16.dp))
-            Button(
-                onClick = onSubmit,
-                modifier = Modifier.fillMaxWidth().height(50.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = NavyBlue),
-                shape = RoundedCornerShape(12.dp),
-                enabled = !loading
-            ) {
-                if (loading) {
-                    CircularProgressIndicator(color = Color.White, modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
-                } else {
-                    Text("Send Verification Code", color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
-                }
-            }
-        } else {
-            // Step 2: enter OTP code
-            Text("Verify Your Email", color = TextDark, fontSize = 20.sp, fontWeight = FontWeight.Bold)
-            Text("Enter the 6-digit code sent to $email", color = TextMid, fontSize = 13.sp)
-            Spacer(Modifier.height(16.dp))
-            // Read-only email display
-            Surface(color = Color(0xFFF1F5F9), shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth().padding(bottom = 10.dp)) {
-                Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Default.Email, null, tint = TextMid, modifier = Modifier.size(18.dp))
-                    Spacer(Modifier.width(8.dp))
-                    Text(email, color = TextDark, fontSize = 13.sp, fontWeight = FontWeight.Medium)
-                }
-            }
-            Spacer(Modifier.height(10.dp))
-            Field("6-digit code", code, onCodeChange, Icons.Default.Lock, KeyboardType.NumberPassword)
-            Spacer(Modifier.height(16.dp))
-            Button(
-                onClick = onSubmit,
-                modifier = Modifier.fillMaxWidth().height(50.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = NavyBlue),
-                shape = RoundedCornerShape(12.dp),
-                enabled = !loading
-            ) {
-                if (loading) {
-                    CircularProgressIndicator(color = Color.White, modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
-                } else {
-                    Text("Verify & Create Account", color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
-                }
+        Text("Create Account", color = TextDark, fontSize = 20.sp, fontWeight = FontWeight.Bold)
+        Text("Sign up with email and set a password", color = TextMid, fontSize = 13.sp)
+        Spacer(Modifier.height(16.dp))
+        Field("Full Name", name, onNameChange, Icons.Default.Person, KeyboardType.Text)
+        Spacer(Modifier.height(10.dp))
+        Field("Email", email, onEmailChange, Icons.Default.Email, KeyboardType.Email)
+        Spacer(Modifier.height(10.dp))
+        Field("Phone (optional)", phone, onPhoneChange, Icons.Default.Phone, KeyboardType.Phone, "+977 98XXXXXXXX")
+        Spacer(Modifier.height(10.dp))
+        PasswordField("Password (min 6 chars)", password, onPasswordChange, passwordVisible, onTogglePassword)
+        Spacer(Modifier.height(16.dp))
+        Button(
+            onClick = onSubmit,
+            modifier = Modifier.fillMaxWidth().height(50.dp),
+            colors = ButtonDefaults.buttonColors(containerColor = NavyBlue),
+            shape = RoundedCornerShape(12.dp),
+            enabled = !loading
+        ) {
+            if (loading) {
+                CircularProgressIndicator(color = Color.White, modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+            } else {
+                Text("Create Account", color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
             }
         }
     }
