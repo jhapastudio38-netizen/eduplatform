@@ -1,52 +1,60 @@
 package app.dreamkorea.smartclass.ui
 
 import android.content.Context
-import android.net.Uri
-import androidx.browser.customtabs.CustomTabsIntent
+import com.google.android.gms.auth.api.signin.GoogleSignIn
+import com.google.android.gms.auth.api.signin.GoogleSignInAccount
+import com.google.android.gms.auth.api.signin.GoogleSignInClient
+import com.google.android.gms.auth.api.signin.GoogleSignInOptions
+import com.google.android.gms.common.api.ApiException
+import com.google.android.gms.common.api.CommonStatusCodes
 
 /**
- * Helper for Google Sign-In using Clerk hosted on our Vercel backend.
+ * Helper for Google Sign-In using GoogleSignIn API.
  *
- * Opens the Vercel-hosted Clerk sign-in page in Chrome Custom Tab.
- * After sign-in, the backend redirects to dreamkorea://auth-callback
- * with the user data.
- *
- * This approach:
- * - No Clerk Android SDK needed
- * - No Firebase SHA-1 needed
- * - Uses Clerk's hosted SignIn component on our Next.js backend
- * - Works with any minSdk
+ * Requires SHA-1 fingerprint registered in Firebase:
+ * C5:B2:2F:48:68:B1:62:AA:81:23:51:75:FE:FD:B5:49:D0:21:24:1D
  */
 object GoogleSignInHelper {
 
-    // Our Vercel-hosted Clerk sign-in page
-    private const val SIGN_IN_URL = "https://my-project-five-sepia.vercel.app/sign-in"
+    private const val WEB_CLIENT_ID = "416728228268-rs08fmuts5u4o29lp0hmgcqhtofls22o.apps.googleusercontent.com"
 
-    /**
-     * Opens the Clerk sign-in page in Chrome Custom Tab.
-     * After sign-in, user will be redirected back to the app.
-     */
-    fun signInWithGoogle(context: Context) {
-        try {
-            val customTabsIntent = CustomTabsIntent.Builder()
-                .setShowTitle(true)
-                .setUrlBarHidingEnabled(false)
-                .build()
-            customTabsIntent.launchUrl(context, Uri.parse(SIGN_IN_URL))
+    fun getClient(context: Context): GoogleSignInClient {
+        val gso = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
+            .requestIdToken(WEB_CLIENT_ID)
+            .requestEmail()
+            .build()
+        return GoogleSignIn.getClient(context, gso)
+    }
+
+    fun getIdTokenFromResult(resultData: android.content.Intent?): GoogleSignInResult {
+        return try {
+            val task = GoogleSignIn.getSignedInAccountFromIntent(resultData)
+            val account: GoogleSignInAccount = task.getResult(ApiException::class.java)
+            val token = account.idToken
+            if (token != null) {
+                GoogleSignInResult.Success(token)
+            } else {
+                GoogleSignInResult.Error("No ID token received from Google")
+            }
+        } catch (e: ApiException) {
+            val message = when (e.statusCode) {
+                CommonStatusCodes.CANCELED -> "Sign in cancelled"
+                CommonStatusCodes.NETWORK_ERROR -> "Network error. Check your connection."
+                CommonStatusCodes.DEVELOPER_ERROR -> "SHA-1 not registered in Firebase. Add: C5:B2:2F:48:68:B1:62:AA:81:23:51:75:FE:FD:B5:49:D0:21:24:1D"
+                12501 -> "Sign in cancelled"
+                12502 -> "Sign in cancelled"
+                12500 -> "Sign in failed. Check Firebase SHA-1 config."
+                10 -> "SHA-1 not registered in Firebase. Add: C5:B2:2F:48:68:B1:62:AA:81:23:51:75:FE:FD:B5:49:D0:21:24:1D"
+                else -> "Sign in error (code ${e.statusCode})"
+            }
+            GoogleSignInResult.Error(message)
         } catch (e: Exception) {
-            // Fallback: open in default browser
-            val intent = android.content.Intent(
-                android.content.Intent.ACTION_VIEW,
-                Uri.parse(SIGN_IN_URL)
-            )
-            intent.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
-            context.startActivity(intent)
+            GoogleSignInResult.Error("Sign in failed: ${e.message ?: "unknown"}")
         }
     }
 }
 
 sealed class GoogleSignInResult {
-    data object Pending : GoogleSignInResult()
-    data class Success(val token: String) : GoogleSignInResult()
+    data class Success(val idToken: String) : GoogleSignInResult()
     data class Error(val message: String) : GoogleSignInResult()
 }

@@ -1,5 +1,6 @@
 package app.dreamkorea.smartclass.ui
 
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.Canvas
@@ -212,7 +213,6 @@ fun LoginScreen(onLoginSuccess: () -> Unit) {
                                     scope.launch {
                                         try {
                                             val resp = AppState.api.signup(mapOf(
-                                                "mode" to "signup",
                                                 "name" to suName.trim(),
                                                 "email" to suEmail.trim().lowercase(),
                                                 "phone" to suPhone.trim(),
@@ -299,12 +299,44 @@ fun LoginScreen(onLoginSuccess: () -> Unit) {
 
             // ── Google Sign-In button (visible on all tabs) ──
             val context = LocalContext.current
+            val googleLauncher = rememberLauncherForActivityResult(
+                contract = androidx.activity.result.contract.ActivityResultContracts.StartActivityForResult()
+            ) { result ->
+                when (val googleResult = GoogleSignInHelper.getIdTokenFromResult(result.data)) {
+                    is GoogleSignInResult.Success -> {
+                        loading = true; error = ""; info = ""
+                        scope.launch {
+                            try {
+                                val resp = AppState.api.googleLogin(mapOf("idToken" to googleResult.idToken))
+                                if (resp.ok) {
+                                    sound.success()
+                                    AppState.saveUserProfile(resp.user)
+                                    AppState.invalidateCache()
+                                    onLoginSuccess()
+                                } else {
+                                    sound.error()
+                                    error = resp.error ?: "Google sign-in failed."
+                                }
+                            } catch (e: retrofit2.HttpException) {
+                                sound.error()
+                                error = extractHttpError(e) ?: "Google sign-in failed."
+                            } catch (e: java.net.UnknownHostException) { sound.error(); error = "No internet connection." }
+                            catch (e: java.io.IOException) { sound.error(); error = "Could not connect." }
+                            catch (e: Exception) { sound.error(); error = "Google sign-in failed: ${e.message ?: "unknown"}" }
+                            loading = false
+                        }
+                    }
+                    is GoogleSignInResult.Error -> {
+                        sound.error()
+                        error = googleResult.message
+                    }
+                }
+            }
 
             GoogleSignInButton(loading = loading) {
                 if (loading) return@GoogleSignInButton
-                // Opens the Vercel-hosted Clerk sign-in page in Chrome Custom Tab
-                // After sign-in, the browser redirects to dreamkorea://auth-callback
-                GoogleSignInHelper.signInWithGoogle(context)
+                val client = GoogleSignInHelper.getClient(context)
+                googleLauncher.launch(client.signInIntent)
             }
         }
     }

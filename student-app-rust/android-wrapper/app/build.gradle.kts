@@ -11,8 +11,8 @@ android {
         applicationId = "app.dreamkorea.smartclass"
         minSdk = 24
         targetSdk = 34
-        versionCode = 267
-        versionName = "10.16.0"
+        versionCode = 268
+        versionName = "10.17.0"
     }
 
     buildFeatures {
@@ -86,6 +86,9 @@ dependencies {
     // Image loading
     implementation("io.coil-kt:coil-compose:2.6.0")
 
-    // Chrome Custom Tabs for Clerk OAuth
+    // Chrome Custom Tabs
     implementation("androidx.browser:browser:1.8.0")
+
+    // Google Sign-In
+    implementation("com.google.android.gms:play-services-auth:21.2.0")
 }
