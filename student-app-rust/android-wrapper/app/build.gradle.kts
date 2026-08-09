@@ -11,8 +11,8 @@ android {
         applicationId = "app.dreamkorea.smartclass"
         minSdk = 24
         targetSdk = 34
-        versionCode = 264
-        versionName = "10.15.0"
+        versionCode = 265
+        versionName = "10.15.1"
     }
 
     buildFeatures {
@@ -83,9 +83,9 @@ dependencies {
     // Coroutines
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")
 
-    // Image loading (Coil — loads admin-uploaded card images from URLs)
+    // Image loading
     implementation("io.coil-kt:coil-compose:2.6.0")
 
-    // Chrome Custom Tabs for Clerk Google Sign-In (web-based, no SDK needed)
+    // Chrome Custom Tabs for Clerk OAuth
     implementation("androidx.browser:browser:1.8.0")
 }

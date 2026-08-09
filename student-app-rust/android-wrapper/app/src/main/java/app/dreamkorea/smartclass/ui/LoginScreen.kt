@@ -302,8 +302,40 @@ fun LoginScreen(onLoginSuccess: () -> Unit) {
 
             GoogleSignInButton(loading = loading) {
                 if (loading) return@GoogleSignInButton
-                // Opens Clerk's Google Sign-In page in Chrome Custom Tab
-                GoogleSignInHelper.signInWithGoogle(context)
+                loading = true; error = ""; info = ""
+                GoogleSignInHelper.signInWithGoogle(context) { result ->
+                    when (result) {
+                        is GoogleSignInResult.Pending -> {
+                            info = "Complete Google sign-in in your browser, then come back to the app."
+                            loading = false
+                        }
+                        is GoogleSignInResult.Error -> {
+                            sound.error()
+                            error = result.message
+                            loading = false
+                        }
+                        is GoogleSignInResult.Success -> {
+                            scope.launch {
+                                try {
+                                    val resp = AppState.api.googleLogin(mapOf("clerkToken" to result.token))
+                                    if (resp.ok) {
+                                        sound.success()
+                                        AppState.saveUserProfile(resp.user)
+                                        AppState.invalidateCache()
+                                        onLoginSuccess()
+                                    } else {
+                                        sound.error()
+                                        error = resp.error ?: "Google sign-in failed."
+                                    }
+                                } catch (e: Exception) {
+                                    sound.error()
+                                    error = "Login failed: ${e.message ?: "unknown"}"
+                                }
+                                loading = false
+                            }
+                        }
+                    }
+                }
             }
         }
     }
