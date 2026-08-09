@@ -1,4 +1,3 @@
-/* Build v3 — merged auth route */
 /**
  * POST /api/auth/credentials
  * Body: { username, password } for login

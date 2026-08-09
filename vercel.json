@@ -5,7 +5,5 @@
     "src/app/api/**/route.ts": {
       "maxDuration": 60
     }
-  },
-  "buildCommand": "next build",
-  "installCommand": "npm install"
+  }
 }
