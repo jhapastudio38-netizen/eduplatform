@@ -32,6 +32,11 @@ class MainActivity : ComponentActivity() {
             var isLoggedIn by remember { mutableStateOf(AppState.isLoggedIn()) }
             var userName by remember { mutableStateOf(AppState.getUserName()) }
 
+            // Handle deep link from Clerk OAuth redirect
+            LaunchedEffect(Unit) {
+                handleDeepLink(intent, isLoggedIn = { isLoggedIn }, userName = { userName }, setLoggedIn = { isLoggedIn = it }, setUserName = { userName = it })
+            }
+
             // Ask for notification permission + start polling when logged in
             LaunchedEffect(isLoggedIn) {
                 if (isLoggedIn) {
@@ -51,6 +56,46 @@ class MainActivity : ComponentActivity() {
                     isLoggedIn = false
                     userName = "Student"
                 })
+            }
+        }
+    }
+
+    override fun onNewIntent(intent: android.content.Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        // The deep link will be handled by the LaunchedEffect in Compose
+    }
+
+    private fun handleDeepLink(
+        intent: android.content.Intent?,
+        isLoggedIn: () -> Boolean,
+        userName: () -> String?,
+        setLoggedIn: (Boolean) -> Unit,
+        setUserName: (String) -> Unit
+    ) {
+        val data = intent?.data ?: return
+        if (data.scheme == "dreamkorea" && data.host == "auth-callback") {
+            // Extract user data from the redirect URL
+            val userId = data.getQueryParameter("userId")
+            val name = data.getQueryParameter("name")
+            val email = data.getQueryParameter("email")
+            val phone = data.getQueryParameter("phone")
+            val role = data.getQueryParameter("role")
+
+            if (userId != null && email != null) {
+                // Save the user profile and log in
+                AppState.saveUserProfile(
+                    app.dreamkorea.smartclass.api.User(
+                        id = userId,
+                        name = name,
+                        email = email,
+                        phone = phone,
+                        role = role ?: "STUDENT"
+                    )
+                )
+                AppState.invalidateCache()
+                setLoggedIn(true)
+                setUserName(AppState.getUserName())
             }
         }
     }
