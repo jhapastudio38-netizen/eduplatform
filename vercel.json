@@ -5,5 +5,10 @@
     "src/app/api/**/route.ts": {
       "maxDuration": 60
     }
+  },
+  "build": {
+    "env": {
+      "BUILD_VERSION": "force-rebuild-v4"
+    }
   }
 }
