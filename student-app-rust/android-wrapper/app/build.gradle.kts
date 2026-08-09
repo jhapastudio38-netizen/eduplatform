@@ -1,7 +1,6 @@
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
-    id("com.google.gms.google-services")
 }
 
 android {
@@ -12,8 +11,8 @@ android {
         applicationId = "app.dreamkorea.smartclass"
         minSdk = 24
         targetSdk = 34
-        versionCode = 263
-        versionName = "10.14.4"
+        versionCode = 264
+        versionName = "10.15.0"
     }
 
     buildFeatures {
@@ -87,12 +86,6 @@ dependencies {
     // Image loading (Coil — loads admin-uploaded card images from URLs)
     implementation("io.coil-kt:coil-compose:2.6.0")
 
-    // Google Sign-In
-    implementation("com.google.android.gms:play-services-auth:21.2.0")
-    // Credential Manager API — modern Google Sign-In (doesn't need SHA-1 in Firebase)
-    implementation("androidx.credentials:credentials:1.2.2")
-    implementation("androidx.credentials:credentials-play-services-auth:1.2.2")
-    // Firebase (required by google-services.json)
-    implementation(platform("com.google.firebase:firebase-bom:33.1.2"))
-    implementation("com.google.firebase:firebase-auth")
+    // Chrome Custom Tabs for Clerk Google Sign-In (web-based, no SDK needed)
+    implementation("androidx.browser:browser:1.8.0")
 }

@@ -25,25 +25,22 @@ class DreamKoreaApp : Application(), ImageLoaderFactory {
     }
 
     // ─── Coil ImageLoader with disk + memory caching ──────────────────────
-    // This makes image loading MUCH faster on slow connections and prevents
-    // scroll lag — images are cached on disk after first load, subsequent
-    // loads are instant. Crossfade makes transitions smooth.
     override fun newImageLoader(): ImageLoader {
         return ImageLoader.Builder(this)
             .crossfade(true)
             .crossfade(200)
             .memoryCache {
                 MemoryCache.Builder(this)
-                    .maxSizePercent(0.25) // 25% of app memory
+                    .maxSizePercent(0.25)
                     .build()
             }
             .diskCache {
                 DiskCache.Builder()
                     .directory(cacheDir.resolve("image_cache"))
-                    .maxSizeBytes(50L * 1024 * 1024) // 50MB disk cache
+                    .maxSizeBytes(50L * 1024 * 1024)
                     .build()
             }
-            .respectCacheHeaders(false) // Cache even without cache-control headers
+            .respectCacheHeaders(false)
             .build()
     }
 }

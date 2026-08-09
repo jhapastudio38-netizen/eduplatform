@@ -1,62 +1,51 @@
 package app.dreamkorea.smartclass.ui
 
 import android.content.Context
-import com.google.android.gms.auth.api.signin.GoogleSignIn
-import com.google.android.gms.auth.api.signin.GoogleSignInAccount
-import com.google.android.gms.auth.api.signin.GoogleSignInClient
-import com.google.android.gms.auth.api.signin.GoogleSignInOptions
-import com.google.android.gms.common.api.ApiException
-import com.google.android.gms.common.api.CommonStatusCodes
+import android.net.Uri
+import androidx.browser.customtabs.CustomTabsIntent
 
 /**
- * Helper for Google Sign-In using the GoogleSignIn API.
+ * Helper for Google Sign-In using Clerk's web-based OAuth flow.
  *
- * IMPORTANT: This requires the SHA-1 fingerprint of the signing keystore
- * to be registered in Firebase Console → Project Settings → Android app.
+ * Opens a Chrome Custom Tab to Clerk's sign-in page with Google OAuth.
+ * After sign-in, Clerk redirects back to the app via deep link,
+ * which the app captures and sends to the backend.
  *
- * SHA-1: C5:B2:2F:48:68:B1:62:AA:81:23:51:75:FE:FD:B5:49:D0:21:24:1D
+ * This approach does NOT require:
+ * - Firebase SHA-1 fingerprint
+ * - Google Play Services Auth
+ * - Clerk Android SDK (which needs minSdk 26+)
+ *
+ * It only needs:
+ * - Clerk publishable key (already set in backend)
+ * - Chrome Custom Tabs (androidx.browser)
  */
 object GoogleSignInHelper {
 
-    private const val WEB_CLIENT_ID = "416728228268-rs08fmuts5u4o29lp0hmgcqhtofls22o.apps.googleusercontent.com"
+    // Clerk frontend API URL — this opens Clerk's hosted sign-in page
+    private const val CLERK_SIGN_IN_URL = "https://champion-sole-99.clerk.accounts.dev/sign-in?strategy=oauth_google"
 
-    fun getClient(context: Context): GoogleSignInClient {
-        val gso = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
-            .requestIdToken(WEB_CLIENT_ID)
-            .requestEmail()
-            .build()
-        return GoogleSignIn.getClient(context, gso)
-    }
-
-    fun getIdTokenFromResult(resultData: android.content.Intent?): GoogleSignInResult {
-        return try {
-            val task = GoogleSignIn.getSignedInAccountFromIntent(resultData)
-            val account: GoogleSignInAccount = task.getResult(ApiException::class.java)
-            val token = account.idToken
-            if (token != null) {
-                GoogleSignInResult.Success(token)
-            } else {
-                GoogleSignInResult.Error("No ID token received from Google")
-            }
-        } catch (e: ApiException) {
-            val message = when (e.statusCode) {
-                CommonStatusCodes.CANCELED -> "Sign in cancelled"
-                CommonStatusCodes.NETWORK_ERROR -> "Network error. Check your connection."
-                CommonStatusCodes.DEVELOPER_ERROR -> "SHA-1 not registered in Firebase. Add: C5:B2:2F:48:68:B1:62:AA:81:23:51:75:FE:FD:B5:49:D0:21:24:1D"
-                12501 -> "Sign in cancelled"
-                12502 -> "Sign in cancelled"
-                12500 -> "Sign in failed. Check Firebase SHA-1 config."
-                10 -> "SHA-1 not registered in Firebase. Add: C5:B2:2F:48:68:B1:62:AA:81:23:51:75:FE:FD:B5:49:D0:21:24:1D"
-                else -> "Sign in error (code ${e.statusCode})"
-            }
-            GoogleSignInResult.Error(message)
+    /**
+     * Opens Clerk's Google Sign-In page in a Chrome Custom Tab.
+     * After the user signs in, Clerk will redirect to the app's deep link.
+     */
+    fun signInWithGoogle(context: Context) {
+        try {
+            val customTabsIntent = CustomTabsIntent.Builder()
+                .setShowTitle(true)
+                .setUrlBarHidingEnabled(false)
+                .build()
+            customTabsIntent.launchUrl(context, Uri.parse(CLERK_SIGN_IN_URL))
         } catch (e: Exception) {
-            GoogleSignInResult.Error("Sign in failed: ${e.message ?: "unknown"}")
+            // Fallback: open in browser
+            val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, Uri.parse(CLERK_SIGN_IN_URL))
+            intent.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+            context.startActivity(intent)
         }
     }
 }
 
 sealed class GoogleSignInResult {
-    data class Success(val idToken: String) : GoogleSignInResult()
+    data class Success(val token: String) : GoogleSignInResult()
     data class Error(val message: String) : GoogleSignInResult()
 }
