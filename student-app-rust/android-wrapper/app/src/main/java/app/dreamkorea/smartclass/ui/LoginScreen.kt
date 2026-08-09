@@ -1,9 +1,12 @@
 package app.dreamkorea.smartclass.ui
 
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -20,6 +23,7 @@ import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
@@ -293,6 +297,48 @@ fun LoginScreen(onLoginSuccess: () -> Unit) {
             }
 
             Spacer(modifier = Modifier.height(40.dp))
+
+            // ── Google Sign-In button (visible on all tabs) ──
+            val context = LocalContext.current
+            val googleLauncher = rememberLauncherForActivityResult(
+                contract = androidx.activity.result.contract.ActivityResultContracts.StartActivityForResult()
+            ) { result ->
+                val idToken = GoogleSignInHelper.getIdTokenFromResult(result.data)
+                if (idToken != null) {
+                    loading = true; error = ""; info = ""
+                    scope.launch {
+                        try {
+                            val resp = AppState.api.googleLogin(mapOf("idToken" to idToken))
+                            if (resp.ok) {
+                                sound.success()
+                                AppState.saveUserProfile(resp.user)
+                                AppState.invalidateCache()
+                                onLoginSuccess()
+                            } else {
+                                sound.error()
+                                error = resp.error ?: "Google sign-in failed."
+                            }
+                        } catch (e: retrofit2.HttpException) {
+                            sound.error()
+                            error = extractHttpError(e) ?: "Google sign-in failed."
+                        } catch (e: java.net.UnknownHostException) { sound.error(); error = "No internet connection." }
+                        catch (e: java.io.IOException) { sound.error(); error = "Could not connect." }
+                        catch (e: Exception) { sound.error(); error = "Google sign-in failed: ${e.message ?: "unknown"}" }
+                        loading = false
+                    }
+                } else {
+                    sound.error()
+                    error = "Google sign-in cancelled."
+                }
+            }
+
+            GoogleSignInButton(loading = loading) {
+                if (loading) return@GoogleSignInButton
+                val client = GoogleSignInHelper.getClient(context)
+                client.signOut().addOnCompleteListener {
+                    googleLauncher.launch(client.signInIntent)
+                }
+            }
         }
     }
 }
@@ -488,5 +534,44 @@ private fun extractHttpError(e: retrofit2.HttpException): String? {
         json.get("error")?.asString
     } catch (_: Exception) {
         null
+    }
+}
+
+// ─── Google Sign-In Button ────────────────────────────────────────────────
+@Composable
+private fun GoogleSignInButton(loading: Boolean, onClick: () -> Unit) {
+    OutlinedButton(
+        onClick = onClick,
+        modifier = Modifier.fillMaxWidth().height(52.dp),
+        shape = RoundedCornerShape(12.dp),
+        colors = ButtonDefaults.outlinedButtonColors(
+            containerColor = Color.White,
+            contentColor = Color(0xFF1F1F1F)
+        ),
+        border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFDADCE0)),
+        enabled = !loading
+    ) {
+        if (loading) {
+            CircularProgressIndicator(color = NavyBlue, modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+        } else {
+            // Google "G" logo (official colors)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Canvas(modifier = Modifier.size(20.dp)) {
+                    // Draw Google "G" logo
+                    val w = size.width
+                    val h = size.height
+                    // Blue arc (bottom-right)
+                    drawArc(color = Color(0xFF4285F4), startAngle = 0f, sweepAngle = 140f, useCenter = false, topLeft = androidx.compose.ui.geometry.Offset(0f, 0f), size = androidx.compose.ui.geometry.Size(w, h), style = Stroke(width = w * 0.18f))
+                    // Red arc (top-right)
+                    drawArc(color = Color(0xFFEA4335), startAngle = 140f, sweepAngle = 100f, useCenter = false, topLeft = androidx.compose.ui.geometry.Offset(0f, 0f), size = androidx.compose.ui.geometry.Size(w, h), style = Stroke(width = w * 0.18f))
+                    // Yellow arc (top-left)
+                    drawArc(color = Color(0xFFFBBC05), startAngle = 240f, sweepAngle = 60f, useCenter = false, topLeft = androidx.compose.ui.geometry.Offset(0f, 0f), size = androidx.compose.ui.geometry.Size(w, h), style = Stroke(width = w * 0.18f))
+                    // Green arc (bottom-left)
+                    drawArc(color = Color(0xFF34A853), startAngle = 300f, sweepAngle = 60f, useCenter = false, topLeft = androidx.compose.ui.geometry.Offset(0f, 0f), size = androidx.compose.ui.geometry.Size(w, h), style = Stroke(width = w * 0.18f))
+                }
+                Spacer(Modifier.width(12.dp))
+                Text("Sign in with Google", fontSize = 15.sp, fontWeight = FontWeight.Medium)
+            }
+        }
     }
 }

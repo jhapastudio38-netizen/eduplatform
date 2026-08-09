@@ -245,6 +245,10 @@ interface DreamKoreaApi {
     @POST("api/auth/signup")
     suspend fun signup(@Body body: Map<String, String>): CredentialsResponse
 
+    // Google Sign-In — sends Google ID token to backend for verification
+    @POST("api/auth/google")
+    suspend fun googleLogin(@Body body: Map<String, String>): CredentialsResponse
+
     // Forgot password — request a 6-digit reset code via email
     @POST("api/auth/request-reset")
     suspend fun requestReset(@Body body: Map<String, String>): SimpleResponse

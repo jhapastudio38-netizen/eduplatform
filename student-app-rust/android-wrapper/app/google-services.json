@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "416728228268",
+    "project_id": "dreamkorea-9cc04",
+    "storage_bucket": "dreamkorea-9cc04.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:416728228268:android:d9941b8490567dcd3e1a09",
+        "android_client_info": {
+          "package_name": "app.dreamkorea.smartclass"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAlWjLAtp7aKWek5zg9C1WlvvES_3kYcbM"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
