@@ -12,8 +12,8 @@ android {
         applicationId = "app.dreamkorea.smartclass"
         minSdk = 24
         targetSdk = 34
-        versionCode = 261
-        versionName = "10.14.2"
+        versionCode = 262
+        versionName = "10.14.3"
     }
 
     buildFeatures {
@@ -89,6 +89,9 @@ dependencies {
 
     // Google Sign-In
     implementation("com.google.android.gms:play-services-auth:21.2.0")
+    // Credential Manager API — modern Google Sign-In (doesn't need SHA-1 in Firebase)
+    implementation("androidx.credentials:credentials:1.2.2")
+    implementation("androidx.credentials:credentials-play-services-auth:1.2.2")
     // Firebase (required by google-services.json)
     implementation(platform("com.google.firebase:firebase-bom:33.1.2"))
     implementation("com.google.firebase:firebase-auth")

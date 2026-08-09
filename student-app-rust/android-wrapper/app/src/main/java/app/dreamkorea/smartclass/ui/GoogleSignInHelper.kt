@@ -9,8 +9,7 @@ import com.google.android.gms.common.api.ApiException
 import com.google.android.gms.common.api.CommonStatusCodes
 
 /**
- * Helper for Google Sign-In.
- * The Web Client ID is from Google Cloud Console (OAuth 2.0 Client ID).
+ * Helper for Google Sign-In using the traditional GoogleSignIn API.
  */
 object GoogleSignInHelper {
 
@@ -30,7 +29,7 @@ object GoogleSignInHelper {
 
     /**
      * Extract the ID token from a GoogleSignInAccount result.
-     * Returns a Result object with either the token or an error message.
+     * Returns a Result object with either the token or a detailed error message.
      */
     fun getIdTokenFromResult(resultData: android.content.Intent?): GoogleSignInResult {
         return try {
@@ -40,7 +39,7 @@ object GoogleSignInHelper {
             if (token != null) {
                 GoogleSignInResult.Success(token)
             } else {
-                GoogleSignInResult.Error("No ID token received from Google")
+                GoogleSignInResult.Error("No ID token received. Check Firebase SHA-1 config.")
             }
         } catch (e: ApiException) {
             val message = when (e.statusCode) {
@@ -48,11 +47,12 @@ object GoogleSignInHelper {
                 CommonStatusCodes.NETWORK_ERROR -> "Network error. Check your connection."
                 CommonStatusCodes.SIGN_IN_REQUIRED -> "Sign in required"
                 CommonStatusCodes.INVALID_ACCOUNT -> "Invalid account"
-                CommonStatusCodes.DEVELOPER_ERROR -> "Configuration error. Contact support."
+                CommonStatusCodes.DEVELOPER_ERROR -> "Configuration error: SHA-1 fingerprint not registered in Firebase. Go to Firebase Console → Project Settings → Android app → Add SHA-1: C5:B2:2F:48:68:B1:62:AA:81:23:51:75:FE:FD:B5:49:D0:21:24:1D"
                 12501 -> "Sign in cancelled"
                 12502 -> "Sign in cancelled"
-                12500 -> "Sign in failed. Try again."
-                else -> "Sign in error (code ${e.statusCode})"
+                12500 -> "Sign in failed. Check Firebase SHA-1 config."
+                10 -> "Configuration error: SHA-1 not registered in Firebase. Add: C5:B2:2F:48:68:B1:62:AA:81:23:51:75:FE:FD:B5:49:D0:21:24:1D"
+                else -> "Sign in error (code ${e.statusCode}): ${e.message}"
             }
             GoogleSignInResult.Error(message)
         } catch (e: Exception) {
