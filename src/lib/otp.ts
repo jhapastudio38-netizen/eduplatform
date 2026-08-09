@@ -47,21 +47,19 @@ export async function sendOtpEmail(
     if (!res.ok) {
       const text = await res.text();
       console.warn(`[OTP] Resend failed (${res.status}): ${text.slice(0, 200)}`);
-      console.log(`[OTP] email=${email} code=${code}`);
       return {
-        ok: true,
+        ok: false,
         channel: "email",
-        message: "OTP sent to email",
+        message: `Email service error (${res.status}): ${text.slice(0, 100)}`,
       };
     }
     return { ok: true, channel: "email", message: "OTP sent to email" };
   } catch (e) {
     console.warn(`[OTP] Resend error: ${e}`);
-    console.log(`[OTP] email=${email} code=${code}`);
     return {
-      ok: true,
+      ok: false,
       channel: "email",
-      message: "OTP sent to email",
+      message: `Email service error: ${e instanceof Error ? e.message : "unknown"}`,
     };
   }
 }
