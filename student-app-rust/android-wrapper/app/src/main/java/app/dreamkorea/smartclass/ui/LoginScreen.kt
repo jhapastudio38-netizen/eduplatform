@@ -212,7 +212,7 @@ fun LoginScreen(onLoginSuccess: () -> Unit) {
                                     scope.launch {
                                         try {
                                             val resp = AppState.api.signup(mapOf(
-                                                "mode" to "student",
+                                                "mode" to "signup",
                                                 "name" to suName.trim(),
                                                 "email" to suEmail.trim().lowercase(),
                                                 "phone" to suPhone.trim(),

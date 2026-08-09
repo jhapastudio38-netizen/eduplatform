@@ -242,11 +242,12 @@ interface DreamKoreaApi {
     suspend fun loginCredentials(@Body body: Map<String, String>): CredentialsResponse
 
     // Student signup with email + password (no OTP needed)
-    @POST("api/auth/signup")
+    // Student signup — uses /api/auth/credentials with mode=signup
+    @POST("api/auth/credentials")
     suspend fun signup(@Body body: Map<String, String>): CredentialsResponse
 
-    // Google Sign-In — sends Google ID token to backend for verification
-    @POST("api/auth/google")
+    // Google Sign-In — uses /api/auth/credentials with mode=google
+    @POST("api/auth/credentials")
     suspend fun googleLogin(@Body body: Map<String, String>): CredentialsResponse
 
     // Forgot password — request a 6-digit reset code via email
