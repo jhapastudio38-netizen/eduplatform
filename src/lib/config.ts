@@ -23,7 +23,7 @@ export const CONFIG = {
   },
   resend: {
     apiKey: process.env.RESEND_API_KEY || atob("cmVfRFE1SGVDZ2RfTHNFcjg3ajJvNWpVaWl2UjkxZkhIUE5i"),
-    fromEmail: process.env.RESEND_FROM || "DreamKorea SmartClass <noreply@dreamkoreasmartclass.com>",
+    fromEmail: process.env.RESEND_FROM || "DreamKorea SmartClass <onboarding@resend.dev>",
   },
   groq: {
     apiKey: process.env.GROQ_API_KEY || "",
