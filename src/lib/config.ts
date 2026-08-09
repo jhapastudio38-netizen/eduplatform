@@ -25,10 +25,6 @@ export const CONFIG = {
     apiKey: process.env.RESEND_API_KEY || atob("cmVfRFE1SGVDZ2RfTHNFcjg3ajJvNWpVaWl2UjkxZkhIUE5i"),
     fromEmail: process.env.RESEND_FROM || "DreamKorea SmartClass <noreply@dreamkoreasmartclass.com>",
   },
-  clerk: {
-    publishableKey: process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY || "pk_test_Y2hhbXBpb24tc29sZS05OS5jbGVyay5hY2NvdW50cy5kZXYk",
-    secretKey: process.env.CLERK_SECRET_KEY || "sk_test_5wKIkfvGgq5NMuDvcSTDg0Pp0NWaBX7nU13b8zpgF8",
-  },
   groq: {
     apiKey: process.env.GROQ_API_KEY || "",
     model: process.env.GROQ_MODEL || "llama-3.3-70b-versatile",
