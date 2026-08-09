@@ -6,6 +6,7 @@ import com.google.android.gms.auth.api.signin.GoogleSignInAccount
 import com.google.android.gms.auth.api.signin.GoogleSignInClient
 import com.google.android.gms.auth.api.signin.GoogleSignInOptions
 import com.google.android.gms.common.api.ApiException
+import com.google.android.gms.common.api.CommonStatusCodes
 
 /**
  * Helper for Google Sign-In.
@@ -23,24 +24,44 @@ object GoogleSignInHelper {
         val gso = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
             .requestIdToken(WEB_CLIENT_ID)
             .requestEmail()
-            .requestProfile()
             .build()
         return GoogleSignIn.getClient(context, gso)
     }
 
     /**
      * Extract the ID token from a GoogleSignInAccount result.
-     * Returns null if sign-in failed or was cancelled.
+     * Returns a Result object with either the token or an error message.
      */
-    fun getIdTokenFromResult(resultData: android.content.Intent?): String? {
+    fun getIdTokenFromResult(resultData: android.content.Intent?): GoogleSignInResult {
         return try {
             val task = GoogleSignIn.getSignedInAccountFromIntent(resultData)
             val account: GoogleSignInAccount = task.getResult(ApiException::class.java)
-            account.idToken
+            val token = account.idToken
+            if (token != null) {
+                GoogleSignInResult.Success(token)
+            } else {
+                GoogleSignInResult.Error("No ID token received from Google")
+            }
         } catch (e: ApiException) {
-            null
+            val message = when (e.statusCode) {
+                CommonStatusCodes.CANCELED -> "Sign in cancelled"
+                CommonStatusCodes.NETWORK_ERROR -> "Network error. Check your connection."
+                CommonStatusCodes.SIGN_IN_REQUIRED -> "Sign in required"
+                CommonStatusCodes.INVALID_ACCOUNT -> "Invalid account"
+                CommonStatusCodes.DEVELOPER_ERROR -> "Configuration error. Contact support."
+                12501 -> "Sign in cancelled"
+                12502 -> "Sign in cancelled"
+                12500 -> "Sign in failed. Try again."
+                else -> "Sign in error (code ${e.statusCode})"
+            }
+            GoogleSignInResult.Error(message)
         } catch (e: Exception) {
-            null
+            GoogleSignInResult.Error("Sign in failed: ${e.message ?: "unknown error"}")
         }
     }
+}
+
+sealed class GoogleSignInResult {
+    data class Success(val idToken: String) : GoogleSignInResult()
+    data class Error(val message: String) : GoogleSignInResult()
 }
