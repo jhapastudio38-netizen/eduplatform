@@ -1,3 +1,4 @@
+// v2
 /**
  * POST /api/auth/signup
  * Body: { mode, name, email, phone, password }

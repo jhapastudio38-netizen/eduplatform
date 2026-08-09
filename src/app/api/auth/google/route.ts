@@ -1,3 +1,4 @@
+// v2
 /**
  * POST /api/auth/google
  * Body: { idToken: string }
