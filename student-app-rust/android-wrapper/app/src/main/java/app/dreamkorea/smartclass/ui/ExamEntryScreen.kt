@@ -272,9 +272,9 @@ fun ExamEntryScreen(theme: AppTheme, sound: SoundManager, testId: String, onStar
                     .padding(top = sdp(90f)),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                // ── BLACK OUTLINE profile icon (NOT colored, NOT filled circle) ──
-                // 140px circle with black outline + black Person silhouette icon.
-                // Bigger than before so it fits nicely in the layout.
+                // ── PROFILE ICON ── white circle with black outline + black
+                // head+shoulders silhouette drawn with Canvas (clean, no box).
+                // 140px circle, 6px black border, white background inside.
                 Box(
                     modifier = Modifier
                         .size(sdp(140f))
@@ -283,12 +283,33 @@ fun ExamEntryScreen(theme: AppTheme, sound: SoundManager, testId: String, onStar
                         .border(width = sdp(6f), color = Color(0xFF111111)),
                     contentAlignment = Alignment.Center
                 ) {
-                    Icon(
-                        Icons.Default.Person,
-                        contentDescription = "Profile",
-                        tint = Color(0xFF111111),
-                        modifier = Modifier.size(sdp(95f))
-                    )
+                    // Custom drawn profile silhouette — head circle + shoulders arc
+                    androidx.compose.foundation.Canvas(
+                        modifier = Modifier.size(sdp(100f))
+                    ) {
+                        val w = this.size.width
+                        val h = this.size.height
+                        val black = androidx.compose.ui.graphics.Color(0xFF111111)
+
+                        // Head — filled black circle, upper portion
+                        drawCircle(
+                            color = black,
+                            radius = w * 0.18f,
+                            center = androidx.compose.ui.geometry.Offset(w * 0.5f, h * 0.35f)
+                        )
+                        // Shoulders — filled black arc (bottom half), clipped to circle
+                        val shoulderPath = androidx.compose.ui.graphics.Path().apply {
+                            addOval(
+                                androidx.compose.ui.geometry.Rect(
+                                    left = w * 0.15f,
+                                    top = h * 0.55f,
+                                    right = w * 0.85f,
+                                    bottom = h * 1.15f
+                                )
+                            )
+                        }
+                        drawPath(shoulderPath, color = black)
+                    }
                 }
 
                 Spacer(Modifier.height(sdp(16f)))

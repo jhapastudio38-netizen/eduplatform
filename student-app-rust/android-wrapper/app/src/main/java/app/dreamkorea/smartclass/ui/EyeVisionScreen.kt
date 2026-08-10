@@ -7,6 +7,10 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.togetherWith
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -22,6 +26,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -219,29 +224,29 @@ fun EyeVisionScreen(theme: AppTheme, sound: SoundManager, onBack: () -> Unit) {
         // ── Compact top status bar ───────────────────────────────────────
         Surface(color = theme.cardBg, shadowElevation = 2.dp) {
             Row(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 6.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Icon(Icons.Default.Visibility, null, tint = theme.primary, modifier = Modifier.size(20.dp))
+                Icon(Icons.Default.Visibility, null, tint = theme.primary, modifier = Modifier.size(18.dp))
                 Spacer(Modifier.width(8.dp))
                 Text(
                     "Eye Vision Test",
                     color = theme.darkText,
-                    fontSize = 14.sp,
+                    fontSize = 13.sp,
                     fontWeight = FontWeight.Bold
                 )
                 Spacer(Modifier.weight(1f))
                 Text(
                     "Question ${currentTestIdx + 1} of ${tests.size}",
                     color = theme.subText,
-                    fontSize = 12.sp,
+                    fontSize = 11.sp,
                     fontWeight = FontWeight.Medium
                 )
-                Spacer(Modifier.width(12.dp))
+                Spacer(Modifier.width(8.dp))
                 Text(
                     "Correct: $correctCount",
                     color = theme.primary,
-                    fontSize = 12.sp,
+                    fontSize = 11.sp,
                     fontWeight = FontWeight.Bold
                 )
             }
@@ -276,23 +281,35 @@ fun EyeVisionScreen(theme: AppTheme, sound: SoundManager, onBack: () -> Unit) {
                 modifier = Modifier
                     .weight(1f)
                     .fillMaxHeight()
-                    .padding(12.dp)
+                    .padding(8.dp)
             ) {
-                // ── Answer display ─────────────────────────────────────────
+                // ── Answer display — with smooth animation when digits appear ──
                 Surface(
                     color = theme.cardBg,
                     shape = RoundedCornerShape(8.dp),
                     border = androidx.compose.foundation.BorderStroke(1.dp, theme.divider),
-                    modifier = Modifier.fillMaxWidth().height(56.dp)
+                    modifier = Modifier.fillMaxWidth().height(44.dp)
                 ) {
                     Box(contentAlignment = Alignment.CenterEnd, modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp)) {
-                        Text(
-                            text = currentAnswer.ifBlank { "—" },
-                            color = if (currentAnswer.isBlank()) theme.subText else theme.darkText,
-                            fontSize = 28.sp,
-                            fontWeight = FontWeight.Bold,
-                            fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
-                        )
+                        // AnimatedContent gives a smooth slide+fade when the answer changes
+                        AnimatedContent(
+                            targetState = currentAnswer,
+                            transitionSpec = {
+                                (fadeIn(androidx.compose.animation.core.tween(150)) +
+                                 slideInVertically(androidx.compose.animation.core.tween(150)) { it / 3 }) togetherWith
+                                (fadeOut(androidx.compose.animation.core.tween(100)) +
+                                 slideOutVertically(androidx.compose.animation.core.tween(100)) { -it / 3 })
+                            },
+                            label = "answerAnim"
+                        ) { answer ->
+                            Text(
+                                text = answer.ifBlank { "—" },
+                                color = if (answer.isBlank()) theme.subText else theme.darkText,
+                                fontSize = 28.sp,
+                                fontWeight = FontWeight.Bold,
+                                fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
+                            )
+                        }
                     }
                 }
                 if (!currentTest.description.isNullOrBlank()) {
@@ -308,6 +325,7 @@ fun EyeVisionScreen(theme: AppTheme, sound: SoundManager, onBack: () -> Unit) {
                 Spacer(Modifier.height(8.dp))
 
                 // ── Numeric keypad: 3×4 grid (1-9, C, 0, ⌫) ────────────────
+                // Each key has a smooth press animation (scale down on tap)
                 val keys = listOf("1", "2", "3", "4", "5", "6", "7", "8", "9", "C", "0", "⌫")
                 keys.chunked(3).forEach { rowKeys ->
                     Row(
@@ -318,6 +336,23 @@ fun EyeVisionScreen(theme: AppTheme, sound: SoundManager, onBack: () -> Unit) {
                     ) {
                         rowKeys.forEach { key ->
                             val isAction = key == "C" || key == "⌫"
+                            // Press animation state — scales down on tap, springs back
+                            var pressed by remember { androidx.compose.runtime.mutableStateOf(false) }
+                            val scale by androidx.compose.animation.core.animateFloatAsState(
+                                targetValue = if (pressed) 0.9f else 1f,
+                                animationSpec = androidx.compose.animation.core.spring(
+                                    dampingRatio = androidx.compose.animation.core.Spring.DampingRatioMediumBouncy,
+                                    stiffness = androidx.compose.animation.core.Spring.StiffnessHigh
+                                ),
+                                label = "keyScale"
+                            )
+                            // Auto-reset pressed state after 150ms
+                            androidx.compose.runtime.LaunchedEffect(pressed) {
+                                if (pressed) {
+                                    kotlinx.coroutines.delay(150)
+                                    pressed = false
+                                }
+                            }
                             Surface(
                                 color = if (isAction) theme.primary.copy(alpha = 0.1f) else theme.cardBg,
                                 shape = RoundedCornerShape(8.dp),
@@ -325,7 +360,9 @@ fun EyeVisionScreen(theme: AppTheme, sound: SoundManager, onBack: () -> Unit) {
                                 modifier = Modifier
                                     .weight(1f)
                                     .fillMaxHeight()
+                                    .scale(scale)
                                     .clickable {
+                                        pressed = true
                                         sound.click()
                                         when (key) {
                                             "C" -> currentAnswer = ""

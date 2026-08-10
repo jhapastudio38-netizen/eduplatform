@@ -703,7 +703,7 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
         Surface(modifier = Modifier.fillMaxWidth().padding(horizontal = 6.dp, vertical = 2.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text("${currentIdx + 1}. ", color = Color(0xFF003478), fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                Text(q.stem.take(80), color = Color(0xFF1E293B), fontSize = 11.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
+                Text(q.stem.take(80), color = Color(0xFF1E293B), fontSize = 14.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
                 if (q.isFree) {
                     Spacer(Modifier.width(4.dp))
                     Surface(color = Color(0xFF22C55E), shape = RoundedCornerShape(3.dp)) {
@@ -734,7 +734,7 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     if (!q.title.isNullOrBlank()) {
-                        Text(q.title, color = Color(0xFF003478), fontSize = 13.sp, fontWeight = FontWeight.Bold, modifier = Modifier.fillMaxWidth(0.92f).padding(bottom = 4.dp))
+                        Text(q.title, color = Color(0xFF003478), fontSize = 16.sp, fontWeight = FontWeight.Bold, modifier = Modifier.fillMaxWidth(0.92f).padding(bottom = 4.dp))
                     }
                     if (q.descType == "image" && !q.descImageUrl.isNullOrBlank()) {
                         val url = q.descImageUrl!!.toAbsoluteUrl()
@@ -747,7 +747,7 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
                     }
                     if (!q.descText.isNullOrBlank()) {
                         Surface(color = Color(0xFFF8FAFC), shape = RoundedCornerShape(8.dp), modifier = Modifier.fillMaxWidth(0.92f)) {
-                            Text(q.descText, color = Color(0xFF1E293B), fontSize = 18.sp, textAlign = TextAlign.Start, modifier = Modifier.padding(12.dp))
+                            Text(q.descText, color = Color(0xFF1E293B), fontSize = 20.sp, textAlign = TextAlign.Start, modifier = Modifier.padding(12.dp))
                         }
                         Spacer(Modifier.height(6.dp))
                     }
@@ -762,7 +762,7 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
                     }
                     if (!q.mediaText.isNullOrBlank()) {
                         Surface(color = Color(0xFFF8FAFC), shape = RoundedCornerShape(8.dp), modifier = Modifier.fillMaxWidth(0.92f)) {
-                            Text(q.mediaText, color = Color(0xFF1E293B), fontSize = 18.sp, textAlign = TextAlign.Center, modifier = Modifier.padding(12.dp))
+                            Text(q.mediaText, color = Color(0xFF1E293B), fontSize = 20.sp, textAlign = TextAlign.Center, modifier = Modifier.padding(12.dp))
                         }
                         Spacer(Modifier.height(6.dp))
                     }
@@ -1279,6 +1279,7 @@ fun AudioPlayerCard(
     questionId: String? = null,
     playCounts: SnapshotStateMap<String, Int>? = null,
     onPlayingChange: ((Boolean) -> Unit)? = null,
+    unlimited: Boolean = false,
 ) {
     val context = LocalContext.current
     var mediaPlayer by remember { mutableStateOf<android.media.MediaPlayer?>(null) }
@@ -1294,12 +1295,14 @@ fun AudioPlayerCard(
     }
 
     // maxPlays: loopCount=1 → play once, loopCount=0 → play twice (default), else play N times
+    // unlimited=true → no limit (review mode — user can play as much as they want)
     val maxPlays = when {
+        unlimited -> Int.MAX_VALUE
         loopCount == 1 -> 1
         loopCount <= 0 -> 2
         else -> loopCount
     }
-    val disabled = persistentCount >= maxPlays
+    val disabled = !unlimited && persistentCount >= maxPlays
     val scope = rememberCoroutineScope()
 
     fun incrementPlayCount() {
@@ -1331,44 +1334,53 @@ fun AudioPlayerCard(
             modifier = Modifier.padding(8.dp),
             contentAlignment = Alignment.Center
         ) {
-            // Play button only — no headphones icon, no text
-            IconButton(
-                onClick = {
-                    if (disabled) return@IconButton
-                    sound.click()
-                    if (isPlaying) return@IconButton
-                    // GLOBAL: stop any other currently playing audio
-                    AudioRegistry.stopAllExcept(url)
-                    try {
-                        mediaPlayer?.release()
-                        val mp = android.media.MediaPlayer().apply {
-                            setDataSource(url)
-                            setOnPreparedListener {
-                                start()
-                                isPlaying = true
-                                incrementPlayCount()
-                            }
-                            setOnCompletionListener {
-                                val currentCount = if (questionId != null && playCounts != null)
-                                    playCounts?.get(questionId) ?: 0
-                                else localPlayCount
-                                if (currentCount < maxPlays) {
-                                    scope.launch {
-                                        if (loopDelaySec > 0) delay(loopDelaySec * 1000L)
-                                        val latestCount = if (questionId != null && playCounts != null)
-                                            playCounts?.get(questionId) ?: 0
-                                        else localPlayCount
-                                        if (latestCount < maxPlays) {
-                                            incrementPlayCount()
-                                            start()
-                                        } else {
-                                            isPlaying = false
-                                        }
-                                    }
-                                } else {
-                                    isPlaying = false
+                // Play button — always looks enabled (no dimming) but ignores
+                // clicks while this audio is playing. Other audio buttons are
+                // also always visible at full opacity.
+                IconButton(
+                    onClick = {
+                        if (disabled) return@IconButton
+                        if (isPlaying) return@IconButton // ignore tap while playing
+                        sound.click()
+                        // GLOBAL: stop any other currently playing audio
+                        AudioRegistry.stopAllExcept(url)
+                        try {
+                            mediaPlayer?.release()
+                            val mp = android.media.MediaPlayer().apply {
+                                setDataSource(url)
+                                setOnPreparedListener {
+                                    start()
+                                    isPlaying = true
+                                    incrementPlayCount()
                                 }
-                            }
+                                setOnCompletionListener {
+                                    // Unlimited mode (review) — never auto-replay, just stop
+                                    if (unlimited) {
+                                        isPlaying = false
+                                        return@setOnCompletionListener
+                                    }
+                                    val currentCount = if (questionId != null && playCounts != null)
+                                        playCounts?.get(questionId) ?: 0
+                                    else localPlayCount
+                                    if (currentCount < maxPlays) {
+                                        scope.launch {
+                                            // 2 second default gap between plays
+                                            val delaySec = if (loopDelaySec > 0) loopDelaySec else 2
+                                            delay(delaySec * 1000L)
+                                            val latestCount = if (questionId != null && playCounts != null)
+                                                playCounts?.get(questionId) ?: 0
+                                            else localPlayCount
+                                            if (latestCount < maxPlays) {
+                                                incrementPlayCount()
+                                                start()
+                                            } else {
+                                                isPlaying = false
+                                            }
+                                        }
+                                    } else {
+                                        isPlaying = false
+                                    }
+                                }
                             setOnErrorListener { mp, what, extra ->
                                 android.util.Log.e("AudioPlayer", "Error: what=$what extra=$extra url=$url")
                                 isPlaying = false
@@ -1382,7 +1394,8 @@ fun AudioPlayerCard(
                         isPlaying = false
                     }
                 },
-                enabled = !disabled && !isPlaying
+                // Always enabled (no dimming) — clicks are ignored while playing
+                enabled = !disabled
             ) {
                 Icon(
                     if (isPlaying) Icons.Default.VolumeUp else Icons.Default.PlayArrow,
@@ -1967,7 +1980,7 @@ fun ReviewCard(theme: AppTheme, review: ReviewItem, questionNumber: Int = 0, sou
                 }
             }
             // Media audio — uses mediaAudioUrl ?: audioUrl
-            // Review audio: loopCount = 1, loopDelaySec = 0 (single play, no loop)
+            // Review audio: unlimited plays (exam is finished), one at a time
             val mediaAudUrl = (review.mediaAudioUrl ?: review.audioUrl)?.toAbsoluteUrl()
             if (!mediaAudUrl.isNullOrBlank()) {
                 Spacer(Modifier.height(8.dp))
@@ -1976,7 +1989,8 @@ fun ReviewCard(theme: AppTheme, review: ReviewItem, questionNumber: Int = 0, sou
                     url = mediaAudUrl,
                     loopCount = 1,
                     loopDelaySec = 0,
-                    sound = sound ?: rememberSoundManager()
+                    sound = sound ?: rememberSoundManager(),
+                    unlimited = true
                 )
             }
             Spacer(Modifier.height(8.dp))

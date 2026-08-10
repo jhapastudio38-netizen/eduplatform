@@ -302,3 +302,58 @@ Stage Summary:
 - Manual signup: now works (backend route created + deployed)
 - Login: only Sign In + Sign Up tabs (Forgot removed)
 - Backup repo: https://github.com/jhapastudio38-netizen/dreamkorea-smartclass-backup
+
+---
+Task ID: 9
+Agent: Main (Super Z)
+Task: Profile icon fix, bigger question text, audio no-dim, review unlimited, eye test animation
+
+Work Log:
+- BACKUP: Created new GitHub repo dreamkorea-smartclass-v1033, pushed v10.33.0 codebase
+  • URL: https://github.com/jhapastudio38-netizen/dreamkorea-smartclass-v1033
+
+- PROFILE ICON FIX (ExamEntryScreen):
+  • Removed Icons.Default.Person (filled black icon created a "black box" look)
+  • Replaced with custom Canvas-drawn profile silhouette: head circle + shoulders arc
+  • White circle background with 6px black border, clean black silhouette inside
+  • No more black box effect — looks like a proper profile icon
+
+- QUESTION TEXT BIGGER (ExamScreen question display):
+  • Stem (instruction row): 11sp → 14sp
+  • Question title: 13sp → 16sp
+  • Description text: 18sp → 20sp
+  • Media text: 18sp → 20sp
+
+- AUDIO NO-DIM FIX (AudioPlayerCard):
+  • Removed `!isPlaying` from `enabled` parameter — button stays visually enabled (no dimming)
+  • Click is ignored while playing (if (isPlaying) return@IconButton)
+  • Other audio buttons now show at full opacity at all times
+  • Can't play another audio until current finishes (global AudioRegistry enforces one-at-a-time)
+  • 2 second default gap: if (loopDelaySec > 0) loopDelaySec else 2
+
+- REVIEW AUDIO UNLIMITED (AudioPlayerCard):
+  • Added `unlimited: Boolean = false` parameter
+  • When unlimited=true: maxPlays = Int.MAX_VALUE, disabled = false
+  • Completion listener returns immediately (no auto-replay) — user taps again to replay
+  • Review passes unlimited=true — user can play as many times as they want
+  • Still one-at-a-time (AudioRegistry stops other playing audios)
+
+- EYE TEST FIX (EyeVisionScreen):
+  • Answer display: AnimatedContent with slideInVertically + fadeIn (smooth digit animation)
+  • Keypad keys: scale animation on press (0.9f spring bounce, auto-reset after 150ms)
+  • Compact top status bar (padding 16/8 → 12/6, font 14/12 → 13/11)
+  • Answer display height 56dp → 44dp
+  • Keypad padding 12dp → 8dp
+  • More vertical space for the 4×3 keypad grid — fits on screen
+
+- Added imports: AnimatedContent, togetherWith, slideInVertically, slideOutVertically, scale
+- Build v10.34.0 (292) succeeded, signed, verified
+
+Stage Summary:
+- Shipped: /home/z/my-project/download/DreamKorea-SmartClass-v10.34.0.apk (12.2MB, v10.34.0/292)
+- Profile icon: clean Canvas-drawn silhouette (no black box)
+- Question text: bigger (14-20sp)
+- Audio: no dimming, one at a time, 2s default gap
+- Review audio: unlimited plays, one at a time
+- Eye test: smooth digit animation + keypad fits on screen
+- Backup: https://github.com/jhapastudio38-netizen/dreamkorea-smartclass-v1033
