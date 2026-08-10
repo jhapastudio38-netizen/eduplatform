@@ -28,6 +28,16 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+            <!-- Deep link handler for Google OAuth callback.
+                 After the student signs in with Google on the web, the server
+                 redirects to dreamkorea://auth-callback?userId=...&name=...&...
+                 which Android routes back to MainActivity via onNewIntent. -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="dreamkorea" android:host="auth-callback" />
+            </intent-filter>
         </activity>
 
         <receiver

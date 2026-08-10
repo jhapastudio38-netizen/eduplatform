@@ -85,4 +85,9 @@ dependencies {
 
     // Image loading (Coil — loads admin-uploaded card images from URLs)
     implementation("io.coil-kt:coil-compose:2.6.0")
+
+    // Chrome Custom Tabs — used for Google OAuth sign-in flow on Android.
+    // Opens the consent screen in a Chrome tab; after consent the server
+    // redirects to dreamkorea://auth-callback which we handle in MainActivity.
+    implementation("androidx.browser:browser:1.8.0")
 }

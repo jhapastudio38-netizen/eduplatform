@@ -1,11 +1,17 @@
 package app.dreamkorea.smartclass.ui
 
+import android.content.Intent
+import android.net.Uri
+import androidx.browser.customtabs.CustomTabsIntent
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
@@ -16,10 +22,15 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
@@ -208,8 +219,10 @@ fun LoginScreen(onLoginSuccess: () -> Unit) {
                                     loading = true; error = ""; info = ""
                                     scope.launch {
                                         try {
+                                            // Traditional email/password signup — no OTP.
+                                            // The server creates the user + session and returns
+                                            // the user profile which we persist via AppState.
                                             val resp = AppState.api.signup(mapOf(
-                                                "mode" to "student",
                                                 "name" to suName.trim(),
                                                 "email" to suEmail.trim().lowercase(),
                                                 "phone" to suPhone.trim(),
@@ -292,8 +305,117 @@ fun LoginScreen(onLoginSuccess: () -> Unit) {
                 }
             }
 
+            // ── Google Sign-In button ───────────────────────────────────────
+            // Visible on ALL tabs (login / signup / forgot). Opens the Google
+            // OAuth consent screen in a Chrome Custom Tab; the server redirects
+            // back to dreamkorea://auth-callback which MainActivity handles.
+            // LocalContext.current must be called from a @Composable scope, so we
+            // hoist it out of the (non-composable) onClick lambda.
+            val googleCtx = LocalContext.current
+            GoogleSignInButton(
+                modifier = Modifier.alpha(formAlpha).padding(top = 16.dp),
+                onClick = {
+                    sound.click()
+                    val url = "https://my-project-five-sepia.vercel.app/api/auth/google-mobile"
+                    try {
+                        CustomTabsIntent.Builder()
+                            .setShowTitle(true)
+                            .build()
+                            .launchUrl(googleCtx, Uri.parse(url))
+                    } catch (_: Exception) {
+                        // Fallback — open in system browser if Custom Tabs unavailable
+                        val browserIntent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
+                        browserIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                        try { googleCtx.startActivity(browserIntent) } catch (_: Exception) {}
+                    }
+                }
+            )
+
             Spacer(modifier = Modifier.height(40.dp))
         }
+    }
+}
+
+/**
+ * Google Sign-In button — OutlinedButton with the multi-coloured Google "G"
+ * drawn on a Canvas (no external drawable dependency). 15sp label.
+ *
+ * The "G" is drawn as four arc segments in Google's brand colours:
+ * blue (top-right), red (top-left), yellow (bottom-left), green (bottom-right).
+ */
+@Composable
+private fun GoogleSignInButton(modifier: Modifier = Modifier, onClick: () -> Unit) {
+    OutlinedButton(
+        onClick = onClick,
+        modifier = modifier.fillMaxWidth().height(50.dp),
+        shape = RoundedCornerShape(12.dp),
+        colors = ButtonDefaults.outlinedButtonColors(
+            containerColor = Color.White,
+            contentColor = Color(0xFF1F1F1F),
+        ),
+        border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFDADCE0)),
+    ) {
+        // Canvas-drawn Google "G" logo (24dp)
+        Canvas(modifier = Modifier.size(24.dp)) {
+            val stroke = Stroke(width = size.minDimension * 0.16f)
+            val cx = size.width / 2f
+            val cy = size.height / 2f
+            val r = size.minDimension * 0.42f
+            // Top-right arc (blue) — from -30° to 30°
+            drawArc(
+                color = Color(0xFF4285F4),
+                startAngle = -30f,
+                sweepAngle = 60f,
+                useCenter = false,
+                topLeft = Offset(cx - r, cy - r),
+                size = androidx.compose.ui.geometry.Size(r * 2, r * 2),
+                style = stroke,
+            )
+            // Top-left arc (red) — 30° to 150°
+            drawArc(
+                color = Color(0xFFEA4335),
+                startAngle = 30f,
+                sweepAngle = 120f,
+                useCenter = false,
+                topLeft = Offset(cx - r, cy - r),
+                size = androidx.compose.ui.geometry.Size(r * 2, r * 2),
+                style = stroke,
+            )
+            // Bottom-left arc (yellow) — 150° to 210°
+            drawArc(
+                color = Color(0xFFFBBC05),
+                startAngle = 150f,
+                sweepAngle = 60f,
+                useCenter = false,
+                topLeft = Offset(cx - r, cy - r),
+                size = androidx.compose.ui.geometry.Size(r * 2, r * 2),
+                style = stroke,
+            )
+            // Bottom-right arc (green) — 210° to 330° (i.e. -150° to -30°)
+            drawArc(
+                color = Color(0xFF34A853),
+                startAngle = 210f,
+                sweepAngle = 120f,
+                useCenter = false,
+                topLeft = Offset(cx - r, cy - r),
+                size = androidx.compose.ui.geometry.Size(r * 2, r * 2),
+                style = stroke,
+            )
+            // Horizontal bar (the "G" crossbar) — green, drawn on the right side
+            val barPath = Path().apply {
+                val startX = cx + r * 0.15f
+                val endX = cx + r
+                moveTo(startX, cy)
+                lineTo(endX, cy)
+            }
+            drawPath(
+                path = barPath,
+                color = Color(0xFF4285F4),
+                style = Stroke(width = size.minDimension * 0.16f),
+            )
+        }
+        Spacer(Modifier.width(12.dp))
+        Text("Sign in with Google", fontSize = 15.sp, fontWeight = FontWeight.Medium)
     }
 }
 

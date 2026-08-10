@@ -18,6 +18,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
@@ -224,163 +225,139 @@ fun ExamEntryScreen(theme: AppTheme, sound: SoundManager, testId: String, onStar
     val studentName = AppState.getUserName()
     val studentEmail = AppState.getUserEmail()
 
-    // ── OUTER BORDER: thin black rectangle around the entire screen ──────
-    Column(
+    // ── OUTER: full-screen white panel with watermark ────────────────────
+    // Spec: 96% × 92% white panel, thin dark border, DreamKorea watermark
+    // (200dp, 5% alpha) behind the content.
+    Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color.White)
-            .border(2.dp, Color.Black)
+            .background(Color(0xFFFDFDFD)),
+        contentAlignment = Alignment.Center
     ) {
-        // ── DreamKorea logo at top centre ────────────────────────────────
-        Box(
-            modifier = Modifier.fillMaxWidth().padding(top = 8.dp, bottom = 4.dp),
-            contentAlignment = Alignment.Center
-        ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Image(
-                    painter = painterResource(id = app.dreamkorea.smartclass.R.drawable.dreamkorea_logo),
-                    contentDescription = "DreamKorea Logo",
-                    modifier = Modifier.size(32.dp),
-                    contentScale = ContentScale.Fit
-                )
-                Spacer(Modifier.width(8.dp))
-                Text(
-                    "DreamKorea SmartClass",
-                    color = Color(0xFF003478),
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.Bold,
-                )
-            }
-        }
+        // DreamKorea watermark — centered, 5% alpha, sits behind the panel
+        Image(
+            painter = painterResource(id = app.dreamkorea.smartclass.R.drawable.dreamkorea_logo),
+            contentDescription = null,
+            modifier = Modifier.size(200.dp).alpha(0.05f),
+            contentScale = ContentScale.Fit
+        )
 
-        Box(
-            modifier = Modifier.weight(1f).padding(16.dp)
+        // ── WHITE PANEL (96% × 92%) ───────────────────────────────────────
+        Surface(
+            color = Color.White,
+            shape = RoundedCornerShape(12.dp),
+            border = BorderStroke(1.dp, Color(0xFF1A1A1A)),
+            modifier = Modifier
+                .fillMaxWidth(0.96f)
+                .fillMaxHeight(0.92f)
         ) {
-            // Landscape-friendly layout: Row with LEFT (student) + RIGHT (exam)
-            Row(
-                modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()),
-                horizontalArrangement = Arrangement.spacedBy(24.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                // ── LEFT: Student info ────────────────────────────────────
+            Box(modifier = Modifier.fillMaxSize().padding(20.dp)) {
                 Column(
-                    modifier = Modifier.weight(0.4f),
+                    modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    // Title at top
-                Text(
-                    t.title,
-                    color = Color.Black,
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.Bold,
-                    textAlign = TextAlign.Center,
-                    maxLines = 2
-                )
-                Spacer(Modifier.height(16.dp))
-
-                // Profile icon
-                Box(
-                    modifier = Modifier
-                        .size(64.dp)
-                        .clip(CircleShape)
-                        .background(Color(0xFF003478)),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(Icons.Default.Person, null, tint = Color.White, modifier = Modifier.size(36.dp))
-                }
-                Spacer(Modifier.height(8.dp))
-
-                // Student name
-                Text(
-                    studentName,
-                    color = Color.Black,
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    textAlign = TextAlign.Center
-                )
-                // Student email
-                Text(
-                    studentEmail,
-                    color = Color.Gray,
-                    fontSize = 11.sp,
-                    textAlign = TextAlign.Center
-                )
-            }
-
-            // ── Vertical divider ──────────────────────────────────────────
-            Box(
-                modifier = Modifier
-                    .width(1.dp)
-                    .fillMaxHeight(0.7f)
-                    .background(Color(0xFFCCCCCC))
-            )
-
-            // ── RIGHT: Exam info + buttons ────────────────────────────────
-            Column(
-                modifier = Modifier.weight(0.6f),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                // Exam description
-                if (!t.description.isNullOrBlank()) {
-                    // Description heading — 14sp (FIX-3: bumped from 12sp)
+                    // ── Title (24sp bold, centered) ──────────────────────────
                     Text(
-                        "About this exam",
-                        color = Color(0xFF003478),
-                        fontSize = 14.sp,
+                        t.title,
+                        color = Color(0xFF1A1A1A),
+                        fontSize = 24.sp,
                         fontWeight = FontWeight.Bold,
-                        modifier = Modifier.fillMaxWidth().padding(bottom = 4.dp)
+                        textAlign = TextAlign.Center,
+                        maxLines = 2,
+                        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
                     )
-                    Surface(
-                        color = Color(0xFFF5F5F5),
-                        shape = RoundedCornerShape(8.dp),
-                        border = BorderStroke(1.dp, Color(0xFFCCCCCC)),
-                        modifier = Modifier.fillMaxWidth()
+                    Spacer(Modifier.height(20.dp))
+
+                    // ── Dark circular profile icon (50dp) ─────────────────────
+                    Box(
+                        modifier = Modifier
+                            .size(50.dp)
+                            .clip(CircleShape)
+                            .background(Color(0xFF1A1A1A)),
+                        contentAlignment = Alignment.Center
                     ) {
-                        // Description text — 14sp / 18sp line height / 6 max lines (FIX-3)
+                        Icon(Icons.Default.Person, null, tint = Color.White, modifier = Modifier.size(28.dp))
+                    }
+                    Spacer(Modifier.height(8.dp))
+
+                    // ── Student name (12sp) + email (12sp) ────────────────────
+                    Text(
+                        studentName,
+                        color = Color(0xFF1A1A1A),
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Medium,
+                        textAlign = TextAlign.Center,
+                    )
+                    Text(
+                        studentEmail,
+                        color = Color(0xFF666666),
+                        fontSize = 12.sp,
+                        textAlign = TextAlign.Center,
+                    )
+
+                    Spacer(Modifier.height(24.dp))
+
+                    // ── Description heading (14sp) + text (14sp, 5 lines, left) ─
+                    if (!t.description.isNullOrBlank()) {
+                        Text(
+                            "About this exam",
+                            color = Color(0xFF1A1A1A),
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Bold,
+                            textAlign = TextAlign.Left,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                        Spacer(Modifier.height(6.dp))
                         Text(
                             t.description!!,
-                            color = Color.Black,
+                            color = Color(0xFF1A1A1A),
                             fontSize = 14.sp,
-                            lineHeight = 18.sp,
-                            maxLines = 6,
+                            lineHeight = 20.sp,
+                            maxLines = 5,
                             overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
-                            modifier = Modifier.padding(12.dp)
+                            textAlign = TextAlign.Left,
+                            modifier = Modifier.fillMaxWidth(),
                         )
                     }
-                    Spacer(Modifier.height(12.dp))
-                }
 
-                                Spacer(Modifier.height(20.dp))
+                    Spacer(Modifier.height(24.dp))
 
-                // Get Started button — graded exams lock after 1 attempt, practice can retake
-                // FIX-3: bigger button — 170dp × 42dp, 14sp font
-                Button(
-                    onClick = { sound.swoosh(); onStart() },
-                    modifier = Modifier.width(170.dp).height(42.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF003478)),
-                    shape = RoundedCornerShape(10.dp),
-                    enabled = !alreadyCompleted
-                ) {
-                    Text(
-                        if (alreadyCompleted) "Already Completed" else "Get Started",
-                        color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Bold
-                    )
-                }
-
-                Spacer(Modifier.height(8.dp))
-
-                // Cancel button — FIX-3: bigger button — 140dp × 42dp, 14sp font
-                OutlinedButton(
-                    onClick = { sound.click(); onBack() },
-                    modifier = Modifier.width(140.dp).height(42.dp),
-                    shape = RoundedCornerShape(10.dp),
-                    colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.Black),
-                    border = BorderStroke(1.dp, Color.Black)
-                ) {
-                    Text("Cancel", fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+                    // ── Get Started + Cancel buttons side by side ─────────────
+                    // Get Started: blue #1A73E8, 170×42dp, 14sp
+                    // Cancel: white bg, dark border, 140×42dp, 14sp
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.Center,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Button(
+                            onClick = { sound.swoosh(); onStart() },
+                            modifier = Modifier.width(170.dp).height(42.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1A73E8)),
+                            shape = RoundedCornerShape(10.dp),
+                            enabled = !alreadyCompleted
+                        ) {
+                            Text(
+                                if (alreadyCompleted) "Already Completed" else "Get Started",
+                                color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Bold
+                            )
+                        }
+                        Spacer(Modifier.width(16.dp))
+                        OutlinedButton(
+                            onClick = { sound.click(); onBack() },
+                            modifier = Modifier.width(140.dp).height(42.dp),
+                            shape = RoundedCornerShape(10.dp),
+                            colors = ButtonDefaults.outlinedButtonColors(
+                                containerColor = Color.White,
+                                contentColor = Color(0xFF1A1A1A),
+                            ),
+                            border = BorderStroke(1.dp, Color(0xFF1A1A1A))
+                        ) {
+                            Text("Cancel", fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+                        }
+                    }
                 }
             }
-        }
         }
     }
 }
