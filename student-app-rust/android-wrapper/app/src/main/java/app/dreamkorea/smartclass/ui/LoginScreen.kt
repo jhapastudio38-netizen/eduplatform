@@ -145,6 +145,11 @@ fun LoginScreen(onLoginSuccess: () -> Unit) {
             // Form card
             Surface(color = Color.White, shape = RoundedCornerShape(20.dp),
                 modifier = Modifier.fillMaxWidth().alpha(formAlpha), shadowElevation = 8.dp) {
+                // IMPORTANT: wrap ALL content in a single Column so the Google
+                // button stacks BELOW the form fields. Previously the Google
+                // button was a sibling of the inner Column inside the Surface
+                // content lambda — but Surface doesn't auto-arrange children,
+                // so the button overlapped at the top of the card.
                 Column(modifier = Modifier.padding(24.dp)) {
                     // Info banner
                     if (info.isNotEmpty()) {
@@ -294,25 +299,25 @@ fun LoginScreen(onLoginSuccess: () -> Unit) {
                             )
                         }
                     }
-                }
 
-                // ── Google Sign-In button ──────────────────────────────────
-                // Visible on all tabs (login / signup / forgot). Opens the
-                // Google OAuth flow in a Chrome Custom Tab. The OAuth callback
-                // redirects to dreamkorea://auth-callback, handled by the
-                // MainActivity intent-filter in AndroidManifest.xml.
-                Spacer(modifier = Modifier.height(16.dp))
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Box(modifier = Modifier.weight(1f).height(1.dp).background(Color(0xFFE2E8F0)))
-                    Text("or", color = TextMid, fontSize = 12.sp, modifier = Modifier.padding(horizontal = 12.dp))
-                    Box(modifier = Modifier.weight(1f).height(1.dp).background(Color(0xFFE2E8F0)))
-                }
-                Spacer(modifier = Modifier.height(12.dp))
+                    // ── Google Sign-In button ──────────────────────────────
+                    // Visible on all tabs (login / signup / forgot). Opens the
+                    // Google OAuth flow in a Chrome Custom Tab. The OAuth callback
+                    // redirects to dreamkorea://auth-callback, handled by the
+                    // MainActivity intent-filter in AndroidManifest.xml.
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Box(modifier = Modifier.weight(1f).height(1.dp).background(Color(0xFFE2E8F0)))
+                        Text("or", color = TextMid, fontSize = 12.sp, modifier = Modifier.padding(horizontal = 12.dp))
+                        Box(modifier = Modifier.weight(1f).height(1.dp).background(Color(0xFFE2E8F0)))
+                    }
+                    Spacer(modifier = Modifier.height(12.dp))
 
-                GoogleSignInButton(sound = sound)
+                    GoogleSignInButton(sound = sound)
+                } // end Column (now wraps form + Google button)
             }
 
             Spacer(modifier = Modifier.height(40.dp))

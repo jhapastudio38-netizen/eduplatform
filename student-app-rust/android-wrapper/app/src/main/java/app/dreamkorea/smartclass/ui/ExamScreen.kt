@@ -662,9 +662,9 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
                                 Box(modifier = Modifier.weight(1f).fillMaxHeight(), contentAlignment = Alignment.Center) {
                                     Text(
                                         t.title.take(40),
-                                        color = Color(0xFF252525),
-                                        fontSize = ssp(28f),
-                                        fontWeight = FontWeight.Bold,
+                                        color = Color(0xFF111111),
+                                        fontSize = ssp(30f),
+                                        fontWeight = FontWeight.Normal,
                                         maxLines = 1,
                                         overflow = TextOverflow.Ellipsis,
                                         textAlign = TextAlign.Center
@@ -674,8 +674,9 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
                                 Box(modifier = Modifier.weight(1f).fillMaxHeight(), contentAlignment = Alignment.Center) {
                                     Text(
                                         userEmail.take(40),
-                                        color = Color(0xFF252525),
-                                        fontSize = ssp(28f),
+                                        color = Color(0xFF111111),
+                                        fontSize = ssp(30f),
+                                        fontWeight = FontWeight.Normal,
                                         maxLines = 1,
                                         overflow = TextOverflow.Ellipsis,
                                         textAlign = TextAlign.Center
@@ -685,8 +686,9 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
                                 Box(modifier = Modifier.weight(1f).fillMaxHeight(), contentAlignment = Alignment.Center) {
                                     Text(
                                         userName.take(40),
-                                        color = Color(0xFF252525),
-                                        fontSize = ssp(28f),
+                                        color = Color(0xFF111111),
+                                        fontSize = ssp(30f),
+                                        fontWeight = FontWeight.Normal,
                                         maxLines = 1,
                                         overflow = TextOverflow.Ellipsis,
                                         textAlign = TextAlign.Center
@@ -698,25 +700,27 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
                                 modifier = Modifier.fillMaxWidth().weight(1f),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                // Nepal — decorative, gray, not clickable, no underline
+                                // Nepal — same style as other nav items, weight 400
                                 Box(modifier = Modifier.weight(1f).fillMaxHeight(), contentAlignment = Alignment.Center) {
-                                    Text("Nepal", color = Color(0xFF888888), fontSize = ssp(16f))
+                                    Text("Nepal", color = Color(0xFF111111), fontSize = ssp(29f), fontWeight = FontWeight.Normal)
                                 }
                                 Box(modifier = Modifier.width(sdp(1f)).fillMaxHeight(0.6f).background(Color(0xFFB8B8B8)))
-                                // All — subtle #F5F5F5 bg + 3px dark indicator when active
-                                NavTab("All", filterMode == null, sdp, ssp, Color(0xFF252525), Color(0xFFF5F5F5)) { filterMode = null }
-                                Box(modifier = Modifier.width(sdp(1f)).fillMaxHeight(0.6f).background(Color(0xFFB8B8B8)))
-                                NavTab("Solved", filterMode == true, sdp, ssp, Color(0xFF252525), Color(0xFFF5F5F5)) { filterMode = true }
-                                Box(modifier = Modifier.width(sdp(1f)).fillMaxHeight(0.6f).background(Color(0xFFB8B8B8)))
-                                NavTab("Unsolved", filterMode == false, sdp, ssp, Color(0xFF252525), Color(0xFFF5F5F5)) { filterMode = false }
+                                // All — subtle #F4F4F4 bg + 4px dark indicator when active
+                                NavTab("All", filterMode == null, sdp, ssp, Color(0xFF111111), Color(0xFFF4F4F4)) { filterMode = null }
+                                Box(modifier = Modifier.width(sdp(1f)).fillMaxHeight(0.6f).background(Color(0xFFB8B8B8))
+                                )
+                                NavTab("Solved", filterMode == true, sdp, ssp, Color(0xFF111111), Color(0xFFF4F4F4)) { filterMode = true }
+                                Box(modifier = Modifier.width(sdp(1f)).fillMaxHeight(0.6f).background(Color(0xFFB8B8B8))
+                                )
+                                NavTab("Unsolved", filterMode == false, sdp, ssp, Color(0xFF111111), Color(0xFFF4F4F4)) { filterMode = false }
                                 Box(modifier = Modifier.width(sdp(1f)).fillMaxHeight(0.6f).background(Color(0xFFB8B8B8)))
                                 // Timer
                                 Box(modifier = Modifier.weight(1f).fillMaxHeight(), contentAlignment = Alignment.Center) {
                                     Text(
                                         timeStr,
-                                        color = Color(0xFF252525),
-                                        fontSize = ssp(16f),
-                                        fontWeight = FontWeight.Bold,
+                                        color = Color(0xFF111111),
+                                        fontSize = ssp(29f),
+                                        fontWeight = FontWeight.Normal,
                                         fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
                                     )
                                 }
@@ -816,26 +820,47 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
                         }
                     }
 
-                    // ── Submit button: 325×68dp, blue #087CF0, 17dp corners ──
+                    // ── Submit button: 328×68dp, blue #1673E8, 18dp corners ──
                     Box(
                         modifier = Modifier.fillMaxWidth().padding(sdp(8f)),
                         contentAlignment = Alignment.Center
                     ) {
                         Button(
                             onClick = { showSubmitDialog = true },
-                            modifier = Modifier.width(sdp(325f)).height(sdp(68f)),
-                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF087CF0)),
-                            shape = RoundedCornerShape(sdp(17f))
+                            modifier = Modifier.width(sdp(328f)).height(sdp(68f)),
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1673E8)),
+                            shape = RoundedCornerShape(sdp(18f)),
+                            contentPadding = androidx.compose.foundation.layout.PaddingValues(0.dp)
                         ) {
                             Text(
                                 "Submit and Finish Exam",
                                 color = Color.White,
-                                fontSize = ssp(17f),
-                                fontWeight = FontWeight.SemiBold
+                                fontSize = ssp(25f),
+                                fontWeight = FontWeight.Normal
                             )
                         }
                     }
                 }
+            }
+
+            // ── FLOATING PENCIL BUTTON — bottom-right, 82px, gray #aaa ──
+            // Same floating button as the exam start screen. Opens annotation.
+            Box(
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .padding(end = sdp(30f), bottom = sdp(8f))
+                    .size(sdp(82f))
+                    .clip(androidx.compose.foundation.shape.CircleShape)
+                    .background(Color(0xFFAAAAAA))
+                    .clickable { /* opens annotation/rough-work tool (future) */ },
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    Icons.Default.Edit,
+                    contentDescription = "Rough work",
+                    tint = Color.White,
+                    modifier = Modifier.size(sdp(38f))
+                )
             }
 
             // ── Submit confirmation dialog ──
@@ -910,16 +935,16 @@ private fun NavTab(
             Text(
                 label,
                 color = textColor,
-                fontSize = ssp(16f),
-                fontWeight = if (active) FontWeight.SemiBold else FontWeight.Normal
+                fontSize = ssp(29f),
+                fontWeight = FontWeight.Normal
             )
             Spacer(Modifier.height(sdp(2f)))
             // 3px dark bottom indicator when active
             Box(
                 modifier = Modifier
                     .fillMaxWidth(0.6f)
-                    .height(if (active) sdp(3f) else 0.dp)
-                    .background(Color(0xFF252525))
+                    .height(if (active) sdp(4f) else 0.dp)
+                    .background(Color(0xFF111111))
             )
         }
     }
@@ -929,25 +954,25 @@ private fun NavTab(
 @Composable
 private fun SectionHeader(label: String, sdp: (Float) -> Dp, ssp: (Float) -> TextUnit) {
     Surface(
-        modifier = Modifier.fillMaxWidth().height(sdp(68f)),
-        border = androidx.compose.foundation.BorderStroke(sdp(1.5f), Color(0xFFB8B8B8))
+        modifier = Modifier.fillMaxWidth().height(sdp(69f)),
+        border = androidx.compose.foundation.BorderStroke(sdp(2f), Color(0xFFC6C6C6))
     ) {
         Box(
-            contentAlignment = Alignment.CenterStart,
-            modifier = Modifier.fillMaxSize().padding(start = sdp(16f))
+            contentAlignment = Alignment.Center,
+            modifier = Modifier.fillMaxSize()
         ) {
             Text(
                 label,
-                color = Color(0xFF252525),
-                fontSize = ssp(20f),
-                fontWeight = FontWeight.SemiBold
+                color = Color(0xFF222222),
+                fontSize = ssp(28f),
+                fontWeight = FontWeight.Normal
             )
         }
     }
 }
 
 /// Scaled 5-column grid of question buttons.
-/// - 2.5px border, 31sp numbers, rectangular (2dp corner radius)
+/// - 3px border #222222, 36sp numbers, NO rounded corners (square)
 /// - globalIndices maps items → sortedItems (NOT test.items), because
 ///   currentIdx indexes into sortedItems.
 @Composable
@@ -1013,20 +1038,19 @@ private fun QuestionGridScaled(
                             false -> isAnswered
                             null -> false
                         }
-                        // Question button: 2.5px border, 31sp numbers, rectangular (2dp corner radius)
+                        // Question button: 3px border #222222, 36sp numbers, SQUARE corners (no radius)
                         Box(
                             modifier = Modifier
                                 .weight(1f)
                                 .aspectRatio(1f)
-                                .clip(RoundedCornerShape(sdp(2f)))
                                 .border(
-                                    width = sdp(2.5f),
+                                    width = sdp(3f),
                                     color = when {
                                         isCurrent -> accentBlue
                                         isAnswered -> accentBlue
-                                        else -> Color(0xFF202020)
+                                        else -> Color(0xFF222222)
                                     },
-                                    shape = RoundedCornerShape(sdp(2f))
+                                    shape = androidx.compose.foundation.shape.RectangleShape
                                 )
                                 .background(if (isAnswered) accentBlue else Color.White)
                                 .alpha(if (isFilteredOut) 0.15f else 1f)
@@ -1039,9 +1063,9 @@ private fun QuestionGridScaled(
                         ) {
                             Text(
                                 "$displayNum",
-                                color = if (isAnswered) Color.White else Color(0xFF202020),
-                                fontSize = ssp(31f),
-                                fontWeight = FontWeight.Bold
+                                color = if (isAnswered) Color.White else Color(0xFF111111),
+                                fontSize = ssp(36f),
+                                fontWeight = FontWeight.Normal
                             )
                         }
                     } else if (showAllBlocks) {
