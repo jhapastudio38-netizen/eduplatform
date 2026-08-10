@@ -440,7 +440,7 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
                     // the question changes — state (playCount, disabled) resets completely.
                     // This fixes the bug where audio was locked from the previous question.
                     key(q.id) {
-                        AudioPlayerCard(theme = theme, url = mediaAudUrl, loopCount = q.audioLoop, loopDelaySec = q.audioLoopDelay, sound = sound, questionId = q.id, playCounts = audioPlayCounts, onPlayingChange = { audioPlaying = it })
+                        AudioPlayerCard(theme = theme, url = mediaAudUrl, loopCount = q.audioLoop, loopDelaySec = if (q.audioLoopDelay > 0) q.audioLoopDelay else 2, sound = sound, questionId = q.id, playCounts = audioPlayCounts, onPlayingChange = { audioPlaying = it })
                     }
                 }
             }
@@ -511,7 +511,7 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
                                 Spacer(Modifier.width(4.dp))
                                 // key(q.id, i) — recreate when question changes so play count resets
                                 key(q.id, i) {
-                                    AudioPlayerCard(theme = theme, url = absUrl, loopCount = q.audioLoop.coerceAtLeast(1), loopDelaySec = q.audioLoopDelay, sound = sound, questionId = "${q.id}-opt-$i", playCounts = audioPlayCounts, onPlayingChange = { audioPlaying = it })
+                                    AudioPlayerCard(theme = theme, url = absUrl, loopCount = q.audioLoop.coerceAtLeast(1), loopDelaySec = if (q.audioLoopDelay > 0) q.audioLoopDelay else 2, sound = sound, questionId = "${q.id}-opt-$i", playCounts = audioPlayCounts, onPlayingChange = { audioPlaying = it })
                                 }
                             }
                         }
@@ -1003,6 +1003,9 @@ private fun LegendItem(color: Color, label: String) {
 //   2 = plays twice
 //   N = plays N times
 //  -1 = infinite loop
+//
+// isReview: when true the button never dims and the student can replay as
+// many times as they want (used on the post-exam Review screen).
 @Composable
 fun AudioPlayerCard(
     theme: AppTheme,
@@ -1013,6 +1016,7 @@ fun AudioPlayerCard(
     questionId: String? = null,
     playCounts: SnapshotStateMap<String, Int>? = null,
     onPlayingChange: ((Boolean) -> Unit)? = null,
+    isReview: Boolean = false,
 ) {
     val context = LocalContext.current
     var mediaPlayer by remember { mutableStateOf<android.media.MediaPlayer?>(null) }
@@ -1027,8 +1031,22 @@ fun AudioPlayerCard(
     }
 
     val maxPlays = if (loopCount <= 0) 2 else loopCount
-    val disabled = persistentCount >= maxPlays
+    // In review mode we never disable — the student may replay indefinitely.
+    val disabled = !isReview && persistentCount >= maxPlays
     val scope = rememberCoroutineScope()
+
+    // ── Pulse animation while playing (scale 1.0 → 1.2 → 1.0, 600ms repeat) ──
+    val infiniteTransition = rememberInfiniteTransition(label = "audioPulse")
+    val pulseScale by infiniteTransition.animateFloat(
+        initialValue = 1.0f,
+        targetValue = 1.2f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(300, easing = LinearEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "pulseScale"
+    )
+    val buttonScale = if (isPlaying) pulseScale else 1.0f
 
     fun incrementPlayCount() {
         if (questionId != null && playCounts != null) {
@@ -1067,21 +1085,31 @@ fun AudioPlayerCard(
             // Simple label — no play count shown
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    if (disabled) "Audio locked" else "Tap to play",
+                    if (disabled) "Audio locked" else if (isPlaying) "Playing…" else "Tap to play",
                     color = if (disabled) Color(0xFF94A3B8) else theme.darkText,
                     fontSize = 13.sp,
                     fontWeight = FontWeight.SemiBold
                 )
             }
-            // Play/Pause button — DISABLED after all plays used
-            IconButton(
-                onClick = {
-                    if (disabled) return@IconButton
-                    sound.click()
-                    if (isPlaying) {
-                        // Don't pause — let it finish. Only allow play, not pause.
-                        return@IconButton
-                    } else {
+            // ── Circular play button (FIX-3) ───────────────────────────────
+            // 48dp circle with colored background. While playing: pulsing
+            // scale animation + GraphicEq icon. When disabled (exam mode,
+            // limit reached): dim to 0.3 alpha + PlayArrow (no lock icon).
+            // When isReview: never dim, always full color.
+            Box(
+                modifier = Modifier
+                    .size(48.dp)
+                    .scale(buttonScale)
+                    .alpha(if (disabled) 0.3f else 1.0f)
+                    .clip(androidx.compose.foundation.shape.CircleShape)
+                    .background(if (isPlaying) theme.primary else theme.primary)
+                    .clickable {
+                        if (disabled) return@clickable
+                        sound.click()
+                        if (isPlaying) {
+                            // Don't pause — let it finish. Only allow play, not pause.
+                            return@clickable
+                        }
                         try {
                             mediaPlayer?.release()
                             val mp = android.media.MediaPlayer().apply {
@@ -1093,11 +1121,11 @@ fun AudioPlayerCard(
                                 }
                                 setOnCompletionListener {
                                     val currentCount = playCounts?.get(questionId) ?: 0
-                                    if (currentCount < maxPlays) {
+                                    if (currentCount < maxPlays || isReview) {
                                         scope.launch {
                                             if (loopDelaySec > 0) delay(loopDelaySec * 1000L)
                                             val latestCount = playCounts?.get(questionId) ?: 0
-                                            if (latestCount < maxPlays) {
+                                            if (latestCount < maxPlays || isReview) {
                                                 incrementPlayCount()
                                                 start()
                                             } else {
@@ -1118,19 +1146,14 @@ fun AudioPlayerCard(
                         } catch (_: Exception) {
                             isPlaying = false
                         }
-                    }
-                },
-                enabled = !disabled && !isPlaying
+                    },
+                contentAlignment = Alignment.Center
             ) {
                 Icon(
-                    when {
-                        disabled -> Icons.Default.Lock
-                        isPlaying -> Icons.Default.VolumeUp
-                        else -> Icons.Default.PlayArrow
-                    },
+                    if (isPlaying) Icons.Default.GraphicEq else Icons.Default.PlayArrow,
                     null,
-                    tint = if (disabled) Color(0xFFCBD5E1) else theme.primary,
-                    modifier = Modifier.size(32.dp)
+                    tint = Color.White,
+                    modifier = Modifier.size(24.dp)
                 )
             }
         }
@@ -1643,7 +1666,7 @@ fun ReviewCard(theme: AppTheme, review: ReviewItem, questionNumber: Int = 0, sou
             if (!review.audioUrl.isNullOrBlank()) {
                 Spacer(Modifier.height(8.dp))
                 val audAbs = review.audioUrl!!.toAbsoluteUrl()
-                AudioPlayerCard(theme = theme, url = audAbs, loopCount = review.audioLoop.coerceAtLeast(1), loopDelaySec = review.audioLoopDelay, sound = sound ?: rememberSoundManager())
+                AudioPlayerCard(theme = theme, url = audAbs, loopCount = review.audioLoop.coerceAtLeast(1), loopDelaySec = review.audioLoopDelay, sound = sound ?: rememberSoundManager(), isReview = true)
             }
             Spacer(Modifier.height(8.dp))
 
@@ -1679,7 +1702,7 @@ fun ReviewCard(theme: AppTheme, review: ReviewItem, questionNumber: Int = 0, sou
                             Spacer(Modifier.width(8.dp))
                             if (isAudioUrl) {
                                 val audUrl = optAud!!.toAbsoluteUrl()
-                                AudioPlayerCard(theme = theme, url = audUrl, loopCount = 1, loopDelaySec = 0, sound = sound ?: rememberSoundManager())
+                                AudioPlayerCard(theme = theme, url = audUrl, loopCount = 1, loopDelaySec = 0, sound = sound ?: rememberSoundManager(), isReview = true)
                             } else if (isImageUrl) {
                                 // Render as image — use optionImages if available, otherwise the option text IS the URL
                                 val imgUrl = (optImg ?: opt).toAbsoluteUrl()
@@ -1775,7 +1798,7 @@ private fun AnswerDisplay(answer: Any?, theme: AppTheme, sound: SoundManager? = 
                     contentScale = ContentScale.Fit
                 )
             } else if (url.startsWith("http") && (url.contains(".mp3") || url.contains(".wav") || url.contains(".ogg") || url.contains(".m4a"))) {
-                AudioPlayerCard(theme = theme, url = url, loopCount = 1, loopDelaySec = 0, sound = sound ?: rememberSoundManager())
+                AudioPlayerCard(theme = theme, url = url, loopCount = 1, loopDelaySec = 0, sound = sound ?: rememberSoundManager(), isReview = true)
             } else {
                 Text(url, color = theme.darkText, fontSize = 12.sp, fontWeight = FontWeight.Medium)
             }

@@ -322,16 +322,28 @@ fun ExamEntryScreen(theme: AppTheme, sound: SoundManager, testId: String, onStar
             ) {
                 // Exam description
                 if (!t.description.isNullOrBlank()) {
+                    // Description heading — 14sp (FIX-3: bumped from 12sp)
+                    Text(
+                        "About this exam",
+                        color = Color(0xFF003478),
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.fillMaxWidth().padding(bottom = 4.dp)
+                    )
                     Surface(
                         color = Color(0xFFF5F5F5),
                         shape = RoundedCornerShape(8.dp),
                         border = BorderStroke(1.dp, Color(0xFFCCCCCC)),
                         modifier = Modifier.fillMaxWidth()
                     ) {
+                        // Description text — 14sp / 18sp line height / 6 max lines (FIX-3)
                         Text(
                             t.description!!,
                             color = Color.Black,
-                            fontSize = 12.sp,
+                            fontSize = 14.sp,
+                            lineHeight = 18.sp,
+                            maxLines = 6,
+                            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
                             modifier = Modifier.padding(12.dp)
                         )
                     }
@@ -341,9 +353,10 @@ fun ExamEntryScreen(theme: AppTheme, sound: SoundManager, testId: String, onStar
                                 Spacer(Modifier.height(20.dp))
 
                 // Get Started button — graded exams lock after 1 attempt, practice can retake
+                // FIX-3: bigger button — 170dp × 42dp, 14sp font
                 Button(
                     onClick = { sound.swoosh(); onStart() },
-                    modifier = Modifier.fillMaxWidth(0.7f).height(44.dp),
+                    modifier = Modifier.width(170.dp).height(42.dp),
                     colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF003478)),
                     shape = RoundedCornerShape(10.dp),
                     enabled = !alreadyCompleted
@@ -356,15 +369,15 @@ fun ExamEntryScreen(theme: AppTheme, sound: SoundManager, testId: String, onStar
 
                 Spacer(Modifier.height(8.dp))
 
-                // Cancel button
+                // Cancel button — FIX-3: bigger button — 140dp × 42dp, 14sp font
                 OutlinedButton(
                     onClick = { sound.click(); onBack() },
-                    modifier = Modifier.fillMaxWidth(0.7f).height(40.dp),
+                    modifier = Modifier.width(140.dp).height(42.dp),
                     shape = RoundedCornerShape(10.dp),
                     colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.Black),
                     border = BorderStroke(1.dp, Color.Black)
                 ) {
-                    Text("Cancel", fontSize = 13.sp)
+                    Text("Cancel", fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
                 }
             }
         }

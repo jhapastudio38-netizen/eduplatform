@@ -227,6 +227,7 @@ fun MainScreen(userName: String, onLogout: () -> Unit) {
             val showBottomBar = when (screen) {
                 is Screen.Exam -> false
                 is Screen.ExamEntry -> false
+                is Screen.EyeVision -> false
                 is Screen.BookReader -> false
                 is Screen.BundleDetail -> false
                 is Screen.Settings -> false
