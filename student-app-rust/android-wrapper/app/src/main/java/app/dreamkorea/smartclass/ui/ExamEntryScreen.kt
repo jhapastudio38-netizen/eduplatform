@@ -331,7 +331,8 @@ fun ExamEntryScreen(theme: AppTheme, sound: SoundManager, testId: String, onStar
                         Text(
                             t.description!!,
                             color = Color.Black,
-                            fontSize = 12.sp,
+                            fontSize = 14.sp,
+                            lineHeight = 18.sp,
                             modifier = Modifier.padding(12.dp)
                         )
                     }
@@ -341,9 +342,10 @@ fun ExamEntryScreen(theme: AppTheme, sound: SoundManager, testId: String, onStar
                                 Spacer(Modifier.height(20.dp))
 
                 // Get Started button — graded exams lock after 1 attempt, practice can retake
+                // Bigger button: 170×42dp, 14sp text
                 Button(
                     onClick = { sound.swoosh(); onStart() },
-                    modifier = Modifier.fillMaxWidth(0.7f).height(44.dp),
+                    modifier = Modifier.width(170.dp).height(42.dp),
                     colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF003478)),
                     shape = RoundedCornerShape(10.dp),
                     enabled = !alreadyCompleted
@@ -356,15 +358,15 @@ fun ExamEntryScreen(theme: AppTheme, sound: SoundManager, testId: String, onStar
 
                 Spacer(Modifier.height(8.dp))
 
-                // Cancel button
+                // Cancel button — bigger: 140×42dp, 14sp text
                 OutlinedButton(
                     onClick = { sound.click(); onBack() },
-                    modifier = Modifier.fillMaxWidth(0.7f).height(40.dp),
+                    modifier = Modifier.width(140.dp).height(42.dp),
                     shape = RoundedCornerShape(10.dp),
                     colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.Black),
                     border = BorderStroke(1.dp, Color.Black)
                 ) {
-                    Text("Cancel", fontSize = 13.sp)
+                    Text("Cancel", fontSize = 14.sp)
                 }
             }
         }

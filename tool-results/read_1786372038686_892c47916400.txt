@@ -1,0 +1,493 @@
+     1→     1→package app.dreamkorea.smartclass.ui
+     2→     2→
+     3→     3→import androidx.compose.animation.*
+     4→     4→import androidx.compose.animation.core.*
+     5→     5→import androidx.compose.foundation.Image
+     6→     6→import androidx.compose.foundation.background
+     7→     7→import androidx.compose.foundation.layout.*
+     8→     8→import androidx.compose.foundation.rememberScrollState
+     9→     9→import androidx.compose.foundation.shape.RoundedCornerShape
+    10→    10→import androidx.compose.foundation.text.KeyboardOptions
+    11→    11→import androidx.compose.foundation.verticalScroll
+    12→    12→import androidx.compose.material.icons.Icons
+    13→    13→import androidx.compose.material.icons.filled.*
+    14→    14→import androidx.compose.material3.*
+    15→    15→import androidx.compose.runtime.*
+    16→    16→import androidx.compose.ui.Alignment
+    17→    17→import androidx.compose.ui.Modifier
+    18→    18→import androidx.compose.ui.draw.alpha
+    19→    19→import androidx.compose.ui.draw.scale
+    20→    20→import androidx.compose.ui.graphics.Brush
+    21→    21→import androidx.compose.ui.graphics.Color
+    22→    22→import androidx.compose.ui.layout.ContentScale
+    23→    23→import androidx.compose.ui.res.painterResource
+    24→    24→import androidx.compose.ui.text.font.FontWeight
+    25→    25→import androidx.compose.ui.text.input.KeyboardType
+    26→    26→import androidx.compose.ui.text.input.PasswordVisualTransformation
+    27→    27→import androidx.compose.ui.text.input.VisualTransformation
+    28→    28→import androidx.compose.ui.unit.dp
+    29→    29→import androidx.compose.ui.unit.sp
+    30→    30→import app.dreamkorea.smartclass.data.AppState
+    31→    31→import kotlinx.coroutines.launch
+    32→    32→
+    33→    33→/**
+    34→    34→ * Login Screen — three tabs: Sign In / Sign Up / Forgot Password.
+    35→    35→ *
+    36→    36→ * Sign In: email + password → POST /api/auth/credentials
+    37→    37→ * Sign Up: name + email + phone + password → POST /api/auth/signup (mode=student)
+    38→    38→ *          — no OTP needed, password is set immediately
+    39→    39→ * Forgot:  email → POST /api/auth/request-reset → enter 6-digit code →
+    40→    40→ *          new password → POST /api/auth/reset-password
+    41→    41→ *
+    42→    42→ * Default tab: Sign In. The DK logo animates in on mount. Background is a
+    43→    43→ * navy gradient (matching the brand). Form card sits on a white surface with
+    44→    44→ * a strong shadow for separation.
+    45→    45→ */
+    46→    46→@Composable
+    47→    47→fun LoginScreen(onLoginSuccess: () -> Unit) {
+    48→    48→    val scope = rememberCoroutineScope()
+    49→    49→    val sound = rememberSoundManager()
+    50→    50→
+    51→    51→    // Tab: "login" | "signup" | "forgot"
+    52→    52→    var mode by remember { mutableStateOf("login") }
+    53→    53→
+    54→    54→    // Sign Up state
+    55→    55→    var suName by remember { mutableStateOf("") }
+    56→    56→    var suEmail by remember { mutableStateOf("") }
+    57→    57→    var suPhone by remember { mutableStateOf("") }
+    58→    58→    var suPassword by remember { mutableStateOf("") }
+    59→    59→
+    60→    60→    // Login state
+    61→    61→    var liEmail by remember { mutableStateOf("") }
+    62→    62→    var liPassword by remember { mutableStateOf("") }
+    63→    63→
+    64→    64→    // Forgot password state
+    65→    65→    var fpEmail by remember { mutableStateOf("") }
+    66→    66→    var fpCode by remember { mutableStateOf("") }
+    67→    67→    var fpNewPassword by remember { mutableStateOf("") }
+    68→    68→    var fpStep by remember { mutableStateOf(1) } // 1=enter email, 2=enter code+new password
+    69→    69→
+    70→    70→    var loading by remember { mutableStateOf(false) }
+    71→    71→    var error by remember { mutableStateOf("") }
+    72→    72→    var info by remember { mutableStateOf("") }
+    73→    73→    var passwordVisible by remember { mutableStateOf(false) }
+    74→    74→
+    75→    75→    // Animations
+    76→    76→    var logoVisible by remember { mutableStateOf(false) }
+    77→    77→    var formVisible by remember { mutableStateOf(false) }
+    78→    78→    LaunchedEffect(Unit) {
+    79→    79→        logoVisible = true
+    80→    80→        kotlinx.coroutines.delay(300)
+    81→    81→        formVisible = true
+    82→    82→    }
+    83→    83→    val logoScale by animateFloatAsState(
+    84→    84→        targetValue = if (logoVisible) 1f else 0.3f,
+    85→    85→        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessLow),
+    86→    86→        label = "logoScale"
+    87→    87→    )
+    88→    88→    val formAlpha by animateFloatAsState(
+    89→    89→        targetValue = if (formVisible) 1f else 0f,
+    90→    90→        animationSpec = tween(600, easing = FastOutSlowInEasing),
+    91→    91→        label = "formAlpha"
+    92→    92→    )
+    93→    93→
+    94→    94→    Box(modifier = Modifier.fillMaxSize().background(
+    95→    95→        Brush.verticalGradient(listOf(Color(0xFFF8FAFC), Color(0xFFEFF6FF), NavyBlue.copy(alpha = 0.3f), NavyBlue))
+    96→    96→    )) {
+    97→    97→        Column(
+    98→    98→            modifier = Modifier.fillMaxSize().padding(horizontal = 24.dp).verticalScroll(rememberScrollState()),
+    99→    99→            horizontalAlignment = Alignment.CenterHorizontally,
+   100→   100→            verticalArrangement = Arrangement.Center
+   101→   101→        ) {
+   102→   102→            Spacer(modifier = Modifier.height(40.dp))
+   103→   103→
+   104→   104→            // Logo
+   105→   105→            Surface(color = Color.White, shape = androidx.compose.foundation.shape.CircleShape,
+   106→   106→                modifier = Modifier.size(100.dp).scale(logoScale), shadowElevation = 12.dp) {
+   107→   107→                Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
+   108→   108→                    Image(painter = painterResource(id = app.dreamkorea.smartclass.R.drawable.dreamkorea_logo),
+   109→   109→                        contentDescription = "Logo", modifier = Modifier.size(64.dp), contentScale = ContentScale.Fit)
+   110→   110→                }
+   111→   111→            }
+   112→   112→
+   113→   113→            Spacer(modifier = Modifier.height(20.dp))
+   114→   114→            Text("DreamKorea SmartClass", color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+   115→   115→            Text("Learn Korean anywhere", color = Color.White.copy(alpha = 0.8f), fontSize = 12.sp)
+   116→   116→            Spacer(modifier = Modifier.height(24.dp))
+   117→   117→
+   118→   118→            // Three-tab toggle: Sign In / Sign Up / Forgot
+   119→   119→            AnimatedVisibility(visible = logoVisible, enter = fadeIn(tween(500))) {
+   120→   120→                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
+   121→   121→                    listOf("login" to "Sign In", "signup" to "Sign Up", "forgot" to "Forgot").forEach { (key, label) ->
+   122→   122→                        if (key != "login" && key != "signup") Spacer(Modifier.width(8.dp))
+   123→   123→                        if (key == "signup") Spacer(Modifier.width(8.dp))
+   124→   124→                        FilterChip(
+   125→   125→                            selected = mode == key,
+   126→   126→                            onClick = { sound.click(); mode = key; error = ""; info = ""; fpStep = 1 },
+   127→   127→                            label = { Text(label, fontSize = 12.sp) },
+   128→   128→                            colors = FilterChipDefaults.filterChipColors(
+   129→   129→                                selectedContainerColor = NavyBlue,
+   130→   130→                                selectedLabelColor = Color.White
+   131→   131→                            )
+   132→   132→                        )
+   133→   133→                    }
+   134→   134→                }
+   135→   135→            }
+   136→   136→
+   137→   137→            Spacer(modifier = Modifier.height(20.dp))
+   138→   138→
+   139→   139→            // Form card
+   140→   140→            Surface(color = Color.White, shape = RoundedCornerShape(20.dp),
+   141→   141→                modifier = Modifier.fillMaxWidth().alpha(formAlpha), shadowElevation = 8.dp) {
+   142→   142→                Column(modifier = Modifier.padding(24.dp)) {
+   143→   143→                    // Info banner
+   144→   144→                    if (info.isNotEmpty()) {
+   145→   145→                        Surface(color = Color(0xFFE8F5E9), shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)) {
+   146→   146→                            Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+   147→   147→                                Icon(Icons.Default.CheckCircle, null, tint = SuccessGreen, modifier = Modifier.size(18.dp))
+   148→   148→                                Spacer(Modifier.width(8.dp))
+   149→   149→                                Text(info, color = SuccessGreen, fontSize = 13.sp, modifier = Modifier.weight(1f))
+   150→   150→                            }
+   151→   151→                        }
+   152→   152→                    }
+   153→   153→                    // Error banner
+   154→   154→                    if (error.isNotEmpty()) {
+   155→   155→                        Surface(color = Color(0xFFFEE2E2), shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)) {
+   156→   156→                            Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+   157→   157→                                Icon(Icons.Default.Error, null, tint = Color(0xFFEF4444), modifier = Modifier.size(18.dp))
+   158→   158→                                Spacer(Modifier.width(8.dp))
+   159→   159→                                Text(error, color = Color(0xFFEF4444), fontSize = 13.sp, modifier = Modifier.weight(1f))
+   160→   160→                            }
+   161→   161→                        }
+   162→   162→                    }
+   163→   163→
+   164→   164→                    AnimatedContent(targetState = mode, transitionSpec = {
+   165→   165→                        (fadeIn(tween(300)) + slideInHorizontally(tween(300)) { it / 5 }) togetherWith
+   166→   166→                        (fadeOut(tween(200)) + slideOutHorizontally(tween(200)) { -it / 5 })
+   167→   167→                    }, label = "modeTransition") { currentMode ->
+   168→   168→                        when (currentMode) {
+   169→   169→                            "login" -> LoginTab(
+   170→   170→                                email = liEmail, password = liPassword, passwordVisible = passwordVisible, loading = loading,
+   171→   171→                                onEmailChange = { liEmail = it }, onPasswordChange = { liPassword = it },
+   172→   172→                                onTogglePassword = { passwordVisible = !passwordVisible },
+   173→   173→                                onSubmit = {
+   174→   174→                                    if (liEmail.isBlank() || liPassword.isBlank()) { error = "Enter email and password"; return@LoginTab }
+   175→   175→                                    loading = true; error = ""; info = ""
+   176→   176→                                    scope.launch {
+   177→   177→                                        try {
+   178→   178→                                            val resp = AppState.api.loginCredentials(mapOf("username" to liEmail.trim(), "password" to liPassword))
+   179→   179→                                            if (resp.ok) {
+   180→   180→                                                sound.success()
+   181→   181→                                                AppState.saveUserProfile(resp.user)
+   182→   182→                                                AppState.invalidateCache()
+   183→   183→                                                onLoginSuccess()
+   184→   184→                                            } else {
+   185→   185→                                                sound.error()
+   186→   186→                                                error = resp.error ?: "Wrong email or password."
+   187→   187→                                            }
+   188→   188→                                        } catch (e: retrofit2.HttpException) {
+   189→   189→                                            sound.error()
+   190→   190→                                            error = extractHttpError(e) ?: "Wrong email or password."
+   191→   191→                                        } catch (e: java.net.UnknownHostException) { sound.error(); error = "No internet connection." }
+   192→   192→                                        catch (e: java.io.IOException) { sound.error(); error = "Could not connect." }
+   193→   193→                                        catch (e: Exception) { sound.error(); error = "Login failed: ${e.message ?: "unknown"}" }
+   194→   194→                                        loading = false
+   195→   195→                                    }
+   196→   196→                                }
+   197→   197→                            )
+   198→   198→                            "signup" -> SignupTab(
+   199→   199→                                name = suName, email = suEmail, phone = suPhone, password = suPassword,
+   200→   200→                                passwordVisible = passwordVisible, loading = loading,
+   201→   201→                                onNameChange = { suName = it }, onEmailChange = { suEmail = it },
+   202→   202→                                onPhoneChange = { suPhone = it }, onPasswordChange = { suPassword = it },
+   203→   203→                                onTogglePassword = { passwordVisible = !passwordVisible },
+   204→   204→                                onSubmit = {
+   205→   205→                                    if (suName.isBlank()) { error = "Name is required"; return@SignupTab }
+   206→   206→                                    if (suEmail.isBlank() || !suEmail.contains("@")) { error = "Enter a valid email"; return@SignupTab }
+   207→   207→                                    if (suPassword.length < 6) { error = "Password must be at least 6 characters"; return@SignupTab }
+   208→   208→                                    loading = true; error = ""; info = ""
+   209→   209→                                    scope.launch {
+   210→   210→                                        try {
+   211→   211→                                            val resp = AppState.api.signup(mapOf(
+   212→   212→                                                "mode" to "student",
+   213→   213→                                                "name" to suName.trim(),
+   214→   214→                                                "email" to suEmail.trim().lowercase(),
+   215→   215→                                                "phone" to suPhone.trim(),
+   216→   216→                                                "password" to suPassword
+   217→   217→                                            ))
+   218→   218→                                            if (resp.ok) {
+   219→   219→                                                sound.success()
+   220→   220→                                                AppState.saveUserProfile(resp.user)
+   221→   221→                                                AppState.invalidateCache()
+   222→   222→                                                onLoginSuccess()
+   223→   223→                                            } else {
+   224→   224→                                                sound.error()
+   225→   225→                                                error = resp.error ?: "Signup failed."
+   226→   226→                                            }
+   227→   227→                                        } catch (e: retrofit2.HttpException) {
+   228→   228→                                            sound.error()
+   229→   229→                                            error = extractHttpError(e) ?: "Signup failed."
+   230→   230→                                        } catch (e: java.net.UnknownHostException) { sound.error(); error = "No internet connection." }
+   231→   231→                                        catch (e: java.io.IOException) { sound.error(); error = "Could not connect." }
+   232→   232→                                        catch (e: Exception) { sound.error(); error = "Signup failed: ${e.message ?: "unknown"}" }
+   233→   233→                                        loading = false
+   234→   234→                                    }
+   235→   235→                                }
+   236→   236→                            )
+   237→   237→                            "forgot" -> ForgotTab(
+   238→   238→                                email = fpEmail, code = fpCode, newPassword = fpNewPassword,
+   239→   239→                                passwordVisible = passwordVisible, loading = loading, step = fpStep,
+   240→   240→                                onEmailChange = { fpEmail = it }, onCodeChange = { fpCode = it },
+   241→   241→                                onNewPasswordChange = { fpNewPassword = it },
+   242→   242→                                onTogglePassword = { passwordVisible = !passwordVisible },
+   243→   243→                                onRequestCode = {
+   244→   244→                                    if (fpEmail.isBlank() || !fpEmail.contains("@")) { error = "Enter a valid email"; return@ForgotTab }
+   245→   245→                                    loading = true; error = ""; info = ""
+   246→   246→                                    scope.launch {
+   247→   247→                                        try {
+   248→   248→                                            AppState.api.requestReset(mapOf("email" to fpEmail.trim().lowercase()))
+   249→   249→                                            sound.success()
+   250→   250→                                            info = "If an account exists, a reset code was sent to ${fpEmail.trim()}."
+   251→   251→                                            fpStep = 2
+   252→   252→                                        } catch (e: java.net.UnknownHostException) { sound.error(); error = "No internet connection." }
+   253→   253→                                        catch (e: java.io.IOException) { sound.error(); error = "Could not connect." }
+   254→   254→                                        catch (e: Exception) { sound.error(); error = "Request failed." }
+   255→   255→                                        loading = false
+   256→   256→                                    }
+   257→   257→                                },
+   258→   258→                                onReset = {
+   259→   259→                                    if (fpCode.length != 6) { error = "Enter the 6-digit code"; return@ForgotTab }
+   260→   260→                                    if (fpNewPassword.length < 6) { error = "New password must be at least 6 characters"; return@ForgotTab }
+   261→   261→                                    loading = true; error = ""; info = ""
+   262→   262→                                    scope.launch {
+   263→   263→                                        try {
+   264→   264→                                            val resp = AppState.api.resetPassword(mapOf(
+   265→   265→                                                "email" to fpEmail.trim().lowercase(),
+   266→   266→                                                "code" to fpCode.trim(),
+   267→   267→                                                "newPassword" to fpNewPassword
+   268→   268→                                            ))
+   269→   269→                                            if (resp.ok) {
+   270→   270→                                                sound.success()
+   271→   271→                                                info = "Password reset! You can now sign in with your new password."
+   272→   272→                                                mode = "login"
+   273→   273→                                                liEmail = fpEmail
+   274→   274→                                                fpStep = 1
+   275→   275→                                                fpCode = ""; fpNewPassword = ""
+   276→   276→                                            } else {
+   277→   277→                                                sound.error()
+   278→   278→                                                error = resp.error ?: "Reset failed."
+   279→   279→                                            }
+   280→   280→                                        } catch (e: retrofit2.HttpException) {
+   281→   281→                                            sound.error()
+   282→   282→                                            error = extractHttpError(e) ?: "Reset failed."
+   283→   283→                                        } catch (e: java.net.UnknownHostException) { sound.error(); error = "No internet connection." }
+   284→   284→                                        catch (e: java.io.IOException) { sound.error(); error = "Could not connect." }
+   285→   285→                                        catch (e: Exception) { sound.error(); error = "Reset failed: ${e.message ?: "unknown"}" }
+   286→   286→                                        loading = false
+   287→   287→                                    }
+   288→   288→                                }
+   289→   289→                            )
+   290→   290→                        }
+   291→   291→                    }
+   292→   292→                }
+   293→   293→            }
+   294→   294→
+   295→   295→            Spacer(modifier = Modifier.height(40.dp))
+   296→   296→        }
+   297→   297→    }
+   298→   298→}
+   299→   299→
+   300→   300→// ─── Login tab ───────────────────────────────────────────────────────────
+   301→   301→@Composable
+   302→   302→private fun LoginTab(
+   303→   303→    email: String, password: String, passwordVisible: Boolean, loading: Boolean,
+   304→   304→    onEmailChange: (String) -> Unit, onPasswordChange: (String) -> Unit,
+   305→   305→    onTogglePassword: () -> Unit, onSubmit: () -> Unit
+   306→   306→) {
+   307→   307→    Column(modifier = Modifier.fillMaxWidth()) {
+   308→   308→        Text("Welcome Back", color = TextDark, fontSize = 20.sp, fontWeight = FontWeight.Bold)
+   309→   309→        Text("Sign in with your email and password", color = TextMid, fontSize = 13.sp)
+   310→   310→        Spacer(Modifier.height(16.dp))
+   311→   311→        Field("Email", email, onEmailChange, Icons.Default.Email, KeyboardType.Email)
+   312→   312→        Spacer(Modifier.height(10.dp))
+   313→   313→        PasswordField("Password", password, onPasswordChange, passwordVisible, onTogglePassword)
+   314→   314→        Spacer(Modifier.height(16.dp))
+   315→   315→        Button(
+   316→   316→            onClick = onSubmit,
+   317→   317→            modifier = Modifier.fillMaxWidth().height(50.dp),
+   318→   318→            colors = ButtonDefaults.buttonColors(containerColor = NavyBlue),
+   319→   319→            shape = RoundedCornerShape(12.dp),
+   320→   320→            enabled = !loading
+   321→   321→        ) {
+   322→   322→            if (loading) {
+   323→   323→                CircularProgressIndicator(color = Color.White, modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+   324→   324→            } else {
+   325→   325→                Text("Sign In", color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+   326→   326→            }
+   327→   327→        }
+   328→   328→    }
+   329→   329→}
+   330→   330→
+   331→   331→// ─── Sign Up tab ─────────────────────────────────────────────────────────
+   332→   332→@Composable
+   333→   333→private fun SignupTab(
+   334→   334→    name: String, email: String, phone: String, password: String,
+   335→   335→    passwordVisible: Boolean, loading: Boolean,
+   336→   336→    onNameChange: (String) -> Unit, onEmailChange: (String) -> Unit,
+   337→   337→    onPhoneChange: (String) -> Unit, onPasswordChange: (String) -> Unit,
+   338→   338→    onTogglePassword: () -> Unit, onSubmit: () -> Unit
+   339→   339→) {
+   340→   340→    Column(modifier = Modifier.fillMaxWidth()) {
+   341→   341→        Text("Create Account", color = TextDark, fontSize = 20.sp, fontWeight = FontWeight.Bold)
+   342→   342→        Text("Sign up with email and set a password", color = TextMid, fontSize = 13.sp)
+   343→   343→        Spacer(Modifier.height(16.dp))
+   344→   344→        Field("Full Name", name, onNameChange, Icons.Default.Person, KeyboardType.Text)
+   345→   345→        Spacer(Modifier.height(10.dp))
+   346→   346→        Field("Email", email, onEmailChange, Icons.Default.Email, KeyboardType.Email)
+   347→   347→        Spacer(Modifier.height(10.dp))
+   348→   348→        Field("Phone (optional)", phone, onPhoneChange, Icons.Default.Phone, KeyboardType.Phone, "+977 98XXXXXXXX")
+   349→   349→        Spacer(Modifier.height(10.dp))
+   350→   350→        PasswordField("Password (min 6 chars)", password, onPasswordChange, passwordVisible, onTogglePassword)
+   351→   351→        Spacer(Modifier.height(16.dp))
+   352→   352→        Button(
+   353→   353→            onClick = onSubmit,
+   354→   354→            modifier = Modifier.fillMaxWidth().height(50.dp),
+   355→   355→            colors = ButtonDefaults.buttonColors(containerColor = NavyBlue),
+   356→   356→            shape = RoundedCornerShape(12.dp),
+   357→   357→            enabled = !loading
+   358→   358→        ) {
+   359→   359→            if (loading) {
+   360→   360→                CircularProgressIndicator(color = Color.White, modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+   361→   361→            } else {
+   362→   362→                Text("Create Account", color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+   363→   363→            }
+   364→   364→        }
+   365→   365→    }
+   366→   366→}
+   367→   367→
+   368→   368→// ─── Forgot Password tab ─────────────────────────────────────────────────
+   369→   369→@Composable
+   370→   370→private fun ForgotTab(
+   371→   371→    email: String, code: String, newPassword: String,
+   372→   372→    passwordVisible: Boolean, loading: Boolean, step: Int,
+   373→   373→    onEmailChange: (String) -> Unit, onCodeChange: (String) -> Unit,
+   374→   374→    onNewPasswordChange: (String) -> Unit, onTogglePassword: () -> Unit,
+   375→   375→    onRequestCode: () -> Unit, onReset: () -> Unit
+   376→   376→) {
+   377→   377→    Column(modifier = Modifier.fillMaxWidth()) {
+   378→   378→        Text(if (step == 1) "Reset Password" else "Enter Code & New Password", color = TextDark, fontSize = 20.sp, fontWeight = FontWeight.Bold)
+   379→   379→        Text(if (step == 1) "We'll send a 6-digit code to your email" else "Check your email for the 6-digit code", color = TextMid, fontSize = 13.sp)
+   380→   380→        Spacer(Modifier.height(16.dp))
+   381→   381→
+   382→   382→        if (step == 1) {
+   383→   383→            Field("Email", email, onEmailChange, Icons.Default.Email, KeyboardType.Email)
+   384→   384→            Spacer(Modifier.height(16.dp))
+   385→   385→            Button(
+   386→   386→                onClick = onRequestCode,
+   387→   387→                modifier = Modifier.fillMaxWidth().height(50.dp),
+   388→   388→                colors = ButtonDefaults.buttonColors(containerColor = NavyBlue),
+   389→   389→                shape = RoundedCornerShape(12.dp),
+   390→   390→                enabled = !loading
+   391→   391→            ) {
+   392→   392→                if (loading) CircularProgressIndicator(color = Color.White, modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+   393→   393→                else Text("Send Reset Code", color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+   394→   394→            }
+   395→   395→        } else {
+   396→   396→            // Read-only email display
+   397→   397→            Surface(color = Color(0xFFF1F5F9), shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth().padding(bottom = 10.dp)) {
+   398→   398→                Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+   399→   399→                    Icon(Icons.Default.Email, null, tint = TextMid, modifier = Modifier.size(18.dp))
+   400→   400→                    Spacer(Modifier.width(8.dp))
+   401→   401→                    Text(email, color = TextDark, fontSize = 13.sp, fontWeight = FontWeight.Medium)
+   402→   402→                }
+   403→   403→            }
+   404→   404→            // Code field
+   405→   405→            OutlinedTextField(
+   406→   406→                value = code, onValueChange = { onCodeChange(it.filter { c -> c.isDigit() }.take(6)) },
+   407→   407→                label = { Text("6-digit code") },
+   408→   408→                modifier = Modifier.fillMaxWidth(),
+   409→   409→                singleLine = true,
+   410→   410→                colors = OutlinedTextFieldDefaults.colors(
+   411→   411→                    focusedTextColor = TextDark, unfocusedTextColor = TextDark,
+   412→   412→                    focusedBorderColor = NavyBlue, unfocusedBorderColor = DividerColor,
+   413→   413→                    cursorColor = NavyBlue, focusedLabelColor = NavyBlue, unfocusedLabelColor = TextMid
+   414→   414→                ),
+   415→   415→                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
+   416→   416→                shape = RoundedCornerShape(12.dp),
+   417→   417→                leadingIcon = { Icon(Icons.Default.Password, null, tint = TextMid, modifier = Modifier.size(20.dp)) }
+   418→   418→            )
+   419→   419→            Spacer(Modifier.height(10.dp))
+   420→   420→            PasswordField("New Password (min 6 chars)", newPassword, onNewPasswordChange, passwordVisible, onTogglePassword)
+   421→   421→            Spacer(Modifier.height(16.dp))
+   422→   422→            Button(
+   423→   423→                onClick = onReset,
+   424→   424→                modifier = Modifier.fillMaxWidth().height(50.dp),
+   425→   425→                colors = ButtonDefaults.buttonColors(containerColor = NavyBlue),
+   426→   426→                shape = RoundedCornerShape(12.dp),
+   427→   427→                enabled = !loading
+   428→   428→            ) {
+   429→   429→                if (loading) CircularProgressIndicator(color = Color.White, modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+   430→   430→                else Text("Reset Password", color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+   431→   431→            }
+   432→   432→        }
+   433→   433→    }
+   434→   434→}
+   435→   435→
+   436→   436→// ─── Reusable field helpers ──────────────────────────────────────────────
+   437→   437→@Composable
+   438→   438→private fun Field(label: String, value: String, onChange: (String) -> Unit, icon: androidx.compose.ui.graphics.vector.ImageVector, keyboardType: KeyboardType, placeholder: String = "") {
+   439→   439→    OutlinedTextField(
+   440→   440→        value = value, onValueChange = onChange, label = { Text(label) },
+   441→   441→        modifier = Modifier.fillMaxWidth(), singleLine = true,
+   442→   442→        colors = OutlinedTextFieldDefaults.colors(
+   443→   443→            focusedTextColor = TextDark, unfocusedTextColor = TextDark,
+   444→   444→            focusedBorderColor = NavyBlue, unfocusedBorderColor = DividerColor,
+   445→   445→            cursorColor = NavyBlue, focusedLabelColor = NavyBlue, unfocusedLabelColor = TextMid
+   446→   446→        ),
+   447→   447→        keyboardOptions = KeyboardOptions(keyboardType = keyboardType),
+   448→   448→        shape = RoundedCornerShape(12.dp),
+   449→   449→        leadingIcon = { Icon(icon, null, tint = TextMid, modifier = Modifier.size(20.dp)) },
+   450→   450→        placeholder = if (placeholder.isNotEmpty()) { { Text(placeholder, color = TextLight, fontSize = 13.sp) } } else null
+   451→   451→    )
+   452→   452→}
+   453→   453→
+   454→   454→@Composable
+   455→   455→private fun PasswordField(label: String, value: String, onChange: (String) -> Unit, visible: Boolean, onToggle: () -> Unit) {
+   456→   456→    OutlinedTextField(
+   457→   457→        value = value, onValueChange = onChange, label = { Text(label) },
+   458→   458→        modifier = Modifier.fillMaxWidth(), singleLine = true,
+   459→   459→        colors = OutlinedTextFieldDefaults.colors(
+   460→   460→            focusedTextColor = TextDark, unfocusedTextColor = TextDark,
+   461→   461→            focusedBorderColor = NavyBlue, unfocusedBorderColor = DividerColor,
+   462→   462→            cursorColor = NavyBlue, focusedLabelColor = NavyBlue, unfocusedLabelColor = TextMid
+   463→   463→        ),
+   464→   464→        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+   465→   465→        shape = RoundedCornerShape(12.dp),
+   466→   466→        leadingIcon = { Icon(Icons.Default.Lock, null, tint = TextMid, modifier = Modifier.size(20.dp)) },
+   467→   467→        trailingIcon = {
+   468→   468→            IconButton(onClick = onToggle) {
+   469→   469→                Icon(if (visible) Icons.Default.Visibility else Icons.Default.VisibilityOff, null, tint = TextMid, modifier = Modifier.size(18.dp))
+   470→   470→            }
+   471→   471→        },
+   472→   472→        visualTransformation = if (visible) VisualTransformation.None else PasswordVisualTransformation()
+   473→   473→    )
+   474→   474→}
+   475→   475→
+   476→   476→/**
+   477→   477→ * Extract the human-readable error message from a Retrofit HttpException.
+   478→   478→ *
+   479→   479→ * The server returns errors as JSON: {"error": "Email already registered"}
+   480→   480→ * We parse the response body to pull out the "error" field. If parsing fails
+   481→   481→ * or the body is empty, we return null so the caller can use a fallback.
+   482→   482→ */
+   483→   483→private fun extractHttpError(e: retrofit2.HttpException): String? {
+   484→   484→    return try {
+   485→   485→        val raw = e.response()?.errorBody()?.string()
+   486→   486→        if (raw.isNullOrBlank()) return null
+   487→   487→        val json = com.google.gson.JsonParser.parseString(raw).asJsonObject
+   488→   488→        json.get("error")?.asString
+   489→   489→    } catch (_: Exception) {
+   490→   490→        null
+   491→   491→    }
+   492→   492→}
+   493→   493→

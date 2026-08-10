@@ -1,0 +1,1354 @@
+     1→package app.dreamkorea.smartclass.ui
+     2→
+     3→import androidx.compose.animation.*
+     4→import androidx.compose.animation.core.*
+     5→import androidx.compose.foundation.Image
+     6→import androidx.compose.foundation.background
+     7→import androidx.compose.foundation.clickable
+     8→import androidx.compose.foundation.layout.*
+     9→import androidx.compose.foundation.lazy.LazyColumn
+    10→import androidx.compose.foundation.lazy.LazyRow
+    11→import androidx.compose.foundation.lazy.items
+    12→import androidx.compose.foundation.lazy.itemsIndexed
+    13→import androidx.compose.foundation.shape.CircleShape
+    14→import androidx.compose.foundation.shape.RoundedCornerShape
+    15→import androidx.compose.material.icons.Icons
+    16→import androidx.compose.material.icons.filled.*
+    17→import androidx.compose.material3.*
+    18→import androidx.compose.runtime.*
+    19→import androidx.compose.ui.Alignment
+    20→import androidx.compose.ui.Modifier
+    21→import androidx.compose.ui.draw.clip
+    22→import androidx.compose.ui.draw.scale
+    23→import androidx.compose.ui.graphics.Brush
+    24→import androidx.compose.ui.graphics.Color
+    25→import androidx.compose.ui.graphics.lerp
+    26→import androidx.compose.ui.graphics.vector.ImageVector
+    27→import androidx.compose.ui.layout.ContentScale
+    28→import androidx.compose.ui.platform.LocalContext
+    29→import androidx.compose.ui.res.painterResource
+    30→import androidx.compose.ui.text.font.FontWeight
+    31→import androidx.compose.ui.text.style.TextAlign
+    32→import androidx.compose.ui.text.style.TextOverflow
+    33→import androidx.compose.ui.unit.dp
+    34→import androidx.compose.ui.unit.sp
+    35→import androidx.compose.ui.viewinterop.AndroidView
+    36→import app.dreamkorea.smartclass.api.*
+    37→import app.dreamkorea.smartclass.data.AppState
+    38→import kotlinx.coroutines.launch
+    39→
+    40→// Professional color palette — matching the reference design
+    41→val NavyBlue = Color(0xFF1E3A8A)
+    42→val NavyBlueLight = Color(0xFF3B82F6)
+    43→val SuccessGreen = Color(0xFF22C55E)
+    44→val WarningOrange = Color(0xFFF59E0B)
+    45→val AccentPurple = Color(0xFF8B5CF6)
+    46→val AccentPink = Color(0xFFEC4899)
+    47→val BgGray = Color(0xFFF8FAFC)
+    48→val CardWhite = Color(0xFFFFFFFF)
+    49→val TextDark = Color(0xFF1E293B)
+    50→val TextMid = Color(0xFF64748B)
+    51→val TextLight = Color(0xFF94A3B8)
+    52→val DividerColor = Color(0xFFE2E8F0)
+    53→
+    54→// Navigation destinations
+    55→sealed class Screen {
+    56→    object Home : Screen()
+    57→    object Learn : Screen()
+    58→    object Books : Screen()
+    59→    object Tests : Screen()
+    60→    object Videos : Screen()
+    61→    object Profile : Screen()
+    62→    object LiveRoom : Screen()
+    63→    object Settings : Screen()
+    64→    object UbtTest : Screen()
+    65→    object FreeExam : Screen()
+    66→    object Batch : Screen()
+    67→    object Results : Screen()
+    68→    object QuestionBank : Screen()
+    69→    object AudioLessons : Screen()
+    70→    object Classroom : Screen()
+    71→    object RecordedVideo : Screen()
+    72→    object ClassResult : Screen()
+    73→    object CourseVideo : Screen()
+    74→    object Join : Screen()
+    75→    object EyeVision : Screen()
+    76→    object Bundles : Screen()
+    77→    object Dictionary : Screen()
+    78→    object Grammar : Screen()
+    79→    object Alarms : Screen()
+    80→    data class BundleList(val kind: String) : Screen()
+    81→    data class Exam(val testId: String) : Screen()
+    82→    data class ExamEntry(val testId: String) : Screen()
+    83→    data class BookReader(val book: Book) : Screen()
+    84→    data class TestList(val filter: String, val title: String) : Screen()
+    85→    data class BundleDetail(val bundleId: String, val bundleTitle: String) : Screen()
+    86→}
+    87→
+    88→// Tab destinations for bottom navigation
+    89→enum class BottomTab(val label: String, val icon: ImageVector) {
+    90→    Home("Home", Icons.Default.Home),
+    91→    Exams("Exams", Icons.Default.Quiz),
+    92→    Tools("Tools", Icons.Default.Build),
+    93→    Books("Books", Icons.Default.Book),
+    94→}
+    95→
+    96→@Composable
+    97→fun MainScreen(userName: String, onLogout: () -> Unit) {
+    98→    val theme = rememberAppTheme()
+    99→    val sound = rememberSoundManager()
+   100→    var screen by remember { mutableStateOf<Screen>(Screen.Home) }
+   101→    var activeTab by remember { mutableStateOf(BottomTab.Home) }
+   102→    var hideBottomBar by remember { mutableStateOf(false) }
+   103→    val context = androidx.compose.ui.platform.LocalContext.current
+   104→
+   105→    // ── ORIENTATION CONTROL ──────────────────────────────────────────────
+   106→    // Force PORTRAIT for all screens EXCEPT exam + exam entry (landscape).
+   107→    // Uses LaunchedEffect (runs AFTER DisposableEffect) so it doesn't
+   108→    // override the exam screen's own landscape lock.
+   109→    androidx.compose.runtime.LaunchedEffect(screen) {
+   110→        val activity = context as? android.app.Activity
+   111→        when (screen) {
+   112→            is Screen.Exam, is Screen.ExamEntry -> {
+   113→                // Exam screens handle their own orientation (landscape)
+   114→                // Don't override — let ExamScreen/ExamEntryScreen set LANDSCAPE
+   115→            }
+   116→            else -> {
+   117→                // Force portrait for ALL other screens (home, books, etc.)
+   118→                activity?.requestedOrientation = android.content.pm.ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+   119→            }
+   120→        }
+   121→    }
+   122→
+   123→    fun navigateTo(s: Screen) {
+   124→        screen = s
+   125→        activeTab = when (s) {
+   126→            is Screen.Home -> BottomTab.Home
+   127→            is Screen.Tests, is Screen.UbtTest, is Screen.FreeExam,
+   128→            is Screen.Batch, is Screen.TestList, is Screen.QuestionBank,
+   129→            is Screen.Exam -> BottomTab.Exams
+   130→            is Screen.Books, is Screen.BookReader -> BottomTab.Books
+   131→            is Screen.Learn -> BottomTab.Tools
+   132→            else -> activeTab
+   133→        }
+   134→    }
+   135→
+   136→    // ── System back button handler ──────────────────────────────────────
+   137→    // When the user presses the hardware/gesture back button:
+   138→    //   • If on a sub-screen → go to Home (not close the app)
+   139→    //   • If on Home → let the system handle it (exit app)
+   140→    //   • If in an exam → the ExamScreen has its own BackHandler (exit dialog)
+   141→    androidx.activity.compose.BackHandler(enabled = screen !is Screen.Home && screen !is Screen.Exam && screen !is Screen.ExamEntry) {
+   142→        navigateTo(Screen.Home)
+   143→    }
+   144→
+   145→    Surface(modifier = Modifier.fillMaxSize(), color = BgGray) {
+   146→        Column(modifier = Modifier.fillMaxSize()) {
+   147→            // ─── Top bar — shown on Home with profile/settings icons ──────────
+   148→            val showTopBar = when (screen) {
+   149→                is Screen.Exam -> false
+   150→                is Screen.BookReader -> false
+   151→                is Screen.Home -> true
+   152→                is Screen.Settings -> false
+   153→                else -> false
+   154→            }
+   155→            if (showTopBar) {
+   156→                TopBar(theme, userName, sound, onProfile = { navigateTo(Screen.Profile) }, onSettings = { screen = Screen.Settings })
+   157→            }
+   158→
+   159→            // ─── Screen content with slide animation ─────────────────────────
+   160→            Box(modifier = Modifier.weight(1f)) {
+   161→                // Subtle background image — low opacity, barely noticeable
+   162→                Image(
+   163→                    painter = painterResource(id = app.dreamkorea.smartclass.R.drawable.app_bg),
+   164→                    contentDescription = null,
+   165→                    modifier = Modifier.fillMaxSize(),
+   166→                    contentScale = ContentScale.Fit
+   167→                )
+   168→                Box(modifier = Modifier.fillMaxSize().background(BgGray.copy(alpha = 0.92f)))
+   169→                AnimatedContent(
+   170→                    targetState = screen,
+   171→                    transitionSpec = {
+   172→                        // Slide + fade for tab switches, fade for sub-screens
+   173→                        if (screen is Screen.Home || screen is Screen.Tests || screen is Screen.Books || screen is Screen.Learn) {
+   174→                            (fadeIn(tween(300)) + slideInHorizontally(tween(300), initialOffsetX = { it / 8 })) togetherWith
+   175→                            (fadeOut(tween(200)) + slideOutHorizontally(tween(200), targetOffsetX = { -it / 8 }))
+   176→                        } else {
+   177→                            fadeIn(tween(300)) togetherWith fadeOut(tween(200))
+   178→                        }
+   179→                    },
+   180→                    label = "screenTransition"
+   181→                ) { s ->
+   182→                    when (s) {
+   183→                        is Screen.Home -> HomeScreen(theme, sound, userName, onNavigate = { navigateTo(it) })
+   184→                        is Screen.Learn -> {
+   185→                            onNavigateToTool = { route ->
+   186→                                when (route) {
+   187→                                    "dictionary" -> navigateTo(Screen.Dictionary)
+   188→                                    "grammar" -> navigateTo(Screen.Grammar)
+   189→                                    "alarms" -> navigateTo(Screen.Alarms)
+   190→                                    "eyevision" -> navigateTo(Screen.EyeVision)
+   191→                                }
+   192→                            }
+   193→                            LearnScreen(theme, sound, onBack = { navigateTo(Screen.Home) })
+   194→                        }
+   195→                        is Screen.Books -> BooksScreen(theme, sound, onBack = { navigateTo(Screen.Home) }, onBookClick = { screen = Screen.BookReader(it) })
+   196→                        is Screen.Tests -> TestsScreen(theme, sound, filter = "all", title = "All Exams", onBack = { navigateTo(Screen.Home) }, onStartExam = { screen = Screen.ExamEntry(it) }, onOpenPackages = { screen = Screen.Bundles })
+   197→                        is Screen.Videos -> VideosScreen(theme, sound, onBack = { navigateTo(Screen.Home) }, onHideBottomBar = { hide -> hideBottomBar = hide })
+   198→                        is Screen.Profile -> ProfileScreen(theme, sound, userName, onBack = { navigateTo(Screen.Home) }, onLogout = onLogout)
+   199→                        is Screen.LiveRoom -> LiveRoomScreen(theme, onBack = { navigateTo(Screen.Home) })
+   200→                        is Screen.Settings -> SettingsScreen(theme, sound, onBack = { navigateTo(Screen.Home) })
+   201→                        is Screen.ExamEntry -> ExamEntryScreen(theme, sound, testId = s.testId, onStart = { screen = Screen.Exam(s.testId) }, onBack = { navigateTo(Screen.Home) })
+   202→                        is Screen.Exam -> ExamScreen(theme, testId = s.testId, onExit = { navigateTo(Screen.Home) })
+   203→                        is Screen.BookReader -> BookReaderScreen(theme, sound, s.book, onBack = { screen = Screen.Books })
+   204→                        is Screen.UbtTest -> TestsScreen(theme, sound, filter = "exam", title = "UBT Exams", onBack = { navigateTo(Screen.Home) }, onStartExam = { screen = Screen.ExamEntry(it) }, onOpenPackages = { screen = Screen.Bundles })
+   205→                        is Screen.FreeExam -> TestsScreen(theme, sound, filter = "demo", title = "Demo Exams", onBack = { navigateTo(Screen.Home) }, onStartExam = { screen = Screen.ExamEntry(it) }, onOpenPackages = { screen = Screen.Bundles })
+   206→                        is Screen.Batch -> TestsScreen(theme, sound, filter = "batch", title = "Batch Exams", onBack = { navigateTo(Screen.Home) }, onStartExam = { screen = Screen.ExamEntry(it) }, onOpenPackages = { screen = Screen.Bundles })
+   207→                        is Screen.Results -> ResultsScreen(theme, sound, onBack = { navigateTo(Screen.Home) })
+   208→                        is Screen.QuestionBank -> QuestionBankScreen(theme, sound, onBack = { navigateTo(Screen.Home) }, onStartExam = { screen = Screen.ExamEntry(it) }, onOpenPackages = { screen = Screen.Bundles })
+   209→                        is Screen.AudioLessons -> LearnScreen(theme, sound, onBack = { navigateTo(Screen.Home) })
+   210→                        is Screen.Classroom -> LiveRoomScreen(theme, onBack = { navigateTo(Screen.Home) })
+   211→                        is Screen.RecordedVideo -> VideosScreen(theme, sound, onBack = { navigateTo(Screen.Home) })
+   212→                        is Screen.ClassResult -> ResultsScreen(theme, sound, onBack = { navigateTo(Screen.Home) })
+   213→                        is Screen.CourseVideo -> VideosScreen(theme, sound, onBack = { navigateTo(Screen.Home) })
+   214→                        is Screen.TestList -> TestsScreen(theme, sound, filter = s.filter, title = s.title, onBack = { navigateTo(Screen.Home) }, onStartExam = { screen = Screen.ExamEntry(it) }, onOpenPackages = { screen = Screen.Bundles })
+   215→                        is Screen.Join -> JoinScreen(theme, sound, onBack = { navigateTo(Screen.Home) })
+   216→                        is Screen.EyeVision -> EyeVisionScreen(theme, sound, onBack = { navigateTo(Screen.Home) })
+   217→                        is Screen.Dictionary -> DictionaryScreen(theme, sound, onBack = { navigateTo(Screen.Home) })
+   218→                        is Screen.Grammar -> GrammarScreen(theme, sound, onBack = { navigateTo(Screen.Home) })
+   219→                        is Screen.Alarms -> AlarmsScreen(theme, sound, onBack = { navigateTo(Screen.Home) })
+   220→                        is Screen.Bundles -> BundlesScreen(theme, sound, onBack = { navigateTo(Screen.Home) }, onOpenBundle = { id, title -> screen = Screen.BundleDetail(id, title) }, onOpenTest = { screen = Screen.ExamEntry(it) })
+   221→                        is Screen.BundleList -> BundlesScreen(theme, sound, onBack = { navigateTo(Screen.Home) }, onOpenBundle = { id, title -> screen = Screen.BundleDetail(id, title) }, onOpenTest = { screen = Screen.ExamEntry(it) }, initialKind = s.kind)
+   222→                        is Screen.BundleDetail -> BundleDetailScreen(theme, sound, bundleId = s.bundleId, bundleTitle = s.bundleTitle, onBack = { screen = Screen.Bundles }, onOpenTest = { screen = Screen.ExamEntry(it) })                    }
+   223→                }
+   224→            }
+   225→
+   226→            // ─── Bottom navigation bar ──────────────────────────────────────
+   227→            val showBottomBar = when (screen) {
+   228→                is Screen.Exam -> false
+   229→                is Screen.ExamEntry -> false
+   230→                is Screen.BookReader -> false
+   231→                is Screen.BundleDetail -> false
+   232→                is Screen.Settings -> false
+   233→                else -> !hideBottomBar
+   234→            }
+   235→            if (showBottomBar) {
+   236→                BottomNavBar(activeTab = activeTab, onTabClick = { tab ->
+   237→                    sound.click()
+   238→                    when (tab) {
+   239→                        BottomTab.Home -> navigateTo(Screen.Home)
+   240→                        BottomTab.Exams -> navigateTo(Screen.Tests)
+   241→                        BottomTab.Tools -> navigateTo(Screen.Learn)
+   242→                        BottomTab.Books -> navigateTo(Screen.Books)
+   243→                    }
+   244→                })
+   245→            }
+   246→        }
+   247→
+   248→        // Global full-screen image viewer overlay — renders above every screen
+   249→        // when an image URL is set via FullScreenImageViewer.show(url).
+   250→        // Used by EyeVisionScreen, ExamScreen, and any other place that shows
+   251→        // images the student may want to tap to enlarge.
+   252→        FullScreenViewerOverlay(theme = theme)
+   253→    }
+   254→}
+   255→
+   256→// ─── Bottom Navigation Bar — clean, full-width ────────────────────────────────
+   257→@Composable
+   258→fun BottomNavBar(activeTab: BottomTab, onTabClick: (BottomTab) -> Unit) {
+   259→    Surface(
+   260→        color = CardWhite,
+   261→        shadowElevation = 8.dp,
+   262→        tonalElevation = 0.dp,
+   263→    ) {
+   264→        Row(
+   265→            modifier = Modifier
+   266→                .fillMaxWidth()
+   267→                .navigationBarsPadding()
+   268→                .padding(vertical = 8.dp),
+   269→            horizontalArrangement = Arrangement.SpaceEvenly,
+   270→            verticalAlignment = Alignment.CenterVertically,
+   271→        ) {
+   272→            BottomTab.values().forEach { tab ->
+   273→                val isActive = tab == activeTab
+   274→                val iconColor = if (isActive) NavyBlue else Color(0xFF94A3B8)
+   275→                val textColor = if (isActive) NavyBlue else Color(0xFF94A3B8)
+   276→
+   277→                // Animated scale on press
+   278→                var pressed by remember { mutableStateOf(false) }
+   279→                val scale by animateFloatAsState(
+   280→                    targetValue = if (pressed) 0.85f else 1f,
+   281→                    animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy),
+   282→                    label = "navScale"
+   283→                )
+   284→                // Animated background for active tab
+   285→                val bgAlpha by animateFloatAsState(
+   286→                    targetValue = if (isActive) 1f else 0f,
+   287→                    animationSpec = tween(300, easing = FastOutSlowInEasing),
+   288→                    label = "navBgAlpha"
+   289→                )
+   290→
+   291→                Box(
+   292→                    modifier = Modifier
+   293→                        .clip(RoundedCornerShape(16.dp))
+   294→                        .background(NavyBlue.copy(alpha = 0.08f * bgAlpha))
+   295→                        .clickable { onTabClick(tab) }
+   296→                        .padding(horizontal = 16.dp, vertical = 6.dp)
+   297→                        .scale(scale),
+   298→                    contentAlignment = Alignment.Center,
+   299→                ) {
+   300→                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+   301→                        Icon(
+   302→                            tab.icon,
+   303→                            tab.label,
+   304→                            tint = iconColor,
+   305→                            modifier = Modifier.size(24.dp),
+   306→                        )
+   307→                        Spacer(Modifier.height(3.dp))
+   308→                        Text(
+   309→                            tab.label,
+   310→                            color = textColor,
+   311→                            fontSize = 10.sp,
+   312→                            fontWeight = if (isActive) FontWeight.SemiBold else FontWeight.Normal,
+   313→                        )
+   314→                    }
+   315→                }
+   316→            }
+   317→        }
+   318→    }
+   319→}
+   320→
+   321→// ─── Top bar ──────────────────────────────────────────────────────────────────
+   322→@Composable
+   323→fun TopBar(theme: AppTheme, userName: String, sound: SoundManager, onProfile: () -> Unit, onSettings: () -> Unit) {
+   324→    Surface(color = CardWhite, shadowElevation = 0.dp, tonalElevation = 0.dp) {
+   325→        Row(
+   326→            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp),
+   327→            verticalAlignment = Alignment.CenterVertically
+   328→        ) {
+   329→            Image(
+   330→                painter = painterResource(id = app.dreamkorea.smartclass.R.drawable.dreamkorea_logo),
+   331→                contentDescription = "DreamKorea Logo",
+   332→                modifier = Modifier.size(38.dp),
+   333→                contentScale = ContentScale.Fit
+   334→            )
+   335→            Spacer(Modifier.width(10.dp))
+   336→            Text("DreamKorea", color = TextDark, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+   337→            Spacer(Modifier.weight(1f))
+   338→            // Profile icon only (settings removed)
+   339→            Box(
+   340→                modifier = Modifier.size(36.dp).clip(CircleShape).clickable { sound.click(); onProfile() },
+   341→                contentAlignment = Alignment.Center
+   342→            ) {
+   343→                Icon(Icons.Default.Person, "Profile", tint = TextDark, modifier = Modifier.size(22.dp))
+   344→            }
+   345→        }
+   346→    }
+   347→}
+   348→
+   349→// Async image loader — uses Coil
+   350→@Composable
+   351→fun AsyncImageLoader(url: String, modifier: Modifier = Modifier) {
+   352→    val absoluteUrl = if (url.isBlank()) "" else if (url.startsWith("http")) url else "https://my-project-five-sepia.vercel.app$url"
+   353→    if (absoluteUrl.isBlank()) {
+   354→        Box(modifier = modifier.background(NavyBlue.copy(alpha = 0.05f)), contentAlignment = Alignment.Center) {
+   355→            Icon(Icons.Default.Image, null, tint = NavyBlue.copy(alpha = 0.2f), modifier = Modifier.size(32.dp))
+   356→        }
+   357→        return
+   358→    }
+   359→    // Use Crop so the image fills the entire card — no empty space, no "cut" look
+   360→    coil.compose.AsyncImage(model = absoluteUrl, contentDescription = null, modifier = modifier, contentScale = ContentScale.Crop)
+   361→}
+   362→
+   363→// ─── HOME SCREEN — Professional EdTech design ─────────────────────────────────
+   364→@Composable
+   365→fun HomeScreen(theme: AppTheme, sound: SoundManager, userName: String, onNavigate: (Screen) -> Unit) {
+   366→    var stats by remember { mutableStateOf<UserStats?>(null) }
+   367→    var homeCards by remember {
+   368→        mutableStateOf<List<HomeCard>>(AppState.getCachedNow<List<HomeCard>>(AppState.KEY_HOME_CARDS) ?: emptyList())
+   369→    }
+   370→    var loading by remember { mutableStateOf(homeCards.isEmpty()) }
+   371→    val configuration = androidx.compose.ui.platform.LocalConfiguration.current
+   372→    val isLandscape = configuration.screenWidthDp > configuration.screenHeightDp
+   373→    // Adapt column count to orientation — 2 cols portrait, 3-4 cols landscape
+   374→    val cardColumns = when {
+   375→        isLandscape && configuration.screenWidthDp >= 900 -> 4
+   376→        isLandscape -> 3
+   377→        else -> 2
+   378→    }
+   379→
+   380→    // Real-time refresh: load on mount, and refresh every time the screen
+   381→    // becomes visible (e.g. when user navigates back from another screen).
+   382→    val lifecycleOwner = androidx.compose.ui.platform.LocalLifecycleOwner.current
+   383→    var refreshTrigger by remember { mutableStateOf(0) }
+   384→    LaunchedEffect(refreshTrigger) {
+   385→        if (homeCards.isNotEmpty()) loading = false
+   386→        try {
+   387→            homeCards = AppState.cachedFresh(AppState.KEY_HOME_CARDS) {
+   388→                AppState.api.getHomeCards().cards
+   389→            }
+   390→            stats = AppState.api.getStats().stats
+   391→        } catch (_: Exception) {}
+   392→        finally { loading = false }
+   393→    }
+   394→    // Refresh when the app comes to foreground (real-time updates)
+   395→    DisposableEffect(lifecycleOwner) {
+   396→        val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
+   397→            if (event == androidx.lifecycle.Lifecycle.Event.ON_RESUME) {
+   398→                refreshTrigger++ // triggers LaunchedEffect above to re-fetch
+   399→            }
+   400→        }
+   401→        lifecycleOwner.lifecycle.addObserver(observer)
+   402→        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+   403→    }
+   404→
+   405→    val effectiveCards = remember(homeCards, loading) {
+   406→        if (loading) emptyList()
+   407→        else if (homeCards.isNotEmpty()) {
+   408→            // Merge server cards with guaranteed QBank + Batch cards
+   409→            val serverKeys = homeCards.map { it.key }.toSet()
+   410→            val serverRoutes = homeCards.map { it.route }.toSet()
+   411→            val extras = mutableListOf<HomeCard>()
+   412→            // Only add QBank card if server doesn't have one (by key OR by route)
+   413→            if (!serverKeys.contains("qbank_packages") && !serverRoutes.contains("questionbank")) {
+   414→                extras.add(HomeCard(key = "qbank_packages", title = "Question Bank", section = "test", sortOrder = 99, route = "questionbank", imageUrl = ""))
+   415→            }
+   416→            // Only add Batch card if server doesn't have one (by key OR by route)
+   417→            if (!serverKeys.contains("batch_packages") && !serverRoutes.contains("batch")) {
+   418→                extras.add(HomeCard(key = "batch_packages", title = "Batch", section = "test", sortOrder = 100, route = "batch", imageUrl = ""))
+   419→            }
+   420→            homeCards + extras
+   421→        } else listOf(
+   422→            HomeCard(key = "ubt_test", title = "UBT Test", section = "test", sortOrder = 0, route = "tests", imageUrl = ""),
+   423→            HomeCard(key = "demo_exam", title = "Demo Exam", section = "test", sortOrder = 1, route = "tests", imageUrl = ""),
+   424→            HomeCard(key = "qbank_packages", title = "Question Bank", section = "test", sortOrder = 2, route = "questionbank", imageUrl = ""),
+   425→            HomeCard(key = "batch_packages", title = "Batch", section = "test", sortOrder = 3, route = "batch", imageUrl = ""),
+   426→            HomeCard(key = "results", title = "Results", section = "test", sortOrder = 5, route = "results", imageUrl = ""),
+   427→            HomeCard(key = "all_books", title = "Books", section = "resources", sortOrder = 0, route = "books", imageUrl = ""),
+   428→            HomeCard(key = "eye_vision", title = "Eye Vision", section = "resources", sortOrder = 2, route = "eyevision", imageUrl = ""),
+   429→            HomeCard(key = "dictionary", title = "Dictionary", section = "resources", sortOrder = 4, route = "dictionary", imageUrl = ""),
+   430→            HomeCard(key = "grammar", title = "Grammar", section = "resources", sortOrder = 5, route = "grammar", imageUrl = ""),
+   431→            HomeCard(key = "alarms", title = "Alarms", section = "resources", sortOrder = 6, route = "alarms", imageUrl = ""),
+   432→            HomeCard(key = "join", title = "Join Live", section = "resources", sortOrder = 3, route = "join", imageUrl = "")
+   433→        )
+   434→    }
+   435→
+   436→    if (loading) {
+   437→        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+   438→            CircularProgressIndicator(color = NavyBlue)
+   439→        }
+   440→        return
+   441→    }
+   442→
+   443→    val sections = effectiveCards.groupBy { it.section }
+   444→
+   445→    LazyColumn(
+   446→        modifier = Modifier.fillMaxSize(),
+   447→        contentPadding = PaddingValues(bottom = 100.dp)
+   448→    ) {
+   449→        // ─── Hero card — with tree image background + greeting + progress ─────
+   450→        item {
+   451→            Surface(
+   452→                shape = RoundedCornerShape(20.dp),
+   453→                modifier = Modifier.fillMaxWidth().padding(16.dp),
+   454→                shadowElevation = 6.dp,
+   455→            ) {
+   456→                Box(modifier = Modifier.fillMaxWidth().height(if (isLandscape) 120.dp else 160.dp)) {
+   457→                    // Tree image as background — Crop to fill the entire card
+   458→                    // so it blends with the gradient overlay nicely
+   459→                    Image(
+   460→                        painter = painterResource(id = app.dreamkorea.smartclass.R.drawable.hero_bg),
+   461→                        contentDescription = null,
+   462→                        modifier = Modifier.fillMaxSize(),
+   463→                        contentScale = ContentScale.Crop
+   464→                    )
+   465→                    // Gradient overlay — pink/magenta to match the tree image
+   466→                    Box(
+   467→                        modifier = Modifier.fillMaxSize().background(
+   468→                            Brush.verticalGradient(
+   469→                                listOf(Color(0xFF8B2252).copy(alpha = 0.75f), Color(0xFF1E3A8A).copy(alpha = 0.85f))
+   470→                            )
+   471→                        )
+   472→                    )
+   473→                    // Content on top
+   474→                    Column(modifier = Modifier.padding(20.dp)) {
+   475→                        Text("Hello, $userName", color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.Bold)
+   476→                        Text("Let's learn Korean together", color = Color.White.copy(alpha = 0.8f), fontSize = 13.sp)
+   477→                        Spacer(Modifier.height(12.dp))
+   478→                        Row(verticalAlignment = Alignment.CenterVertically) {
+   479→                            Surface(color = Color.White.copy(alpha = 0.2f), shape = RoundedCornerShape(8.dp)) {
+   480→                                Text("${stats?.totalExamsTaken ?: 0} exams", color = Color.White, fontSize = 11.sp, modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp))
+   481→                            }
+   482→                            Spacer(Modifier.width(6.dp))
+   483→                            Surface(color = Color.White.copy(alpha = 0.2f), shape = RoundedCornerShape(8.dp)) {
+   484→                                Text("${stats?.studyStreakDays ?: 0} day streak", color = Color.White, fontSize = 11.sp, modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp))
+   485→                            }
+   486→                        }
+   487→                        Spacer(Modifier.height(10.dp))
+   488→                        val progress = ((stats?.averageScore ?: 0.0).toFloat() / 100f).coerceIn(0f, 1f)
+   489→                        LinearProgressIndicator(
+   490→                            progress = { progress },
+   491→                            color = Color(0xFFF472B6),
+   492→                            trackColor = Color.White.copy(alpha = 0.2f),
+   493→                            modifier = Modifier.fillMaxWidth().height(6.dp).clip(RoundedCornerShape(3.dp)),
+   494→                        )
+   495→                        Spacer(Modifier.height(4.dp))
+   496→                        Text("${String.format("%.0f", stats?.averageScore ?: 0.0)}% average score", color = Color.White.copy(alpha = 0.7f), fontSize = 11.sp)
+   497→                    }
+   498→                }
+   499→            }
+   500→        }
+   501→
+   502→        // ─── Quick Access grid (4 colorful buttons) ──────────────────────
+   503→        item {
+   504→            Row(
+   505→                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
+   506→                horizontalArrangement = Arrangement.SpaceEvenly,
+   507→            ) {
+   508→                QuickAccessBtn("UBT", NavyBlue, Icons.Default.School) { onNavigate(Screen.UbtTest) }
+   509→                QuickAccessBtn("Demo", SuccessGreen, Icons.Default.Quiz) { onNavigate(Screen.FreeExam) }
+   510→                QuickAccessBtn("Books", WarningOrange, Icons.Default.Book) { onNavigate(Screen.Books) }
+   511→                QuickAccessBtn("Eye Test", AccentPurple, Icons.Default.Visibility) { onNavigate(Screen.EyeVision) }
+   512→                if (isLandscape) {
+   513→                    QuickAccessBtn("QBank", AccentPink, Icons.Default.Quiz) { onNavigate(Screen.QuestionBank) }
+   514→                    QuickAccessBtn("Batch", Color(0xFFEF6C00), Icons.Default.Layers) { onNavigate(Screen.BundleList("batch")) }
+   515→                }
+   516→            }
+   517→        }
+   518→
+   519→        // ─── Today's goal bar ────────────────────────────────────────────
+   520→        item {
+   521→            Surface(
+   522→                color = CardWhite,
+   523→                shape = RoundedCornerShape(14.dp),
+   524→                modifier = Modifier.fillMaxWidth().padding(16.dp, 4.dp),
+   525→                shadowElevation = 1.dp,
+   526→            ) {
+   527→                Column(modifier = Modifier.padding(16.dp)) {
+   528→                    Row(Modifier.fillMaxWidth(), Arrangement.SpaceBetween) {
+   529→                        Text("Today's Goal", color = TextDark, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+   530→                        Text("${stats?.totalQuestionsAnswered ?: 0} answered", color = TextMid, fontSize = 12.sp)
+   531→                    }
+   532→                    Spacer(Modifier.height(8.dp))
+   533→                    val goalProgress = ((stats?.totalQuestionsAnswered ?: 0).coerceAtMost(20) / 20f).coerceIn(0f, 1f)
+   534→                    LinearProgressIndicator(
+   535→                        progress = { goalProgress },
+   536→                        color = NavyBlue,
+   537→                        trackColor = DividerColor,
+   538→                        modifier = Modifier.fillMaxWidth().height(8.dp).clip(RoundedCornerShape(4.dp)),
+   539→                    )
+   540→                    Spacer(Modifier.height(4.dp))
+   541→                    Text("${stats?.totalQuestionsAnswered ?: 0} / 20 questions", color = TextMid, fontSize = 11.sp)
+   542→                }
+   543→            }
+   544→        }
+   545→
+   546→        // ─── Section: Free Exams ─────────────────────────────────────────
+   547→        val testCards = sections["test"] ?: emptyList()
+   548→        if (testCards.isNotEmpty()) {
+   549→            item {
+   550→                Text("Free Exams", color = TextDark, fontSize = 17.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
+   551→            }
+   552→            val rows = testCards.chunked(cardColumns)
+   553→            rows.forEach { rowCards ->
+   554→                item {
+   555→                    Row(
+   556→                        modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp),
+   557→                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+   558→                    ) {
+   559→                        rowCards.forEach { card ->
+   560→                            HomeCardItem(theme, sound, card, modifier = Modifier.weight(1f)) {
+   561→                                val dest = when (card.key) {
+   562→                                    "ubt_test" -> Screen.UbtTest
+   563→                                    "demo_exam" -> Screen.FreeExam
+   564→                                    "batch" -> Screen.Batch
+   565→                                    "batch_packages" -> Screen.BundleList("batch")
+   566→                                    "qbank_packages" -> Screen.QuestionBank
+   567→                                    "chapter_exam" -> Screen.TestList("chapter", "Chapter Exams")
+   568→                                    "results" -> Screen.Results
+   569→                                    else -> when (card.route) {
+   570→                                        "tests" -> Screen.Tests
+   571→                                        "results" -> Screen.Results
+   572→                                        "batch" -> Screen.BundleList("batch")
+   573→                                        "questionbank" -> Screen.QuestionBank
+   574→                                        else -> Screen.Tests
+   575→                                    }
+   576→                                }
+   577→                                onNavigate(dest)
+   578→                            }
+   579→                        }
+   580→                        // Fill empty slots so cards don't stretch
+   581→                        repeat(cardColumns - rowCards.size) { Spacer(Modifier.weight(1f)) }
+   582→                    }
+   583→                }
+   584→            }
+   585→        }
+   586→
+   587→        // ─── Section: Tools & Resources ──────────────────────────────────
+   588→        val resourceCards = sections["resources"] ?: emptyList()
+   589→        if (resourceCards.isNotEmpty()) {
+   590→            item {
+   591→                Text("Tools & Resources", color = TextDark, fontSize = 17.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
+   592→            }
+   593→            // Grid of resource cards
+   594→            val resRows = resourceCards.chunked(cardColumns)
+   595→            resRows.forEach { rowCards ->
+   596→                item {
+   597→                    Row(
+   598→                        modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp),
+   599→                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+   600→                    ) {
+   601→                        rowCards.forEach { card ->
+   602→                            HomeCardItem(theme, sound, card, modifier = Modifier.weight(1f)) {
+   603→                                val dest = when (card.key) {
+   604→                                    "all_books" -> Screen.Books
+   605→                                    "question_bank" -> Screen.QuestionBank
+   606→                                    "qbank_packages" -> Screen.QuestionBank
+   607→                                    "batch_packages" -> Screen.BundleList("batch")
+   608→                                    "eye_vision" -> Screen.EyeVision
+   609→                                    "dictionary" -> Screen.Dictionary
+   610→                                    "grammar" -> Screen.Grammar
+   611→                                    "alarms" -> Screen.Alarms
+   612→                                    "join" -> Screen.Join
+   613→                                    "course_video" -> Screen.CourseVideo
+   614→                                    "audio_lessons" -> Screen.AudioLessons
+   615→                                    "recorded_video" -> Screen.RecordedVideo
+   616→                                    "packages" -> Screen.Bundles
+   617→                                    else -> when (card.route) {
+   618→                                        "books" -> Screen.Books
+   619→                                        "videos" -> Screen.Videos
+   620→                                        "learn" -> Screen.Learn
+   621→                                        "live" -> Screen.Join
+   622→                                        "eyevision" -> Screen.EyeVision
+   623→                                        "dictionary" -> Screen.Dictionary
+   624→                                        "grammar" -> Screen.Grammar
+   625→                                        "alarms" -> Screen.Alarms
+   626→                                        "questionbank" -> Screen.QuestionBank
+   627→                                        "packages" -> Screen.Bundles
+   628→                                        "join" -> Screen.Join
+   629→                                        else -> Screen.Tests
+   630→                                    }
+   631→                                }
+   632→                                onNavigate(dest)
+   633→                            }
+   634→                        }
+   635→                        // Fill empty slots so cards don't stretch
+   636→                        repeat(cardColumns - rowCards.size) { Spacer(Modifier.weight(1f)) }
+   637→                    }
+   638→                }
+   639→            }
+   640→        }
+   641→
+   642→        // ─── Footer ──────────────────────────────────────────────────────
+   643→        item {
+   644→            Text("DreamKorea SmartClass", color = TextLight, fontSize = 10.sp, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth().padding(16.dp))
+   645→        }
+   646→    }
+   647→}
+   648→
+   649→// ─── Quick Access Button ──────────────────────────────────────────────────────
+   650→@Composable
+   651→fun QuickAccessBtn(label: String, color: Color, icon: ImageVector, onClick: () -> Unit) {
+   652→    var pressed by remember { mutableStateOf(false) }
+   653→    val scale by animateFloatAsState(
+   654→        targetValue = if (pressed) 0.92f else 1f,
+   655→        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy),
+   656→        label = "quickScale"
+   657→    )
+   658→    Column(
+   659→        horizontalAlignment = Alignment.CenterHorizontally,
+   660→        modifier = Modifier.clickable { pressed = true; onClick() }.scale(scale).padding(4.dp),
+   661→    ) {
+   662→        Surface(color = color.copy(alpha = 0.15f), shape = RoundedCornerShape(14.dp), modifier = Modifier.size(48.dp)) {
+   663→            Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
+   664→                Icon(icon, label, tint = color, modifier = Modifier.size(24.dp))
+   665→            }
+   666→        }
+   667→        Spacer(Modifier.height(4.dp))
+   668→        Text(label, color = TextDark, fontSize = 11.sp, fontWeight = FontWeight.Medium)
+   669→    }
+   670→}
+   671→
+   672→// ─── Home Card Item — professional card design ────────────────────────────────
+   673→@Composable
+   674→fun HomeCardItem(theme: AppTheme, sound: SoundManager, card: HomeCard, modifier: Modifier = Modifier, onClick: () -> Unit) {
+   675→    var pressed by remember { mutableStateOf(false) }
+   676→    val scale by animateFloatAsState(
+   677→        targetValue = if (pressed) 0.96f else 1f,
+   678→        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy),
+   679→        label = "cardScale"
+   680→    )
+   681→    val configuration = androidx.compose.ui.platform.LocalConfiguration.current
+   682→    val isLandscape = configuration.screenWidthDp > configuration.screenHeightDp
+   683→    // In landscape, cards should be wider (less tall) so they don't get huge
+   684→    val aspectRatio = if (isLandscape) 1.2f else 0.85f
+   685→    Surface(
+   686→        color = CardWhite,
+   687→        shape = RoundedCornerShape(16.dp),
+   688→        modifier = modifier.fillMaxWidth().aspectRatio(aspectRatio).scale(scale),
+   689→        shadowElevation = 2.dp,
+   690→        border = androidx.compose.foundation.BorderStroke(1.dp, DividerColor),
+   691→    ) {
+   692→        Column(modifier = Modifier.fillMaxSize().clickable { sound.click(); pressed = true; onClick() }) {
+   693→            Box(
+   694→                modifier = Modifier.fillMaxWidth().weight(1f).background(BgGray),
+   695→                contentAlignment = Alignment.Center
+   696→            ) {
+   697→                AsyncImageLoader(url = card.imageUrl ?: "", modifier = Modifier.fillMaxSize())
+   698→            }
+   699→            Box(
+   700→                modifier = Modifier.fillMaxWidth().padding(12.dp),
+   701→                contentAlignment = Alignment.Center
+   702→            ) {
+   703→                Text(
+   704→                    card.title,
+   705→                    color = TextDark,
+   706→                    fontSize = 12.sp,
+   707→                    fontWeight = FontWeight.SemiBold,
+   708→                    textAlign = TextAlign.Center,
+   709→                    maxLines = 2,
+   710→                    lineHeight = 14.sp
+   711→                )
+   712→            }
+   713→        }
+   714→    }
+   715→}
+   716→
+   717→// ─── Screen header (back button + title) ──────────────────────────────────────
+   718→@Composable
+   719→fun ScreenHeader(theme: AppTheme, sound: SoundManager, title: String, subtitle: String? = null, onBack: () -> Unit) {
+   720→    Row(
+   721→        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp).statusBarsPadding(),
+   722→        verticalAlignment = Alignment.CenterVertically
+   723→    ) {
+   724→        IconButton(onClick = { sound.click(); onBack() }, modifier = Modifier.size(36.dp)) {
+   725→            Icon(Icons.Default.ArrowBack, "Back", tint = TextDark, modifier = Modifier.size(22.dp))
+   726→        }
+   727→        Spacer(Modifier.width(8.dp))
+   728→        Column {
+   729→            Text(title, color = TextDark, fontSize = 20.sp, fontWeight = FontWeight.Bold)
+   730→            if (subtitle != null) {
+   731→                Text(subtitle, color = TextMid, fontSize = 12.sp, fontWeight = FontWeight.Medium)
+   732→            }
+   733→        }
+   734→    }
+   735→}
+   736→
+   737→// ─── Learn Screen ─────────────────────────────────────────────────────────────
+   738→@Composable
+   739→fun LearnScreen(theme: AppTheme, sound: SoundManager, onBack: () -> Unit) {
+   740→    // Tools page — shows all study tools instead of empty subjects list
+   741→    data class Tool(val title: String, val desc: String, val icon: ImageVector, val route: String)
+   742→    val tools = listOf(
+   743→        Tool("Dictionary", "Search English, Korean & Nepali words", Icons.Default.Translate, "dictionary"),
+   744→        Tool("Korean Grammar", "10 essential grammar lessons", Icons.Default.MenuBook, "grammar"),
+   745→        Tool("Study Alarms", "Set daily study reminders", Icons.Default.Alarm, "alarms"),
+   746→        Tool("Eye Vision", "Adaptive vision tests", Icons.Default.Visibility, "eyevision"),
+   747→    )
+   748→    LazyColumn(modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+   749→        item { ScreenHeader(theme, sound, "Tools", "Study tools and resources", onBack) }
+   750→        items(tools.size) { idx ->
+   751→            val tool = tools[idx]
+   752→            Surface(
+   753→                color = CardWhite,
+   754→                shape = RoundedCornerShape(14.dp),
+   755→                modifier = Modifier.fillMaxWidth().clickable { sound.click(); onNavigateToTool(tool.route) },
+   756→                shadowElevation = 2.dp,
+   757→            ) {
+   758→                Row(modifier = Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
+   759→                    Surface(color = NavyBlue.copy(alpha = 0.1f), shape = RoundedCornerShape(10.dp), modifier = Modifier.size(48.dp)) {
+   760→                        Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
+   761→                            Icon(tool.icon, null, tint = NavyBlue, modifier = Modifier.size(24.dp))
+   762→                        }
+   763→                    }
+   764→                    Spacer(Modifier.width(12.dp))
+   765→                    Column(modifier = Modifier.weight(1f)) {
+   766→                        Text(tool.title, color = TextDark, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+   767→                        Text(tool.desc, color = TextMid, fontSize = 11.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
+   768→                    }
+   769→                    Icon(Icons.Default.ChevronRight, null, tint = TextLight, modifier = Modifier.size(20.dp))
+   770→                }
+   771→            }
+   772→        }
+   773→    }
+   774→}
+   775→
+   776→// Helper for tool navigation (not used directly — tools are navigated from Home cards)
+   777→var onNavigateToTool: (String) -> Unit = {}
+   778→
+   779→// ─── Books Screen ─────────────────────────────────────────────────────────────
+   780→@Composable
+   781→fun BooksScreen(theme: AppTheme, sound: SoundManager, onBack: () -> Unit, onBookClick: (Book) -> Unit = {}) {
+   782→    var books by remember {
+   783→        mutableStateOf<List<Book>>(AppState.getCachedNow<List<Book>>(AppState.KEY_BOOKS) ?: emptyList())
+   784→    }
+   785→    var loading by remember { mutableStateOf(books.isEmpty()) }
+   786→    var retryCount by remember { mutableStateOf(0) }
+   787→
+   788→    // Use cachedFresh so we ALWAYS hit the network when this screen mounts —
+   789→    // the user expects to see new books the admin just published, not stale
+   790→    // cache. Cache is still updated so getCachedNow() returns fresh data
+   791→    // after a screen rotation.
+   792→    LaunchedEffect(retryCount) {
+   793→        if (books.isNotEmpty()) loading = false else loading = true
+   794→        try {
+   795→            books = AppState.cachedFresh(AppState.KEY_BOOKS) { AppState.api.getBooks().books }
+   796→        } catch (_: Exception) {}
+   797→        finally { loading = false }
+   798→    }
+   799→
+   800→    if (loading) {
+   801→        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator(color = NavyBlue) }
+   802→        return
+   803→    }
+   804→
+   805→    LazyColumn(modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+   806→        item { ScreenHeader(theme, sound, "Books", "Digital library for Korean learning", onBack) }
+   807→        if (books.isEmpty()) {
+   808→            item { EmptyState(theme, "No books yet", "Your teacher will add books here soon.", Icons.Default.Book) }
+   809→        } else {
+   810→            itemsIndexed(books) { i, b ->
+   811→                AnimatedListItem(index = i, theme = theme) {
+   812→                    Surface(color = CardWhite, shape = RoundedCornerShape(14.dp), modifier = Modifier.fillMaxWidth().clickable { onBookClick(b) }, shadowElevation = 2.dp) {
+   813→                        Row(modifier = Modifier.padding(12.dp)) {
+   814→                            // Cover image (or fallback icon)
+   815→                            Surface(color = NavyBlue, shape = RoundedCornerShape(8.dp), modifier = Modifier.size(54.dp, 72.dp)) {
+   816→                                if (!b.coverUrl.isNullOrBlank()) {
+   817→                                    coil.compose.AsyncImage(
+   818→                                        model = b.coverUrl,
+   819→                                        contentDescription = b.title,
+   820→                                        modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(8.dp)),
+   821→                                        contentScale = ContentScale.Fit
+   822→                                    )
+   823→                                } else {
+   824→                                    Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
+   825→                                        Icon(Icons.Default.Book, null, tint = Color.White, modifier = Modifier.size(24.dp))
+   826→                                    }
+   827→                                }
+   828→                            }
+   829→                            Spacer(Modifier.width(12.dp))
+   830→                            Column(modifier = Modifier.weight(1f)) {
+   831→                                Text(b.title, color = TextDark, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, maxLines = 2, overflow = TextOverflow.Ellipsis)
+   832→                                if (!b.author.isNullOrBlank()) Text("by ${b.author}", color = TextMid, fontSize = 11.sp)
+   833→                                Spacer(Modifier.height(6.dp))
+   834→                                Row(verticalAlignment = Alignment.CenterVertically) {
+   835→                                    if (!b.category.isNullOrBlank()) { InfoChip(theme, b.category, NavyBlue); Spacer(Modifier.width(6.dp)) }
+   836→                                    if (!b.level.isNullOrBlank()) { InfoChip(theme, b.level, AccentPurple); Spacer(Modifier.width(6.dp)) }
+   837→                                    if (b.pageCount != null) InfoChip(theme, "${b.pageCount}p", TextMid)
+   838→                                }
+   839→                                if (!b.description.isNullOrBlank()) {
+   840→                                    Spacer(Modifier.height(4.dp))
+   841→                                    Text(b.description!!, color = TextMid, fontSize = 10.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
+   842→                                }
+   843→                            }
+   844→                        }
+   845→                    }
+   846→                }
+   847→            }
+   848→        }
+   849→    }
+   850→}
+   851→
+   852→// ─── Tests Screen ─────────────────────────────────────────────────────────────
+   853→@Composable
+   854→fun TestsScreen(theme: AppTheme, sound: SoundManager, filter: String = "all", title: String = "All Exams", onBack: () -> Unit, onStartExam: (String) -> Unit, onOpenPackages: () -> Unit = {}) {
+   855→    // Local filter state — allows in-screen filtering via tabs
+   856→    var activeFilter by remember { mutableStateOf(filter) }
+   857→    var tests by remember {
+   858→        mutableStateOf<List<TestItem>>(AppState.getCachedNow<List<TestItem>>(AppState.keyTests(activeFilter)) ?: emptyList())
+   859→    }
+   860→    var loading by remember { mutableStateOf(tests.isEmpty()) }
+   861→    var error by remember { mutableStateOf("") }
+   862→    var retryCount by remember { mutableStateOf(0) }
+   863→
+   864→    LaunchedEffect(activeFilter, retryCount) {
+   865→        if (tests.isNotEmpty()) loading = false else loading = true
+   866→        error = ""
+   867→        try {
+   868→            // Always fetch fresh — admin may have just published a new exam
+   869→            AppState.invalidateCache(AppState.keyTests(activeFilter))
+   870→            val result = kotlinx.coroutines.withTimeoutOrNull(20_000L) { AppState.getCachedTests(activeFilter) }
+   871→            if (result != null) tests = result
+   872→            else if (tests.isEmpty()) error = "The request timed out. Check your internet and try again."
+   873→        } catch (e: retrofit2.HttpException) {
+   874→            if (tests.isEmpty()) error = when (e.code()) { 401 -> "Your session has expired." else -> "Could not load (HTTP ${e.code()})." }
+   875→        } catch (e: java.net.UnknownHostException) { if (tests.isEmpty()) error = "No internet connection." }
+   876→        catch (e: java.net.SocketTimeoutException) { if (tests.isEmpty()) error = "The request timed out." }
+   877→        catch (e: java.io.IOException) { if (tests.isEmpty()) error = "Network error." }
+   878→        catch (e: Exception) { if (tests.isEmpty()) error = "Unexpected error." }
+   879→        finally { loading = false }
+   880→    }
+   881→
+   882→    if (loading) {
+   883→        Column(Modifier.fillMaxSize()) {
+   884→            LinearProgressIndicator(modifier = Modifier.fillMaxWidth(), color = NavyBlue, trackColor = NavyBlue.copy(alpha = 0.1f))
+   885→            ScreenHeader(theme, sound, title, "Tap a test to start.", onBack)
+   886→        }
+   887→        return
+   888→    }
+   889→
+   890→    if (error.isNotEmpty()) {
+   891→        Column(Modifier.fillMaxSize().padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
+   892→            Icon(Icons.Default.CloudOff, null, tint = TextLight, modifier = Modifier.size(56.dp))
+   893→            Spacer(Modifier.height(16.dp))
+   894→            Text("Couldn't load tests", color = TextDark, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+   895→            Spacer(Modifier.height(8.dp))
+   896→            Text(error, color = TextMid, fontSize = 13.sp, textAlign = TextAlign.Center)
+   897→            Spacer(Modifier.height(24.dp))
+   898→            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+   899→                OutlinedButton(onClick = onBack, shape = RoundedCornerShape(10.dp)) { Text("Go back") }
+   900→                Button(onClick = { sound.click(); retryCount++ }, colors = ButtonDefaults.buttonColors(containerColor = NavyBlue), shape = RoundedCornerShape(10.dp)) {
+   901→                    Icon(Icons.Default.Refresh, null, modifier = Modifier.size(18.dp)); Spacer(Modifier.width(6.dp)); Text("Retry")
+   902→                }
+   903→            }
+   904→        }
+   905→        return
+   906→    }
+   907→
+   908→    LazyColumn(modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 100.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+   909→        item {
+   910→            Column(modifier = Modifier.fillMaxWidth().padding(top = 16.dp)) {
+   911→                Text(title, color = TextDark, fontSize = 24.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 16.dp))
+   912→                Text(if (tests.isEmpty()) "No tests available." else "${tests.size} exams available", color = TextMid, fontSize = 13.sp, modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp))
+   913→            }
+   914→        }
+   915→
+   916→        // Filter tabs + Packages button — only show when initial filter="all"
+   917→        if (filter == "all") {
+   918→            item {
+   919→                Row(
+   920→                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
+   921→                    verticalAlignment = Alignment.CenterVertically,
+   922→                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+   923→                ) {
+   924→                    val filters = listOf("all" to "All", "exam" to "Exam", "demo" to "Demo")
+   925→                    filters.forEach { (key, label) ->
+   926→                        val isActive = activeFilter == key
+   927→                        Surface(
+   928→                            color = if (isActive) NavyBlue else CardWhite,
+   929→                            shape = RoundedCornerShape(20.dp),
+   930→                            modifier = Modifier.clickable { sound.click(); activeFilter = key },
+   931→                            shadowElevation = if (isActive) 2.dp else 0.dp,
+   932→                            border = if (isActive) null else androidx.compose.foundation.BorderStroke(1.dp, DividerColor),
+   933→                        ) {
+   934→                            Text(
+   935→                                label,
+   936→                                color = if (isActive) Color.White else TextMid,
+   937→                                fontSize = 13.sp,
+   938→                                fontWeight = if (isActive) FontWeight.SemiBold else FontWeight.Normal,
+   939→                                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+   940→                            )
+   941→                        }
+   942→                    }
+   943→                }
+   944→            }
+   945→        }
+   946→
+   947→        if (tests.isEmpty()) {
+   948→            item { EmptyState(theme, "Nothing here yet", "Your teacher will add content to this section soon.", Icons.Default.Quiz) }
+   949→        } else {
+   950→            itemsIndexed(tests) { i, t -> AnimatedListItem(index = i, theme = theme) { TestCard(theme, sound, t, onClick = { onStartExam(t.id) }) } }
+   951→        }
+   952→    }
+   953→}
+   954→
+   955→// ─── Test Card ────────────────────────────────────────────────────────────────
+   956→@Composable
+   957→fun TestCard(theme: AppTheme, sound: SoundManager, t: TestItem, onClick: () -> Unit) {
+   958→    var pressed by remember { mutableStateOf(false) }
+   959→    val scale by animateFloatAsState(targetValue = if (pressed) 0.97f else 1f, animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy), label = "testScale")
+   960→    val accentColor = if (t.isExam) AccentPink else NavyBlue
+   961→    Surface(
+   962→        color = CardWhite, shape = RoundedCornerShape(16.dp),
+   963→        modifier = Modifier.fillMaxWidth().scale(scale).clickable { sound.click(); pressed = true; onClick() },
+   964→        shadowElevation = 2.dp,
+   965→    ) {
+   966→        Row(modifier = Modifier.fillMaxWidth()) {
+   967→            Box(modifier = Modifier.width(6.dp).height(100.dp).background(Brush.verticalGradient(listOf(accentColor, accentColor.copy(alpha = 0.4f)))))
+   968→            Column(modifier = Modifier.padding(16.dp).weight(1f)) {
+   969→                Row(Modifier.fillMaxWidth(), Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+   970→                    Text(t.title, color = TextDark, fontSize = 17.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+   971→                    Surface(color = accentColor.copy(alpha = 0.15f), shape = RoundedCornerShape(6.dp)) {
+   972→                        Text(if (t.isExam) "EXAM" else "PRACTICE", color = accentColor, fontSize = 9.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp))
+   973→                    }
+   974→                }
+   975→                if (!t.description.isNullOrBlank()) { Spacer(Modifier.height(4.dp)); Text(t.description, color = TextMid, fontSize = 12.sp, maxLines = 2, overflow = TextOverflow.Ellipsis) }
+   976→                Spacer(Modifier.height(10.dp))
+   977→                Row(verticalAlignment = Alignment.CenterVertically) {
+   978→                    InfoChipWithIcon(theme, Icons.Default.Timer, "${t.durationMin} min", NavyBlue); Spacer(Modifier.width(6.dp))
+   979→                    InfoChipWithIcon(theme, Icons.Default.CheckCircle, "Pass ${t.passScore}%", SuccessGreen)
+   980→                    if (t.questionCount > 0) { Spacer(Modifier.width(6.dp)); InfoChipWithIcon(theme, Icons.Default.Quiz, "${t.questionCount} Q", AccentPurple) }
+   981→                    Spacer(Modifier.weight(1f))
+   982→                    Text("Start", color = accentColor, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+   983→                }
+   984→            }
+   985→        }
+   986→    }
+   987→}
+   988→
+   989→// ─── Videos Screen ────────────────────────────────────────────────────────────
+   990→@Composable
+   991→fun VideosScreen(theme: AppTheme, sound: SoundManager, onBack: () -> Unit, onHideBottomBar: (Boolean) -> Unit = {}) {
+   992→    var videos by remember { mutableStateOf<List<VideoLesson>>(AppState.getCachedNow<List<VideoLesson>>(AppState.KEY_VIDEOS) ?: emptyList()) }
+   993→    var loading by remember { mutableStateOf(videos.isEmpty()) }
+   994→    var playingVideo by remember { mutableStateOf<VideoLesson?>(null) }
+   995→
+   996→    // Hide bottom bar when video is playing
+   997→    LaunchedEffect(playingVideo) {
+   998→        onHideBottomBar(playingVideo != null)
+   999→    }
+  1000→
+  1001→    LaunchedEffect(Unit) {
+  1002→        try { videos = AppState.cachedFresh(AppState.KEY_VIDEOS) { AppState.api.getVideoLessons().videos } } catch (_: Exception) {}
+  1003→        finally { loading = false }
+  1004→    }
+  1005→
+  1006→    // ── Video click → open in external browser/YouTube app ─────────────
+  1007→    // Simple, reliable approach: just launch the URL externally
+  1008→    val context = LocalContext.current
+  1009→    if (playingVideo != null) {
+  1010→        val v = playingVideo!!
+  1011→        LaunchedEffect(v.id) {
+  1012→            val url = if (v.videoSource == "upload" && !v.videoUrl.isNullOrBlank()) {
+  1013→                if (v.videoUrl!!.startsWith("http")) v.videoUrl else "https://my-project-five-sepia.vercel.app${v.videoUrl}"
+  1014→            } else if (v.youtubeId.isNotBlank()) {
+  1015→                "https://www.youtube.com/watch?v=${v.youtubeId}"
+  1016→            } else {
+  1017→                null
+  1018→            }
+  1019→            if (url != null) {
+  1020→                try {
+  1021→                    val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(url))
+  1022→                    intent.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+  1023→                    context.startActivity(intent)
+  1024→                } catch (_: Exception) {}
+  1025→            }
+  1026→            playingVideo = null
+  1027→        }
+  1028→        return
+  1029→    }
+  1030→
+  1031→    if (loading) {
+  1032→        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator(color = NavyBlue) }
+  1033→        return
+  1034→    }
+  1035→
+  1036→    LazyColumn(modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+  1037→        item { ScreenHeader(theme, sound, "Video Lessons", "Watch and learn Korean", onBack) }
+  1038→        if (videos.isEmpty()) {
+  1039→            item { EmptyState(theme, "No videos yet", "Your teacher will add videos here soon.", Icons.Default.VideoLibrary) }
+  1040→        } else {
+  1041→            itemsIndexed(videos) { i, v ->
+  1042→                AnimatedListItem(index = i, theme = theme) {
+  1043→                    Surface(
+  1044→                        color = CardWhite,
+  1045→                        shape = RoundedCornerShape(14.dp),
+  1046→                        modifier = Modifier.fillMaxWidth().clickable { sound.click(); playingVideo = v },
+  1047→                        shadowElevation = 2.dp,
+  1048→                    ) {
+  1049→                        Column(modifier = Modifier.padding(12.dp)) {
+  1050→                            // Thumbnail or placeholder
+  1051→                            Surface(color = Color.Black, shape = RoundedCornerShape(10.dp), modifier = Modifier.fillMaxWidth().height(160.dp)) {
+  1052→                                Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
+  1053→                                    if (!v.thumbnailUrl.isNullOrBlank()) {
+  1054→                                        val thumbUrl = if (v.thumbnailUrl!!.startsWith("http")) v.thumbnailUrl else "https://my-project-five-sepia.vercel.app${v.thumbnailUrl}"
+  1055→                                        coil.compose.AsyncImage(
+  1056→                                            model = thumbUrl,
+  1057→                                            contentDescription = v.title,
+  1058→                                            modifier = Modifier.fillMaxSize(),
+  1059→                                            contentScale = ContentScale.Crop,
+  1060→                                        )
+  1061→                                    }
+  1062→                                    Icon(Icons.Default.PlayCircle, null, tint = Color.White, modifier = Modifier.size(56.dp))
+  1063→                                }
+  1064→                            }
+  1065→                            Spacer(Modifier.height(8.dp))
+  1066→                            Text(v.title, color = TextDark, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, maxLines = 2, overflow = TextOverflow.Ellipsis)
+  1067→                            if (!v.description.isNullOrBlank()) {
+  1068→                                Spacer(Modifier.height(2.dp))
+  1069→                                Text(v.description!!, color = TextMid, fontSize = 11.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
+  1070→                            }
+  1071→                            Spacer(Modifier.height(6.dp))
+  1072→                            Row(verticalAlignment = Alignment.CenterVertically) {
+  1073→                                InfoChipWithIcon(theme, Icons.Default.Timer, "${v.durationMin} min", NavyBlue); Spacer(Modifier.width(6.dp))
+  1074→                                if (!v.level.isNullOrBlank()) { InfoChip(theme, v.level, AccentPurple); Spacer(Modifier.width(6.dp)) }
+  1075→                                if (!v.category.isNullOrBlank()) { InfoChip(theme, v.category, TextMid); Spacer(Modifier.width(6.dp)) }
+  1076→                                Spacer(Modifier.weight(1f))
+  1077→                                Text("${v.views} views", color = TextMid, fontSize = 9.sp)
+  1078→                            }
+  1079→                        }
+  1080→                    }
+  1081→                }
+  1082→            }
+  1083→        }
+  1084→    }
+  1085→}
+  1086→
+  1087→// ─── Profile Screen ───────────────────────────────────────────────────────────
+  1088→@Composable
+  1089→fun ProfileScreen(theme: AppTheme, sound: SoundManager, userName: String, onBack: () -> Unit, onLogout: () -> Unit) {
+  1090→    val scope = rememberCoroutineScope()
+  1091→    var stats by remember { mutableStateOf<UserStats?>(null) }
+  1092→    var loading by remember { mutableStateOf(true) }
+  1093→
+  1094→    LaunchedEffect(Unit) {
+  1095→        try { stats = AppState.api.getStats().stats } catch (_: Exception) {}
+  1096→        finally { loading = false }
+  1097→    }
+  1098→
+  1099→    LazyColumn(modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+  1100→        item {
+  1101→            Column(modifier = Modifier.fillMaxWidth().padding(top = 16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+  1102→                Text("Profile", color = TextDark, fontSize = 24.sp, fontWeight = FontWeight.Bold)
+  1103→            }
+  1104→        }
+  1105→
+  1106→        // Profile header card
+  1107→        item {
+  1108→            Surface(color = CardWhite, shape = RoundedCornerShape(16.dp), modifier = Modifier.fillMaxWidth(), shadowElevation = 2.dp) {
+  1109→                Column(modifier = Modifier.padding(20.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+  1110→                    Surface(color = NavyBlue, shape = CircleShape, modifier = Modifier.size(72.dp)) {
+  1111→                        Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
+  1112→                            Text(userName.take(2).uppercase(), color = Color.White, fontSize = 24.sp, fontWeight = FontWeight.Bold)
+  1113→                        }
+  1114→                    }
+  1115→                    Spacer(Modifier.height(10.dp))
+  1116→                    Text(userName, color = TextDark, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+  1117→                    Text("Student", color = TextMid, fontSize = 12.sp)
+  1118→                }
+  1119→            }
+  1120→        }
+  1121→
+  1122→        // Stats grid
+  1123→        item {
+  1124→            Surface(color = CardWhite, shape = RoundedCornerShape(14.dp), modifier = Modifier.fillMaxWidth(), shadowElevation = 1.dp) {
+  1125→                Column(modifier = Modifier.padding(16.dp)) {
+  1126→                    Text("Your Progress", color = TextDark, fontSize = 14.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(bottom = 12.dp))
+  1127→                    if (loading) {
+  1128→                        Row(Modifier.fillMaxWidth(), Arrangement.SpaceEvenly) { repeat(4) { SkeletonBox(theme, Modifier.size(60.dp, 40.dp)) } }
+  1129→                    } else {
+  1130→                        Row(Modifier.fillMaxWidth(), Arrangement.SpaceEvenly) {
+  1131→                            ProfileStat(theme, "${stats?.totalExamsTaken ?: 0}", "Exams")
+  1132→                            ProfileStat(theme, "${String.format("%.0f", stats?.averageScore ?: 0.0)}%", "Avg")
+  1133→                            ProfileStat(theme, "${stats?.studyStreakDays ?: 0}", "Streak")
+  1134→                            ProfileStat(theme, "${stats?.badgesEarned ?: 0}", "Badges")
+  1135→                        }
+  1136→                    }
+  1137→                }
+  1138→            }
+  1139→        }
+  1140→
+  1141→        // Account info
+  1142→        item {
+  1143→            Surface(color = CardWhite, shape = RoundedCornerShape(14.dp), modifier = Modifier.fillMaxWidth(), shadowElevation = 1.dp) {
+  1144→                Column(modifier = Modifier.padding(14.dp)) {
+  1145→                    Text("Account", color = TextDark, fontSize = 14.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(bottom = 8.dp))
+  1146→                    val userEmail = AppState.user?.email ?: ""
+  1147→                    val userPhone = AppState.user?.phone ?: ""
+  1148→                    if (userEmail.isNotEmpty()) { StatRow(theme, "Email", userEmail, Icons.Default.Email); Spacer(Modifier.height(6.dp)) }
+  1149→                    if (userPhone.isNotEmpty()) { StatRow(theme, "Phone", userPhone, Icons.Default.Phone) }
+  1150→                }
+  1151→            }
+  1152→        }
+  1153→
+  1154→        // Contact info
+  1155→        item {
+  1156→            Surface(color = CardWhite, shape = RoundedCornerShape(14.dp), modifier = Modifier.fillMaxWidth(), shadowElevation = 1.dp) {
+  1157→                Column(modifier = Modifier.padding(14.dp)) {
+  1158→                    Text("Contact DreamKorea", color = TextDark, fontSize = 14.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(bottom = 10.dp))
+  1159→                    ContactRow(theme, Icons.Default.Phone, "023-591658", "tel:023591658"); Spacer(Modifier.height(8.dp))
+  1160→                    ContactRow(theme, Icons.Default.Phone, "9852677658", "tel:9852677658"); Spacer(Modifier.height(8.dp))
+  1161→                    ContactRow(theme, Icons.Default.Phone, "9765308000", "tel:9765308000"); Spacer(Modifier.height(10.dp))
+  1162→                    Divider(color = DividerColor, thickness = 0.5.dp); Spacer(Modifier.height(10.dp))
+  1163→                    ContactRow(theme, Icons.Default.LocationOn, "Krishithok Road, Birtamod, Jhapa", "geo:26.67,87.99?q=Krishithok+Road+Birtamod+Jhapa+Nepal"); Spacer(Modifier.height(10.dp))
+  1164→                    Divider(color = DividerColor, thickness = 0.5.dp); Spacer(Modifier.height(10.dp))
+  1165→                    ContactRow(theme, Icons.Default.Language, "DreamKorea SmartClass", "https://my-project-five-sepia.vercel.app")
+  1166→                }
+  1167→            }
+  1168→        }
+  1169→
+  1170→        // Display Mode toggle
+  1171→        item {
+  1172→            Surface(color = theme.cardBg, shape = RoundedCornerShape(14.dp), modifier = Modifier.fillMaxWidth(), shadowElevation = 1.dp) {
+  1173→                Column(modifier = Modifier.padding(14.dp)) {
+  1174→                    Text("Display Mode", color = theme.darkText, fontSize = 14.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(bottom = 10.dp))
+  1175→                    val isHorizontal = AppState.getTextSizeMultiplier() > 1.0f
+  1176→                    Row(
+  1177→                        modifier = Modifier.fillMaxWidth(),
+  1178→                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+  1179→                    ) {
+  1180→                        Button(
+  1181→                            onClick = {
+  1182→                                sound.click()
+  1183→                                AppState.setTextSizeMultiplier(1.0f)
+  1184→                            },
+  1185→                            modifier = Modifier.weight(1f).height(44.dp),
+  1186→                            colors = ButtonDefaults.buttonColors(
+  1187→                                containerColor = if (!isHorizontal) theme.primary else Color.Transparent,
+  1188→                                contentColor = if (!isHorizontal) Color.White else theme.subText
+  1189→                            ),
+  1190→                            shape = RoundedCornerShape(10.dp),
+  1191→                            border = if (!isHorizontal) null else androidx.compose.foundation.BorderStroke(1.dp, theme.divider)
+  1192→                        ) {
+  1193→                            Text("Stable", fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+  1194→                        }
+  1195→                        Button(
+  1196→                            onClick = {
+  1197→                                sound.click()
+  1198→                                AppState.setTextSizeMultiplier(1.15f)
+  1199→                            },
+  1200→                            modifier = Modifier.weight(1f).height(44.dp),
+  1201→                            colors = ButtonDefaults.buttonColors(
+  1202→                                containerColor = if (isHorizontal) theme.primary else Color.Transparent,
+  1203→                                contentColor = if (isHorizontal) Color.White else theme.subText
+  1204→                            ),
+  1205→                            shape = RoundedCornerShape(10.dp),
+  1206→                            border = if (isHorizontal) null else androidx.compose.foundation.BorderStroke(1.dp, theme.divider)
+  1207→                        ) {
+  1208→                            Text("Horizontal", fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+  1209→                        }
+  1210→                    }
+  1211→                    Spacer(Modifier.height(6.dp))
+  1212→                    Text(
+  1213→                        if (isHorizontal) "Questions display side-by-side (landscape recommended)" else "Questions display vertically (portrait)",
+  1214→                        color = theme.subText, fontSize = 11.sp
+  1215→                    )
+  1216→                }
+  1217→            }
+  1218→        }
+  1219→
+  1220→        // Logout
+  1221→        item {
+  1222→            Button(
+  1223→                onClick = { sound.click(); scope.launch { try { AppState.api.logout() } catch (_: Exception) {}; AppState.clearSession(); onLogout() } },
+  1224→                modifier = Modifier.fillMaxWidth().height(48.dp),
+  1225→                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFEF4444)),
+  1226→                shape = RoundedCornerShape(12.dp)
+  1227→            ) {
+  1228→                Icon(Icons.Default.Logout, null, modifier = Modifier.size(18.dp)); Spacer(Modifier.width(8.dp))
+  1229→                Text("Sign out", fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+  1230→            }
+  1231→        }
+  1232→
+  1233→        item { Text("DreamKorea SmartClass v2.1.0", color = TextLight, fontSize = 10.sp, modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center) }
+  1234→    }
+  1235→}
+  1236→
+  1237→// ─── Reusable components ──────────────────────────────────────────────────────
+  1238→@Composable
+  1239→fun InfoChip(theme: AppTheme, text: String, color: Color) {
+  1240→    Surface(color = color.copy(alpha = 0.1f), shape = RoundedCornerShape(4.dp)) {
+  1241→        Text(text, color = color, fontSize = 9.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp))
+  1242→    }
+  1243→}
+  1244→
+  1245→@Composable
+  1246→fun InfoChipWithIcon(theme: AppTheme, icon: ImageVector, text: String, color: Color) {
+  1247→    Surface(color = color.copy(alpha = 0.1f), shape = RoundedCornerShape(4.dp)) {
+  1248→        Row(modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp), verticalAlignment = Alignment.CenterVertically) {
+  1249→            Icon(icon, null, tint = color, modifier = Modifier.size(10.dp)); Spacer(Modifier.width(2.dp))
+  1250→            Text(text, color = color, fontSize = 9.sp, fontWeight = FontWeight.SemiBold)
+  1251→        }
+  1252→    }
+  1253→}
+  1254→
+  1255→@Composable
+  1256→fun StatRow(theme: AppTheme, label: String, value: String, icon: ImageVector) {
+  1257→    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+  1258→        Row(verticalAlignment = Alignment.CenterVertically) {
+  1259→            Icon(icon, null, tint = NavyBlue, modifier = Modifier.size(16.dp)); Spacer(Modifier.width(8.dp))
+  1260→            Text(label, color = TextMid, fontSize = 12.sp)
+  1261→        }
+  1262→        Text(value, color = TextDark, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+  1263→    }
+  1264→}
+  1265→
+  1266→@Composable
+  1267→fun ContactRow(theme: AppTheme, icon: ImageVector, text: String, link: String) {
+  1268→    val context = androidx.compose.ui.platform.LocalContext.current
+  1269→    Row(
+  1270→        modifier = Modifier.fillMaxWidth().clickable {
+  1271→            val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(link))
+  1272→            context.startActivity(intent)
+  1273→        }.padding(vertical = 4.dp),
+  1274→        verticalAlignment = Alignment.CenterVertically
+  1275→    ) {
+  1276→        Icon(icon, null, tint = NavyBlue, modifier = Modifier.size(18.dp)); Spacer(Modifier.width(10.dp))
+  1277→        Text(text, color = TextDark, fontSize = 13.sp, fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f))
+  1278→        Icon(Icons.Default.ChevronRight, null, tint = TextLight, modifier = Modifier.size(16.dp))
+  1279→    }
+  1280→}
+  1281→
+  1282→@Composable
+  1283→fun ProfileStat(theme: AppTheme, value: String, label: String) {
+  1284→    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+  1285→        Text(value, color = NavyBlue, fontSize = 20.sp, fontWeight = FontWeight.Bold)
+  1286→        Text(label, color = TextMid, fontSize = 10.sp)
+  1287→    }
+  1288→}
+  1289→
+  1290→@Composable
+  1291→fun SkeletonBox(theme: AppTheme, modifier: Modifier) {
+  1292→    Box(modifier = modifier.clip(RoundedCornerShape(4.dp)).background(DividerColor))
+  1293→}
+  1294→
+  1295→@Composable
+  1296→fun EmptyState(theme: AppTheme, title: String, body: String, icon: ImageVector) {
+  1297→    Surface(color = CardWhite, shape = RoundedCornerShape(14.dp), modifier = Modifier.fillMaxWidth(), shadowElevation = 1.dp) {
+  1298→        Column(modifier = Modifier.padding(32.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+  1299→            Icon(icon, null, tint = TextLight, modifier = Modifier.size(48.dp)); Spacer(Modifier.height(12.dp))
+  1300→            Text(title, color = TextDark, fontSize = 15.sp, fontWeight = FontWeight.SemiBold); Spacer(Modifier.height(4.dp))
+  1301→            Text(body, color = TextMid, fontSize = 12.sp, textAlign = TextAlign.Center)
+  1302→        }
+  1303→    }
+  1304→}
+  1305→
+  1306→@Composable
+  1307→fun AnimatedListItem(index: Int, theme: AppTheme, content: @Composable () -> Unit) {
+  1308→    var visible by remember { mutableStateOf(false) }
+  1309→    LaunchedEffect(Unit) { kotlinx.coroutines.delay(index * 40L); visible = true }
+  1310→    AnimatedVisibility(visible = visible, enter = fadeIn(tween(300)) + slideInVertically(initialOffsetY = { it / 4 }, animationSpec = tween(300))) {
+  1311→        content()
+  1312→    }
+  1313→}
+  1314→
+  1315→// ─── Book Reader Screen — in-app PDF viewer via WebView ──────────────────────
+  1316→@Composable
+  1317→fun BookReaderScreen(theme: AppTheme, sound: SoundManager, book: Book, onBack: () -> Unit) {
+  1318→    Column(modifier = Modifier.fillMaxSize().background(BgGray)) {
+  1319→        ScreenHeader(theme, sound, book.title, if (book.pdfUrl.isNullOrBlank()) "No PDF" else "Reading…", onBack)
+  1320→
+  1321→        if (book.pdfUrl.isNullOrBlank()) {
+  1322→            Column(modifier = Modifier.fillMaxSize().padding(20.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
+  1323→                Surface(color = NavyBlue, shape = RoundedCornerShape(8.dp), modifier = Modifier.size(120.dp, 160.dp), shadowElevation = 4.dp) {
+  1324→                    Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) { Icon(Icons.Default.Book, null, tint = Color.White, modifier = Modifier.size(48.dp)) }
+  1325→                }
+  1326→                Spacer(Modifier.height(16.dp))
+  1327→                Text(book.title, color = TextDark, fontSize = 18.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
+  1328→                if (!book.author.isNullOrBlank()) Text("by ${book.author}", color = TextMid, fontSize = 13.sp)
+  1329→                Spacer(Modifier.height(16.dp))
+  1330→                Text("No PDF available for this book", color = TextMid, fontSize = 13.sp, textAlign = TextAlign.Center)
+  1331→            }
+  1332→        } else {
+  1333→            // In-app PDF viewer using Android WebView
+  1334→            // Google Docs Viewer embeds the PDF inside a WebView — no external app needed
+  1335→            val pdfUrl = book.pdfUrl!!
+  1336→            val googleDocsUrl = "https://docs.google.com/viewer?embedded=true&url=${android.net.Uri.encode(pdfUrl)}"
+  1337→            AndroidView(
+  1338→                factory = { ctx ->
+  1339→                    android.webkit.WebView(ctx).apply {
+  1340→                        settings.javaScriptEnabled = true
+  1341→                        settings.loadWithOverviewMode = true
+  1342→                        settings.useWideViewPort = true
+  1343→                        settings.builtInZoomControls = true
+  1344→                        settings.displayZoomControls = false
+  1345→                        webViewClient = android.webkit.WebViewClient()
+  1346→                        loadUrl(googleDocsUrl)
+  1347→                    }
+  1348→                },
+  1349→                modifier = Modifier.fillMaxSize()
+  1350→            )
+  1351→        }
+  1352→    }
+  1353→}
+  1354→

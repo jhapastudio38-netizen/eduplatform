@@ -1,9 +1,14 @@
 package app.dreamkorea.smartclass.ui
 
+import android.content.Intent
+import android.net.Uri
+import androidx.browser.customtabs.CustomTabsIntent
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -20,6 +25,7 @@ import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
@@ -209,7 +215,6 @@ fun LoginScreen(onLoginSuccess: () -> Unit) {
                                     scope.launch {
                                         try {
                                             val resp = AppState.api.signup(mapOf(
-                                                "mode" to "student",
                                                 "name" to suName.trim(),
                                                 "email" to suEmail.trim().lowercase(),
                                                 "phone" to suPhone.trim(),
@@ -290,9 +295,89 @@ fun LoginScreen(onLoginSuccess: () -> Unit) {
                         }
                     }
                 }
+
+                // ── Google Sign-In button ──────────────────────────────────
+                // Visible on all tabs (login / signup / forgot). Opens the
+                // Google OAuth flow in a Chrome Custom Tab. The OAuth callback
+                // redirects to dreamkorea://auth-callback, handled by the
+                // MainActivity intent-filter in AndroidManifest.xml.
+                Spacer(modifier = Modifier.height(16.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Box(modifier = Modifier.weight(1f).height(1.dp).background(Color(0xFFE2E8F0)))
+                    Text("or", color = TextMid, fontSize = 12.sp, modifier = Modifier.padding(horizontal = 12.dp))
+                    Box(modifier = Modifier.weight(1f).height(1.dp).background(Color(0xFFE2E8F0)))
+                }
+                Spacer(modifier = Modifier.height(12.dp))
+
+                GoogleSignInButton(sound = sound)
             }
 
             Spacer(modifier = Modifier.height(40.dp))
+        }
+    }
+}
+
+// ─── Google Sign-In button ──────────────────────────────────────────────
+// Opens https://my-project-five-sepia.vercel.app/api/auth/google-mobile in
+// a Chrome Custom Tab. The OAuth flow completes server-side, then redirects
+// to dreamkorea://auth-callback (handled by MainActivity's intent-filter).
+//
+// Shows the Google logo (R.drawable.google_logo) if present in res/drawable,
+// otherwise falls back to text-only ("Sign in with Google").
+@Composable
+private fun GoogleSignInButton(sound: SoundManager) {
+    val context = LocalContext.current
+    // Look up the google_logo drawable at runtime — avoids a compile-time
+    // dependency on a resource that may or may not exist.
+    val googleLogoId = remember {
+        context.resources.getIdentifier("google_logo", "drawable", context.packageName)
+    }
+
+    Surface(
+        color = Color.White,
+        shape = RoundedCornerShape(12.dp),
+        border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFD1D5DB)),
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(50.dp)
+            .clickable {
+                sound.click()
+                val url = "https://my-project-five-sepia.vercel.app/api/auth/google-mobile"
+                try {
+                    CustomTabsIntent.Builder()
+                        .build()
+                        .launchUrl(context, Uri.parse(url))
+                } catch (_: Exception) {
+                    // Fallback: open in any available browser via ACTION_VIEW
+                    try {
+                        context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
+                    } catch (_: Exception) { /* no browser available — silently ignore */ }
+                }
+            },
+        shadowElevation = 1.dp
+    ) {
+        Row(
+            modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.Center
+        ) {
+            if (googleLogoId != 0) {
+                Image(
+                    painter = painterResource(id = googleLogoId),
+                    contentDescription = "Google logo",
+                    modifier = Modifier.size(20.dp)
+                )
+                Spacer(Modifier.width(10.dp))
+            }
+            Text(
+                "Sign in with Google",
+                color = Color(0xFF1F2937),
+                fontSize = 15.sp,
+                fontWeight = FontWeight.Medium
+            )
         }
     }
 }

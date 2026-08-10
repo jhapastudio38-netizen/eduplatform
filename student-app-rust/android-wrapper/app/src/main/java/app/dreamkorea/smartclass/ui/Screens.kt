@@ -230,6 +230,7 @@ fun MainScreen(userName: String, onLogout: () -> Unit) {
                 is Screen.BookReader -> false
                 is Screen.BundleDetail -> false
                 is Screen.Settings -> false
+                is Screen.EyeVision -> false
                 else -> !hideBottomBar
             }
             if (showBottomBar) {
