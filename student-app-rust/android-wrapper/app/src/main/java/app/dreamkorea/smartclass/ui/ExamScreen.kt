@@ -810,6 +810,7 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
                         BlockQuestionGrid(
                             test = t,
                             items = readingItems,
+                            sortedItems = sortedItems,
                             answers = answers,
                             currentIdx = currentIdx,
                             sound = sound,
@@ -832,6 +833,7 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
                         BlockQuestionGrid(
                             test = t,
                             items = listeningItems,
+                            sortedItems = sortedItems,
                             answers = answers,
                             currentIdx = currentIdx,
                             sound = sound,
@@ -936,6 +938,7 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
 private fun BlockQuestionGrid(
     test: TestDetail,
     items: List<TestItemDetail>,
+    sortedItems: List<TestItemDetail>,
     answers: SnapshotStateMap<String, Any>,
     currentIdx: Int,
     sound: SoundManager,
@@ -949,7 +952,7 @@ private fun BlockQuestionGrid(
 ) {
     val cols = 5
     val globalIndices = items.mapNotNull { item ->
-        test.items.indexOfFirst { it.question.id == item.question.id }.takeIf { it >= 0 }
+        sortedItems.indexOfFirst { it.question.id == item.question.id }.takeIf { it >= 0 }
     }
     val expectedTotal = if (showAllBlocks) {
         val isAudio = items.isNotEmpty() && items[0].question.blockType == "audio"
@@ -1434,9 +1437,14 @@ fun AudioPlayerCard(
                                         isPlaying = false
                                     }
                                 }
-                                setOnErrorListener { _, _, _ ->
+                                setOnErrorListener { mp, what, extra ->
+                                    android.util.Log.e("AudioPlayer", "MediaPlayer error: what=$what extra=$extra url=$url")
                                     isPlaying = false
+                                    try { mp.reset() } catch (_: Exception) {}
                                     true
+                                }
+                                setOnBufferingUpdateListener { _, percent ->
+                                    android.util.Log.d("AudioPlayer", "Buffering: $percent%")
                                 }
                                 prepareAsync()
                             }

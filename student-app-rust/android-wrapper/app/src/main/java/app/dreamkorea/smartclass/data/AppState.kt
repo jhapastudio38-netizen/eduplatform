@@ -221,13 +221,24 @@ object AppState {
             putString(KEY_EMAIL, user.email)
             putString(KEY_PHONE, user.phone ?: "")
             putString(KEY_ROLE, user.role)
-            // Mark that we have a session (token presence is checked by the cookie jar)
-            // We store a marker so isLoggedIn() returns true.
             if (prefs.getString(KEY_TOKEN, null) == null) {
                 putString(KEY_TOKEN, "session_via_cookie")
             }
             apply()
         }
+    }
+
+    fun saveSessionToken(token: String) {
+        prefs.edit().putString(KEY_TOKEN, token).apply()
+        val cookie = Cookie.Builder()
+            .name("ep_sid")
+            .value(token)
+            .domain(baseUrl.host)
+            .path("/")
+            .secure()
+            .httpOnly()
+            .build()
+        cookieStore[baseUrl.host] = mutableListOf(cookie)
     }
 
     fun clearSession() {
