@@ -325,9 +325,9 @@ private fun GoogleSignInButton(sound: SoundManager) {
                 Image(
                     painter = painterResource(id = googleLogoId),
                     contentDescription = "Google logo",
-                    modifier = Modifier.size(20.dp)
+                    modifier = Modifier.size(24.dp)
                 )
-                Spacer(Modifier.width(10.dp))
+                Spacer(Modifier.width(12.dp))
             }
             Text(
                 "Sign in with Google",

@@ -272,9 +272,10 @@ fun ExamEntryScreen(theme: AppTheme, sound: SoundManager, testId: String, onStar
                     .padding(top = sdp(90f)),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                // ── PROFILE ICON ── white circle with black outline + black
-                // head+shoulders silhouette drawn with Canvas (clean, no box).
-                // 140px circle, 6px black border, white background inside.
+                // ── PROFILE ICON ── clean white circle with black outline.
+                // Uses Icons.Default.AccountCircle which is a Material Design
+                // icon that renders as a circle with a person silhouette inside.
+                // No black box, no overflow — clean and professional.
                 Box(
                     modifier = Modifier
                         .size(sdp(140f))
@@ -283,33 +284,12 @@ fun ExamEntryScreen(theme: AppTheme, sound: SoundManager, testId: String, onStar
                         .border(width = sdp(6f), color = Color(0xFF111111)),
                     contentAlignment = Alignment.Center
                 ) {
-                    // Custom drawn profile silhouette — head circle + shoulders arc
-                    androidx.compose.foundation.Canvas(
-                        modifier = Modifier.size(sdp(100f))
-                    ) {
-                        val w = this.size.width
-                        val h = this.size.height
-                        val black = androidx.compose.ui.graphics.Color(0xFF111111)
-
-                        // Head — filled black circle, upper portion
-                        drawCircle(
-                            color = black,
-                            radius = w * 0.18f,
-                            center = androidx.compose.ui.geometry.Offset(w * 0.5f, h * 0.35f)
-                        )
-                        // Shoulders — filled black arc (bottom half), clipped to circle
-                        val shoulderPath = androidx.compose.ui.graphics.Path().apply {
-                            addOval(
-                                androidx.compose.ui.geometry.Rect(
-                                    left = w * 0.15f,
-                                    top = h * 0.55f,
-                                    right = w * 0.85f,
-                                    bottom = h * 1.15f
-                                )
-                            )
-                        }
-                        drawPath(shoulderPath, color = black)
-                    }
+                    Icon(
+                        Icons.Default.AccountCircle,
+                        contentDescription = "Profile",
+                        tint = Color(0xFF111111),
+                        modifier = Modifier.fillMaxSize().padding(sdp(4f))
+                    )
                 }
 
                 Spacer(Modifier.height(sdp(16f)))

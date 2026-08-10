@@ -357,3 +357,64 @@ Stage Summary:
 - Review audio: unlimited plays, one at a time
 - Eye test: smooth digit animation + keypad fits on screen
 - Backup: https://github.com/jhapastudio38-netizen/dreamkorea-smartclass-v1033
+
+---
+Task ID: 10
+Agent: Main (Super Z)
+Task: Profile icon fix, eye test review, loading skeleton, audio fix, Google logo, animations
+
+Work Log:
+- BACKUP: Created new GitHub repo dreamkorea-smartclass-v1034-backup
+  • URL: https://github.com/jhapastudio38-netizen/dreamkorea-smartclass-v1034-backup
+
+- PROFILE ICON FIX (ExamEntryScreen):
+  • Removed Canvas-drawn silhouette (was causing black box due to overflow)
+  • Replaced with Icons.Default.AccountCircle — Material Design icon that's a circle with person silhouette
+  • Clean white circle + 6px black border + black AccountCircle icon inside
+  • No black box, no overflow — renders cleanly
+
+- EYE TEST REVIEW (EyeVisionScreen):
+  • Added showReview state + userAnswers tracking (userAnswer, correctAnswer pairs)
+  • Next/Skip buttons now record answers to userAnswers list
+  • Results screen has "Review Answers" button
+  • Review screen: scrollable list showing each test image + user answer + correct answer
+  • Color-coded: green=correct, red=wrong, gray=skipped, with status icons
+
+- LOADING SKELETON FIX (ExamScreen):
+  • Replaced SkeletonListScreen with a loading screen that matches block page style
+  • Same 1364×693 outer frame with 2px #222 border
+  • Centered blue spinner (60px) + "Loading exam…" text (22sp)
+  • Consistent with the block page — no jarring transition
+
+- AUDIO FIX (AudioPlayerCard):
+  • Fixed double-increment bug: incrementPlayCount() was called in BOTH preparedListener AND completion handler
+  • Now incremented only in onClick (first play) and in completion handler (second play)
+  • Flow: tap → count=1 → play 1 → complete → 1<2 → delay 2s → count=2 → play 2 → complete → 2<2 false → stop
+  • Audio plays exactly twice with 2s gap, then stops — user can tap another audio
+  • AudioRegistry ensures only one audio at a time
+
+- GOOGLE LOGO (LoginScreen):
+  • Created google_logo.xml vector drawable — official 4-color Google "G" logo
+  • Blue (#4285F4), Green (#34A853), Yellow (#FBBC05), Red (#EA4335)
+  • LoginScreen already looked up google_logo drawable at runtime — now found
+  • Increased size from 20dp to 24dp for better visibility
+
+- SMOOTH ANIMATIONS (ExamScreen):
+  • Added fade-in animation when question display appears (alpha animateFloatAsState, 300ms)
+  • Image preloading: next 2 questions' images preloaded via coil.Coil.imageLoader
+  • Crossfade enabled on all AsyncImage calls (smooth image loading, no blank)
+  • Added imports: animateFloatAsState, tween, FastOutSlowInEasing
+
+- Fixed compile errors: duplicate val context, coil.imageLoader → coil.Coil.imageLoader
+- Removed duplicate google_logo.png (was conflicting with google_logo.xml)
+- Build v10.35.0 (293) succeeded, signed, verified
+
+Stage Summary:
+- Shipped: /home/z/my-project/download/DreamKorea-SmartClass-v10.35.0.apk (12.2MB, v10.35.0/293)
+- Profile icon: clean AccountCircle, no black box
+- Eye test: review screen with correct/incorrect answers
+- Loading: matches block page style
+- Audio: plays twice with 2s gap, then stops
+- Google logo: official 4-color G logo on Sign-In button
+- Animations: fade transitions + image preloading + crossfade
+- Backup: https://github.com/jhapastudio38-netizen/dreamkorea-smartclass-v1034-backup

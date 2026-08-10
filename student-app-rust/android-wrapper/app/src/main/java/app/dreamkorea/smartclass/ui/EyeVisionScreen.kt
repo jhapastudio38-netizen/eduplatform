@@ -75,6 +75,9 @@ fun EyeVisionScreen(theme: AppTheme, sound: SoundManager, onBack: () -> Unit) {
     var attemptedCount by remember { mutableStateOf(0) }
     var showResults by remember { mutableStateOf(false) }
     var checking by remember { mutableStateOf(false) }
+    // Track user answers + correct answers for the review screen
+    var userAnswers by remember { mutableStateOf<List<Pair<String, String?>>>(emptyList()) } // (userAnswer, correctAnswer)
+    var showReview by remember { mutableStateOf(false) }
 
     fun toAbs(url: String): String =
         if (url.startsWith("http")) url else "https://my-project-five-sepia.vercel.app$url"
@@ -116,8 +119,129 @@ fun EyeVisionScreen(theme: AppTheme, sound: SoundManager, onBack: () -> Unit) {
         activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
     }
 
+    // ── REVIEW SCREEN (portrait) ──────────────────────────────────────
+    // Shows each test image with the user's answer and the correct answer.
+    if (showReview) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(theme.background)
+                .padding(16.dp)
+        ) {
+            // Header
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    "Review — Eye Vision Test",
+                    color = theme.darkText,
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.weight(1f)
+                )
+                Text(
+                    "$correctCount / ${tests.size} correct",
+                    color = theme.primary,
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+            // Scrollable list of test results
+            androidx.compose.foundation.lazy.LazyColumn(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                items(tests.size) { idx ->
+                    val test = tests[idx]
+                    val (userAns, correctAns) = if (idx < userAnswers.size) userAnswers[idx] else ("" to null)
+                    val isCorrect = userAns.isNotBlank() && correctAns != null && userAns == correctAns
+                    val isSkipped = userAns.isBlank()
+                    Surface(
+                        color = theme.cardBg,
+                        shape = RoundedCornerShape(10.dp),
+                        border = androidx.compose.foundation.BorderStroke(
+                            1.dp,
+                            when {
+                                isCorrect -> Color(0xFF22C55E)
+                                isSkipped -> theme.divider
+                                else -> Color(0xFFEF4444)
+                            }
+                        ),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Row(modifier = Modifier.padding(10.dp), verticalAlignment = Alignment.CenterVertically) {
+                            // Test image thumbnail
+                            coil.compose.AsyncImage(
+                                model = test.imageUrl,
+                                contentDescription = "Test ${idx + 1}",
+                                modifier = Modifier.size(72.dp).clip(RoundedCornerShape(8.dp)),
+                                contentScale = ContentScale.Fit
+                            )
+                            Spacer(Modifier.width(12.dp))
+                            // Answers
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    "Question ${idx + 1}",
+                                    color = theme.darkText,
+                                    fontSize = 13.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                Spacer(Modifier.height(4.dp))
+                                Text(
+                                    "Your answer: ${if (isSkipped) "Skipped" else userAns}",
+                                    color = when {
+                                        isCorrect -> Color(0xFF22C55E)
+                                        isSkipped -> theme.subText
+                                        else -> Color(0xFFEF4444)
+                                    },
+                                    fontSize = 13.sp,
+                                    fontWeight = FontWeight.Medium
+                                )
+                                if (!correctAns.isNullOrBlank()) {
+                                    Text(
+                                        "Correct: $correctAns",
+                                        color = Color(0xFF22C55E),
+                                        fontSize = 13.sp,
+                                        fontWeight = FontWeight.Medium
+                                    )
+                                }
+                            }
+                            // Status icon
+                            Icon(
+                                when {
+                                    isCorrect -> Icons.Default.CheckCircle
+                                    isSkipped -> Icons.Default.SkipNext
+                                    else -> Icons.Default.Cancel
+                                },
+                                null,
+                                tint = when {
+                                    isCorrect -> Color(0xFF22C55E)
+                                    isSkipped -> theme.subText
+                                    else -> Color(0xFFEF4444)
+                                },
+                                modifier = Modifier.size(28.dp)
+                            )
+                        }
+                    }
+                }
+            }
+            Spacer(Modifier.height(12.dp))
+            // Back to Results button
+            Button(
+                onClick = { sound.click(); showReview = false },
+                modifier = Modifier.fillMaxWidth().height(48.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = theme.primary),
+                shape = RoundedCornerShape(12.dp)
+            ) {
+                Text("Back to Results", color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+            }
+        }
+        return
+    }
+
     // ── RESULTS SCREEN (portrait) ──────────────────────────────────────
-    // No stat boxes — just the score and a "Back to Home" button.
+    // No stat boxes — just the score and buttons for Review + Back to Home.
     if (showResults) {
         Column(
             modifier = Modifier
@@ -163,6 +287,18 @@ fun EyeVisionScreen(theme: AppTheme, sound: SoundManager, onBack: () -> Unit) {
                 fontWeight = FontWeight.Bold
             )
             Spacer(Modifier.height(32.dp))
+            // Review button — shows what was correct and what wasn't
+            OutlinedButton(
+                onClick = { sound.click(); showReview = true },
+                modifier = Modifier.fillMaxWidth(0.7f).height(48.dp),
+                shape = RoundedCornerShape(12.dp),
+                colors = ButtonDefaults.outlinedButtonColors(contentColor = theme.primary),
+                border = androidx.compose.foundation.BorderStroke(1.5.dp, theme.primary)
+            ) {
+                Text("Review Answers", fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+            }
+            Spacer(Modifier.height(12.dp))
+            // Back to Home button
             Button(
                 onClick = { sound.click(); onBack() },
                 modifier = Modifier.fillMaxWidth(0.7f).height(48.dp),
@@ -400,6 +536,8 @@ fun EyeVisionScreen(theme: AppTheme, sound: SoundManager, onBack: () -> Unit) {
                 OutlinedButton(
                     onClick = {
                         sound.click()
+                        // Track skipped answer (empty user answer)
+                        userAnswers = userAnswers + ("" to null)
                         currentAnswer = ""
                         if (currentTestIdx < tests.size - 1) {
                             currentTestIdx++
@@ -434,8 +572,11 @@ fun EyeVisionScreen(theme: AppTheme, sound: SoundManager, onBack: () -> Unit) {
                                 } else {
                                     sound.error()
                                 }
+                                // Track answer for review: (userAnswer, correctAnswer)
+                                userAnswers = userAnswers + (currentAnswer.trim() to resp.correctAnswer)
                             } catch (_: Exception) {
                                 // Network error — count as attempted, don't increment correct
+                                userAnswers = userAnswers + (currentAnswer.trim() to null)
                             }
                             checking = false
                             currentAnswer = ""

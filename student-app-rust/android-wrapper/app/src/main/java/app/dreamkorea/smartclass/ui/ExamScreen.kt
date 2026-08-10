@@ -24,6 +24,9 @@ import androidx.compose.runtime.snapshots.SnapshotStateMap
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.draw.rotate
@@ -227,14 +230,42 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
     }
 
     if (loading) {
-        // Loading skeleton with a subtle "Loading..." label so users know it's working
-        Column(Modifier.fillMaxSize()) {
-            LinearProgressIndicator(
-                modifier = Modifier.fillMaxWidth(),
-                color = theme.primary,
-                trackColor = theme.primary.copy(alpha = 0.1f),
-            )
-            SkeletonListScreen(theme, itemCount = 4)
+        // Loading screen that matches the block page style — same 1364×693
+        // outer frame with 2px #222 border, centered spinner + "Loading exam…"
+        BoxWithConstraints(
+            modifier = Modifier.fillMaxSize().background(Color.White)
+        ) {
+            val cw = maxWidth.value
+            val ch = maxHeight.value
+            val scale = minOf(cw / 1364f, ch / 693f).coerceAtLeast(0.15f)
+            val sdp: (Float) -> Dp = { v -> (v * scale).dp }
+            val ssp: (Float) -> TextUnit = { v -> (v * scale).sp }
+
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(sdp(18f))
+                    .border(width = sdp(2f), color = Color(0xFF222222)),
+                contentAlignment = Alignment.Center
+            ) {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center
+                ) {
+                    CircularProgressIndicator(
+                        color = Color(0xFF1673E8),
+                        modifier = Modifier.size(sdp(60f)),
+                        strokeWidth = sdp(4f)
+                    )
+                    Spacer(Modifier.height(sdp(16f)))
+                    Text(
+                        "Loading exam…",
+                        color = Color(0xFF111111),
+                        fontSize = ssp(22f),
+                        fontWeight = FontWeight.Normal
+                    )
+                }
+            }
         }
         return
     }
@@ -314,6 +345,25 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
     }
 
     val currentQuestion = t.items.getOrNull(currentIdx)
+
+    // ── Preload images for the next 2 questions (smooth transitions, no blank) ──
+    // context is already declared at the top of the function
+    LaunchedEffect(currentIdx, t.id) {
+        val imageUrls = mutableListOf<String>()
+        for (i in 1..2) {
+            val item = t.items.getOrNull(currentIdx + i) ?: continue
+            val q = item.question
+            q.descImageUrl?.let { imageUrls.add(it.toAbsoluteUrl()) }
+            (q.mediaImageUrl ?: q.imageUrl)?.let { imageUrls.add(it.toAbsoluteUrl()) }
+        }
+        imageUrls.distinct().forEach { url ->
+            coil.Coil.imageLoader(context).enqueue(
+                coil.request.ImageRequest.Builder(context)
+                    .data(url)
+                    .build()
+            )
+        }
+    }
 
     // ─── Result screen ──────────────────────────────────────────────────────
     if (submitResult != null) {
@@ -672,7 +722,13 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
     // Shown when showGrid = false (after the student taps a question number).
     // Layout: top status header + instruction row + content (question left,
     // answers right) + bottom navigation.
-    Column(modifier = Modifier.fillMaxSize().background(Color(0xFFF8FAFC))) {
+    // Smooth fade-in when the question display appears.
+    val questionDisplayAlpha by animateFloatAsState(
+        targetValue = 1f,
+        animationSpec = tween(300, easing = FastOutSlowInEasing),
+        label = "questionDisplayFade"
+    )
+    Column(modifier = Modifier.fillMaxSize().background(Color(0xFFF8FAFC)).alpha(questionDisplayAlpha)) {
         // ── 1. TOP STATUS HEADER ── compact white bar with thin border
         Surface(
             color = Color.White,
@@ -739,7 +795,7 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
                     if (q.descType == "image" && !q.descImageUrl.isNullOrBlank()) {
                         val url = q.descImageUrl!!.toAbsoluteUrl()
                         coil.compose.AsyncImage(
-                            model = url, contentDescription = null,
+                            model = coil.request.ImageRequest.Builder(LocalContext.current).data(url).crossfade(true).build(), contentDescription = null,
                             modifier = Modifier.fillMaxWidth(0.92f).heightIn(max = 200.dp).clip(RoundedCornerShape(8.dp)).clickable { FullScreenImageViewer.show(url) },
                             contentScale = ContentScale.Fit
                         )
@@ -754,7 +810,7 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
                     val mediaImgUrl = (q.mediaImageUrl ?: q.imageUrl)?.toAbsoluteUrl()
                     if (!mediaImgUrl.isNullOrBlank()) {
                         coil.compose.AsyncImage(
-                            model = mediaImgUrl, contentDescription = null,
+                            model = coil.request.ImageRequest.Builder(LocalContext.current).data(mediaImgUrl).crossfade(true).build(), contentDescription = null,
                             modifier = Modifier.fillMaxWidth(0.92f).heightIn(max = 220.dp).clip(RoundedCornerShape(8.dp)).clickable { FullScreenImageViewer.show(mediaImgUrl) },
                             contentScale = ContentScale.Fit
                         )
@@ -822,7 +878,7 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
                                         Box(contentAlignment = Alignment.Center) { Text("${i+1}", color = if (isSelected) Color.White else Color.Black, fontSize = 14.sp, fontWeight = FontWeight.Bold) }
                                     }
                                     Spacer(Modifier.width(4.dp))
-                                    coil.compose.AsyncImage(model = absUrl, contentDescription = "Option ${i+1}", modifier = Modifier.size(80.dp).clip(RoundedCornerShape(4.dp)).clickable { FullScreenImageViewer.show(absUrl) }, contentScale = ContentScale.Fit)
+                                    coil.compose.AsyncImage(model = coil.request.ImageRequest.Builder(LocalContext.current).data(absUrl).crossfade(true).build(), contentDescription = "Option ${i+1}", modifier = Modifier.size(80.dp).clip(RoundedCornerShape(4.dp)).clickable { FullScreenImageViewer.show(absUrl) }, contentScale = ContentScale.Fit)
                                 }
                             }
                         }
@@ -1342,6 +1398,8 @@ fun AudioPlayerCard(
                         if (disabled) return@IconButton
                         if (isPlaying) return@IconButton // ignore tap while playing
                         sound.click()
+                        // Increment count for the FIRST play here (not in preparedListener)
+                        incrementPlayCount()
                         // GLOBAL: stop any other currently playing audio
                         AudioRegistry.stopAllExcept(url)
                         try {
@@ -1351,7 +1409,8 @@ fun AudioPlayerCard(
                                 setOnPreparedListener {
                                     start()
                                     isPlaying = true
-                                    incrementPlayCount()
+                                    // Count is incremented BEFORE start() in the onClick handler,
+                                    // so we do NOT increment here again (was causing double-count bug)
                                 }
                                 setOnCompletionListener {
                                     // Unlimited mode (review) — never auto-replay, just stop
@@ -1371,6 +1430,7 @@ fun AudioPlayerCard(
                                                 playCounts?.get(questionId) ?: 0
                                             else localPlayCount
                                             if (latestCount < maxPlays) {
+                                                // Increment BEFORE start so count is accurate
                                                 incrementPlayCount()
                                                 start()
                                             } else {
