@@ -27,7 +27,13 @@ class MainActivity : ComponentActivity() {
         if (granted) NotificationService.startPolling(this)
     }
 
-    private var googleRedirectData: Uri? = null
+    // CRITICAL: This MUST be mutableStateOf (not a plain var) so that Compose
+    // observes changes. When onNewIntent sets this field, Compose recomposes
+    // and the LaunchedEffect(googleRedirectData) below re-runs, calling
+    // handleGoogleRedirect. With a plain var, the LaunchedEffect(Unit) only
+    // ran once at composition time and never saw the deep link that arrived
+    // later — causing Google login to silently fail (stuck on login screen).
+    private var googleRedirectData by mutableStateOf<Uri?>(null)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -36,8 +42,12 @@ class MainActivity : ComponentActivity() {
             var isLoggedIn by remember { mutableStateOf(AppState.isLoggedIn()) }
             var userName by remember { mutableStateOf(AppState.getUserName()) }
 
-            LaunchedEffect(Unit) {
+            // Key on googleRedirectData so it re-runs whenever a new deep link
+            // arrives via onNewIntent (after the user completes Google OAuth
+            // in the Chrome Custom Tab and is redirected back).
+            LaunchedEffect(googleRedirectData) {
                 googleRedirectData?.let { data ->
+                    Log.d("MainActivity", "Processing Google redirect in LaunchedEffect: $data")
                     handleGoogleRedirect(data) { loggedIn, name ->
                         if (loggedIn) {
                             isLoggedIn = true

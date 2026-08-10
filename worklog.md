@@ -88,3 +88,42 @@ Stage Summary:
 - Pressing Get Started changes only the inner content — outer frame/scale/position stay identical
 - LoginScreen Google button now sits at the bottom of the form card (no overlap)
 - Google login (saveSessionToken) and audio playback (MediaPlayer + 2s gap) still intact from previous build
+
+---
+Task ID: 4
+Agent: Main (Super Z)
+Task: Fix Google login stuck + rebuild block page to pixel-perfect spec
+
+Work Log:
+- BUG FOUND: Google login stuck on login screen
+  • Root cause: `googleRedirectData` was a plain `var Uri? = null` (NOT Compose state)
+  • `LaunchedEffect(Unit)` only runs ONCE when composable enters composition
+  • When `onNewIntent` set `googleRedirectData` after Google OAuth redirect, Compose didn't see the change
+  • The LaunchedEffect never re-ran → `handleGoogleRedirect` was never called → user stayed stuck
+  • FIX: Changed `googleRedirectData` to `mutableStateOf<Uri?>(null)` and keyed LaunchedEffect to `googleRedirectData`
+  • Now when the deep link arrives, Compose recomposes and the LaunchedEffect re-runs, calling handleGoogleRedirect
+
+- Block page rebuilt to match pixel-perfect spec:
+  • Canvas: 1364×693 (was 1365×700) — matches exam entry screen exactly
+  • Outer border: 2px #222222 (was #252525)
+  • Header+Nav area: 156px tall (was 85px) — logo column 137×156 spans both rows
+  • Header row: 78px (was ~42px) with bottom border 2px #222, 3 centered labels, 30sp Normal #111
+  • Nav row: 78px (was ~42px) with bottom border 2px #222, 5 items at 29sp Normal #111
+  • REMOVED vertical separator lines between header/nav items (spec says no separators)
+  • Section title row: 69px, two boxes with 2px #C6C6C6 border, 28sp Normal #222 centered
+  • Question panels: 3px #222 border (was #202020), 18px radius, 12px padding inside
+  • NavTab: now uses RowScope.weight(1f) for equal-width tabs, active underline is full width (was 60%)
+  • Active tab bg: #F4F4F4, underline 4px #111 (black)
+  • Submit button: #1673E8, 328×68px, 25sp Normal white, 18px radius
+  • Floating pencil: 82px #AAAAAA, white Edit icon 38px, bottom-right
+  • accentBlue changed from #087CF0 to #1673E8 (matches submit button)
+
+- Added borderBottom() Modifier extension using drawBehind for header/nav bottom borders
+- Added imports: drawBehind, Offset, CircleShape
+- Fixed compile error: NavTab weight() needs RowScope → changed to RowScope.NavTab
+- Build succeeded, signed, verified
+
+Stage Summary:
+- Shipped: /home/z/my-project/download/DreamKorea-SmartClass-v10.29.0.apk (12.2MB, v10.29.0/287)
+- Google login now actually completes — deep link is observed by Compose, handleGoogleRedirect fires, session token saved, user logged in
+- Block page now matches the 1364×693 spec with correct header/nav heights, logo column spanning both rows, no separators, proper section title boxes, and pixel-accurate question panels

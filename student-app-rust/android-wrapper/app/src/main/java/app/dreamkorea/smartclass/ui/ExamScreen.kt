@@ -47,11 +47,28 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Offset
 import app.dreamkorea.smartclass.api.*
 import app.dreamkorea.smartclass.data.AppState
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
+
+/// Bottom-only border helper — draws a line at the bottom edge of the composable.
+/// Used for the header/nav row bottom separators (2px #222).
+private fun Modifier.borderBottom(width: Dp, color: Color): Modifier =
+    this.then(
+        Modifier.drawBehind {
+            val w = width.toPx()
+            drawLine(
+                color = color,
+                start = androidx.compose.ui.geometry.Offset(0f, size.height - w / 2),
+                end = androidx.compose.ui.geometry.Offset(size.width, size.height - w / 2),
+                strokeWidth = w
+            )
+        }
+    )
 
 /**
  * Exam taking screen — full flow:
@@ -618,48 +635,55 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
         val userName = AppState.getUserName()
 
         BoxWithConstraints(
-            modifier = Modifier.fillMaxSize().background(Color(0xFFFDFDFD))
+            modifier = Modifier.fillMaxSize().background(Color.White)
         ) {
-            // Uniform scaling: scale = min(cw/1365, ch/700). All dimensions
-            // scale proportionally so the layout looks identical on every
-            // screen size — just smaller or larger.
+            // ══ PIXEL-PERFECT BLOCK PAGE ══
+            // Fixed design canvas: 1364 × 693 px (same as exam entry screen).
+            // The entire canvas scales proportionally — children keep pixel sizes.
             val cw = maxWidth.value
             val ch = maxHeight.value
-            val scale = minOf(cw / 1365f, ch / 700f).coerceAtLeast(0.15f)
+            val scale = minOf(cw / 1364f, ch / 693f).coerceAtLeast(0.15f)
             val sdp: (Float) -> Dp = { v -> (v * scale).dp }
             val ssp: (Float) -> TextUnit = { v -> (v * scale).sp }
-            val accentBlue = Color(0xFF087CF0)
+            // Answered/current question color — same blue as submit button
+            val accentBlue = Color(0xFF1673E8)
 
-            // ── OUTER FRAME: 18dp margin, 2px #252525 border, square corners ──
+            // ── OUTER FRAME: 2px solid #222222, no radius, 18px margin ──
             Box(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(sdp(18f))
-                    .border(width = sdp(2f), color = Color(0xFF252525))
+                    .border(width = sdp(2f), color = Color(0xFF222222))
             ) {
                 Column(modifier = Modifier.fillMaxSize()) {
-                    // ── Header + Nav row (logo column spans both rows on the left) ──
-                    Row(modifier = Modifier.fillMaxWidth().height(sdp(85f))) {
-                        // Logo column — 135dp wide (scaled), spans header + nav rows
+                    // ══ 1. HEADER + NAV AREA (156px tall) ══
+                    // Logo column (137px wide) spans BOTH header row (78px) and
+                    // nav row (78px) on the left. Right side has 2 stacked rows.
+                    Row(modifier = Modifier.fillMaxWidth().height(sdp(156f))) {
+                        // ── Logo column: 137px wide, 156px tall ──
                         Box(
-                            modifier = Modifier.width(sdp(135f)).fillMaxHeight(),
+                            modifier = Modifier.width(sdp(137f)).fillMaxHeight(),
                             contentAlignment = Alignment.Center
                         ) {
                             Image(
                                 painter = painterResource(id = app.dreamkorea.smartclass.R.drawable.dreamkorea_logo),
                                 contentDescription = "DreamKorea Logo",
-                                modifier = Modifier.fillMaxSize().padding(sdp(8f)),
+                                modifier = Modifier.fillMaxSize().padding(sdp(12f)),
                                 contentScale = ContentScale.Fit
                             )
                         }
 
-                        // Right side: header row + nav row stacked vertically
+                        // ── Right side: header row (78px) + nav row (78px) ──
                         Column(modifier = Modifier.weight(1f).fillMaxHeight()) {
-                            // ── Header row: title | email | name (28sp text) ──
+                            // ── Header row: 78px, 3 centered labels, bottom border 2px #222 ──
                             Row(
-                                modifier = Modifier.fillMaxWidth().weight(1f),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(sdp(78f))
+                                    .borderBottom(sdp(2f), Color(0xFF222222)),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
+                                // LEFT: exam title
                                 Box(modifier = Modifier.weight(1f).fillMaxHeight(), contentAlignment = Alignment.Center) {
                                     Text(
                                         t.title.take(40),
@@ -671,7 +695,7 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
                                         textAlign = TextAlign.Center
                                     )
                                 }
-                                Box(modifier = Modifier.width(sdp(1f)).fillMaxHeight(0.6f).background(Color(0xFFB8B8B8)))
+                                // CENTER: user email (student ID code)
                                 Box(modifier = Modifier.weight(1f).fillMaxHeight(), contentAlignment = Alignment.Center) {
                                     Text(
                                         userEmail.take(40),
@@ -683,7 +707,7 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
                                         textAlign = TextAlign.Center
                                     )
                                 }
-                                Box(modifier = Modifier.width(sdp(1f)).fillMaxHeight(0.6f).background(Color(0xFFB8B8B8)))
+                                // RIGHT: user name
                                 Box(modifier = Modifier.weight(1f).fillMaxHeight(), contentAlignment = Alignment.Center) {
                                     Text(
                                         userName.take(40),
@@ -696,25 +720,25 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
                                     )
                                 }
                             }
-                            // ── Nav row: Nepal | All | Solved | Unsolved | Timer ──
+                            // ── Nav row: 78px, 5 items, bottom border 2px #222 ──
+                            // No vertical separators between items (per spec)
                             Row(
-                                modifier = Modifier.fillMaxWidth().weight(1f),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(sdp(78f))
+                                    .borderBottom(sdp(2f), Color(0xFF222222)),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                // Nepal — same style as other nav items, weight 400
+                                // Nepal — same style, not clickable
                                 Box(modifier = Modifier.weight(1f).fillMaxHeight(), contentAlignment = Alignment.Center) {
                                     Text("Nepal", color = Color(0xFF111111), fontSize = ssp(29f), fontWeight = FontWeight.Normal)
                                 }
-                                Box(modifier = Modifier.width(sdp(1f)).fillMaxHeight(0.6f).background(Color(0xFFB8B8B8)))
-                                // All — subtle #F4F4F4 bg + 4px dark indicator when active
+                                // All — active by default, #F4F4F4 bg + 4px black underline
                                 NavTab("All", filterMode == null, sdp, ssp, Color(0xFF111111), Color(0xFFF4F4F4)) { filterMode = null }
-                                Box(modifier = Modifier.width(sdp(1f)).fillMaxHeight(0.6f).background(Color(0xFFB8B8B8))
-                                )
+                                // Solved
                                 NavTab("Solved", filterMode == true, sdp, ssp, Color(0xFF111111), Color(0xFFF4F4F4)) { filterMode = true }
-                                Box(modifier = Modifier.width(sdp(1f)).fillMaxHeight(0.6f).background(Color(0xFFB8B8B8))
-                                )
+                                // Unsolved
                                 NavTab("Unsolved", filterMode == false, sdp, ssp, Color(0xFF111111), Color(0xFFF4F4F4)) { filterMode = false }
-                                Box(modifier = Modifier.width(sdp(1f)).fillMaxHeight(0.6f).background(Color(0xFFB8B8B8)))
                                 // Timer
                                 Box(modifier = Modifier.weight(1f).fillMaxHeight(), contentAlignment = Alignment.Center) {
                                     Text(
@@ -729,17 +753,48 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
                         }
                     }
 
-                    // ── Question panels ──
+                    // ══ 2. SECTION TITLE ROW (69px) ══
+                    // Two bordered boxes: Reading (left) | Listening (right)
+                    // Each ~644px wide, 69px tall, 2px #C6C6C6 border, 28sp Normal #222
+                    if (!isQBank) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth().height(sdp(69f)).padding(horizontal = sdp(18f)),
+                            horizontalArrangement = Arrangement.spacedBy(sdp(18f))
+                        ) {
+                            // Reading title box
+                            Box(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .fillMaxHeight()
+                                    .border(sdp(2f), Color(0xFFC6C6C6)),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text("Reading", color = Color(0xFF222222), fontSize = ssp(28f), fontWeight = FontWeight.Normal)
+                            }
+                            // Listening title box
+                            Box(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .fillMaxHeight()
+                                    .border(sdp(2f), Color(0xFFC6C6C6)),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text("Listening", color = Color(0xFF222222), fontSize = ssp(28f), fontWeight = FontWeight.Normal)
+                            }
+                        }
+                    }
+
+                    // ══ 3. QUESTION GRID PANELS ══
+                    // Two rounded panels (3px #222 border, 18px radius) with
+                    // 5×4 grid of question buttons inside each.
                     if (isQBank) {
                         // QBank: single panel with ALL questions
-                        Column(modifier = Modifier.weight(1f).fillMaxWidth()) {
-                            SectionHeader("All Questions", sdp, ssp)
+                        Column(modifier = Modifier.weight(1f).fillMaxWidth().padding(horizontal = sdp(18f), vertical = sdp(8f))) {
                             Box(
                                 modifier = Modifier
                                     .weight(1f).fillMaxWidth()
-                                    .padding(sdp(8f))
-                                    .border(sdp(3f), Color(0xFF202020), RoundedCornerShape(sdp(18f)))
-                                    .padding(sdp(8f))
+                                    .border(sdp(3f), Color(0xFF222222), RoundedCornerShape(sdp(18f)))
+                                    .padding(sdp(12f))
                             ) {
                                 QuestionGridScaled(
                                     items = sortedItems,
@@ -761,67 +816,64 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
                         }
                     } else {
                         // Exam: Reading LEFT | Listening RIGHT
-                        Row(modifier = Modifier.weight(1f).fillMaxWidth()) {
+                        Row(
+                            modifier = Modifier.weight(1f).fillMaxWidth().padding(horizontal = sdp(18f), vertical = sdp(8f)),
+                            horizontalArrangement = Arrangement.spacedBy(sdp(18f))
+                        ) {
                             // Reading panel
-                            Column(modifier = Modifier.weight(1f).fillMaxHeight()) {
-                                SectionHeader("Reading", sdp, ssp)
-                                Box(
-                                    modifier = Modifier
-                                        .weight(1f).fillMaxWidth()
-                                        .padding(sdp(4f))
-                                        .border(sdp(3f), Color(0xFF202020), RoundedCornerShape(sdp(18f)))
-                                        .padding(sdp(8f))
-                                ) {
-                                    QuestionGridScaled(
-                                        items = readingItems,
-                                        sortedItems = sortedItems,
-                                        test = t,
-                                        answers = answers,
-                                        currentIdx = currentIdx,
-                                        sound = sound,
-                                        haptic = haptic,
-                                        filterMode = filterMode,
-                                        scale = scale,
-                                        showAllBlocks = showAllBlocks,
-                                        accentBlue = accentBlue
-                                    ) { idx ->
-                                        currentIdx = idx
-                                        showGrid = false
-                                    }
+                            Box(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .fillMaxHeight()
+                                    .border(sdp(3f), Color(0xFF222222), RoundedCornerShape(sdp(18f)))
+                                    .padding(sdp(12f))
+                            ) {
+                                QuestionGridScaled(
+                                    items = readingItems,
+                                    sortedItems = sortedItems,
+                                    test = t,
+                                    answers = answers,
+                                    currentIdx = currentIdx,
+                                    sound = sound,
+                                    haptic = haptic,
+                                    filterMode = filterMode,
+                                    scale = scale,
+                                    showAllBlocks = showAllBlocks,
+                                    accentBlue = accentBlue
+                                ) { idx ->
+                                    currentIdx = idx
+                                    showGrid = false
                                 }
                             }
                             // Listening panel
-                            Column(modifier = Modifier.weight(1f).fillMaxHeight()) {
-                                SectionHeader("Listening", sdp, ssp)
-                                Box(
-                                    modifier = Modifier
-                                        .weight(1f).fillMaxWidth()
-                                        .padding(sdp(4f))
-                                        .border(sdp(3f), Color(0xFF202020), RoundedCornerShape(sdp(18f)))
-                                        .padding(sdp(8f))
-                                ) {
-                                    QuestionGridScaled(
-                                        items = listeningItems,
-                                        sortedItems = sortedItems,
-                                        test = t,
-                                        answers = answers,
-                                        currentIdx = currentIdx,
-                                        sound = sound,
-                                        haptic = haptic,
-                                        filterMode = filterMode,
-                                        scale = scale,
-                                        showAllBlocks = showAllBlocks,
-                                        accentBlue = accentBlue
-                                    ) { idx ->
-                                        currentIdx = idx
-                                        showGrid = false
-                                    }
+                            Box(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .fillMaxHeight()
+                                    .border(sdp(3f), Color(0xFF222222), RoundedCornerShape(sdp(18f)))
+                                    .padding(sdp(12f))
+                            ) {
+                                QuestionGridScaled(
+                                    items = listeningItems,
+                                    sortedItems = sortedItems,
+                                    test = t,
+                                    answers = answers,
+                                    currentIdx = currentIdx,
+                                    sound = sound,
+                                    haptic = haptic,
+                                    filterMode = filterMode,
+                                    scale = scale,
+                                    showAllBlocks = showAllBlocks,
+                                    accentBlue = accentBlue
+                                ) { idx ->
+                                    currentIdx = idx
+                                    showGrid = false
                                 }
                             }
                         }
                     }
 
-                    // ── Submit button: 328×68dp, blue #1673E8, 18dp corners ──
+                    // ══ 4. SUBMIT BUTTON: 328×68px, #1673E8, 18px radius ══
                     Box(
                         modifier = Modifier.fillMaxWidth().padding(sdp(8f)),
                         contentAlignment = Alignment.Center
@@ -844,8 +896,7 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
                 }
             }
 
-            // ── FLOATING PENCIL BUTTON — bottom-right, 82px, gray #aaa ──
-            // Same floating button as the exam start screen. Opens annotation.
+            // ══ 5. FLOATING PENCIL BUTTON — 82px, #AAAAAA, bottom-right ══
             Box(
                 modifier = Modifier
                     .align(Alignment.BottomEnd)
@@ -911,9 +962,11 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
     }
 }
 
-/// Nav tab — centered label, subtle background + 3px dark indicator when active.
+/// Nav tab — centered label, subtle background + 4px black underline when active.
+/// The caller must provide a weight modifier (e.g. Modifier.weight(1f)) from
+/// the parent RowScope, since weight is not available outside RowScope.
 @Composable
-private fun NavTab(
+private fun RowScope.NavTab(
     label: String,
     active: Boolean,
     sdp: (Float) -> Dp,
@@ -924,7 +977,9 @@ private fun NavTab(
 ) {
     Box(
         modifier = Modifier
-            .background(if (active) activeBg else Color.Transparent)
+            .weight(1f)
+            .fillMaxHeight()
+            .background(if (active) activeBg else Color.White)
             .clickable { onClick() },
         contentAlignment = Alignment.Center
     ) {
@@ -940,10 +995,10 @@ private fun NavTab(
                 fontWeight = FontWeight.Normal
             )
             Spacer(Modifier.height(sdp(2f)))
-            // 3px dark bottom indicator when active
+            // 4px black bottom indicator — full tab width when active
             Box(
                 modifier = Modifier
-                    .fillMaxWidth(0.6f)
+                    .fillMaxWidth()
                     .height(if (active) sdp(4f) else 0.dp)
                     .background(Color(0xFF111111))
             )
