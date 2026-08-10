@@ -50,7 +50,11 @@ export async function GET(req: NextRequest) {
 
   const clientId = getClientId();
   const clientSecret = getClientSecret();
-  const redirectUri = "https://my-project-five-sepia.vercel.app/api/auth/google-mobile/callback";
+  // Build redirect_uri from the request host — must match the one used in
+  // the initial OAuth request. Works on both vercel.app and dreamkoreasmartclass.com.
+  const host = req.headers.get("host") || "my-project-five-sepia.vercel.app";
+  const protocol = req.headers.get("x-forwarded-proto") || "https";
+  const redirectUri = `${protocol}://${host}/api/auth/google-mobile/callback`;
 
   // ── 1. Exchange code for access token ──
   let accessToken: string | null = null;
