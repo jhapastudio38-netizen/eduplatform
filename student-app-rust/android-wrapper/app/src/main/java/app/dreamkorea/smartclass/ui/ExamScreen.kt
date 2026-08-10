@@ -898,8 +898,6 @@ private fun NavTab(
 ) {
     Box(
         modifier = Modifier
-            .weight(1f)
-            .fillMaxHeight()
             .background(if (active) activeBg else Color.Transparent)
             .clickable { onClick() },
         contentAlignment = Alignment.Center
