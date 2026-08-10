@@ -6,18 +6,16 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
@@ -25,6 +23,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.dreamkorea.smartclass.api.TestDetail
@@ -35,14 +34,18 @@ import kotlinx.coroutines.withTimeoutOrNull
 /**
  * Pre-exam info screen — shown before the user starts the actual test.
  *
- * Layout (landscape-friendly — uses Row layout so left side has student info,
- * right side has exam info + buttons):
- * - Outer black border around the entire screen
- * - LEFT: Title + circular avatar + student name + student email
- * - RIGHT: Exam description + exam stats (time/questions/pass) + Get Started + Cancel
- *
- * Forces landscape on entry (BEFORE the loading check so the user sees the
- * loading screen in landscape), restores orientation on leave.
+ * Spec:
+ *  - White background, thin dark border panel (96% width, 92% height)
+ *  - Title centered at top (24sp bold black)
+ *  - Circular profile icon (50dp, dark background, white person icon)
+ *  - "Name of Student: {name}" and "Student Email: {email}" (12sp semibold)
+ *  - "Exam description" heading (12sp bold)
+ *  - Description text (12sp, max 5 lines, left-aligned)
+ *  - "Get Started" button (blue #1A73E8, 130x34dp, white text)
+ *  - "Cancel" button (white, dark border, 110x34dp)
+ *  - Buttons side by side in a Row
+ *  - Everything centered, fits on screen, no scroll
+ *  - DreamKorea watermark behind (200dp, 5% alpha)
  *
  * Special testId handling:
  *   • "qbank-combined"     → fetches /api/student/qbank-combined
@@ -55,18 +58,10 @@ fun ExamEntryScreen(theme: AppTheme, sound: SoundManager, testId: String, onStar
     var test by remember { mutableStateOf<TestDetail?>(null) }
     var loading by remember { mutableStateOf(true) }
     var error by remember { mutableStateOf("") }
-    var alreadyCompleted by remember { mutableStateOf(false) }
-    var isSubscribed by remember { mutableStateOf(false) }
-    var showRotateHint by remember { mutableStateOf(true) }
 
-    // Auto-hide the rotate hint after 3 seconds
-    LaunchedEffect(Unit) {
-        kotlinx.coroutines.delay(3000)
-        showRotateHint = false
-    }
-
-    // ── ORIENTATION ── FORCE LANDSCAPE. No onDispose PORTRAIT —
-    // MainScreen handles portrait when screen changes to non-exam.
+    // ── ORIENTATION ── FORCE LANDSCAPE for the exam entry screen so it
+    // matches the exam itself (no jarring rotation when the user taps
+    // "Get Started"). MainScreen restores portrait on leave.
     DisposableEffect(Unit) {
         val activity = context as? Activity
         activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
@@ -83,67 +78,32 @@ fun ExamEntryScreen(theme: AppTheme, sound: SoundManager, testId: String, onStar
         try {
             val result = withTimeoutOrNull(30_000L) {
                 when {
-                    // Combined QBank exam — fetches ALL published question_bank tests as one test
                     testId == "qbank-combined" -> {
-                        try {
-                            AppState.api.getQBankCombined().test
-                        } catch (e: retrofit2.HttpException) {
-                            if (e.code() == 404) {
-                                // Fallback: server doesn't have /qbank-combined yet —
-                                // build the combined exam client-side from individual tests
-                                buildQBankCombinedClientSide()
-                            } else throw e
+                        try { AppState.api.getQBankCombined().test }
+                        catch (e: retrofit2.HttpException) {
+                            if (e.code() == 404) buildQBankCombinedClientSide() else throw e
                         }
                     }
-                    // Combined bundle exam — fetches ALL tests in a specific bundle (qbank/batch)
-                    // as one combined exam
                     testId.startsWith("bundle-") -> {
                         val bundleId = testId.removePrefix("bundle-")
-                        try {
-                            AppState.api.getBundleCombined(bundleId).test
-                        } catch (e: retrofit2.HttpException) {
-                            if (e.code() == 404) {
-                                // Fallback: server doesn't have /bundles/[id]/combined yet —
-                                // build the combined exam client-side from individual tests
-                                buildBundleCombinedClientSide(bundleId)
-                            } else throw e
+                        try { AppState.api.getBundleCombined(bundleId).test }
+                        catch (e: retrofit2.HttpException) {
+                            if (e.code() == 404) buildBundleCombinedClientSide(bundleId) else throw e
                         }
                     }
-                    // Normal test — fetch by ID
                     else -> AppState.api.getTestDetail(testId).test
                 }
             }
             if (result != null) {
-                if (result.items.isEmpty()) {
-                    error = "This exam has no questions yet."
-                } else {
-                    test = result
-                    // Check completion status — graded exams can only be taken once
-                    // Practice exams (question_bank, bundles, demo) can be retaken
-                    val isPractice = testId == "qbank-combined" || testId.startsWith("bundle-") ||
-                        result.isExam == false
-                    if (!isPractice) {
-                        try {
-                            val status = AppState.api.getCompletionStatus(testId)
-                            alreadyCompleted = status.completed
-                            isSubscribed = status.isSubscribed
-                        } catch (_: Exception) {
-                            // If the endpoint fails, just skip the check
-                        }
-                    }
-                    // Also try to get subscription status
-                    try {
-                        val sub = AppState.api.getSubscriptionStatus()
-                        isSubscribed = sub.isSubscribed
-                    } catch (_: Exception) {}
-                }
+                if (result.items.isEmpty()) error = "This exam has no questions yet."
+                else test = result
             } else {
                 error = "Could not load the test. Check your connection."
             }
         } catch (e: retrofit2.HttpException) {
             error = when (e.code()) {
                 401 -> "Your session has expired. Please log in again."
-                404 -> "This test was not found. The admin may need to redeploy the backend."
+                404 -> "This test was not found."
                 else -> "Could not load (HTTP ${e.code()})."
             }
         } catch (e: java.io.IOException) {
@@ -152,41 +112,6 @@ fun ExamEntryScreen(theme: AppTheme, sound: SoundManager, testId: String, onStar
             error = "Could not load the test."
         } finally {
             loading = false
-        }
-    }
-
-    // ── Rotate hint overlay — shows briefly when entering landscape ─────
-    if (showRotateHint && !loading) {
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(Color.Black.copy(alpha = 0.7f))
-                .clickable { showRotateHint = false },
-            contentAlignment = Alignment.Center
-        ) {
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                // Rotating phone icon
-                Icon(
-                    Icons.Default.ScreenRotation,
-                    null,
-                    tint = Color.White,
-                    modifier = Modifier.size(64.dp)
-                )
-                Spacer(Modifier.height(16.dp))
-                Text(
-                    "Rotate to Landscape",
-                    color = Color.White,
-                    fontSize = 20.sp,
-                    fontWeight = FontWeight.Bold
-                )
-                Spacer(Modifier.height(8.dp))
-                Text(
-                    "This exam works best in landscape mode.\nTap to continue.",
-                    color = Color.White.copy(alpha = 0.8f),
-                    fontSize = 13.sp,
-                    textAlign = TextAlign.Center
-                )
-            }
         }
     }
 
@@ -221,171 +146,153 @@ fun ExamEntryScreen(theme: AppTheme, sound: SoundManager, testId: String, onStar
     }
 
     val t = test!!
-    val studentName = AppState.getUserName()
-    val studentEmail = AppState.getUserEmail()
+    val studentName = AppState.getUserName() ?: "Student"
+    val studentEmail = AppState.getUserEmail() ?: ""
 
-    // ── OUTER BORDER: thin black rectangle around the entire screen ──────
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Color.White)
-            .border(2.dp, Color.Black)
+    // ── Outer screen: white with DreamKorea watermark behind ──────────
+    Box(
+        modifier = Modifier.fillMaxSize().background(Color.White),
+        contentAlignment = Alignment.Center
     ) {
-        // ── DreamKorea logo at top centre ────────────────────────────────
-        Box(
-            modifier = Modifier.fillMaxWidth().padding(top = 8.dp, bottom = 4.dp),
-            contentAlignment = Alignment.Center
-        ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Image(
-                    painter = painterResource(id = app.dreamkorea.smartclass.R.drawable.dreamkorea_logo),
-                    contentDescription = "DreamKorea Logo",
-                    modifier = Modifier.size(32.dp),
-                    contentScale = ContentScale.Fit
-                )
-                Spacer(Modifier.width(8.dp))
-                Text(
-                    "DreamKorea SmartClass",
-                    color = Color(0xFF003478),
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.Bold,
-                )
-            }
-        }
+        // Watermark logo behind the panel — 200dp, 5% alpha
+        Image(
+            painter = painterResource(id = app.dreamkorea.smartclass.R.drawable.dreamkorea_logo),
+            contentDescription = null,
+            modifier = Modifier.size(200.dp).alpha(0.05f),
+            contentScale = ContentScale.Fit
+        )
 
-        Box(
-            modifier = Modifier.weight(1f).padding(16.dp)
+        // ── Panel: 96% width, 92% height, thin dark border ────────────
+        Surface(
+            color = Color.White,
+            border = BorderStroke(1.dp, Color(0xFF1F2937)),
+            shape = RoundedCornerShape(4.dp),
+            modifier = Modifier
+                .fillMaxWidth(0.96f)
+                .fillMaxHeight(0.92f)
         ) {
-            // Landscape-friendly layout: Row with LEFT (student) + RIGHT (exam)
-            Row(
-                modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()),
-                horizontalArrangement = Arrangement.spacedBy(24.dp),
-                verticalAlignment = Alignment.CenterVertically
+            Column(
+                modifier = Modifier.fillMaxSize().padding(horizontal = 24.dp, vertical = 20.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center
             ) {
-                // ── LEFT: Student info ────────────────────────────────────
-                Column(
-                    modifier = Modifier.weight(0.4f),
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    // Title at top
+                // ── Title centered at top ──
                 Text(
                     t.title,
                     color = Color.Black,
-                    fontSize = 16.sp,
+                    fontSize = 24.sp,
                     fontWeight = FontWeight.Bold,
                     textAlign = TextAlign.Center,
-                    maxLines = 2
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
                 )
-                Spacer(Modifier.height(16.dp))
 
-                // Profile icon
+                Spacer(Modifier.height(20.dp))
+
+                // ── Circular profile icon ── 50dp, dark bg, white person icon
                 Box(
                     modifier = Modifier
-                        .size(64.dp)
+                        .size(50.dp)
                         .clip(CircleShape)
-                        .background(Color(0xFF003478)),
+                        .background(Color(0xFF1F2937)),
                     contentAlignment = Alignment.Center
                 ) {
-                    Icon(Icons.Default.Person, null, tint = Color.White, modifier = Modifier.size(36.dp))
+                    Icon(Icons.Default.Person, null, tint = Color.White, modifier = Modifier.size(28.dp))
                 }
-                Spacer(Modifier.height(8.dp))
 
-                // Student name
+                Spacer(Modifier.height(10.dp))
+
+                // ── Student name + email ── 12sp semibold
                 Text(
-                    studentName,
+                    "Name of Student: $studentName",
                     color = Color.Black,
-                    fontSize = 14.sp,
+                    fontSize = 12.sp,
                     fontWeight = FontWeight.SemiBold,
                     textAlign = TextAlign.Center
                 )
-                // Student email
+                Spacer(Modifier.height(4.dp))
                 Text(
-                    studentEmail,
-                    color = Color.Gray,
-                    fontSize = 11.sp,
+                    "Student Email: $studentEmail",
+                    color = Color.Black,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.SemiBold,
                     textAlign = TextAlign.Center
                 )
-            }
 
-            // ── Vertical divider ──────────────────────────────────────────
-            Box(
-                modifier = Modifier
-                    .width(1.dp)
-                    .fillMaxHeight(0.7f)
-                    .background(Color(0xFFCCCCCC))
-            )
+                Spacer(Modifier.height(20.dp))
 
-            // ── RIGHT: Exam info + buttons ────────────────────────────────
-            Column(
-                modifier = Modifier.weight(0.6f),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                // Exam description
-                if (!t.description.isNullOrBlank()) {
-                    Surface(
-                        color = Color(0xFFF5F5F5),
-                        shape = RoundedCornerShape(8.dp),
-                        border = BorderStroke(1.dp, Color(0xFFCCCCCC)),
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Text(
-                            t.description!!,
-                            color = Color.Black,
-                            fontSize = 12.sp,
-                            modifier = Modifier.padding(12.dp)
-                        )
-                    }
-                    Spacer(Modifier.height(12.dp))
-                }
+                // ── "Exam description" heading ── 12sp bold
+                Text(
+                    "Exam description",
+                    color = Color.Black,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.fillMaxWidth(),
+                    textAlign = TextAlign.Start
+                )
 
-                                Spacer(Modifier.height(20.dp))
+                Spacer(Modifier.height(6.dp))
 
-                // Get Started button — graded exams lock after 1 attempt, practice can retake
-                Button(
-                    onClick = { sound.swoosh(); onStart() },
-                    modifier = Modifier.fillMaxWidth(0.7f).height(44.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF003478)),
-                    shape = RoundedCornerShape(10.dp),
-                    enabled = !alreadyCompleted
+                // ── Description text ── 12sp, max 5 lines, left-aligned
+                Surface(
+                    color = Color(0xFFF8FAFC),
+                    shape = RoundedCornerShape(4.dp),
+                    modifier = Modifier.fillMaxWidth()
                 ) {
                     Text(
-                        if (alreadyCompleted) "Already Completed" else "Get Started",
-                        color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Bold
+                        t.description?.takeIf { it.isNotBlank() } ?: "No description provided.",
+                        color = Color.Black,
+                        fontSize = 12.sp,
+                        maxLines = 5,
+                        overflow = TextOverflow.Ellipsis,
+                        textAlign = TextAlign.Start,
+                        modifier = Modifier.padding(10.dp)
                     )
                 }
 
-                Spacer(Modifier.height(8.dp))
+                Spacer(Modifier.height(24.dp))
 
-                // Cancel button
-                OutlinedButton(
-                    onClick = { sound.click(); onBack() },
-                    modifier = Modifier.fillMaxWidth(0.7f).height(40.dp),
-                    shape = RoundedCornerShape(10.dp),
-                    colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.Black),
-                    border = BorderStroke(1.dp, Color.Black)
+                // ── Buttons row ── Get Started (130x34) + Cancel (110x34)
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(16.dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text("Cancel", fontSize = 13.sp)
+                    // Get Started — blue #1A73E8, 130x34, white text
+                    Button(
+                        onClick = { sound.swoosh(); onStart() },
+                        modifier = Modifier.width(130.dp).height(34.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1A73E8)),
+                        shape = RoundedCornerShape(4.dp),
+                        contentPadding = PaddingValues(0.dp)
+                    ) {
+                        Text(
+                            "Get Started",
+                            color = Color.White,
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
+                    // Cancel — white, dark border, 110x34
+                    OutlinedButton(
+                        onClick = { sound.click(); onBack() },
+                        modifier = Modifier.width(110.dp).height(34.dp),
+                        shape = RoundedCornerShape(4.dp),
+                        colors = ButtonDefaults.outlinedButtonColors(
+                            containerColor = Color.White,
+                            contentColor = Color.Black
+                        ),
+                        border = BorderStroke(1.dp, Color(0xFF1F2937)),
+                        contentPadding = PaddingValues(0.dp)
+                    ) {
+                        Text(
+                            "Cancel",
+                            color = Color.Black,
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
                 }
             }
-        }
-        }
-    }
-}
-
-@Composable
-private fun StatChip(value: String, label: String, modifier: Modifier = Modifier) {
-    Surface(
-        color = Color.White,
-        border = BorderStroke(1.dp, Color(0xFFCCCCCC)),
-        shape = RoundedCornerShape(6.dp),
-        modifier = modifier
-    ) {
-        Column(
-            modifier = Modifier.padding(vertical = 6.dp, horizontal = 8.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            Text(value, color = Color(0xFF003478), fontSize = 14.sp, fontWeight = FontWeight.Bold)
-            Text(label, color = Color.Gray, fontSize = 9.sp)
         }
     }
 }
@@ -480,7 +387,7 @@ internal suspend fun combineTestsClientSide(
         audioBlockCount = audioCount,
         textBlockEnabled = true,
         audioBlockEnabled = true,
-        showAllBlocks = false, // combined exams: only show created questions, no blanks
+        showAllBlocks = false,
         items = allItems,
     )
 }

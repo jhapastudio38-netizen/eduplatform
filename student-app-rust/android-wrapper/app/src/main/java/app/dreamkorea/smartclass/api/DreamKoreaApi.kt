@@ -157,7 +157,17 @@ data class ReviewItem(
     val userAnswer: Any?, // String or List<String>
     val correctAnswer: Any?, // String or List<String>
     val explanation: String?,
-    val isCorrect: Boolean
+    val isCorrect: Boolean,
+    // ── Description + media block fields (mirror QuestionDetail) ───────
+    val descType: String = "none",
+    val descText: String? = null,
+    val descImageUrl: String? = null,
+    val mediaType: String = "none",
+    val mediaText: String? = null,
+    val mediaImageUrl: String? = null,
+    val mediaAudioUrl: String? = null,
+    val answerType: String = "text",
+    val blockType: String = "text",
 )
 data class EyeVisionRecommendation(
     val show: Boolean = false,
@@ -244,6 +254,16 @@ interface DreamKoreaApi {
     // Student signup with email + password (no OTP needed)
     @POST("api/auth/signup")
     suspend fun signup(@Body body: Map<String, String>): CredentialsResponse
+
+    // Google Sign-In — exchanges the Google OAuth payload (or after a deep-link
+    // redirect) for a DreamKorea session. The mobile flow uses a Chrome Custom
+    // Tab to https://my-project-five-sepia.vercel.app/api/auth/google-mobile,
+    // which then redirects back to dreamkorea://auth-callback with the user's
+    // profile in query params. This endpoint is used by the post-redirect
+    // exchange (when the redirect includes a one-time code instead of the
+    // full profile) and by any direct programmatic Google login.
+    @POST("api/auth/google")
+    suspend fun googleLogin(@Body body: Map<String, String>): CredentialsResponse
 
     // Forgot password — request a 6-digit reset code via email
     @POST("api/auth/request-reset")

@@ -1,9 +1,13 @@
 package app.dreamkorea.smartclass.ui
 
+import android.content.Intent
+import android.net.Uri
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -20,6 +24,7 @@ import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
@@ -27,6 +32,7 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.browser.customtabs.CustomTabsIntent
 import app.dreamkorea.smartclass.data.AppState
 import kotlinx.coroutines.launch
 
@@ -47,6 +53,7 @@ import kotlinx.coroutines.launch
 fun LoginScreen(onLoginSuccess: () -> Unit) {
     val scope = rememberCoroutineScope()
     val sound = rememberSoundManager()
+    val context = LocalContext.current
 
     // Tab: "login" | "signup" | "forgot"
     var mode by remember { mutableStateOf("login") }
@@ -208,8 +215,10 @@ fun LoginScreen(onLoginSuccess: () -> Unit) {
                                     loading = true; error = ""; info = ""
                                     scope.launch {
                                         try {
+                                            // Traditional signup — name, email, phone, password.
+                                            // No OTP, no "mode" field; the server infers role=STUDENT
+                                            // from the /api/auth/signup endpoint.
                                             val resp = AppState.api.signup(mapOf(
-                                                "mode" to "student",
                                                 "name" to suName.trim(),
                                                 "email" to suEmail.trim().lowercase(),
                                                 "phone" to suPhone.trim(),
@@ -288,6 +297,61 @@ fun LoginScreen(onLoginSuccess: () -> Unit) {
                                 }
                             )
                         }
+                    }
+                }
+            }
+
+            // ── "Sign in with Google" button ───────────────────────────────
+            // Visible on ALL tabs (Sign In / Sign Up / Forgot). Opens the
+            // server's Google OAuth flow in a Chrome Custom Tab; the browser
+            // redirects back to dreamkorea://auth-callback when done.
+            Spacer(modifier = Modifier.height(20.dp))
+            AnimatedVisibility(visible = formVisible, enter = fadeIn(tween(500))) {
+                Surface(
+                    color = Color.White,
+                    shape = RoundedCornerShape(12.dp),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFD1D5DB)),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(50.dp)
+                        .clickable {
+                            sound.click()
+                            try {
+                                val url = "https://my-project-five-sepia.vercel.app/api/auth/google-mobile"
+                                val intent = CustomTabsIntent.Builder()
+                                    .setShowTitle(true)
+                                    .build()
+                                intent.intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                                intent.launchUrl(context, Uri.parse(url))
+                            } catch (_: Exception) {
+                                // Fallback — open in any available browser
+                                try {
+                                    val browserIntent = Intent(Intent.ACTION_VIEW, Uri.parse("https://my-project-five-sepia.vercel.app/api/auth/google-mobile"))
+                                    browserIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                                    context.startActivity(browserIntent)
+                                } catch (_: Exception) { /* no browser available */ }
+                            }
+                        },
+                    shadowElevation = 2.dp,
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.Center,
+                    ) {
+                        Image(
+                            painter = painterResource(id = app.dreamkorea.smartclass.R.drawable.google_logo),
+                            contentDescription = "Google logo",
+                            modifier = Modifier.size(22.dp),
+                            contentScale = ContentScale.Fit,
+                        )
+                        Spacer(Modifier.width(12.dp))
+                        Text(
+                            "Sign in with Google",
+                            color = Color(0xFF1F2937),
+                            fontSize = 15.sp,
+                            fontWeight = FontWeight.Medium,
+                        )
                     }
                 }
             }

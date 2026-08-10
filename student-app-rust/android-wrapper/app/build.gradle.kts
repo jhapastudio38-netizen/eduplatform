@@ -11,8 +11,8 @@ android {
         applicationId = "app.dreamkorea.smartclass"
         minSdk = 24
         targetSdk = 34
-        versionCode = 275
-        versionName = "10.21.0"
+        versionCode = 276
+        versionName = "10.22.0"
     }
 
     buildFeatures {
@@ -85,4 +85,9 @@ dependencies {
 
     // Image loading (Coil — loads admin-uploaded card images from URLs)
     implementation("io.coil-kt:coil-compose:2.6.0")
+
+    // Chrome Custom Tabs — used by Google Sign-In to open the OAuth flow in
+    // the system Chrome (cookies are shared with the browser so a returning
+    // user with an active Google session gets a one-tap login).
+    implementation("androidx.browser:browser:1.8.0")
 }
