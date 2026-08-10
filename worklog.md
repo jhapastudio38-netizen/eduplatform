@@ -165,3 +165,43 @@ Stage Summary:
 - Profile icon renders cleanly (no black particles/artifacts)
 - Pencil FAB no longer overlaps submit button
 - Backend Google OAuth routes are now in source control — safe from future reverts
+
+---
+Task ID: 6
+Agent: Main (Super Z)
+Task: Fix exam crash on Get Started + remove floating pencil + block page structure
+
+Work Log:
+- CRASH ROOT CAUSE FOUND: ExamScreen had TWO full-screen layouts rendered simultaneously
+  • The question display Column (top status header + instruction row + content + bottom nav) was rendered UNCONDITIONALLY
+  • The block page grid (BoxWithConstraints) was rendered in `if (showGrid)` AFTER the question display
+  • When showGrid = true (initial state), BOTH layouts were composed at the same time
+  • Two full-screen Columns competing for the same space → crash on "Get Started"
+  • Video analysis confirmed: app shows "Loading exam..." then crashes to home screen
+
+- FIX: Restructured ExamScreen to use if/else:
+  • `if (showGrid)` → renders ONLY the block page grid, then `return`
+  • Otherwise → renders ONLY the question display (top status + instruction + content + bottom nav)
+  • Only one layout is composed at a time → no crash
+
+- Removed floating pencil button from BOTH screens:
+  • User clarified the gray circle with pencil is their S Pen, not part of the app
+  • Removed from ExamScreen block page
+  • Removed from ExamEntryScreen
+
+- Block page layout already matches spec from v10.29.0:
+  • 1364×693 canvas with proportional scaling
+  • Logo column 137×156 spanning both header+nav rows
+  • Header row 78px, nav row 78px, section titles 69px
+  • Question panels 3px #222 border, 18px radius
+  • Submit button #1673E8, 328×68px
+  • No separators between header/nav items
+
+- Build v10.31.0 (289) succeeded with --rerun-tasks (forced full recompile)
+- Signed, verified
+
+Stage Summary:
+- Shipped: /home/z/my-project/download/DreamKorea-SmartClass-v10.31.0.apk (12.2MB, v10.31.0/289)
+- Exam no longer crashes when tapping Get Started — only one layout renders at a time
+- Floating pencil button removed (was S Pen, not part of app)
+- Block page layout matches the spec screenshot

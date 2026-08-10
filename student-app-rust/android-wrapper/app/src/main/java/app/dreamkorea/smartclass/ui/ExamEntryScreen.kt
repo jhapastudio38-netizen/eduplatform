@@ -412,28 +412,6 @@ fun ExamEntryScreen(theme: AppTheme, sound: SoundManager, testId: String, onStar
                     )
                 }
             }
-
-            // ── FLOATING PENCIL BUTTON — bottom-right, 82px diameter, gray #aaa ──
-            // Per spec: center at x≈1147, y≈669 — near bottom-right edge,
-            // partially crossing the bottom border. Positioned so it doesn't
-            // overlap the Cancel button.
-            Box(
-                modifier = Modifier
-                    .align(androidx.compose.ui.Alignment.BottomEnd)
-                    .padding(end = sdp(15f), bottom = sdp(-10f))
-                    .size(sdp(82f))
-                    .clip(CircleShape)
-                    .background(Color(0xFFAAAAAA))
-                    .clickable { /* opens annotation/drawing tool (future) */ },
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    Icons.Default.Edit,
-                    contentDescription = "Rough work",
-                    tint = Color.White,
-                    modifier = Modifier.size(sdp(38f))
-                )
-            }
         }
     }
 }
