@@ -1390,41 +1390,11 @@ fun AudioPlayerCard(
     }
 
     Surface(color = theme.cardBg, shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth(), shadowElevation = 1.dp) {
-        Row(
-            modifier = Modifier.padding(14.dp),
-            verticalAlignment = Alignment.CenterVertically
+        Box(
+            modifier = Modifier.padding(8.dp),
+            contentAlignment = Alignment.Center
         ) {
-            // Audio icon
-            Surface(
-                color = if (disabled) Color(0xFFE2E8F0) else theme.primary.copy(alpha = 0.15f),
-                shape = RoundedCornerShape(10.dp),
-                modifier = Modifier.size(44.dp)
-            ) {
-                Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
-                    Icon(
-                        Icons.Default.Headphones,
-                        null,
-                        tint = if (disabled) Color(0xFF94A3B8) else theme.primary,
-                        modifier = Modifier.size(22.dp)
-                    )
-                }
-            }
-            Spacer(Modifier.width(12.dp))
-            // Simple label — no play count shown
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    if (disabled) "Audio locked" else if (isPlaying) "Playing…" else "Tap to play",
-                    color = if (disabled) Color(0xFF94A3B8) else theme.darkText,
-                    fontSize = 13.sp,
-                    fontWeight = FontWeight.SemiBold
-                )
-            }
-            // ── Circular play button ──────────────────────────────────────
-            // 48dp circle with colored background. While playing: pulsing
-            // scale animation + GraphicEq icon. When disabled (exam mode,
-            // limit reached OR externally blocked): dim to 0.3 alpha +
-            // PlayArrow (no lock icon). When isReview: never dim, always
-            // full color.
+            // ── Circular play button only (no headphones icon, no text) ──
             val enabled = !disabled && !isPlaying && !externallyBlocked
             Box(
                 modifier = Modifier
@@ -1443,9 +1413,8 @@ fun AudioPlayerCard(
                                 setOnPreparedListener {
                                     start()
                                     isPlaying = true
-                                    myToken = stopToken  // remember our token
+                                    myToken = stopToken
                                     incrementPlayCount()
-                                    // Notify parent so it can stop other audios.
                                     onPlayStart?.invoke()
                                 }
                                 setOnCompletionListener {
