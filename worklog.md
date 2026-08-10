@@ -418,3 +418,38 @@ Stage Summary:
 - Google logo: official 4-color G logo on Sign-In button
 - Animations: fade transitions + image preloading + crossfade
 - Backup: https://github.com/jhapastudio38-netizen/dreamkorea-smartclass-v1034-backup
+
+---
+Task ID: 11
+Agent: Main (Super Z)
+Task: Profile icon fill circle + block other audio buttons during playback
+
+Work Log:
+- BACKUP: Created new GitHub repo dreamkorea-smartclass-v1035-backup
+  • URL: https://github.com/jhapastudio38-netizen/dreamkorea-smartclass-v1035-backup
+
+- PROFILE ICON FIX (ExamEntryScreen):
+  • Previous: Icons.Default.AccountCircle had built-in circle outline → double circle, icon too small
+  • Fixed: Switched to Icons.Default.Person (no built-in circle) with fillMaxSize()
+  • Now the Person icon fills the entire circle edge-to-edge — only the profile silhouette is visible
+  • White circle + 6px black border + black Person icon filling the circle
+
+- AUDIO BLOCK FIX (AudioPlayerCard + AudioRegistry):
+  • Added global anyAudioPlaying state to AudioRegistry (mutableStateOf — Compose observes it)
+  • onPlaybackStarted() → sets anyAudioPlaying = true when audio starts
+  • onPlaybackFinished() → sets anyAudioPlaying = false when audio completes/stops/errors
+  • IconButton enabled = !disabled && !AudioRegistry.anyAudioPlaying
+  • Icon tint dims to 0.3 alpha when anyAudioPlaying is true
+  • onClick also has early return: if (AudioRegistry.anyAudioPlaying) return@IconButton
+  • Now when one audio is playing, ALL other audio buttons are disabled (dimmed, can't click)
+  • Student cannot play multiple audios at the same time — glitch fixed
+  • 2 second default gap between plays still intact
+  • Audio plays twice → 2s gap → second play → stops → other buttons re-enabled
+
+- Build v10.36.0 (294) succeeded, signed, verified
+
+Stage Summary:
+- Shipped: /home/z/my-project/download/DreamKorea-SmartClass-v10.36.0.apk (12.2MB, v10.36.0/294)
+- Profile icon: Person icon fills the circle completely (no double circle, no small icon)
+- Audio: other audio buttons are disabled (dimmed) while one plays — can't click them until audio finishes
+- Backup: https://github.com/jhapastudio38-netizen/dreamkorea-smartclass-v1035-backup

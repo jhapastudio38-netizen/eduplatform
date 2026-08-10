@@ -1397,11 +1397,15 @@ fun AudioPlayerCard(
                     onClick = {
                         if (disabled) return@IconButton
                         if (isPlaying) return@IconButton // ignore tap while playing
+                        // BLOCK if any other audio is playing globally
+                        if (AudioRegistry.anyAudioPlaying) return@IconButton
                         sound.click()
                         // Increment count for the FIRST play here (not in preparedListener)
                         incrementPlayCount()
                         // GLOBAL: stop any other currently playing audio
                         AudioRegistry.stopAllExcept(url)
+                        // Mark global playing state — blocks all other audio buttons
+                        AudioRegistry.onPlaybackStarted()
                         try {
                             mediaPlayer?.release()
                             val mp = android.media.MediaPlayer().apply {
@@ -1416,6 +1420,7 @@ fun AudioPlayerCard(
                                     // Unlimited mode (review) — never auto-replay, just stop
                                     if (unlimited) {
                                         isPlaying = false
+                                        AudioRegistry.onPlaybackFinished()
                                         return@setOnCompletionListener
                                     }
                                     val currentCount = if (questionId != null && playCounts != null)
@@ -1435,15 +1440,18 @@ fun AudioPlayerCard(
                                                 start()
                                             } else {
                                                 isPlaying = false
+                                                AudioRegistry.onPlaybackFinished()
                                             }
                                         }
                                     } else {
                                         isPlaying = false
+                                        AudioRegistry.onPlaybackFinished()
                                     }
                                 }
                             setOnErrorListener { mp, what, extra ->
                                 android.util.Log.e("AudioPlayer", "Error: what=$what extra=$extra url=$url")
                                 isPlaying = false
+                                AudioRegistry.onPlaybackFinished()
                                 try { mp.reset() } catch (_: Exception) {}
                                 true
                             }
@@ -1454,13 +1462,15 @@ fun AudioPlayerCard(
                         isPlaying = false
                     }
                 },
-                // Always enabled (no dimming) — clicks are ignored while playing
-                enabled = !disabled
+                // Disabled when: this audio is used up OR another audio is playing globally.
+                // This BLOCKS the student from clicking other audio buttons while one plays.
+                enabled = !disabled && !AudioRegistry.anyAudioPlaying
             ) {
                 Icon(
                     if (isPlaying) Icons.Default.VolumeUp else Icons.Default.PlayArrow,
                     null,
-                    tint = if (disabled) theme.primary.copy(alpha = 0.3f) else theme.primary,
+                    // Dim the icon when disabled or when another audio is playing
+                    tint = if (disabled || AudioRegistry.anyAudioPlaying) theme.primary.copy(alpha = 0.3f) else theme.primary,
                     modifier = Modifier.size(36.dp)
                 )
             }
@@ -1470,8 +1480,14 @@ fun AudioPlayerCard(
 
 /// Global registry — ensures only one AudioPlayerCard plays at a time.
 /// When a new audio starts, it calls stopAllExcept() to stop all others.
+/// Also tracks a global "anyAudioPlaying" state so ALL other audio buttons
+/// are disabled (can't be clicked) while any audio is playing.
 private object AudioRegistry {
     private val players = mutableMapOf<String, () -> Unit>()
+    // Global state — true when any audio is playing. All AudioPlayerCards
+    // observe this to disable their buttons while audio plays.
+    var anyAudioPlaying by mutableStateOf(false)
+        private set
 
     fun registerPlayer(url: String, stopCallback: () -> Unit) {
         players[url] = stopCallback
@@ -1479,12 +1495,24 @@ private object AudioRegistry {
 
     fun unregisterPlayer(url: String) {
         players.remove(url)
+        // If no players left playing, reset the global flag
+        if (players.isEmpty()) anyAudioPlaying = false
     }
 
     fun stopAllExcept(currentUrl: String) {
         players.forEach { (url, stop) ->
             if (url != currentUrl) stop()
         }
+    }
+
+    /** Called when an audio starts playing — sets global flag to block all others. */
+    fun onPlaybackStarted() {
+        anyAudioPlaying = true
+    }
+
+    /** Called when the current audio finishes — clears global flag so others can play. */
+    fun onPlaybackFinished() {
+        anyAudioPlaying = false
     }
 }
 

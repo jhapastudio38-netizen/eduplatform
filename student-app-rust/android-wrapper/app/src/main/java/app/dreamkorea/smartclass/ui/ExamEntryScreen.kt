@@ -272,10 +272,9 @@ fun ExamEntryScreen(theme: AppTheme, sound: SoundManager, testId: String, onStar
                     .padding(top = sdp(90f)),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                // ── PROFILE ICON ── clean white circle with black outline.
-                // Uses Icons.Default.AccountCircle which is a Material Design
-                // icon that renders as a circle with a person silhouette inside.
-                // No black box, no overflow — clean and professional.
+                // ── PROFILE ICON ── white circle with black outline + black
+                // Person icon (head + shoulders) that fills the circle.
+                // Person icon has NO built-in circle, so it fills cleanly.
                 Box(
                     modifier = Modifier
                         .size(sdp(140f))
@@ -285,10 +284,12 @@ fun ExamEntryScreen(theme: AppTheme, sound: SoundManager, testId: String, onStar
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
-                        Icons.Default.AccountCircle,
+                        Icons.Default.Person,
                         contentDescription = "Profile",
                         tint = Color(0xFF111111),
-                        modifier = Modifier.fillMaxSize().padding(sdp(4f))
+                        // fillMaxSize makes the Person icon fill the entire circle
+                        // No padding — the icon fills edge to edge
+                        modifier = Modifier.fillMaxSize()
                     )
                 }
 
