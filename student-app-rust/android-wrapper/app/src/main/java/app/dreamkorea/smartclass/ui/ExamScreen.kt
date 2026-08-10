@@ -897,10 +897,13 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
             }
 
             // ══ 5. FLOATING PENCIL BUTTON — 82px, #AAAAAA, bottom-right ══
+            // Per spec: center at x≈1148, y≈670 — near bottom-right edge,
+            // partially crossing the bottom border. Positioned OUTSIDE the
+            // submit button area so it doesn't overlap.
             Box(
                 modifier = Modifier
                     .align(Alignment.BottomEnd)
-                    .padding(end = sdp(30f), bottom = sdp(8f))
+                    .padding(end = sdp(15f), bottom = sdp(-10f))
                     .size(sdp(82f))
                     .clip(androidx.compose.foundation.shape.CircleShape)
                     .background(Color(0xFFAAAAAA))

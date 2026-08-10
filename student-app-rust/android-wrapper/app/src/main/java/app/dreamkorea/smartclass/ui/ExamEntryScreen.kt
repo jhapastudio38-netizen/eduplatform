@@ -273,40 +273,22 @@ fun ExamEntryScreen(theme: AppTheme, sound: SoundManager, testId: String, onStar
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 // ── BLACK OUTLINE profile icon (NOT colored, NOT filled circle) ──
-                // 118×118px, black outline circle + head + shoulders silhouette
+                // 118×118px circle with black outline + black Person silhouette icon.
+                // Uses Material's Person icon (head + shoulders) which renders cleanly
+                // without any background bleeding or border artifacts.
                 Box(
-                    modifier = Modifier.size(sdp(118f)),
+                    modifier = Modifier
+                        .size(sdp(118f))
+                        .clip(CircleShape)
+                        .background(Color.White)
+                        .border(width = sdp(5f), color = Color(0xFF111111)),
                     contentAlignment = Alignment.Center
                 ) {
-                    // Outer black ring (5-6px stroke)
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .clip(CircleShape)
-                            .border(width = sdp(5f), color = Color(0xFF111111))
-                    )
-                    // Head circle (black, upper portion)
-                    Box(
-                        modifier = Modifier
-                            .size(sdp(42f))
-                            .align(Alignment.Center)
-                            .offset(y = sdp(-18f))
-                            .clip(CircleShape)
-                            .background(Color(0xFF111111))
-                    )
-                    // Shoulders/body (black arc, lower portion) — simplified as a rounded shape
-                    Box(
-                        modifier = Modifier
-                            .size(width = sdp(80f), height = sdp(45f))
-                            .align(Alignment.BottomCenter)
-                            .offset(y = sdp(12f))
-                            .clip(
-                                androidx.compose.foundation.shape.RoundedCornerShape(
-                                    topStart = sdp(40f), topEnd = sdp(40f),
-                                    bottomStart = sdp(4f), bottomEnd = sdp(4f)
-                                )
-                            )
-                            .background(Color(0xFF111111))
+                    Icon(
+                        Icons.Default.Person,
+                        contentDescription = "Profile",
+                        tint = Color(0xFF111111),
+                        modifier = Modifier.size(sdp(80f))
                     )
                 }
 
@@ -432,12 +414,13 @@ fun ExamEntryScreen(theme: AppTheme, sound: SoundManager, testId: String, onStar
             }
 
             // ── FLOATING PENCIL BUTTON — bottom-right, 82px diameter, gray #aaa ──
-            // Center: x≈1147, y≈669 (relative to full viewport). Inside the
-            // 1364×693 canvas, place at bottom-right corner area.
+            // Per spec: center at x≈1147, y≈669 — near bottom-right edge,
+            // partially crossing the bottom border. Positioned so it doesn't
+            // overlap the Cancel button.
             Box(
                 modifier = Modifier
                     .align(androidx.compose.ui.Alignment.BottomEnd)
-                    .padding(end = sdp(30f), bottom = sdp(8f))
+                    .padding(end = sdp(15f), bottom = sdp(-10f))
                     .size(sdp(82f))
                     .clip(CircleShape)
                     .background(Color(0xFFAAAAAA))
