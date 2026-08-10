@@ -11,8 +11,8 @@ android {
         applicationId = "app.dreamkorea.smartclass"
         minSdk = 24
         targetSdk = 34
-        versionCode = 276
-        versionName = "10.22.0"
+        versionCode = 277
+        versionName = "10.22.1"
     }
 
     buildFeatures {

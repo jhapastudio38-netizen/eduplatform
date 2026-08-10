@@ -1,4 +1,9 @@
 package app.dreamkorea.smartclass.ui
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.togetherWith
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.core.tween
 
 import android.app.Activity
 import android.content.pm.ActivityInfo
@@ -88,10 +93,13 @@ fun EyeVisionScreen(theme: AppTheme, sound: SoundManager, onBack: () -> Unit) {
     }
 
     // ── ORIENTATION ───────────────────────────────────────────────────
-    // Force landscape while taking the test. When results/review show, we
-    // switch to portrait. Single DisposableEffect — the value we set is
-    // driven by the `finished` flag so re-renders don't pile up multiple
-    // orientation requests.
+    // Force landscape IMMEDIATELY on entry, then switch to portrait for results/review.
+    // Use LaunchedEffect for immediate force + DisposableEffect for state-driven switches.
+    LaunchedEffect(Unit) {
+        kotlinx.coroutines.delay(50)
+        (context as? Activity)?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
+    }
+
     val targetOrientation = if (finished.value) ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
                             else ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
     DisposableEffect(targetOrientation) {
@@ -138,6 +146,21 @@ fun EyeVisionScreen(theme: AppTheme, sound: SoundManager, onBack: () -> Unit) {
     }
 
     // ── TEST MODE (landscape) ─────────────────────────────────────────
+    // AnimatedContent gives a smooth slide transition between questions.
+    AnimatedContent(
+        targetState = currentIdx,
+        modifier = Modifier.fillMaxSize(),
+        transitionSpec = {
+            slideInHorizontally(
+                animationSpec = tween(300),
+                initialOffsetX = { it }
+            ) togetherWith slideOutHorizontally(
+                animationSpec = tween(300),
+                targetOffsetX = { -it }
+            )
+        },
+        label = "eyeTestSlide"
+    ) { idx ->
     Column(modifier = Modifier.fillMaxSize().background(Color(0xFFF8FAFC))) {
         // Top header — thin status bar with question counter + back
         Surface(color = Color.White, shadowElevation = 1.dp) {
@@ -352,6 +375,7 @@ fun EyeVisionScreen(theme: AppTheme, sound: SoundManager, onBack: () -> Unit) {
                 }
             }
         }
+    }
     }
 }
 
