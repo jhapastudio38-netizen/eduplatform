@@ -230,6 +230,20 @@ object AppState {
         }
     }
 
+    fun saveSessionToken(token: String) {
+        prefs.edit().putString(KEY_TOKEN, token).apply()
+        // Set the cookie in the OkHttp cookie jar so API calls are authenticated
+        val cookie = Cookie.Builder()
+            .name("ep_sid")
+            .value(token)
+            .domain(baseUrl.host)
+            .path("/")
+            .secure()
+            .httpOnly()
+            .build()
+        cookieStore[baseUrl.host] = mutableListOf(cookie)
+    }
+
     fun clearSession() {
         prefs.edit().clear().apply()
         cookieStore.clear()

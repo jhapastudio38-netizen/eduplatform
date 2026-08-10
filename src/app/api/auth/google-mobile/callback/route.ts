@@ -136,7 +136,7 @@ export async function GET(req: NextRequest) {
     });
   }
 
-  await createSession(user.id);
+  const sessionToken = await createSession(user.id);
   await audit({
     actorId: user.id,
     action: "login",
@@ -145,13 +145,14 @@ export async function GET(req: NextRequest) {
     ip,
   });
 
-  // ── Redirect back to the Android app with the user profile ────────────
+  // ── Redirect back to the Android app with the user profile + session token ────
   const callbackParams = new URLSearchParams({
     userId: user.id,
     name: user.name || "",
     email: user.email,
     phone: user.phone || "",
     role: user.role,
+    sessionToken,
   });
   return NextResponse.redirect(
     `dreamkorea://auth-callback?${callbackParams.toString()}`

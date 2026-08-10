@@ -89,6 +89,7 @@ class MainActivity : ComponentActivity() {
         val email = data.getQueryParameter("email") ?: ""
         val phone = data.getQueryParameter("phone")
         val role = data.getQueryParameter("role") ?: "STUDENT"
+        val sessionToken = data.getQueryParameter("sessionToken")
 
         AppState.saveUserProfile(
             User(
@@ -99,6 +100,10 @@ class MainActivity : ComponentActivity() {
                 role = role,
             )
         )
+        // Save the session token so API calls are authenticated
+        if (!sessionToken.isNullOrBlank()) {
+            AppState.saveSessionToken(sessionToken)
+        }
         AppState.invalidateCache()
         isLoggedInState.value = true
     }

@@ -810,6 +810,7 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
                         BlockQuestionGrid(
                             test = t,
                             items = readingItems,
+                            sortedItems = sortedItems,
                             answers = answers,
                             currentIdx = currentIdx,
                             sound = sound,
@@ -832,6 +833,7 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
                         BlockQuestionGrid(
                             test = t,
                             items = listeningItems,
+                            sortedItems = sortedItems,
                             answers = answers,
                             currentIdx = currentIdx,
                             sound = sound,
@@ -936,6 +938,7 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
 private fun BlockQuestionGrid(
     test: TestDetail,
     items: List<TestItemDetail>,
+    sortedItems: List<TestItemDetail>,
     answers: SnapshotStateMap<String, Any>,
     currentIdx: Int,
     sound: SoundManager,
@@ -949,7 +952,7 @@ private fun BlockQuestionGrid(
 ) {
     val cols = 5
     val globalIndices = items.mapNotNull { item ->
-        test.items.indexOfFirst { it.question.id == item.question.id }.takeIf { it >= 0 }
+        sortedItems.indexOfFirst { it.question.id == item.question.id }.takeIf { it >= 0 }
     }
     val expectedTotal = if (showAllBlocks) {
         val isAudio = items.isNotEmpty() && items[0].question.blockType == "audio"
@@ -1147,6 +1150,7 @@ private fun RefTab(label: String, active: Boolean, accent: Color, modifier: Modi
 private fun QuestionGridRef(
     test: TestDetail,
     items: List<TestItemDetail>,
+    sortedItems: List<TestItemDetail>,
     answers: SnapshotStateMap<String, Any>,
     currentIdx: Int,
     sound: SoundManager,
@@ -1156,7 +1160,7 @@ private fun QuestionGridRef(
     showAllBlocks: Boolean,
     onPick: (Int) -> Unit,
 ) {
-    val globalIndices = items.mapNotNull { item -> test.items.indexOfFirst { it.question.id == item.question.id }.takeIf { it >= 0 } }
+    val globalIndices = items.mapNotNull { item -> sortedItems.indexOfFirst { it.question.id == item.question.id }.takeIf { it >= 0 } }
     val cols = 4  // 4 columns per the HTML reference
     val gridScrollState = rememberScrollState()
 
@@ -1387,35 +1391,10 @@ fun AudioPlayerCard(
     }
 
     Surface(color = theme.cardBg, shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth(), shadowElevation = 1.dp) {
-        Row(
-            modifier = Modifier.padding(14.dp),
-            verticalAlignment = Alignment.CenterVertically
+        Box(
+            modifier = Modifier.padding(8.dp),
+            contentAlignment = Alignment.Center
         ) {
-            // Audio icon
-            Surface(
-                color = if (disabled) Color(0xFFE2E8F0) else theme.primary.copy(alpha = 0.15f),
-                shape = RoundedCornerShape(10.dp),
-                modifier = Modifier.size(44.dp)
-            ) {
-                Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
-                    Icon(
-                        Icons.Default.Headphones,
-                        null,
-                        tint = if (disabled) Color(0xFF94A3B8) else theme.primary,
-                        modifier = Modifier.size(22.dp)
-                    )
-                }
-            }
-            Spacer(Modifier.width(12.dp))
-            // Simple label — no play count shown
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    if (disabled) "Audio locked" else if (isPlaying) "Playing…" else "Tap to play",
-                    color = if (disabled) Color(0xFF94A3B8) else theme.darkText,
-                    fontSize = 13.sp,
-                    fontWeight = FontWeight.SemiBold
-                )
-            }
             // ── Circular play button ──────────────────────────────────────
             // 48dp circle with colored background. While playing: pulsing
             // scale animation + GraphicEq icon. When disabled (exam mode,
