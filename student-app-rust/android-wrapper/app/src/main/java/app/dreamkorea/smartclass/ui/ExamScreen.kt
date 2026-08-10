@@ -357,7 +357,7 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text("${currentIdx + 1}. ", color = Color(0xFF003478), fontSize = 12.sp, fontWeight = FontWeight.Bold)
                 val displayText = q.stem.take(80)
-                Text(displayText, color = Color(0xFF1E293B), fontSize = 11.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
+                Text(displayText, color = Color(0xFF1E293B), fontSize = 14.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
                 if (q.isFree) {
                     Spacer(Modifier.width(4.dp))
                     Surface(color = Color(0xFF22C55E), shape = RoundedCornerShape(3.dp)) {
@@ -1346,8 +1346,11 @@ fun AudioPlayerCard(
     val scope = rememberCoroutineScope()
 
     // ── Stop playback when another audio starts (stopToken changes) ──
+    // Track the token value when we started playing so we only stop when
+    // a DIFFERENT audio starts (not when our own onPlayStart fires).
+    var myToken by remember { mutableStateOf<Any?>(null) }
     LaunchedEffect(stopToken) {
-        if (stopToken != null && isPlaying) {
+        if (stopToken != null && isPlaying && stopToken != myToken) {
             try {
                 mediaPlayer?.let { mp ->
                     if (mp.isPlaying) mp.stop()
@@ -1440,6 +1443,7 @@ fun AudioPlayerCard(
                                 setOnPreparedListener {
                                     start()
                                     isPlaying = true
+                                    myToken = stopToken  // remember our token
                                     incrementPlayCount()
                                     // Notify parent so it can stop other audios.
                                     onPlayStart?.invoke()

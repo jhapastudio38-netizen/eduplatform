@@ -10,7 +10,7 @@ export const CONFIG = {
     description:
       "Smart learning platform for Korean education — exams, question bank, batches, courses, and live classes.",
     supportEmail: "support@dreamkoreasmartclass.com",
-    url: process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000",
+    url: process.env.NEXT_PUBLIC_APP_URL || "https://my-project-five-sepia.vercel.app",
   },
   auth: {
     otpTtlMinutes: 5,
