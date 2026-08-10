@@ -14,6 +14,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
@@ -1050,7 +1051,7 @@ private fun QuestionGridScaled(
                                         isAnswered -> accentBlue
                                         else -> Color(0xFF222222)
                                     },
-                                    shape = androidx.compose.foundation.shape.RectangleShape
+                                    shape = androidx.compose.ui.graphics.RectangleShape
                                 )
                                 .background(if (isAnswered) accentBlue else Color.White)
                                 .alpha(if (isFilteredOut) 0.15f else 1f)

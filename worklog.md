@@ -48,3 +48,43 @@ Stage Summary:
 - Block page (ExamScreen grid) uses BoxWithConstraints scaling — should fit all screens
 - LoginScreen uses verticalScroll — should adapt to all screen sizes
 - EyeVisionScreen — verified layout structure is correct
+
+---
+Task ID: 3
+Agent: Main (Super Z)
+Task: Pixel-perfect rebuild of ExamEntryScreen + block page + LoginScreen Google button fix
+
+Work Log:
+- LoginScreen: Fixed Google button overlap — moved the "or" divider + GoogleSignInButton INSIDE the form Column (was a sibling of the Column inside Surface, causing it to overlap at the top)
+- ExamEntryScreen: Complete rewrite using 1364×693 canvas with proportional scaling (same as block page):
+  • 2px solid #222 outer border, no radius, 18px margin
+  • Title centered at top (29sp, Bold, #080808)
+  • BLACK outline profile icon (118×118px) — circle ring + head + shoulders silhouette (NOT blue filled circle)
+  • "Name of Student: X" and "Student Email: X" centered (24sp, Bold, #111)
+  • "Exam description" heading LEFT aligned at x=99 (23sp, Bold)
+  • Description body text LEFT aligned (24sp, Normal, #111, lineHeight 31sp)
+  • Get Started button: 259×69dp, #1E73EA, radius 18dp, 25sp white bold text
+  • Cancel button: 259×70dp, white, 2px solid #333, radius 17dp, 24sp bold text
+  • 33dp gap between buttons
+  • Floating gray pencil button (82dp, #AAA, white Edit icon) at bottom-right
+  • NO DreamKorea logo bar, NO timer, NO cards — plain white spacious layout
+- Block page (ExamScreen grid):
+  • Question buttons: 3px border #222222 (was 2.5px #202020), 36sp numbers (was 31sp), SQUARE corners (was 2dp radius), font weight Normal (was Bold)
+  • Section headers: 2px #C6C6C6 border (was 1.5px #B8B8B8), 28sp text (was 20sp), centered (was left-aligned), weight Normal (was SemiBold)
+  • Header row text: 30sp Normal #111 (was 28sp Bold #252525)
+  • Nav row: 29sp Normal #111 (was 16sp), active bg #F4F4F4 (was #F5F5F5), active underline 4px #111 (was 3px #252525)
+  • Submit button: #1673E8 (was #087CF0), 328×68dp, 25sp text (was 17sp), radius 18dp (was 17dp)
+  • Added floating gray pencil button (82dp, #AAA, white Edit icon) at bottom-right
+- Fixed compile error: RectangleShape wrong import path → androidx.compose.ui.graphics.RectangleShape
+- Added CircleShape import to ExamScreen.kt
+- Reduced gradle memory to 1.5g heap + 384m metaspace (OOM prevention)
+- Used Kotlin out-of-process compiler to reduce peak memory
+- Build succeeded via persistent gradle daemon
+- Signed APK with debug keystore, verified
+
+Stage Summary:
+- Shipped: /home/z/my-project/download/DreamKorea-SmartClass-v10.28.0.apk (12.2MB, v10.28.0/286)
+- Both exam entry screen and block page now use the SAME 1364×693 canvas with proportional scaling
+- Pressing Get Started changes only the inner content — outer frame/scale/position stay identical
+- LoginScreen Google button now sits at the bottom of the form card (no overlap)
+- Google login (saveSessionToken) and audio playback (MediaPlayer + 2s gap) still intact from previous build
