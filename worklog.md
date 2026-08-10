@@ -205,3 +205,39 @@ Stage Summary:
 - Exam no longer crashes when tapping Get Started — only one layout renders at a time
 - Floating pencil button removed (was S Pen, not part of app)
 - Block page layout matches the spec screenshot
+
+---
+Task ID: 7
+Agent: Main (Super Z)
+Task: Make all 40 question blocks fit on screen without scrolling
+
+Work Log:
+- Analyzed reference screenshot with VLM — confirmed all 40 questions must fit on screen
+- VLM analysis: Header 22-25%, Section headers 6-8%, Grids 55-60%, Submit 12-15%
+- Previous layout had:
+  • Header+Nav: 156px (78+78) — too tall
+  • Section headers: 69px — too tall
+  • Question buttons: aspectRatio(1f) forced square shape, caused overflow
+  • verticalScroll on grid — allowed scrolling but user wants everything visible
+
+- Changes made:
+  1. Reduced header+nav from 156px to 120px (60+60 per row)
+  2. Reduced section headers from 69px to 45px, font from 28sp to 22sp
+  3. Removed aspectRatio(1f) from question buttons — now use weight(1f) + fillMaxHeight()
+  4. Removed verticalScroll from QuestionGridScaled — all 4 rows must fit
+  5. Each Row uses weight(1f) so 4 rows share vertical space equally
+  6. Reduced panel inner padding from 12px to 8px
+  7. Reduced panel vertical margin from 8px to 4px
+  8. Reduced button font from 36sp to 32sp (fits better in smaller buttons)
+
+- Available grid height calculation:
+  Canvas 693px - 36px margins - 120px header - 45px section headers - 8px panel margins - 22px panel border/padding - 76px submit = ~386px
+  4 rows × 6px gap = 18px → each row gets ~92px — plenty for question buttons
+
+- Build v10.32.0 (290) succeeded with --rerun-tasks, signed, verified
+
+Stage Summary:
+- Shipped: /home/z/my-project/download/DreamKorea-SmartClass-v10.32.0.apk (12.2MB, v10.32.0/290)
+- All 40 question blocks (5×4 Reading + 5×4 Listening) now fit on screen without scrolling
+- Header is more compact (120px vs 156px), section headers smaller (45px vs 69px)
+- Question buttons fill available space proportionally (rectangular, not forced square)

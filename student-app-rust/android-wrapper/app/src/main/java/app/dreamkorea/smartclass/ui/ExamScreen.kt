@@ -385,11 +385,11 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
                     .border(width = sdp(2f), color = Color(0xFF222222))
             ) {
                 Column(modifier = Modifier.fillMaxSize()) {
-                    // ══ 1. HEADER + NAV AREA (156px tall) ══
-                    // Logo column (137px wide) spans BOTH header row (78px) and
-                    // nav row (78px) on the left. Right side has 2 stacked rows.
-                    Row(modifier = Modifier.fillMaxWidth().height(sdp(156f))) {
-                        // ── Logo column: 137px wide, 156px tall ──
+                    // ══ 1. HEADER + NAV AREA (120px tall — compact so grids fit) ══
+                    // Logo column (137px wide) spans BOTH header row (60px) and
+                    // nav row (60px) on the left. Right side has 2 stacked rows.
+                    Row(modifier = Modifier.fillMaxWidth().height(sdp(120f))) {
+                        // ── Logo column: 137px wide, 120px tall ──
                         Box(
                             modifier = Modifier.width(sdp(137f)).fillMaxHeight(),
                             contentAlignment = Alignment.Center
@@ -397,18 +397,18 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
                             Image(
                                 painter = painterResource(id = app.dreamkorea.smartclass.R.drawable.dreamkorea_logo),
                                 contentDescription = "DreamKorea Logo",
-                                modifier = Modifier.fillMaxSize().padding(sdp(12f)),
+                                modifier = Modifier.fillMaxSize().padding(sdp(10f)),
                                 contentScale = ContentScale.Fit
                             )
                         }
 
-                        // ── Right side: header row (78px) + nav row (78px) ──
+                        // ── Right side: header row (60px) + nav row (60px) ──
                         Column(modifier = Modifier.weight(1f).fillMaxHeight()) {
-                            // ── Header row: 78px, 3 centered labels, bottom border 2px #222 ──
+                            // ── Header row: 60px, 3 centered labels, bottom border 2px #222 ──
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .height(sdp(78f))
+                                    .height(sdp(60f))
                                     .borderBottom(sdp(2f), Color(0xFF222222)),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
@@ -449,12 +449,12 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
                                     )
                                 }
                             }
-                            // ── Nav row: 78px, 5 items, bottom border 2px #222 ──
+                            // ── Nav row: 60px, 5 items, bottom border 2px #222 ──
                             // No vertical separators between items (per spec)
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .height(sdp(78f))
+                                    .height(sdp(60f))
                                     .borderBottom(sdp(2f), Color(0xFF222222)),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
@@ -482,15 +482,13 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
                         }
                     }
 
-                    // ══ 2. SECTION TITLE ROW (69px) ══
+                    // ══ 2. SECTION TITLE ROW (45px — compact so grids fit) ══
                     // Two bordered boxes: Reading (left) | Listening (right)
-                    // Each ~644px wide, 69px tall, 2px #C6C6C6 border, 28sp Normal #222
                     if (!isQBank) {
                         Row(
-                            modifier = Modifier.fillMaxWidth().height(sdp(69f)).padding(horizontal = sdp(18f)),
+                            modifier = Modifier.fillMaxWidth().height(sdp(45f)).padding(horizontal = sdp(18f)),
                             horizontalArrangement = Arrangement.spacedBy(sdp(18f))
                         ) {
-                            // Reading title box
                             Box(
                                 modifier = Modifier
                                     .weight(1f)
@@ -498,9 +496,8 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
                                     .border(sdp(2f), Color(0xFFC6C6C6)),
                                 contentAlignment = Alignment.Center
                             ) {
-                                Text("Reading", color = Color(0xFF222222), fontSize = ssp(28f), fontWeight = FontWeight.Normal)
+                                Text("Reading", color = Color(0xFF222222), fontSize = ssp(22f), fontWeight = FontWeight.Normal)
                             }
-                            // Listening title box
                             Box(
                                 modifier = Modifier
                                     .weight(1f)
@@ -508,7 +505,7 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
                                     .border(sdp(2f), Color(0xFFC6C6C6)),
                                 contentAlignment = Alignment.Center
                             ) {
-                                Text("Listening", color = Color(0xFF222222), fontSize = ssp(28f), fontWeight = FontWeight.Normal)
+                                Text("Listening", color = Color(0xFF222222), fontSize = ssp(22f), fontWeight = FontWeight.Normal)
                             }
                         }
                     }
@@ -516,14 +513,14 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
                     // ══ 3. QUESTION GRID PANELS ══
                     // Two rounded panels (3px #222 border, 18px radius) with
                     // 5×4 grid of question buttons inside each.
+                    // Panels use weight(1f) to fill all remaining vertical space.
                     if (isQBank) {
-                        // QBank: single panel with ALL questions
-                        Column(modifier = Modifier.weight(1f).fillMaxWidth().padding(horizontal = sdp(18f), vertical = sdp(8f))) {
+                        Column(modifier = Modifier.weight(1f).fillMaxWidth().padding(horizontal = sdp(18f), vertical = sdp(4f))) {
                             Box(
                                 modifier = Modifier
                                     .weight(1f).fillMaxWidth()
                                     .border(sdp(3f), Color(0xFF222222), RoundedCornerShape(sdp(18f)))
-                                    .padding(sdp(12f))
+                                    .padding(sdp(8f))
                             ) {
                                 QuestionGridScaled(
                                     items = sortedItems,
@@ -546,7 +543,7 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
                     } else {
                         // Exam: Reading LEFT | Listening RIGHT
                         Row(
-                            modifier = Modifier.weight(1f).fillMaxWidth().padding(horizontal = sdp(18f), vertical = sdp(8f)),
+                            modifier = Modifier.weight(1f).fillMaxWidth().padding(horizontal = sdp(18f), vertical = sdp(4f)),
                             horizontalArrangement = Arrangement.spacedBy(sdp(18f))
                         ) {
                             // Reading panel
@@ -555,7 +552,7 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
                                     .weight(1f)
                                     .fillMaxHeight()
                                     .border(sdp(3f), Color(0xFF222222), RoundedCornerShape(sdp(18f)))
-                                    .padding(sdp(12f))
+                                    .padding(sdp(8f))
                             ) {
                                 QuestionGridScaled(
                                     items = readingItems,
@@ -580,7 +577,7 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
                                     .weight(1f)
                                     .fillMaxHeight()
                                     .border(sdp(3f), Color(0xFF222222), RoundedCornerShape(sdp(18f)))
-                                    .padding(sdp(12f))
+                                    .padding(sdp(8f))
                             ) {
                                 QuestionGridScaled(
                                     items = listeningItems,
@@ -971,7 +968,6 @@ private fun QuestionGridScaled(
         sortedItems.indexOfFirst { it.question.id == item.question.id }.takeIf { it >= 0 }
     }
     val cols = 5  // 5 columns per spec
-    val gridScrollState = rememberScrollState()
 
     // Determine total cells to render (with optional block padding)
     val expectedTotal = if (showAllBlocks) {
@@ -983,15 +979,19 @@ private fun QuestionGridScaled(
     }
     val rowsCount = (expectedTotal + cols - 1) / cols
 
+    // NO verticalScroll — all 4 rows must fit on screen.
+    // Each Row uses weight(1f) so 4 rows share the vertical space equally.
+    // Buttons use weight(1f) for width and fillMaxHeight() so they fill
+    // available space without forcing square aspect ratio.
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .verticalScroll(gridScrollState),
+            .fillMaxHeight(),
         verticalArrangement = Arrangement.spacedBy(sdp(6f))
     ) {
         for (rowIdx in 0 until rowsCount) {
             Row(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier.fillMaxWidth().weight(1f),
                 horizontalArrangement = Arrangement.spacedBy(sdp(6f))
             ) {
                 for (colIdx in 0 until cols) {
@@ -1012,11 +1012,11 @@ private fun QuestionGridScaled(
                             false -> isAnswered
                             null -> false
                         }
-                        // Question button: 3px border #222222, 36sp numbers, SQUARE corners (no radius)
+                        // Question button: 3px border #222222, fills available space (no aspectRatio)
                         Box(
                             modifier = Modifier
                                 .weight(1f)
-                                .aspectRatio(1f)
+                                .fillMaxHeight()
                                 .border(
                                     width = sdp(3f),
                                     color = when {
@@ -1038,7 +1038,7 @@ private fun QuestionGridScaled(
                             Text(
                                 "$displayNum",
                                 color = if (isAnswered) Color.White else Color(0xFF111111),
-                                fontSize = ssp(36f),
+                                fontSize = ssp(32f),
                                 fontWeight = FontWeight.Normal
                             )
                         }
@@ -1049,9 +1049,8 @@ private fun QuestionGridScaled(
                         Box(
                             modifier = Modifier
                                 .weight(1f)
-                                .aspectRatio(1f)
-                                .clip(RoundedCornerShape(sdp(2f)))
-                                .border(sdp(1.5f), Color(0xFFEEEEEE), RoundedCornerShape(sdp(2f)))
+                                .fillMaxHeight()
+                                .border(sdp(1.5f), Color(0xFFEEEEEE))
                                 .background(Color(0xFFFAFAFA)),
                             contentAlignment = Alignment.Center
                         ) {
@@ -1063,7 +1062,7 @@ private fun QuestionGridScaled(
                             )
                         }
                     } else {
-                        Spacer(modifier = Modifier.weight(1f).aspectRatio(1f))
+                        Spacer(modifier = Modifier.weight(1f).fillMaxHeight())
                     }
                 }
             }
