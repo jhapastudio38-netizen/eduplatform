@@ -355,65 +355,13 @@ private fun GoogleSignInButton(modifier: Modifier = Modifier, onClick: () -> Uni
         ),
         border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFDADCE0)),
     ) {
-        // Canvas-drawn Google "G" logo (24dp)
-        Canvas(modifier = Modifier.size(24.dp)) {
-            val stroke = Stroke(width = size.minDimension * 0.16f)
-            val cx = size.width / 2f
-            val cy = size.height / 2f
-            val r = size.minDimension * 0.42f
-            // Top-right arc (blue) — from -30° to 30°
-            drawArc(
-                color = Color(0xFF4285F4),
-                startAngle = -30f,
-                sweepAngle = 60f,
-                useCenter = false,
-                topLeft = Offset(cx - r, cy - r),
-                size = androidx.compose.ui.geometry.Size(r * 2, r * 2),
-                style = stroke,
-            )
-            // Top-left arc (red) — 30° to 150°
-            drawArc(
-                color = Color(0xFFEA4335),
-                startAngle = 30f,
-                sweepAngle = 120f,
-                useCenter = false,
-                topLeft = Offset(cx - r, cy - r),
-                size = androidx.compose.ui.geometry.Size(r * 2, r * 2),
-                style = stroke,
-            )
-            // Bottom-left arc (yellow) — 150° to 210°
-            drawArc(
-                color = Color(0xFFFBBC05),
-                startAngle = 150f,
-                sweepAngle = 60f,
-                useCenter = false,
-                topLeft = Offset(cx - r, cy - r),
-                size = androidx.compose.ui.geometry.Size(r * 2, r * 2),
-                style = stroke,
-            )
-            // Bottom-right arc (green) — 210° to 330° (i.e. -150° to -30°)
-            drawArc(
-                color = Color(0xFF34A853),
-                startAngle = 210f,
-                sweepAngle = 120f,
-                useCenter = false,
-                topLeft = Offset(cx - r, cy - r),
-                size = androidx.compose.ui.geometry.Size(r * 2, r * 2),
-                style = stroke,
-            )
-            // Horizontal bar (the "G" crossbar) — green, drawn on the right side
-            val barPath = Path().apply {
-                val startX = cx + r * 0.15f
-                val endX = cx + r
-                moveTo(startX, cy)
-                lineTo(endX, cy)
-            }
-            drawPath(
-                path = barPath,
-                color = Color(0xFF4285F4),
-                style = Stroke(width = size.minDimension * 0.16f),
-            )
-        }
+        // High-res Google "G" logo PNG
+        Image(
+            painter = painterResource(id = app.dreamkorea.smartclass.R.drawable.google_logo),
+            contentDescription = "Google logo",
+            modifier = Modifier.size(26.dp),
+            contentScale = ContentScale.Fit
+        )
         Spacer(Modifier.width(12.dp))
         Text("Sign in with Google", fontSize = 15.sp, fontWeight = FontWeight.Medium)
     }
