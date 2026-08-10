@@ -83,8 +83,8 @@ export async function POST(req: NextRequest) {
     },
   });
 
-  // Create session
-  await createSession(user.id);
+  // Create session — sets ep_sid cookie AND returns the token
+  const sessionToken = await createSession(user.id);
 
   return NextResponse.json({
     ok: true,
@@ -96,5 +96,6 @@ export async function POST(req: NextRequest) {
       role: user.role,
       username: user.username,
     },
+    sessionToken,
   });
 }
