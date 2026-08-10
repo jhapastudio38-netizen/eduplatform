@@ -793,7 +793,7 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
                                 val optText = options.getOrNull(i) ?: ""
                                 val blankWord = q.optionBlanks.getOrNull(i)?.takeIf { it.isNotBlank() }
                                 Row(
-                                    modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp).clickable(enabled = true) { sound.click(); answers[q.id] = optText },
+                                    modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp).clickable(enabled = !audioPlaying) { sound.click(); answers[q.id] = optText },
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
                                     Surface(
@@ -815,7 +815,7 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
                                 val absUrl = imgUrl.toAbsoluteUrl()
                                 val isSelected = answers[q.id] == absUrl
                                 Row(
-                                    modifier = Modifier.fillMaxWidth().padding(vertical = 3.dp).clickable(enabled = true) { sound.click(); answers[q.id] = absUrl },
+                                    modifier = Modifier.fillMaxWidth().padding(vertical = 3.dp).clickable(enabled = !audioPlaying) { sound.click(); answers[q.id] = absUrl },
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
                                     Surface(color = if (isSelected) theme.primary else Color.White, border = androidx.compose.foundation.BorderStroke(2.dp, Color.Black), shape = androidx.compose.foundation.shape.CircleShape, modifier = Modifier.size(34.dp)) {
@@ -831,7 +831,7 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
                                 val audUrl = q.optionAudios[i]; if (audUrl.isBlank()) return@forEach
                                 val absUrl = audUrl.toAbsoluteUrl()
                                 val isSelected = answers[q.id] == absUrl
-                                Row(modifier = Modifier.fillMaxWidth().padding(vertical = 3.dp).clickable(enabled = true) { sound.click(); answers[q.id] = absUrl }, verticalAlignment = Alignment.CenterVertically) {
+                                Row(modifier = Modifier.fillMaxWidth().padding(vertical = 3.dp).clickable(enabled = !audioPlaying) { sound.click(); answers[q.id] = absUrl }, verticalAlignment = Alignment.CenterVertically) {
                                     Surface(color = if (isSelected) theme.primary else Color.White, border = androidx.compose.foundation.BorderStroke(2.dp, Color.Black), shape = androidx.compose.foundation.shape.CircleShape, modifier = Modifier.size(34.dp)) {
                                         Box(contentAlignment = Alignment.Center) { Text("${i+1}", color = if (isSelected) Color.White else Color.Black, fontSize = 14.sp, fontWeight = FontWeight.Bold) }
                                     }
@@ -853,22 +853,22 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
             border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFE2E8F0)),
         ) {
             Row(modifier = Modifier.fillMaxWidth().height(48.dp), verticalAlignment = Alignment.CenterVertically) {
-                Box(modifier = Modifier.weight(1f).fillMaxHeight().clickable(enabled = !audioPlaying) { if (currentIdx > 0) { currentIdx--; sound.click() } }, contentAlignment = Alignment.Center) {
-                    Text("अघिल्लो (Prev)", color = if (currentIdx > 0 && !audioPlaying) Color(0xFF003478) else Color(0xFFCBD5E1), fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                Box(modifier = Modifier.weight(1f).fillMaxHeight().clickable { if (currentIdx > 0) { currentIdx--; sound.click() } }, contentAlignment = Alignment.Center) {
+                    Text("अघिल्लो (Prev)", color = if (currentIdx > 0) Color(0xFF003478) else Color(0xFFCBD5E1), fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
                 }
                 Box(modifier = Modifier.width(1.dp).fillMaxHeight(0.6f).background(Color(0xFFE2E8F0)))
-                Box(modifier = Modifier.weight(1f).fillMaxHeight().clickable(enabled = !audioPlaying) { sound.click(); showGrid = true }, contentAlignment = Alignment.Center) {
-                    Text("सबै प्रश्नहरू (All)", color = if (audioPlaying) Color(0xFFCBD5E1) else Color(0xFF003478), fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                Box(modifier = Modifier.weight(1f).fillMaxHeight().clickable { sound.click(); showGrid = true }, contentAlignment = Alignment.Center) {
+                    Text("सबै प्रश्नहरू (All)", color = Color(0xFF003478), fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
                 }
                 if (currentIdx < sortedItems.size - 1) {
                     Box(modifier = Modifier.width(1.dp).fillMaxHeight(0.6f).background(Color(0xFFE2E8F0)))
-                    Box(modifier = Modifier.weight(1f).fillMaxHeight().clickable(enabled = !audioPlaying) {
+                    Box(modifier = Modifier.weight(1f).fillMaxHeight().clickable {
                         if (currentIdx < sortedItems.size - 1) { currentIdx++; sound.click() }
                     }, contentAlignment = Alignment.Center) {
                         if (submitting) {
                             CircularProgressIndicator(color = Color(0xFF003478), modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
                         } else {
-                            Text("अर्को (Next)", color = if (audioPlaying) Color(0xFFCBD5E1) else Color(0xFF003478), fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                            Text("अर्को (Next)", color = Color(0xFF003478), fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
                         }
                     }
                 }
@@ -1257,10 +1257,18 @@ private fun LegendItem(color: Color, label: String) {
 
 // ─── Audio player with loop support ───────────────────────────────────────────
 // loopCount = total number of times to play the audio:
-//   0 or 1 = plays once
-//   2 = plays twice
-//   N = plays N times
-//  -1 = infinite loop
+//   0 = default (play 2 times, with 2s gap)
+//   1 = play once (no loop) — used in review mode
+//   2 = play twice
+//   N = play N times
+//
+// GLOBAL AUDIO: Only one AudioPlayerCard can play at a time. When a new
+// audio starts, any previously playing audio is stopped. This is tracked
+// via the AudioRegistry companion object.
+//
+// PERSISTENT play count (playCounts map) prevents the student from
+// cheating by navigating away and back to reset plays. In review mode
+// (playCounts = null), a local count is used instead.
 @Composable
 fun AudioPlayerCard(
     theme: AppTheme,
@@ -1275,29 +1283,46 @@ fun AudioPlayerCard(
     val context = LocalContext.current
     var mediaPlayer by remember { mutableStateOf<android.media.MediaPlayer?>(null) }
     var isPlaying by remember { mutableStateOf(false) }
+    // Local play count — used when playCounts is null (review mode)
+    var localPlayCount by remember { mutableStateOf(0) }
 
     // PERSISTENT play count — stored in parent map (survives navigation).
-    // Prevents cheat where student navigates away and back to reset plays.
-    val persistentCount = playCounts?.get(questionId) ?: 0
+    val persistentCount = playCounts?.get(questionId) ?: localPlayCount
     // Sync isPlaying with parent callback
     LaunchedEffect(isPlaying) {
         onPlayingChange?.invoke(isPlaying)
     }
 
-    val maxPlays = if (loopCount <= 0) 2 else loopCount
+    // maxPlays: loopCount=1 → play once, loopCount=0 → play twice (default), else play N times
+    val maxPlays = when {
+        loopCount == 1 -> 1
+        loopCount <= 0 -> 2
+        else -> loopCount
+    }
     val disabled = persistentCount >= maxPlays
     val scope = rememberCoroutineScope()
 
     fun incrementPlayCount() {
         if (questionId != null && playCounts != null) {
             playCounts[questionId] = (playCounts[questionId] ?: 0) + 1
+        } else {
+            localPlayCount++
         }
     }
 
+    // ── GLOBAL AUDIO: stop this player when another AudioPlayerCard starts ──
     DisposableEffect(url) {
+        AudioRegistry.registerPlayer(url) {
+            // Callback: another player started → stop this one
+            if (isPlaying) {
+                try { mediaPlayer?.let { it.stop(); it.reset() } } catch (_: Exception) {}
+                isPlaying = false
+            }
+        }
         onDispose {
             mediaPlayer?.release()
             mediaPlayer = null
+            AudioRegistry.unregisterPlayer(url)
         }
     }
 
@@ -1312,6 +1337,8 @@ fun AudioPlayerCard(
                     if (disabled) return@IconButton
                     sound.click()
                     if (isPlaying) return@IconButton
+                    // GLOBAL: stop any other currently playing audio
+                    AudioRegistry.stopAllExcept(url)
                     try {
                         mediaPlayer?.release()
                         val mp = android.media.MediaPlayer().apply {
@@ -1322,11 +1349,15 @@ fun AudioPlayerCard(
                                 incrementPlayCount()
                             }
                             setOnCompletionListener {
-                                val currentCount = playCounts?.get(questionId) ?: 0
+                                val currentCount = if (questionId != null && playCounts != null)
+                                    playCounts?.get(questionId) ?: 0
+                                else localPlayCount
                                 if (currentCount < maxPlays) {
                                     scope.launch {
                                         if (loopDelaySec > 0) delay(loopDelaySec * 1000L)
-                                        val latestCount = playCounts?.get(questionId) ?: 0
+                                        val latestCount = if (questionId != null && playCounts != null)
+                                            playCounts?.get(questionId) ?: 0
+                                        else localPlayCount
                                         if (latestCount < maxPlays) {
                                             incrementPlayCount()
                                             start()
@@ -1360,6 +1391,26 @@ fun AudioPlayerCard(
                     modifier = Modifier.size(36.dp)
                 )
             }
+        }
+    }
+}
+
+/// Global registry — ensures only one AudioPlayerCard plays at a time.
+/// When a new audio starts, it calls stopAllExcept() to stop all others.
+private object AudioRegistry {
+    private val players = mutableMapOf<String, () -> Unit>()
+
+    fun registerPlayer(url: String, stopCallback: () -> Unit) {
+        players[url] = stopCallback
+    }
+
+    fun unregisterPlayer(url: String) {
+        players.remove(url)
+    }
+
+    fun stopAllExcept(currentUrl: String) {
+        players.forEach { (url, stop) ->
+            if (url != currentUrl) stop()
         }
     }
 }

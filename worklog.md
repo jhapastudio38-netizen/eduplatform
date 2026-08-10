@@ -241,3 +241,64 @@ Stage Summary:
 - All 40 question blocks (5×4 Reading + 5×4 Listening) now fit on screen without scrolling
 - Header is more compact (120px vs 156px), section headers smaller (45px vs 69px)
 - Question buttons fill available space proportionally (rectangular, not forced square)
+
+---
+Task ID: 8
+Agent: Main (Super Z)
+Task: Fix audio (one at a time), review audio (no loop), exam overview sizing, manual signup, remove forgot tab
+
+Work Log:
+- BACKUP: Created new GitHub repo dreamkorea-smartclass-backup, pushed entire codebase
+  • URL: https://github.com/jhapastudio38-netizen/dreamkorea-smartclass-backup
+  • Contains both backend (src/) and Android app (student-app-rust/)
+
+- AUDIO FIX (ExamScreen):
+  • Created AudioRegistry global object — tracks all active AudioPlayerCards
+  • When a new audio starts, calls AudioRegistry.stopAllExcept(url) to stop all others
+  • Only one audio can play at a time — starting a new one stops the previous
+  • Block option selection during audio playback (enabled = !audioPlaying on all 3 option types)
+  • ALLOW navigation during audio playback (removed !audioPlaying from Prev/All/Next buttons)
+  • User can click anywhere while audio plays EXCEPT selecting options
+
+- REVIEW AUDIO FIX (AudioPlayerCard):
+  • Added localPlayCount state — used when playCounts is null (review mode)
+  • Previously, review mode had no play count tracking → audio looped infinitely
+  • Fixed maxPlays logic: loopCount=1 → maxPlays=1 (play once, no loop)
+  • Review passes loopCount=1 → audio plays exactly once and stops
+
+- EXAM OVERVIEW FIX (ExamEntryScreen):
+  • Profile icon: 118px → 140px (circle), border 5px → 6px, icon 80px → 95px
+  • Student name/email: 24sp → 26sp (bigger)
+  • Description heading: 23sp → 26sp
+  • Description body: 24sp → 27sp, lineHeight 31sp → 34sp
+
+- MANUAL SIGNUP FIX:
+  • ROOT CAUSE: POST /api/auth/signup route didn't exist on backend!
+  • Created /src/app/api/auth/signup/route.ts:
+    - Validates name, email, password (min 6 chars)
+    - Rate limits per IP (5/hour)
+    - Checks for existing email
+    - Hashes password with scrypt
+    - Creates user with role STUDENT
+    - Creates session (sets ep_sid cookie)
+    - Returns user + sessionToken
+  • Updated CredentialsResponse data class to include sessionToken field
+  • Updated LoginScreen signup handler to save sessionToken via AppState.saveSessionToken()
+  • Deployed to Vercel — verified working
+
+- LOGIN SCREEN FIX:
+  • Removed "Forgot" tab from the tab toggle (only Sign In + Sign Up now)
+  • Removed the "forgot" case from AnimatedContent (ForgotTab no longer rendered)
+  • Cleaned up forgot-related state references
+
+- Vercel deployment: READY (signup endpoint tested and working)
+- Build v10.33.0 (291) succeeded, signed, verified
+
+Stage Summary:
+- Shipped: /home/z/my-project/download/DreamKorea-SmartClass-v10.33.0.apk (12.2MB, v10.33.0/291)
+- Audio: only one plays at a time, options blocked during playback, navigation allowed
+- Review audio: plays once (no loop)
+- Exam overview: profile 140px, description 27sp — bigger and nicer
+- Manual signup: now works (backend route created + deployed)
+- Login: only Sign In + Sign Up tabs (Forgot removed)
+- Backup repo: https://github.com/jhapastudio38-netizen/dreamkorea-smartclass-backup

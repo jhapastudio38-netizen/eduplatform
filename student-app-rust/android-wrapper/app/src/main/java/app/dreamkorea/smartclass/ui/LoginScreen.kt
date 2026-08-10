@@ -54,7 +54,7 @@ fun LoginScreen(onLoginSuccess: () -> Unit) {
     val scope = rememberCoroutineScope()
     val sound = rememberSoundManager()
 
-    // Tab: "login" | "signup" | "forgot"
+    // Tab: "login" | "signup" (forgot removed)
     var mode by remember { mutableStateOf("login") }
 
     // Sign Up state
@@ -121,15 +121,14 @@ fun LoginScreen(onLoginSuccess: () -> Unit) {
             Text("Learn Korean anywhere", color = Color.White.copy(alpha = 0.8f), fontSize = 12.sp)
             Spacer(modifier = Modifier.height(24.dp))
 
-            // Three-tab toggle: Sign In / Sign Up / Forgot
+            // Two-tab toggle: Sign In / Sign Up (Forgot Password removed)
             AnimatedVisibility(visible = logoVisible, enter = fadeIn(tween(500))) {
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
-                    listOf("login" to "Sign In", "signup" to "Sign Up", "forgot" to "Forgot").forEach { (key, label) ->
-                        if (key != "login" && key != "signup") Spacer(Modifier.width(8.dp))
+                    listOf("login" to "Sign In", "signup" to "Sign Up").forEach { (key, label) ->
                         if (key == "signup") Spacer(Modifier.width(8.dp))
                         FilterChip(
                             selected = mode == key,
-                            onClick = { sound.click(); mode = key; error = ""; info = ""; fpStep = 1 },
+                            onClick = { sound.click(); mode = key; error = ""; info = "" },
                             label = { Text(label, fontSize = 12.sp) },
                             colors = FilterChipDefaults.filterChipColors(
                                 selectedContainerColor = NavyBlue,
@@ -228,6 +227,11 @@ fun LoginScreen(onLoginSuccess: () -> Unit) {
                                             if (resp.ok) {
                                                 sound.success()
                                                 AppState.saveUserProfile(resp.user)
+                                                // Save session token if returned (ensures API calls work)
+                                                val token = resp.sessionToken
+                                                if (!token.isNullOrBlank()) {
+                                                    AppState.saveSessionToken(token)
+                                                }
                                                 AppState.invalidateCache()
                                                 onLoginSuccess()
                                             } else {
@@ -244,59 +248,7 @@ fun LoginScreen(onLoginSuccess: () -> Unit) {
                                     }
                                 }
                             )
-                            "forgot" -> ForgotTab(
-                                email = fpEmail, code = fpCode, newPassword = fpNewPassword,
-                                passwordVisible = passwordVisible, loading = loading, step = fpStep,
-                                onEmailChange = { fpEmail = it }, onCodeChange = { fpCode = it },
-                                onNewPasswordChange = { fpNewPassword = it },
-                                onTogglePassword = { passwordVisible = !passwordVisible },
-                                onRequestCode = {
-                                    if (fpEmail.isBlank() || !fpEmail.contains("@")) { error = "Enter a valid email"; return@ForgotTab }
-                                    loading = true; error = ""; info = ""
-                                    scope.launch {
-                                        try {
-                                            AppState.api.requestReset(mapOf("email" to fpEmail.trim().lowercase()))
-                                            sound.success()
-                                            info = "If an account exists, a reset code was sent to ${fpEmail.trim()}."
-                                            fpStep = 2
-                                        } catch (e: java.net.UnknownHostException) { sound.error(); error = "No internet connection." }
-                                        catch (e: java.io.IOException) { sound.error(); error = "Could not connect." }
-                                        catch (e: Exception) { sound.error(); error = "Request failed." }
-                                        loading = false
-                                    }
-                                },
-                                onReset = {
-                                    if (fpCode.length != 6) { error = "Enter the 6-digit code"; return@ForgotTab }
-                                    if (fpNewPassword.length < 6) { error = "New password must be at least 6 characters"; return@ForgotTab }
-                                    loading = true; error = ""; info = ""
-                                    scope.launch {
-                                        try {
-                                            val resp = AppState.api.resetPassword(mapOf(
-                                                "email" to fpEmail.trim().lowercase(),
-                                                "code" to fpCode.trim(),
-                                                "newPassword" to fpNewPassword
-                                            ))
-                                            if (resp.ok) {
-                                                sound.success()
-                                                info = "Password reset! You can now sign in with your new password."
-                                                mode = "login"
-                                                liEmail = fpEmail
-                                                fpStep = 1
-                                                fpCode = ""; fpNewPassword = ""
-                                            } else {
-                                                sound.error()
-                                                error = resp.error ?: "Reset failed."
-                                            }
-                                        } catch (e: retrofit2.HttpException) {
-                                            sound.error()
-                                            error = extractHttpError(e) ?: "Reset failed."
-                                        } catch (e: java.net.UnknownHostException) { sound.error(); error = "No internet connection." }
-                                        catch (e: java.io.IOException) { sound.error(); error = "Could not connect." }
-                                        catch (e: Exception) { sound.error(); error = "Reset failed: ${e.message ?: "unknown"}" }
-                                        loading = false
-                                    }
-                                }
-                            )
+                            // "forgot" tab removed — only login + signup
                         }
                     }
 

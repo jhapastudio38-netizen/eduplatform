@@ -273,32 +273,31 @@ fun ExamEntryScreen(theme: AppTheme, sound: SoundManager, testId: String, onStar
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 // ── BLACK OUTLINE profile icon (NOT colored, NOT filled circle) ──
-                // 118×118px circle with black outline + black Person silhouette icon.
-                // Uses Material's Person icon (head + shoulders) which renders cleanly
-                // without any background bleeding or border artifacts.
+                // 140px circle with black outline + black Person silhouette icon.
+                // Bigger than before so it fits nicely in the layout.
                 Box(
                     modifier = Modifier
-                        .size(sdp(118f))
+                        .size(sdp(140f))
                         .clip(CircleShape)
                         .background(Color.White)
-                        .border(width = sdp(5f), color = Color(0xFF111111)),
+                        .border(width = sdp(6f), color = Color(0xFF111111)),
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
                         Icons.Default.Person,
                         contentDescription = "Profile",
                         tint = Color(0xFF111111),
-                        modifier = Modifier.size(sdp(80f))
+                        modifier = Modifier.size(sdp(95f))
                     )
                 }
 
                 Spacer(Modifier.height(sdp(16f)))
 
-                // ── "Name of Student: dreamkorea" — centered, ~24px, weight 700 ──
+                // ── "Name of Student: dreamkorea" — centered, 26px, weight 700 ──
                 Text(
                     text = "Name of Student: $studentName",
                     color = Color(0xFF111111),
-                    fontSize = ssp(24f),
+                    fontSize = ssp(26f),
                     fontWeight = FontWeight.Bold,
                     textAlign = TextAlign.Center,
                     maxLines = 1,
@@ -307,11 +306,11 @@ fun ExamEntryScreen(theme: AppTheme, sound: SoundManager, testId: String, onStar
 
                 Spacer(Modifier.height(sdp(10f)))
 
-                // ── "Student Email: dreamkoreaubt@gmail.com" — centered, ~24px, weight 700 ──
+                // ── "Student Email: dreamkoreaubt@gmail.com" — centered, 26px, weight 700 ──
                 Text(
                     text = "Student Email: $studentEmail",
                     color = Color(0xFF111111),
-                    fontSize = ssp(24f),
+                    fontSize = ssp(26f),
                     fontWeight = FontWeight.Bold,
                     textAlign = TextAlign.Center,
                     maxLines = 1,
@@ -320,8 +319,8 @@ fun ExamEntryScreen(theme: AppTheme, sound: SoundManager, testId: String, onStar
             }
 
             // ── EXAM DESCRIPTION SECTION — LEFT ALIGNED at x≈99, y≈314 ──
-            // Heading "Exam description" (23px, weight 700)
-            // Body text (24-25px, weight 400, left-aligned, wraps to 2 lines)
+            // Heading "Exam description" (26px, weight 700)
+            // Body text (27px, weight 400, left-aligned, wraps to 2 lines)
             Column(
                 modifier = Modifier
                     .align(Alignment.TopStart)
@@ -332,7 +331,7 @@ fun ExamEntryScreen(theme: AppTheme, sound: SoundManager, testId: String, onStar
                 Text(
                     text = "Exam description",
                     color = Color(0xFF111111),
-                    fontSize = ssp(23f),
+                    fontSize = ssp(26f),
                     fontWeight = FontWeight.Bold,
                     textAlign = TextAlign.Start
                 )
@@ -347,10 +346,10 @@ fun ExamEntryScreen(theme: AppTheme, sound: SoundManager, testId: String, onStar
                 Text(
                     text = descText,
                     color = Color(0xFF111111),
-                    fontSize = ssp(24f),
+                    fontSize = ssp(27f),
                     fontWeight = FontWeight.Normal,
                     textAlign = TextAlign.Start,
-                    lineHeight = ssp(31f),
+                    lineHeight = ssp(34f),
                     maxLines = 4,
                     overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
                 )
