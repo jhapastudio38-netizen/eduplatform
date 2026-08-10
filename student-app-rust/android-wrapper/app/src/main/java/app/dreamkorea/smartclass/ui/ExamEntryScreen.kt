@@ -231,62 +231,70 @@ fun ExamEntryScreen(theme: AppTheme, sound: SoundManager, testId: String, onStar
             .background(Color.White)
             .border(2.dp, Color.Black)
     ) {
-        // ── DreamKorea logo at top centre ────────────────────────────────
+        // ── DreamKorea logo bar at top ────────────────────────────────────
         Box(
-            modifier = Modifier.fillMaxWidth().padding(top = 8.dp, bottom = 4.dp),
+            modifier = Modifier.fillMaxWidth().padding(top = 6.dp, bottom = 2.dp),
             contentAlignment = Alignment.Center
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Image(
                     painter = painterResource(id = app.dreamkorea.smartclass.R.drawable.dreamkorea_logo),
                     contentDescription = "DreamKorea Logo",
-                    modifier = Modifier.size(32.dp),
+                    modifier = Modifier.size(28.dp),
                     contentScale = ContentScale.Fit
                 )
                 Spacer(Modifier.width(8.dp))
                 Text(
                     "DreamKorea SmartClass",
                     color = Color(0xFF003478),
-                    fontSize = 14.sp,
+                    fontSize = 13.sp,
                     fontWeight = FontWeight.Bold,
                 )
             }
         }
 
+        // ── EXAM TITLE — full width, centered, at the top ─────────────────
         Box(
-            modifier = Modifier.weight(1f).padding(16.dp)
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
+            contentAlignment = Alignment.Center
         ) {
-            // Landscape-friendly layout: Row with LEFT (student) + RIGHT (exam)
-            Row(
-                modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()),
-                horizontalArrangement = Arrangement.spacedBy(24.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                // ── LEFT: Student info ────────────────────────────────────
-                Column(
-                    modifier = Modifier.weight(0.4f),
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    // Title at top
-                Text(
-                    t.title,
-                    color = Color.Black,
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.Bold,
-                    textAlign = TextAlign.Center,
-                    maxLines = 2
-                )
-                Spacer(Modifier.height(16.dp))
+            Text(
+                t.title,
+                color = Color.Black,
+                fontSize = 16.sp,
+                fontWeight = FontWeight.Bold,
+                textAlign = TextAlign.Center,
+                maxLines = 2,
+                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+            )
+        }
 
-                // Profile icon
+        // ── MAIN CONTENT — Row with LEFT (student) and RIGHT (exam info) ──
+        // NO verticalScroll — it breaks weight-based sizing in landscape.
+        // The content is sized to fit a landscape phone screen.
+        Row(
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxWidth()
+                .padding(16.dp),
+            horizontalArrangement = Arrangement.spacedBy(20.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // ── LEFT: Student info (avatar + name + email) ───────────────
+            Column(
+                modifier = Modifier.weight(0.38f).fillMaxHeight(),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center
+            ) {
+                // Profile avatar
                 Box(
                     modifier = Modifier
-                        .size(64.dp)
+                        .size(56.dp)
                         .clip(CircleShape)
-                        .background(Color(0xFF003478)),
+                        .background(Color(0xFF1A73E8)),
                     contentAlignment = Alignment.Center
                 ) {
-                    Icon(Icons.Default.Person, null, tint = Color.White, modifier = Modifier.size(36.dp))
+                    Icon(Icons.Default.Person, null, tint = Color.White, modifier = Modifier.size(32.dp))
                 }
                 Spacer(Modifier.height(8.dp))
 
@@ -294,16 +302,20 @@ fun ExamEntryScreen(theme: AppTheme, sound: SoundManager, testId: String, onStar
                 Text(
                     studentName,
                     color = Color.Black,
-                    fontSize = 14.sp,
+                    fontSize = 13.sp,
                     fontWeight = FontWeight.SemiBold,
-                    textAlign = TextAlign.Center
+                    textAlign = TextAlign.Center,
+                    maxLines = 1,
+                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
                 )
                 // Student email
                 Text(
                     studentEmail,
                     color = Color.Gray,
-                    fontSize = 11.sp,
-                    textAlign = TextAlign.Center
+                    fontSize = 10.sp,
+                    textAlign = TextAlign.Center,
+                    maxLines = 1,
+                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
                 )
             }
 
@@ -311,16 +323,17 @@ fun ExamEntryScreen(theme: AppTheme, sound: SoundManager, testId: String, onStar
             Box(
                 modifier = Modifier
                     .width(1.dp)
-                    .fillMaxHeight(0.7f)
+                    .fillMaxHeight(0.6f)
                     .background(Color(0xFFCCCCCC))
             )
 
-            // ── RIGHT: Exam info + buttons ────────────────────────────────
+            // ── RIGHT: Exam description + buttons ─────────────────────────
             Column(
-                modifier = Modifier.weight(0.6f),
-                horizontalAlignment = Alignment.CenterHorizontally
+                modifier = Modifier.weight(0.62f).fillMaxHeight(),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center
             ) {
-                // Exam description
+                // Exam description (max 6 lines)
                 if (!t.description.isNullOrBlank()) {
                     Surface(
                         color = Color(0xFFF5F5F5),
@@ -331,22 +344,21 @@ fun ExamEntryScreen(theme: AppTheme, sound: SoundManager, testId: String, onStar
                         Text(
                             t.description!!,
                             color = Color.Black,
-                            fontSize = 14.sp,
-                            lineHeight = 18.sp,
-                            modifier = Modifier.padding(12.dp)
+                            fontSize = 13.sp,
+                            lineHeight = 17.sp,
+                            maxLines = 6,
+                            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                            modifier = Modifier.padding(10.dp)
                         )
                     }
-                    Spacer(Modifier.height(12.dp))
+                    Spacer(Modifier.height(14.dp))
                 }
 
-                                Spacer(Modifier.height(20.dp))
-
-                // Get Started button — graded exams lock after 1 attempt, practice can retake
-                // Bigger button: 170×42dp, 14sp text
+                // Get Started button — 170×42dp, 14sp, blue #1A73E8
                 Button(
                     onClick = { sound.swoosh(); onStart() },
                     modifier = Modifier.width(170.dp).height(42.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF003478)),
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1A73E8)),
                     shape = RoundedCornerShape(10.dp),
                     enabled = !alreadyCompleted
                 ) {
@@ -358,18 +370,20 @@ fun ExamEntryScreen(theme: AppTheme, sound: SoundManager, testId: String, onStar
 
                 Spacer(Modifier.height(8.dp))
 
-                // Cancel button — bigger: 140×42dp, 14sp text
+                // Cancel button — 140×42dp, 14sp, white with dark border
                 OutlinedButton(
                     onClick = { sound.click(); onBack() },
                     modifier = Modifier.width(140.dp).height(42.dp),
                     shape = RoundedCornerShape(10.dp),
-                    colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.Black),
+                    colors = ButtonDefaults.outlinedButtonColors(
+                        containerColor = Color.White,
+                        contentColor = Color.Black
+                    ),
                     border = BorderStroke(1.dp, Color.Black)
                 ) {
                     Text("Cancel", fontSize = 14.sp)
                 }
             }
-        }
         }
     }
 }
