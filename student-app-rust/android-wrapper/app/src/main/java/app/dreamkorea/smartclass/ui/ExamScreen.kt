@@ -551,7 +551,7 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
             Row(modifier = Modifier.fillMaxWidth().height(52.dp), verticalAlignment = Alignment.CenterVertically) {
                 // Previous (अघिल्लो) — disabled when audio playing
                 Box(modifier = Modifier.weight(1f).fillMaxHeight().clickable(enabled = !audioPlaying) { if (currentIdx > 0) { currentIdx--; sound.click() } }, contentAlignment = Alignment.Center) {
-                    Text("अघिल्लो (Prev)", color = if (currentIdx > 0 Text("अघिल्लो (Prev)", color = if (currentIdx > 0 && !audioPlaying) Color(0xFF003478) else Color(0xFFCBD5E1), fontSize = 13.spText("अघिल्लो (Prev)", color = if (currentIdx > 0 && !audioPlaying) Color(0xFF003478) else Color(0xFFCBD5E1), fontSize = 13.sp !audioPlaying) Color(0xFF003478) else Color(0xFFCBD5E1), fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+                    Text("अघिल्लो (Prev)", color = if (currentIdx > 0 && !audioPlaying) Color(0xFF003478) else Color(0xFFCBD5E1), fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
                 }
                 Box(modifier = Modifier.width(1.dp).fillMaxHeight(0.6f).background(Color(0xFFE2E8F0)))
                 // All questions (सबै प्रश्नहरू) — disabled when audio playing
