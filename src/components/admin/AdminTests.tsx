@@ -804,6 +804,9 @@ function ExamEditor({ test, testCategory, onClose }: { test: Test; testCategory:
     ? Array.from({ length: textCount }, (_, i) => i + 1)
     : Array.from({ length: audioCount }, (_, i) => i + 1);
 
+  // Display numbers: text blocks = 1..textCount, audio blocks = (textCount+1)..(textCount+audioCount)
+  const displayNumber = (blockNum: number) => activeBlock === "audio" ? blockNum + textCount : blockNum;
+
   // Simple-mode list of saved questions (sorted by block number)
   const simpleList = Object.values(questions)
     .filter((q) => q.stem.trim())
@@ -878,7 +881,7 @@ function ExamEditor({ test, testCategory, onClose }: { test: Test; testCategory:
 
         {/* Block number selector — grid of numbered buttons (exam & demo only) */}
         {!isSimple && (
-          <div className="grid grid-cols-10 gap-1 max-h-24 overflow-y-auto p-1 bg-slate-50 rounded">
+          <div className="grid grid-cols-10 gap-1 max-h-32 overflow-y-auto p-1 bg-slate-50 rounded">
             {blockNumbers.map((num) => {
               const k = key(activeBlock, num);
               const isFilled = questions[k] && questions[k].stem.trim();
@@ -893,7 +896,7 @@ function ExamEditor({ test, testCategory, onClose }: { test: Test; testCategory:
                     "bg-white border hover:bg-slate-100"
                   }`}
                 >
-                  {num}
+                  {displayNumber(num)}
                 </button>
               );
             })}

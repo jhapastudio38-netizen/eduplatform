@@ -1455,7 +1455,13 @@ fun AudioPlayerCard(
         }
     }
 
-    Surface(color = theme.cardBg, shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth(), shadowElevation = 1.dp) {
+    Surface(
+        color = Color.White,
+        shape = RoundedCornerShape(10.dp),
+        border = androidx.compose.foundation.BorderStroke(1.5.dp, Color(0xFF333333)),
+        modifier = Modifier.fillMaxWidth(),
+        shadowElevation = 1.dp
+    ) {
         Box(
             modifier = Modifier.padding(8.dp),
             contentAlignment = Alignment.Center
