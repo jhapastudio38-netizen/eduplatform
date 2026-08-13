@@ -94,7 +94,7 @@ enum class BottomTab(val label: String, val icon: ImageVector) {
 }
 
 @Composable
-fun MainScreen(userName: String, onLogout: () -> Unit) {
+fun MainScreen(userName: String, onLogout: () -> Unit, onImmersiveChange: (Boolean) -> Unit = {}) {
     val theme = rememberAppTheme()
     val sound = rememberSoundManager()
     var screen by remember { mutableStateOf<Screen>(Screen.Home) }
@@ -102,19 +102,17 @@ fun MainScreen(userName: String, onLogout: () -> Unit) {
     var hideBottomBar by remember { mutableStateOf(false) }
     val context = androidx.compose.ui.platform.LocalContext.current
 
-    // ── ORIENTATION CONTROL ──────────────────────────────────────────────
-    // Force PORTRAIT for all screens EXCEPT exam + exam entry (landscape).
-    // Uses LaunchedEffect (runs AFTER DisposableEffect) so it doesn't
-    // override the exam screen's own landscape lock.
+    // ── IMMERSIVE MODE CONTROL ──────────────────────────────────────────
+    // Enter immersive (hide system bars) ONLY on exam screens.
+    // Exit immersive (show system bars) on home, review, and all other screens.
     androidx.compose.runtime.LaunchedEffect(screen) {
         val activity = context as? android.app.Activity
         when (screen) {
             is Screen.Exam, is Screen.ExamEntry -> {
-                // Exam screens handle their own orientation (landscape)
-                // Don't override — let ExamScreen/ExamEntryScreen set LANDSCAPE
+                onImmersiveChange(true)
             }
             else -> {
-                // Force portrait for ALL other screens (home, books, etc.)
+                onImmersiveChange(false)
                 activity?.requestedOrientation = android.content.pm.ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
             }
         }
@@ -230,6 +228,7 @@ fun MainScreen(userName: String, onLogout: () -> Unit) {
                 is Screen.BookReader -> false
                 is Screen.BundleDetail -> false
                 is Screen.Settings -> false
+                is Screen.EyeVision -> false
                 else -> !hideBottomBar
             }
             if (showBottomBar) {
@@ -349,7 +348,7 @@ fun TopBar(theme: AppTheme, userName: String, sound: SoundManager, onProfile: ()
 // Async image loader — uses Coil
 @Composable
 fun AsyncImageLoader(url: String, modifier: Modifier = Modifier) {
-    val absoluteUrl = if (url.isBlank()) "" else if (url.startsWith("http")) url else "https://my-project-five-sepia.vercel.app$url"
+    val absoluteUrl = if (url.isBlank()) "" else if (url.startsWith("http")) url else "https://dreamkoreasmartclass.com$url"
     if (absoluteUrl.isBlank()) {
         Box(modifier = modifier.background(NavyBlue.copy(alpha = 0.05f)), contentAlignment = Alignment.Center) {
             Icon(Icons.Default.Image, null, tint = NavyBlue.copy(alpha = 0.2f), modifier = Modifier.size(32.dp))
@@ -1010,7 +1009,7 @@ fun VideosScreen(theme: AppTheme, sound: SoundManager, onBack: () -> Unit, onHid
         val v = playingVideo!!
         LaunchedEffect(v.id) {
             val url = if (v.videoSource == "upload" && !v.videoUrl.isNullOrBlank()) {
-                if (v.videoUrl!!.startsWith("http")) v.videoUrl else "https://my-project-five-sepia.vercel.app${v.videoUrl}"
+                if (v.videoUrl!!.startsWith("http")) v.videoUrl else "https://dreamkoreasmartclass.com${v.videoUrl}"
             } else if (v.youtubeId.isNotBlank()) {
                 "https://www.youtube.com/watch?v=${v.youtubeId}"
             } else {
@@ -1051,7 +1050,7 @@ fun VideosScreen(theme: AppTheme, sound: SoundManager, onBack: () -> Unit, onHid
                             Surface(color = Color.Black, shape = RoundedCornerShape(10.dp), modifier = Modifier.fillMaxWidth().height(160.dp)) {
                                 Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
                                     if (!v.thumbnailUrl.isNullOrBlank()) {
-                                        val thumbUrl = if (v.thumbnailUrl!!.startsWith("http")) v.thumbnailUrl else "https://my-project-five-sepia.vercel.app${v.thumbnailUrl}"
+                                        val thumbUrl = if (v.thumbnailUrl!!.startsWith("http")) v.thumbnailUrl else "https://dreamkoreasmartclass.com${v.thumbnailUrl}"
                                         coil.compose.AsyncImage(
                                             model = thumbUrl,
                                             contentDescription = v.title,
@@ -1162,7 +1161,7 @@ fun ProfileScreen(theme: AppTheme, sound: SoundManager, userName: String, onBack
                     Divider(color = DividerColor, thickness = 0.5.dp); Spacer(Modifier.height(10.dp))
                     ContactRow(theme, Icons.Default.LocationOn, "Krishithok Road, Birtamod, Jhapa", "geo:26.67,87.99?q=Krishithok+Road+Birtamod+Jhapa+Nepal"); Spacer(Modifier.height(10.dp))
                     Divider(color = DividerColor, thickness = 0.5.dp); Spacer(Modifier.height(10.dp))
-                    ContactRow(theme, Icons.Default.Language, "DreamKorea SmartClass", "https://my-project-five-sepia.vercel.app")
+                    ContactRow(theme, Icons.Default.Language, "DreamKorea SmartClass", "https://dreamkoreasmartclass.com")
                 }
             }
         }
