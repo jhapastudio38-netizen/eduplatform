@@ -2838,6 +2838,7 @@ private fun gradeCombinedExamClientSide(
                 descType = q.descType,
                 descText = q.descText,
                 descImageUrl = q.descImageUrl,
+                descAudioUrl = q.descAudioUrl,
                 mediaType = q.mediaType,
                 mediaText = q.mediaText,
                 mediaImageUrl = q.mediaImageUrl,
