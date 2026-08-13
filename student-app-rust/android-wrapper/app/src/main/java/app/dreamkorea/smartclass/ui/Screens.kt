@@ -94,7 +94,7 @@ enum class BottomTab(val label: String, val icon: ImageVector) {
 }
 
 @Composable
-fun MainScreen(userName: String, onLogout: () -> Unit) {
+fun MainScreen(userName: String, onLogout: () -> Unit, onImmersiveChange: (Boolean) -> Unit = {}) {
     val theme = rememberAppTheme()
     val sound = rememberSoundManager()
     var screen by remember { mutableStateOf<Screen>(Screen.Home) }
@@ -102,19 +102,17 @@ fun MainScreen(userName: String, onLogout: () -> Unit) {
     var hideBottomBar by remember { mutableStateOf(false) }
     val context = androidx.compose.ui.platform.LocalContext.current
 
-    // ── ORIENTATION CONTROL ──────────────────────────────────────────────
-    // Force PORTRAIT for all screens EXCEPT exam + exam entry (landscape).
-    // Uses LaunchedEffect (runs AFTER DisposableEffect) so it doesn't
-    // override the exam screen's own landscape lock.
+    // ── IMMERSIVE MODE CONTROL ──────────────────────────────────────────
+    // Enter immersive (hide system bars) ONLY on exam screens.
+    // Exit immersive (show system bars) on home, review, and all other screens.
     androidx.compose.runtime.LaunchedEffect(screen) {
         val activity = context as? android.app.Activity
         when (screen) {
             is Screen.Exam, is Screen.ExamEntry -> {
-                // Exam screens handle their own orientation (landscape)
-                // Don't override — let ExamScreen/ExamEntryScreen set LANDSCAPE
+                onImmersiveChange(true)
             }
             else -> {
-                // Force portrait for ALL other screens (home, books, etc.)
+                onImmersiveChange(false)
                 activity?.requestedOrientation = android.content.pm.ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
             }
         }
