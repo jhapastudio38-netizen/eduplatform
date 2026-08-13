@@ -228,6 +228,7 @@ fun MainScreen(userName: String, onLogout: () -> Unit, onImmersiveChange: (Boole
                 is Screen.BookReader -> false
                 is Screen.BundleDetail -> false
                 is Screen.Settings -> false
+                is Screen.EyeVision -> false
                 else -> !hideBottomBar
             }
             if (showBottomBar) {
@@ -347,7 +348,7 @@ fun TopBar(theme: AppTheme, userName: String, sound: SoundManager, onProfile: ()
 // Async image loader — uses Coil
 @Composable
 fun AsyncImageLoader(url: String, modifier: Modifier = Modifier) {
-    val absoluteUrl = if (url.isBlank()) "" else if (url.startsWith("http")) url else "https://my-project-five-sepia.vercel.app$url"
+    val absoluteUrl = if (url.isBlank()) "" else if (url.startsWith("http")) url else "https://dreamkoreasmartclass.com$url"
     if (absoluteUrl.isBlank()) {
         Box(modifier = modifier.background(NavyBlue.copy(alpha = 0.05f)), contentAlignment = Alignment.Center) {
             Icon(Icons.Default.Image, null, tint = NavyBlue.copy(alpha = 0.2f), modifier = Modifier.size(32.dp))
@@ -1008,7 +1009,7 @@ fun VideosScreen(theme: AppTheme, sound: SoundManager, onBack: () -> Unit, onHid
         val v = playingVideo!!
         LaunchedEffect(v.id) {
             val url = if (v.videoSource == "upload" && !v.videoUrl.isNullOrBlank()) {
-                if (v.videoUrl!!.startsWith("http")) v.videoUrl else "https://my-project-five-sepia.vercel.app${v.videoUrl}"
+                if (v.videoUrl!!.startsWith("http")) v.videoUrl else "https://dreamkoreasmartclass.com${v.videoUrl}"
             } else if (v.youtubeId.isNotBlank()) {
                 "https://www.youtube.com/watch?v=${v.youtubeId}"
             } else {
@@ -1049,7 +1050,7 @@ fun VideosScreen(theme: AppTheme, sound: SoundManager, onBack: () -> Unit, onHid
                             Surface(color = Color.Black, shape = RoundedCornerShape(10.dp), modifier = Modifier.fillMaxWidth().height(160.dp)) {
                                 Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
                                     if (!v.thumbnailUrl.isNullOrBlank()) {
-                                        val thumbUrl = if (v.thumbnailUrl!!.startsWith("http")) v.thumbnailUrl else "https://my-project-five-sepia.vercel.app${v.thumbnailUrl}"
+                                        val thumbUrl = if (v.thumbnailUrl!!.startsWith("http")) v.thumbnailUrl else "https://dreamkoreasmartclass.com${v.thumbnailUrl}"
                                         coil.compose.AsyncImage(
                                             model = thumbUrl,
                                             contentDescription = v.title,
@@ -1160,7 +1161,7 @@ fun ProfileScreen(theme: AppTheme, sound: SoundManager, userName: String, onBack
                     Divider(color = DividerColor, thickness = 0.5.dp); Spacer(Modifier.height(10.dp))
                     ContactRow(theme, Icons.Default.LocationOn, "Krishithok Road, Birtamod, Jhapa", "geo:26.67,87.99?q=Krishithok+Road+Birtamod+Jhapa+Nepal"); Spacer(Modifier.height(10.dp))
                     Divider(color = DividerColor, thickness = 0.5.dp); Spacer(Modifier.height(10.dp))
-                    ContactRow(theme, Icons.Default.Language, "DreamKorea SmartClass", "https://my-project-five-sepia.vercel.app")
+                    ContactRow(theme, Icons.Default.Language, "DreamKorea SmartClass", "https://dreamkoreasmartclass.com")
                 }
             }
         }

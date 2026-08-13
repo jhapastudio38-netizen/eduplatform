@@ -24,7 +24,7 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
 object AppState {
-    private const val BASE_URL = "https://my-project-five-sepia.vercel.app/"
+    private const val BASE_URL = "https://dreamkoreasmartclass.com/"
     private const val PREFS_NAME = "dreamkorea_session"
     private const val SETTINGS_PREFS = "dreamkorea_settings"
     private const val KEY_TOKEN = "token"
@@ -221,8 +221,6 @@ object AppState {
             putString(KEY_EMAIL, user.email)
             putString(KEY_PHONE, user.phone ?: "")
             putString(KEY_ROLE, user.role)
-            // Mark that we have a session (token presence is checked by the cookie jar)
-            // We store a marker so isLoggedIn() returns true.
             if (prefs.getString(KEY_TOKEN, null) == null) {
                 putString(KEY_TOKEN, "session_via_cookie")
             }
