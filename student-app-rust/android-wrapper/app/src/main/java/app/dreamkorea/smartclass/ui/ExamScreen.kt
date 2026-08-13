@@ -867,10 +867,10 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
                         }
                         Spacer(Modifier.height(6.dp))
                     }
-                    // Media text — inside box with border
+                    // Media text — border fits text size, centered if small
                     if (!q.mediaText.isNullOrBlank()) {
-                        Surface(color = Color.White, shape = RoundedCornerShape(8.dp), border = androidx.compose.foundation.BorderStroke(1.5.dp, Color(0xFF333333)), modifier = Modifier.fillMaxWidth(0.92f)) {
-                            Text(q.mediaText, color = Color(0xFF1E293B), fontSize = 18.sp, textAlign = TextAlign.Start, modifier = Modifier.padding(12.dp))
+                        Surface(color = Color.White, shape = RoundedCornerShape(8.dp), border = androidx.compose.foundation.BorderStroke(1.5.dp, Color(0xFF333333)), modifier = Modifier.wrapContentWidth().align(Alignment.CenterHorizontally)) {
+                            Text(q.mediaText, color = Color(0xFF1E293B), fontSize = 18.sp, textAlign = TextAlign.Center, modifier = Modifier.padding(12.dp))
                         }
                         Spacer(Modifier.height(6.dp))
                     }
@@ -914,7 +914,7 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
                                         Box(contentAlignment = Alignment.Center) { Text("${i+1}", color = if (isSelected) Color.White else Color.Black, fontSize = 18.sp, fontWeight = FontWeight.Bold) }
                                     }
                                     Spacer(Modifier.width(8.dp))
-                                    Text(text = buildUnderlinedText(optText, blankWord), color = Color.Black, fontSize = 16.sp, modifier = Modifier.weight(1f))
+                                    Text(text = buildUnderlinedText(optText, blankWord), color = Color.Black, fontSize = 18.sp, modifier = Modifier.weight(1f))
                                 }
                             }
                         }
@@ -1438,12 +1438,10 @@ fun AudioPlayerCard(
         }
     }
 
-    Surface(
-        color = Color.White,
-        shape = RoundedCornerShape(10.dp),
-        border = androidx.compose.foundation.BorderStroke(1.5.dp, Color(0xFF333333)),
-        modifier = Modifier.fillMaxWidth(),
-        shadowElevation = 1.dp
+    // No border/box around audio — just the play button
+    Box(
+        modifier = Modifier.fillMaxWidth().padding(4.dp),
+        contentAlignment = Alignment.Center
     ) {
         Box(
             modifier = Modifier.padding(8.dp),
@@ -2489,7 +2487,7 @@ fun ReviewCard(theme: AppTheme, review: ReviewItem, questionNumber: Int = 0, sou
                                 )
                             } else {
                                 // Render as text
-                                Text(opt, color = theme.darkText, fontSize = 13.sp, fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f))
+                                Text(opt, color = theme.darkText, fontSize = 16.sp, fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f))
                             }
                             if (isCorrectAns) {
                                 Icon(Icons.Default.Check, null, tint = Color(0xFF28A745), modifier = Modifier.size(14.dp))
