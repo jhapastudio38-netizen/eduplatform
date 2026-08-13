@@ -25,7 +25,7 @@ data class User(
     val role: String
 )
 data class VerifyResponse(val ok: Boolean, val sessionToken: String? = null, val user: User)
-data class CredentialsResponse(val ok: Boolean = false, val user: User = User("", null, "", null, "STUDENT"), val error: String? = null)
+data class CredentialsResponse(val ok: Boolean = false, val user: User = User("", null, "", null, "STUDENT"), val error: String? = null, val sessionToken: String? = null)
 data class SimpleResponse(val ok: Boolean = false, val error: String? = null)
 data class MeResponse(val user: User?)
 
@@ -154,6 +154,16 @@ data class ReviewItem(
     val audioUrl: String?,
     val audioLoop: Int = 2,
     val audioLoopDelay: Int = 0,
+    // ── Block-based media fields (mirrors QuestionDetail) ───────────────
+    val descType: String = "none",
+    val descText: String? = null,
+    val descImageUrl: String? = null,
+    val mediaType: String = "none",
+    val mediaText: String? = null,
+    val mediaImageUrl: String? = null,
+    val mediaAudioUrl: String? = null,
+    val answerType: String = "text",
+    val blockType: String = "text",
     val userAnswer: Any?, // String or List<String>
     val correctAnswer: Any?, // String or List<String>
     val explanation: String?,
