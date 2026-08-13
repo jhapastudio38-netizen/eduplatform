@@ -836,9 +836,26 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
                     verticalArrangement = if (hasOnlyAudio) Arrangement.Center else Arrangement.Top,
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
+                    // Question title — NO box
                     if (!q.title.isNullOrBlank()) {
-                        Text(q.title, color = Color(0xFF003478), fontSize = 16.sp, fontWeight = FontWeight.Bold, modifier = Modifier.fillMaxWidth(0.92f).padding(bottom = 4.dp))
+                        Text(q.title, color = Color(0xFF003478), fontSize = 18.sp, fontWeight = FontWeight.Bold, modifier = Modifier.fillMaxWidth(0.92f).padding(bottom = 4.dp))
                     }
+                    // Question number + stem text — NO box, plain text with number
+                    val questionText = q.stem.ifBlank { q.mediaText ?: "" }
+                    if (questionText.isNotBlank()) {
+                        Text(
+                            "${currentIdx + 1}. $questionText",
+                            color = Color(0xFF1E293B),
+                            fontSize = 18.sp,
+                            fontWeight = FontWeight.Medium,
+                            modifier = Modifier.fillMaxWidth(0.92f).padding(bottom = 6.dp)
+                        )
+                    }
+                    // Description text — NO box, plain text
+                    if (!q.descText.isNullOrBlank()) {
+                        Text(q.descText, color = Color(0xFF1E293B), fontSize = 18.sp, textAlign = TextAlign.Start, modifier = Modifier.fillMaxWidth(0.92f).padding(bottom = 6.dp))
+                    }
+                    // Description image — inside box with border
                     if (q.descType == "image" && !q.descImageUrl.isNullOrBlank()) {
                         val url = q.descImageUrl!!.toAbsoluteUrl()
                         Surface(
@@ -855,7 +872,7 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
                         }
                         Spacer(Modifier.height(6.dp))
                     }
-                    // Description AUDIO — audio attached to the description section
+                    // Description AUDIO — NO box, just play button
                     if (!q.descAudioUrl.isNullOrBlank()) {
                         val descAudUrl = q.descAudioUrl!!.toAbsoluteUrl()
                         key("${q.id}-desc-audio") {
@@ -863,12 +880,7 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
                         }
                         Spacer(Modifier.height(6.dp))
                     }
-                    if (!q.descText.isNullOrBlank()) {
-                        Surface(color = Color.White, shape = RoundedCornerShape(8.dp), border = androidx.compose.foundation.BorderStroke(1.5.dp, Color(0xFF333333)), modifier = Modifier.fillMaxWidth(0.92f)) {
-                            Text(q.descText, color = Color(0xFF1E293B), fontSize = 20.sp, textAlign = TextAlign.Start, modifier = Modifier.padding(12.dp))
-                        }
-                        Spacer(Modifier.height(6.dp))
-                    }
+                    // Media image — inside box with border
                     val mediaImgUrl = (q.mediaImageUrl ?: q.imageUrl)?.toAbsoluteUrl()
                     if (!mediaImgUrl.isNullOrBlank()) {
                         Surface(
@@ -885,12 +897,14 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
                         }
                         Spacer(Modifier.height(6.dp))
                     }
+                    // Media text — inside box with border
                     if (!q.mediaText.isNullOrBlank()) {
                         Surface(color = Color.White, shape = RoundedCornerShape(8.dp), border = androidx.compose.foundation.BorderStroke(1.5.dp, Color(0xFF333333)), modifier = Modifier.fillMaxWidth(0.92f)) {
-                            Text(q.mediaText, color = Color(0xFF1E293B), fontSize = 20.sp, textAlign = TextAlign.Start, modifier = Modifier.padding(12.dp))
+                            Text(q.mediaText, color = Color(0xFF1E293B), fontSize = 18.sp, textAlign = TextAlign.Start, modifier = Modifier.padding(12.dp))
                         }
                         Spacer(Modifier.height(6.dp))
                     }
+                    // Media audio — play button (has own border)
                     val mediaAudUrl = (q.mediaAudioUrl ?: q.audioUrl)?.toAbsoluteUrl()
                     if (!mediaAudUrl.isNullOrBlank()) {
                         key(q.id) {
