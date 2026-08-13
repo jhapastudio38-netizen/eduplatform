@@ -158,6 +158,7 @@ data class ReviewItem(
     val descType: String = "none",
     val descText: String? = null,
     val descImageUrl: String? = null,
+    val descAudioUrl: String? = null,
     val mediaType: String = "none",
     val mediaText: String? = null,
     val mediaImageUrl: String? = null,

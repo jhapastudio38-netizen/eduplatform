@@ -2369,11 +2369,17 @@ fun ReviewCard(theme: AppTheme, review: ReviewItem, questionNumber: Int = 0, sou
                 Spacer(Modifier.height(8.dp))
                 val url = review.descImageUrl!!.toAbsoluteUrl()
                 coil.compose.AsyncImage(
-                    model = url,
+                    model = coil.request.ImageRequest.Builder(LocalContext.current).data(url).crossfade(true).build(),
                     contentDescription = "Description image",
                     modifier = Modifier.fillMaxWidth().heightIn(max = 160.dp).clip(RoundedCornerShape(8.dp)),
                     contentScale = ContentScale.Fit
                 )
+            }
+            // Description AUDIO — audio attached to the description section
+            if (!review.descAudioUrl.isNullOrBlank()) {
+                Spacer(Modifier.height(8.dp))
+                val descAudUrl = review.descAudioUrl!!.toAbsoluteUrl()
+                AudioPlayerCard(theme = theme, url = descAudUrl, loopCount = 1, loopDelaySec = 0, sound = sound ?: rememberSoundManager(), unlimited = true)
             }
             // Description text — left-aligned, 13sp
             if (!review.descText.isNullOrBlank()) {
@@ -2399,7 +2405,7 @@ fun ReviewCard(theme: AppTheme, review: ReviewItem, questionNumber: Int = 0, sou
             if (!mediaImgUrl.isNullOrBlank()) {
                 Spacer(Modifier.height(8.dp))
                 coil.compose.AsyncImage(
-                    model = mediaImgUrl,
+                    model = coil.request.ImageRequest.Builder(LocalContext.current).data(mediaImgUrl).crossfade(true).build(),
                     contentDescription = "Question image",
                     modifier = Modifier.fillMaxWidth().heightIn(max = 180.dp).clip(RoundedCornerShape(8.dp)),
                     contentScale = ContentScale.Fit
