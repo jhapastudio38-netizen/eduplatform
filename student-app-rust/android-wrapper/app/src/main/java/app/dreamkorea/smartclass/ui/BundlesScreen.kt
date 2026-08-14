@@ -204,7 +204,7 @@ private fun BundleCardCombined(
                 contentAlignment = Alignment.Center
             ) {
                 if (!bundle.coverUrl.isNullOrBlank()) {
-                    val absUrl = if (bundle.coverUrl!!.startsWith("http")) bundle.coverUrl else "https://my-project-five-sepia.vercel.app${bundle.coverUrl}"
+                    val absUrl = if (bundle.coverUrl!!.startsWith("http")) bundle.coverUrl else "https://dreamkoreasmartclass.com${bundle.coverUrl}"
                     coil.compose.AsyncImage(
                         model = absUrl,
                         contentDescription = bundle.title,
