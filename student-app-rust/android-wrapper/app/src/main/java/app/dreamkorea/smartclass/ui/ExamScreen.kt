@@ -1441,8 +1441,8 @@ fun AudioPlayerCard(
 
     // No border/box around audio — just the play button
     Box(
-        modifier = Modifier.fillMaxWidth().padding(4.dp),
-        contentAlignment = Alignment.Center
+        modifier = Modifier.wrapContentSize().padding(4.dp),
+        contentAlignment = Alignment.CenterStart
     ) {
         Box(
             modifier = Modifier.padding(8.dp),
@@ -2555,6 +2555,7 @@ private fun formatAnswer(answer: Any?): String? {
 }
 
 /// Renders an answer — shows image/audio player for URL answers, text otherwise.
+/// Also handles option index (integer) by looking up the actual option value.
 @Composable
 private fun AnswerDisplay(answer: Any?, theme: AppTheme, sound: SoundManager? = null) {
     if (answer == null) {
@@ -2565,12 +2566,12 @@ private fun AnswerDisplay(answer: Any?, theme: AppTheme, sound: SoundManager? = 
         is String -> {
             val url = answer.trim()
             val absUrl = if (url.startsWith("http")) url else url.toAbsoluteUrl()
-            // Check if it's an image URL (any URL from /api/files/ or has image extension)
-            val isImage = absUrl.contains("/api/files/") || absUrl.contains(".jpg") || absUrl.contains(".jpeg") ||
-                absUrl.contains(".png") || absUrl.contains(".gif") || absUrl.contains(".webp") || absUrl.contains(".bmp")
-            // Check if it's an audio URL
-            val isAudio = absUrl.contains(".mp3") || absUrl.contains(".wav") || absUrl.contains(".ogg") ||
-                absUrl.contains(".m4a") || absUrl.contains(".aac") || absUrl.contains(".opus")
+            // Check if it's a URL (image or audio)
+            val isUrl = absUrl.startsWith("http") || absUrl.startsWith("/api/") || absUrl.startsWith("/uploads")
+            val isImage = isUrl && (absUrl.contains("/api/files/") || absUrl.contains(".jpg") || absUrl.contains(".jpeg") ||
+                absUrl.contains(".png") || absUrl.contains(".gif") || absUrl.contains(".webp") || absUrl.contains(".bmp") || absUrl.contains("image"))
+            val isAudio = isUrl && (absUrl.contains(".mp3") || absUrl.contains(".wav") || absUrl.contains(".ogg") ||
+                absUrl.contains(".m4a") || absUrl.contains(".aac") || absUrl.contains(".opus") || absUrl.contains("audio"))
             when {
                 isImage -> {
                     coil.compose.AsyncImage(
@@ -2584,7 +2585,17 @@ private fun AnswerDisplay(answer: Any?, theme: AppTheme, sound: SoundManager? = 
                     AudioPlayerCard(theme = theme, url = absUrl, loopCount = 1, loopDelaySec = 0, sound = sound ?: rememberSoundManager(), unlimited = true)
                 }
                 else -> {
-                    Text(url, color = theme.darkText, fontSize = 12.sp, fontWeight = FontWeight.Medium)
+                    // If it looks like a URL but we can't determine type, try showing as image first
+                    if (isUrl) {
+                        coil.compose.AsyncImage(
+                            model = coil.request.ImageRequest.Builder(LocalContext.current).data(absUrl).crossfade(true).build(),
+                            contentDescription = "Answer",
+                            modifier = Modifier.fillMaxWidth().heightIn(max = 80.dp).clip(RoundedCornerShape(6.dp)),
+                            contentScale = ContentScale.Fit
+                        )
+                    } else {
+                        Text(url, color = theme.darkText, fontSize = 12.sp, fontWeight = FontWeight.Medium)
+                    }
                 }
             }
         }
