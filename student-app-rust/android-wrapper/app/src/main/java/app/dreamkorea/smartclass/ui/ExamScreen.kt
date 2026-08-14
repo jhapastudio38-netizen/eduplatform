@@ -867,10 +867,10 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
                         }
                         Spacer(Modifier.height(6.dp))
                     }
-                    // Media text — border fits text size, centered if small
+                    // Media text — border fits text size, left-aligned, nice
                     if (!q.mediaText.isNullOrBlank()) {
                         Surface(color = Color.White, shape = RoundedCornerShape(8.dp), border = androidx.compose.foundation.BorderStroke(1.5.dp, Color(0xFF333333)), modifier = Modifier.wrapContentWidth().align(Alignment.CenterHorizontally)) {
-                            Text(q.mediaText, color = Color(0xFF1E293B), fontSize = 18.sp, textAlign = TextAlign.Center, modifier = Modifier.padding(12.dp))
+                            Text(q.mediaText, color = Color(0xFF1E293B), fontSize = 18.sp, textAlign = TextAlign.Start, modifier = Modifier.padding(12.dp))
                         }
                         Spacer(Modifier.height(6.dp))
                     }
@@ -2554,8 +2554,8 @@ private fun formatAnswer(answer: Any?): String? {
     }
 }
 
-/// Renders an answer — shows image/audio player for URL answers, text otherwise.
-/// Also handles option index (integer) by looking up the actual option value.
+/// Renders an answer — shows image for image URLs, play button for audio URLs.
+/// Does NOT show the URL text — only the media itself.
 @Composable
 private fun AnswerDisplay(answer: Any?, theme: AppTheme, sound: SoundManager? = null) {
     if (answer == null) {
@@ -2566,14 +2566,16 @@ private fun AnswerDisplay(answer: Any?, theme: AppTheme, sound: SoundManager? = 
         is String -> {
             val url = answer.trim()
             val absUrl = if (url.startsWith("http")) url else url.toAbsoluteUrl()
-            // Check if it's a URL (image or audio)
             val isUrl = absUrl.startsWith("http") || absUrl.startsWith("/api/") || absUrl.startsWith("/uploads")
-            val isImage = isUrl && (absUrl.contains("/api/files/") || absUrl.contains(".jpg") || absUrl.contains(".jpeg") ||
-                absUrl.contains(".png") || absUrl.contains(".gif") || absUrl.contains(".webp") || absUrl.contains(".bmp") || absUrl.contains("image"))
             val isAudio = isUrl && (absUrl.contains(".mp3") || absUrl.contains(".wav") || absUrl.contains(".ogg") ||
                 absUrl.contains(".m4a") || absUrl.contains(".aac") || absUrl.contains(".opus") || absUrl.contains("audio"))
             when {
-                isImage -> {
+                // Audio URL → show play button only
+                isAudio -> {
+                    AudioPlayerCard(theme = theme, url = absUrl, loopCount = 1, loopDelaySec = 0, sound = sound ?: rememberSoundManager(), unlimited = true)
+                }
+                // Any other URL → show as image (don't show URL text)
+                isUrl -> {
                     coil.compose.AsyncImage(
                         model = coil.request.ImageRequest.Builder(LocalContext.current).data(absUrl).crossfade(true).build(),
                         contentDescription = "Answer image",
@@ -2581,21 +2583,9 @@ private fun AnswerDisplay(answer: Any?, theme: AppTheme, sound: SoundManager? = 
                         contentScale = ContentScale.Fit
                     )
                 }
-                isAudio -> {
-                    AudioPlayerCard(theme = theme, url = absUrl, loopCount = 1, loopDelaySec = 0, sound = sound ?: rememberSoundManager(), unlimited = true)
-                }
+                // Plain text answer → show text
                 else -> {
-                    // If it looks like a URL but we can't determine type, try showing as image first
-                    if (isUrl) {
-                        coil.compose.AsyncImage(
-                            model = coil.request.ImageRequest.Builder(LocalContext.current).data(absUrl).crossfade(true).build(),
-                            contentDescription = "Answer",
-                            modifier = Modifier.fillMaxWidth().heightIn(max = 80.dp).clip(RoundedCornerShape(6.dp)),
-                            contentScale = ContentScale.Fit
-                        )
-                    } else {
-                        Text(url, color = theme.darkText, fontSize = 12.sp, fontWeight = FontWeight.Medium)
-                    }
+                    Text(url, color = theme.darkText, fontSize = 12.sp, fontWeight = FontWeight.Medium)
                 }
             }
         }
