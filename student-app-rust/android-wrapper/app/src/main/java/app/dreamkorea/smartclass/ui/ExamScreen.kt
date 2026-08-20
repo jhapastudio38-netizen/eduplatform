@@ -450,6 +450,20 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
             // Answered/current question color — same blue as submit button
             val accentBlue = Color(0xFF1673E8)
 
+            // ─── SCROLL MODE ────────────────────────────────────────────────
+            // When the exam has more than 40 questions, the block grid would
+            // shrink too much if we kept the weight-based fill layout. Instead,
+            // we switch to a scrollable layout:
+            //   • The whole content area scrolls vertically (NOT just the grid).
+            //   • Blocks use a fixed minimum size so they stay readable.
+            //   • The Submit button naturally sits below the grid — the user
+            //     scrolls down to reach it.
+            // For ≤40 questions, we keep the current weight-based layout so
+            // blocks expand to fill available space (no shifting, no scroll).
+            val totalQuestionCount = sortedItems.size
+            val useScrollMode = totalQuestionCount > 40
+            val pageScrollState = rememberScrollState()
+
             // ── OUTER FRAME: 2px solid #222222, no radius, 18px margin ──
             Box(
                 modifier = Modifier
@@ -457,7 +471,11 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
                     .padding(sdp(18f))
                     .border(width = sdp(2f), color = Color(0xFF222222))
             ) {
-                Column(modifier = Modifier.fillMaxSize()) {
+                Column(
+                    modifier = if (useScrollMode)
+                        Modifier.fillMaxWidth().verticalScroll(pageScrollState)
+                    else Modifier.fillMaxSize()
+                ) {
                     // ══ 1. HEADER + NAV AREA (120px tall — compact so grids fit) ══
                     // Logo column (137px wide) spans BOTH header row (60px) and
                     // nav row (60px) on the left. Right side has 2 stacked rows.
@@ -586,12 +604,25 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
                     // ══ 3. QUESTION GRID PANELS ══
                     // Two rounded panels (3px #222 border, 18px radius) with
                     // 5×4 grid of question buttons inside each.
-                    // Panels use weight(1f) to fill all remaining vertical space.
+                    // Panels use weight(1f) to fill all remaining vertical space
+                    // when total ≤ 40 questions. When > 40, panels use
+                    // wrapContentHeight so blocks stay at a readable fixed size
+                    // and the parent Column scrolls vertically.
                     if (isQBank) {
-                        Column(modifier = Modifier.weight(1f).fillMaxWidth().padding(horizontal = sdp(18f), vertical = sdp(4f))) {
+                        Column(
+                            modifier = Modifier
+                                .then(
+                                    if (useScrollMode) Modifier.fillMaxWidth().wrapContentHeight()
+                                    else Modifier.weight(1f).fillMaxWidth()
+                                )
+                                .padding(horizontal = sdp(18f), vertical = sdp(4f))
+                        ) {
                             Box(
                                 modifier = Modifier
-                                    .weight(1f).fillMaxWidth()
+                                    .then(
+                                        if (useScrollMode) Modifier.fillMaxWidth().wrapContentHeight()
+                                        else Modifier.weight(1f).fillMaxWidth()
+                                    )
                                     .border(sdp(3f), Color(0xFF222222), RoundedCornerShape(sdp(18f)))
                                     .padding(sdp(8f))
                             ) {
@@ -606,7 +637,8 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
                                     filterMode = filterMode,
                                     scale = scale,
                                     showAllBlocks = showAllBlocks,
-                                    accentBlue = accentBlue
+                                    accentBlue = accentBlue,
+                                    scrollable = useScrollMode,
                                 ) { idx ->
                                     currentIdx = idx
                                     showGrid = false
@@ -616,14 +648,19 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
                     } else {
                         // Exam: Reading LEFT | Listening RIGHT
                         Row(
-                            modifier = Modifier.weight(1f).fillMaxWidth().padding(horizontal = sdp(18f), vertical = sdp(4f)),
+                            modifier = Modifier
+                                .then(
+                                    if (useScrollMode) Modifier.fillMaxWidth().wrapContentHeight()
+                                    else Modifier.weight(1f).fillMaxWidth()
+                                )
+                                .padding(horizontal = sdp(18f), vertical = sdp(4f)),
                             horizontalArrangement = Arrangement.spacedBy(sdp(18f))
                         ) {
                             // Reading panel
                             Box(
                                 modifier = Modifier
                                     .weight(1f)
-                                    .fillMaxHeight()
+                                    .then(if (useScrollMode) Modifier.wrapContentHeight() else Modifier.fillMaxHeight())
                                     .border(sdp(3f), Color(0xFF222222), RoundedCornerShape(sdp(18f)))
                                     .padding(sdp(8f))
                             ) {
@@ -638,7 +675,8 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
                                     filterMode = filterMode,
                                     scale = scale,
                                     showAllBlocks = showAllBlocks,
-                                    accentBlue = accentBlue
+                                    accentBlue = accentBlue,
+                                    scrollable = useScrollMode,
                                 ) { idx ->
                                     currentIdx = idx
                                     showGrid = false
@@ -648,7 +686,7 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
                             Box(
                                 modifier = Modifier
                                     .weight(1f)
-                                    .fillMaxHeight()
+                                    .then(if (useScrollMode) Modifier.wrapContentHeight() else Modifier.fillMaxHeight())
                                     .border(sdp(3f), Color(0xFF222222), RoundedCornerShape(sdp(18f)))
                                     .padding(sdp(8f))
                             ) {
@@ -663,7 +701,8 @@ fun ExamScreen(theme: AppTheme, testId: String, onExit: () -> Unit) {
                                     filterMode = filterMode,
                                     scale = scale,
                                     showAllBlocks = showAllBlocks,
-                                    accentBlue = accentBlue
+                                    accentBlue = accentBlue,
+                                    scrollable = useScrollMode,
                                 ) { idx ->
                                     currentIdx = idx
                                     showGrid = false
@@ -1055,6 +1094,12 @@ private fun SectionHeader(label: String, sdp: (Float) -> Dp, ssp: (Float) -> Tex
 /// - 3px border #222222, 36sp numbers, NO rounded corners (square)
 /// - globalIndices maps items → sortedItems (NOT test.items), because
 ///   currentIdx indexes into sortedItems.
+///
+/// When scrollable=true (used when total questions > 40), rows use a fixed
+/// minimum height (~80dp scaled) instead of weight-based fill. This keeps
+/// blocks readable when there are many — the parent Column scrolls instead.
+/// When scrollable=false (≤40 questions), rows use weight(1f) so blocks
+/// expand to fill the panel — no shifting, no internal scroll.
 @Composable
 private fun QuestionGridScaled(
     items: List<TestItemDetail>,
@@ -1068,6 +1113,7 @@ private fun QuestionGridScaled(
     scale: Float,
     showAllBlocks: Boolean,
     accentBlue: Color,
+    scrollable: Boolean = false,
     onPick: (Int) -> Unit,
 ) {
     val sdp: (Float) -> Dp = { v -> (v * scale).dp }
@@ -1088,19 +1134,21 @@ private fun QuestionGridScaled(
     }
     val rowsCount = (expectedTotal + cols - 1) / cols
 
-    // NO verticalScroll — all 4 rows must fit on screen.
-    // Each Row uses weight(1f) so 4 rows share the vertical space equally.
-    // Buttons use weight(1f) for width and fillMaxHeight() so they fill
-    // available space without forcing square aspect ratio.
+    // In scroll mode, each row has a fixed min height so blocks stay readable.
+    // In fill mode (≤40), rows use weight(1f) to share vertical space equally.
+    val rowHeight = sdp(80f)  // fixed min height per row when scrollable
+
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .fillMaxHeight(),
+            .then(if (scrollable) Modifier.wrapContentHeight() else Modifier.fillMaxHeight()),
         verticalArrangement = Arrangement.spacedBy(sdp(6f))
     ) {
         for (rowIdx in 0 until rowsCount) {
             Row(
-                modifier = Modifier.fillMaxWidth().weight(1f),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .then(if (scrollable) Modifier.heightIn(min = rowHeight) else Modifier.weight(1f)),
                 horizontalArrangement = Arrangement.spacedBy(sdp(6f))
             ) {
                 for (colIdx in 0 until cols) {

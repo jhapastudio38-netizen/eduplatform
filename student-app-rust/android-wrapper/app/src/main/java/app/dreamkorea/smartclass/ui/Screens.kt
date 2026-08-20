@@ -403,33 +403,39 @@ fun HomeScreen(theme: AppTheme, sound: SoundManager, userName: String, onNavigat
 
     val effectiveCards = remember(homeCards, loading) {
         if (loading) emptyList()
-        else if (homeCards.isNotEmpty()) {
-            // Merge server cards with guaranteed QBank + Batch cards
-            val serverKeys = homeCards.map { it.key }.toSet()
-            val serverRoutes = homeCards.map { it.route }.toSet()
-            val extras = mutableListOf<HomeCard>()
-            // Only add QBank card if server doesn't have one (by key OR by route)
-            if (!serverKeys.contains("qbank_packages") && !serverRoutes.contains("questionbank")) {
-                extras.add(HomeCard(key = "qbank_packages", title = "Question Bank", section = "test", sortOrder = 99, route = "questionbank", imageUrl = ""))
+        else {
+            // ─── Deduplicate Batch + Question Bank entries ───────────────────
+            // The admin may have multiple Batch / Question Bank cards configured
+            // server-side (e.g. legacy entries with different keys/routes). We
+            // collapse them into ONE "Batch" entry that opens the unified
+            // BatchManager (BundlesScreen with kind=batch) which already shows
+            // admin-curated batches containing both exams and question banks.
+            val batchKeys = setOf("batch", "batch_packages", "qbank_packages", "question_bank", "questionbank")
+            val batchRoutes = setOf("batch", "questionbank", "batch_packages", "qbank_packages")
+            val seenBatch = mutableSetOf<String>()
+            val deduped = homeCards.filter { c ->
+                val isBatchLike = c.key in batchKeys || c.route in batchRoutes
+                if (isBatchLike) {
+                    // Keep only the FIRST batch-like card; replace its title/route
+                    // so it always opens the unified BatchManager.
+                    if (seenBatch.isNotEmpty()) false
+                    else { seenBatch.add(c.key); true }
+                } else true
+            }.map { c ->
+                // Force the kept batch-like card to open the unified BatchManager
+                if (c.key in batchKeys || c.route in batchRoutes) {
+                    c.copy(title = "Batch", route = "batch_manager", key = "batch_manager", sortOrder = 3)
+                } else c
             }
-            // Only add Batch card if server doesn't have one (by key OR by route)
-            if (!serverKeys.contains("batch_packages") && !serverRoutes.contains("batch")) {
-                extras.add(HomeCard(key = "batch_packages", title = "Batch", section = "test", sortOrder = 100, route = "batch", imageUrl = ""))
-            }
-            homeCards + extras
-        } else listOf(
-            HomeCard(key = "ubt_test", title = "UBT Test", section = "test", sortOrder = 0, route = "tests", imageUrl = ""),
-            HomeCard(key = "demo_exam", title = "Demo Exam", section = "test", sortOrder = 1, route = "tests", imageUrl = ""),
-            HomeCard(key = "qbank_packages", title = "Question Bank", section = "test", sortOrder = 2, route = "questionbank", imageUrl = ""),
-            HomeCard(key = "batch_packages", title = "Batch", section = "test", sortOrder = 3, route = "batch", imageUrl = ""),
-            HomeCard(key = "results", title = "Results", section = "test", sortOrder = 5, route = "results", imageUrl = ""),
-            HomeCard(key = "all_books", title = "Books", section = "resources", sortOrder = 0, route = "books", imageUrl = ""),
-            HomeCard(key = "eye_vision", title = "Eye Vision", section = "resources", sortOrder = 2, route = "eyevision", imageUrl = ""),
-            HomeCard(key = "dictionary", title = "Dictionary", section = "resources", sortOrder = 4, route = "dictionary", imageUrl = ""),
-            HomeCard(key = "grammar", title = "Grammar", section = "resources", sortOrder = 5, route = "grammar", imageUrl = ""),
-            HomeCard(key = "alarms", title = "Alarms", section = "resources", sortOrder = 6, route = "alarms", imageUrl = ""),
-            HomeCard(key = "join", title = "Join Live", section = "resources", sortOrder = 3, route = "join", imageUrl = "")
-        )
+
+            // Always guarantee ONE Batch card if none exists yet
+            val hasBatch = deduped.any { it.key == "batch_manager" }
+            val withBatch = if (hasBatch) deduped else deduped + HomeCard(
+                key = "batch_manager", title = "Batch", section = "test",
+                sortOrder = 3, route = "batch_manager", imageUrl = ""
+            )
+            withBatch
+        }
     }
 
     if (loading) {
@@ -509,7 +515,7 @@ fun HomeScreen(theme: AppTheme, sound: SoundManager, userName: String, onNavigat
                 QuickAccessBtn("Books", WarningOrange, Icons.Default.Book) { onNavigate(Screen.Books) }
                 QuickAccessBtn("Eye Test", AccentPurple, Icons.Default.Visibility) { onNavigate(Screen.EyeVision) }
                 if (isLandscape) {
-                    QuickAccessBtn("QBank", AccentPink, Icons.Default.Quiz) { onNavigate(Screen.QuestionBank) }
+                    // Only ONE Batch quick-access button — opens unified BatchManager
                     QuickAccessBtn("Batch", Color(0xFFEF6C00), Icons.Default.Layers) { onNavigate(Screen.BundleList("batch")) }
                 }
             }
@@ -560,16 +566,24 @@ fun HomeScreen(theme: AppTheme, sound: SoundManager, userName: String, onNavigat
                                 val dest = when (card.key) {
                                     "ubt_test" -> Screen.UbtTest
                                     "demo_exam" -> Screen.FreeExam
-                                    "batch" -> Screen.Batch
+                                    // ─── Unified Batch Manager ───────────────────────
+                                    // All batch / question-bank keys now open the SAME
+                                    // screen: BundlesScreen with kind="batch". The admin
+                                    // curates batches there, each batch contains exams
+                                    // and question banks.
+                                    "batch" -> Screen.BundleList("batch")
                                     "batch_packages" -> Screen.BundleList("batch")
-                                    "qbank_packages" -> Screen.QuestionBank
+                                    "qbank_packages" -> Screen.BundleList("batch")
+                                    "question_bank" -> Screen.BundleList("batch")
+                                    "batch_manager" -> Screen.BundleList("batch")
                                     "chapter_exam" -> Screen.TestList("chapter", "Chapter Exams")
                                     "results" -> Screen.Results
                                     else -> when (card.route) {
                                         "tests" -> Screen.Tests
                                         "results" -> Screen.Results
                                         "batch" -> Screen.BundleList("batch")
-                                        "questionbank" -> Screen.QuestionBank
+                                        "questionbank" -> Screen.BundleList("batch")
+                                        "batch_manager" -> Screen.BundleList("batch")
                                         else -> Screen.Tests
                                     }
                                 }
@@ -601,9 +615,12 @@ fun HomeScreen(theme: AppTheme, sound: SoundManager, userName: String, onNavigat
                             HomeCardItem(theme, sound, card, modifier = Modifier.weight(1f)) {
                                 val dest = when (card.key) {
                                     "all_books" -> Screen.Books
-                                    "question_bank" -> Screen.QuestionBank
-                                    "qbank_packages" -> Screen.QuestionBank
+                                    // Resources section: also unify any stray Batch / QBank
+                                    // routes to the single BatchManager.
+                                    "question_bank" -> Screen.BundleList("batch")
+                                    "qbank_packages" -> Screen.BundleList("batch")
                                     "batch_packages" -> Screen.BundleList("batch")
+                                    "batch_manager" -> Screen.BundleList("batch")
                                     "eye_vision" -> Screen.EyeVision
                                     "dictionary" -> Screen.Dictionary
                                     "grammar" -> Screen.Grammar
@@ -622,7 +639,8 @@ fun HomeScreen(theme: AppTheme, sound: SoundManager, userName: String, onNavigat
                                         "dictionary" -> Screen.Dictionary
                                         "grammar" -> Screen.Grammar
                                         "alarms" -> Screen.Alarms
-                                        "questionbank" -> Screen.QuestionBank
+                                        "questionbank" -> Screen.BundleList("batch")
+                                        "batch_manager" -> Screen.BundleList("batch")
                                         "packages" -> Screen.Bundles
                                         "join" -> Screen.Join
                                         else -> Screen.Tests
